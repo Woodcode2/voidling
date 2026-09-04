@@ -58,7 +58,7 @@ export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' 
   // hundred balloons come to it. All nine are new words, so like Powder Pass
   // there is no boundary rename — what skRegionAt says is what ./life and
   // ./prototype3d key off, which is the only arrangement that cannot drift.
-  | 'circle' | 'runway' | 'perimeter' | 'launchfield' | 'arrivals'
+  | 'circle' | 'runway' | 'slab' | 'perimeter' | 'launchfield' | 'arrivals'
   | 'tower' | 'hangars' | 'breakfast' | 'meadow';
 // RETIRED on Maple: 'military' (the army base served a defence layer that was
 // deleted from the game), 'airport', 'zoo' and 'fancy'. The literals stay in
@@ -2127,9 +2127,10 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     // launch field is null because it is grass like the rest and its interest
     // is the ninety objects lying on it; and the launch circle is null because
     // it is PAINTED — a white ring on the concrete, drawn in the bake.
-    runway: 0xa9a6b4,       // pale grey-lilac concrete, dew still on it
+    runway: 0xa9a6b4,       // pale grey-lilac concrete, dew still on it — 03/21, the live one
+    slab: 0x8c8b84,         // 09/27 and 15/33, DISUSED: cracked, weathered, grass through the joints
     perimeter: 0x8e8a86,    // cracked tarmac, older and darker than the strips
-    arrivals: 0x76856a,     // the wet grass the trailers have parked on
+    arrivals: 0x9d9a92,     // the hardstanding at the east end of 09/27 the trailers park on
     tower: 0xb3b0a6,        // the apron slab in front of the tower
     hangars: 0x9c988e,      // hangar standing, oil-darkened
     breakfast: 0xa39d8c,    // the old taxiway spur the vans park along
@@ -5818,17 +5819,22 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
 
     await breathe('Filling the balloons…');
 
-    // 3. THE ARRIVALS FIELD — trailers nose-in on the wet grass, tailgates
-    //    down. The spawn is here and it looks straight up 03 at the whale, so
-    //    the trailers are laid in a row rather than scattered: this is the
-    //    first thing a child ever sees of this world.
+    // 3. THE ARRIVALS FIELD — trailers nose-in on the hardstanding at the east
+    //    end of the disused 09/27 slab, tailgates down. The spawn is here and
+    //    the whale is 5.4 degrees off the camera's centreline, dead ahead down
+    //    the old runway, so the trailers are laid in a ROW ALONG THE SLAB — a
+    //    line of tailgates across the frame with the whale beyond them: this
+    //    is the first thing a child ever sees of this world. (It was wet grass
+    //    on the south-west arm, with the whale out of frame; brief §3A.)
     {
       const R = REG('arrivals');
-      const ux = Math.sin((30 * Math.PI) / 180), uy = -Math.cos((30 * Math.PI) / 180);
-      const vx = -uy, vy = ux;
+      // the row runs along 09/27 (east-west); the noses point at the whale
+      const vx = 1, vy = 0;
       let cx = 0, cy = 0;
       for (const [px, py] of R.poly) { cx += px; cy += py; }
       cx /= R.poly.length; cy /= R.poly.length;
+      const tl = Math.hypot(SK.LAUNCH.cx - cx, SK.LAUNCH.cy - cy);
+      const ux = (SK.LAUNCH.cx - cx) / tl, uy = (SK.LAUNCH.cy - cy) / tl;
       for (let i = -4; i <= 4; i++) {
         const p2: SK.Pt = [cx + vx * i * 300, cy + vy * i * 300];
         if (!SK.pointInPoly(p2[0], p2[1], R.poly) || !SK.skPlaceable(p2[0], p2[1], 40)) continue;

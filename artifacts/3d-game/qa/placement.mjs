@@ -210,7 +210,11 @@ function worldData(wid) {
     // here is the FULL half-width, not a core. Anything standing on the
     // concrete is a defect, with two authored exceptions the world places by
     // hand and tags: the threshold numerals and the edge lights.
-    for (const n of ['RWY03', 'RWY09', 'RWY15']) {
+    // …ONE strip, since the rebuild. 09/27 and 15/33 are disused slab now —
+    // half 260, cracked, and PLACEABLE by design (skylark.ts, RUNWAYS[].live)
+    // — so a prop standing on them is a prop on the ground, not on a road.
+    // Only the live runway is a sightline the audit keeps clear.
+    for (const n of ['RWY03']) {
       d.roads.push({ name: n, pts: P(pts(n, s)),
         half: w3len(num(new RegExp(`export const ${n}_HALF = (\\d+);`), s, `${n}_HALF`)), kind: 'road' });
     }

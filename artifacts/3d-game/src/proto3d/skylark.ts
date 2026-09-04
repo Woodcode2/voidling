@@ -78,19 +78,40 @@ export const distToEdge = (x: number, y: number): number => distToPath(x, y, SK_
 // player is 360 world units of radius against a 1,000-wide strip, so a maxed
 // WORLD ENDER still fits on it with room either side. It is the only surface in
 // the game wider than the player, and that is what makes it read as a runway.
-export const RWY03: Pt[] = [[3560, 8760], [7022, 2765]];   // 03/21, true 030
+//
+// …FOR ONE RUNWAY. The paragraph above was applied to all three and the sum
+// did not survive measurement: three 1,000-wide strips plus the perimeter ring
+// took 59.0% of this island out of play — 3.7x the next-worst world, usable
+// ground half of Lantern's, in seventeen disconnected pieces (the round-6
+// rebuild brief §1). The design doc had already said it: "half the island is
+// pavement… keep ONE hero runway at full width and make the other two disused
+// broken slab with grass through it." So 03/21 — the strip that points from
+// arrivals at the whale — keeps 500. 09/27 and 15/33 are DISUSED: half 260,
+// which is POWDER's piste figure, drawn as cracked slab, and PLACEABLE. A
+// derelict runway with its numbers still painted on it is better dressing than
+// a clean one, and it is ten million square units of ground. Measured on the
+// real coast: placeable 41.0% -> 61.5%, seven pieces instead of seventeen.
+export const RWY03: Pt[] = [[3560, 8760], [7022, 2765]];   // 03/21, true 030 — THE LIVE RUNWAY
 export const RWY03_HALF = 500;
-export const RWY09: Pt[] = [[3400, 5750], [8875, 5750]];   // 09/27, true 090
-export const RWY09_HALF = 500;
-export const RWY15: Pt[] = [[5100, 2600], [8900, 9200]];   // 15/33, true 150
-export const RWY15_HALF = 500;
-export const RUNWAYS: { name: string; pts: Pt[]; half: number }[] = [
-  { name: '03/21', pts: RWY03, half: RWY03_HALF },
-  { name: '09/27', pts: RWY09, half: RWY09_HALF },
-  { name: '15/33', pts: RWY15, half: RWY15_HALF },
+export const RWY09: Pt[] = [[3400, 5750], [8875, 5750]];   // 09/27, true 090 — disused slab
+export const RWY09_HALF = 260;
+export const RWY15: Pt[] = [[5100, 2600], [8900, 9200]];   // 15/33, true 150 — disused slab
+export const RWY15_HALF = 260;
+export const RUNWAYS: { name: string; pts: Pt[]; half: number; live: boolean }[] = [
+  { name: '03/21', pts: RWY03, half: RWY03_HALF, live: true },
+  { name: '09/27', pts: RWY09, half: RWY09_HALF, live: false },
+  { name: '15/33', pts: RWY15, half: RWY15_HALF, live: false },
 ];
+/** the one strip that is still a runway — the sightline, kept clear */
+export const LIVE_RUNWAYS = RUNWAYS.filter((r) => r.live);
+/** the two that are slab now — cracked concrete a crew can park on */
+export const SLABS = RUNWAYS.filter((r) => !r.live);
+/** on the LIVE runway — the sightline, the strip a child sees the whale down */
 export const onRunway = (wx: number, wy: number): boolean =>
-  RUNWAYS.some((r) => distToPath(wx, wy, r.pts) <= r.half);
+  LIVE_RUNWAYS.some((r) => distToPath(wx, wy, r.pts) <= r.half);
+/** on either DISUSED strip — cracked slab, placeable, parked on */
+export const onSlab = (wx: number, wy: number): boolean =>
+  SLABS.some((r) => distToPath(wx, wy, r.pts) <= r.half);
 
 // ── the perimeter track ────────────────────────────────────────────────────
 // Cracked tarmac, once the fire road, now the marshals' beat. CLOSED: the last
@@ -102,7 +123,7 @@ export const PERIMETER: Pt[] = [
   [2696,7074], [2980,6318], [3433,5730], [3905,5319], [4286,5010], [4533,4679], [4626,4108],
   [4802,3308], [5268,2557], [6000,2203],
 ];
-export const PERIMETER_HALF = 200;
+export const PERIMETER_HALF = 170;   // was 200; 170 is what bay.ts and gameday.ts settled on after 300 read as a plaza
 export const onPerimeter = (wx: number, wy: number): boolean =>
   distToPath(wx, wy, PERIMETER) <= PERIMETER_HALF;
 
@@ -118,7 +139,7 @@ export const inLaunchCircle = (wx: number, wy: number): boolean =>
   ((wx - LAUNCH.cx) / LAUNCH.rx) ** 2 + ((wy - LAUNCH.cy) / LAUNCH.ry) ** 2 <= 1;
 
 // ── the districts ──────────────────────────────────────────────────────────
-export type SkBiome = 'circle' | 'runway' | 'perimeter' | 'launchfield'
+export type SkBiome = 'circle' | 'runway' | 'slab' | 'perimeter' | 'launchfield'
   | 'arrivals' | 'tower' | 'hangars' | 'breakfast' | 'meadow';
 
 export interface SkRegion { id: SkBiome; name: string; poly: Pt[]; density: number; }
@@ -143,13 +164,19 @@ export const SK_REGIONS: SkRegion[] = [
            [8200, 7750], [8000, 8550], [7350, 9050], [6400, 9250], [5400, 9150],
            [4700, 8750], [4300, 8000], [4250, 7200]] },
 
-  // THE ARRIVALS FIELD. Wet grass at the 21 threshold on the south-west arm:
-  // trailers nose-in, tailgates down, envelopes half-dragged out of their bags,
-  // a ticket caravan with one bulb on. The spawn is here, and it looks straight
-  // up the runway at a whale.
+  // THE ARRIVALS FIELD. It was wet grass on the south-west arm, and it was on
+  // the wrong side of the whale for a camera whose bearing never changes: the
+  // land survey measured her 66.6 degrees off the optical centreline the
+  // instant controls went live, out of frame at every phone aspect, and the
+  // child's first playable frame as 71% grass and tarmac with the arrivals
+  // field itself at 0.0% of the screen. So arrivals moved to the EAST END OF
+  // THE DISUSED 09/27 SLAB — which is where a real meet parks its trailers,
+  // on the hardstanding — and from here she is 5.4 degrees off-axis at 110
+  // units, dead ahead down the old runway. Trailers nose-in along the slab,
+  // tailgates down, envelopes half-dragged out of their bags, a ticket caravan
+  // with one bulb on.
   { id: 'arrivals', name: 'THE ARRIVALS FIELD', density: 1.1,
-    poly: [[2950, 6600], [3700, 6450], [4250, 6700], [4400, 7400], [4300, 8100],
-           [3950, 8500], [3300, 8500], [2900, 8000], [2800, 7300]] },
+    poly: [[7000, 5300], [8250, 5300], [8500, 5750], [8250, 6200], [7000, 6200], [6850, 5750]] },
 
   // THE TOWER. The preserved control tower on the south-east shoulder,
   // checkerboard-painted by volunteers every spring, with the met hut, the
@@ -196,7 +223,12 @@ export const SK_REGIONS: SkRegion[] = [
  *  chosen by a search over the arrivals polygon that weighs BOTH: 662 units
  *  clear of the nearest strip, 1,345 in from the coast, 902 from the 21
  *  threshold so the runway still runs away from the child toward the whale. */
-export const SK_SPAWN: Pt = [4440, 8560];
+// …and all three of those numbers were measured from a spawn that resolved to
+// THE ROUGH — 408 units outside the arrivals polygon three comments said it was
+// in, with the whale out of frame. The spawn is on the arrivals hardstanding
+// now, and the check that should always have existed — skRegionAt(spawn) ===
+// 'arrivals' — is qa/airfield.mjs section D.
+export const SK_SPAWN: Pt = [7800, 5750];
 
 /** Bearing from (wx,wy) to the launch circle. Everything that can face
  *  something — the passengers, the commentary trestle, the parked spectator
@@ -215,6 +247,10 @@ export function skRegionAt(wx: number, wy: number): SkBiome | null {
   if (onRunway(wx, wy)) return 'runway';
   if (onPerimeter(wx, wy)) return 'perimeter';
   for (const r of SK_REGIONS) if (r.id !== 'circle' && pointInPoly(wx, wy, r.poly)) return r.id;
+  // the disused strips come AFTER the districts, so the arrivals hardstanding
+  // laid over the east end of 09/27 is arrivals, and what is left of the two
+  // old runways outside any district is slab
+  if (onSlab(wx, wy)) return 'slab';
   return 'meadow';
 }
 
@@ -226,7 +262,8 @@ export function skRegionAt(wx: number, wy: number): SkBiome | null {
 export function skPlaceable(wx: number, wy: number, clear = 40): boolean {
   if (!onSkylarkLand(wx, wy)) return false;
   if (inLaunchCircle(wx, wy)) return false;
-  for (const r of RUNWAYS) if (distToPath(wx, wy, r.pts) < r.half + clear) return false;
+  // only the LIVE runway is a sightline. The two disused slabs are ground.
+  for (const r of LIVE_RUNWAYS) if (distToPath(wx, wy, r.pts) < r.half + clear) return false;
   if (distToPath(wx, wy, PERIMETER) < PERIMETER_HALF + clear) return false;
   return true;
 }

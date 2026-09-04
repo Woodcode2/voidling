@@ -273,6 +273,10 @@ const SUITE = [
     cmd: ['node', 'qa/worldreg.mjs'], verdict: pf,
     why: 'every per-world table knows every world the game renders — a missing row is never a crash, it is a silent `?? maple` and a world quietly running on another world\'s numbers' },
 
+  { id: 'skyland', tier: 'quality', profiles: ['push', 'live'], timeout: 90,
+    cmd: ['node', 'qa/skyland.mjs'], verdict: pf,
+    why: 'SKYLARK FIELD has ground to stand on — placeable >= 56% (shipped 41%), the child spawns in arrivals (shipped: the rough), and the whale is inside the fixed camera\'s frame when controls go live (shipped: 66 degrees out of it)' },
+
   { id: 'airfield', tier: 'quality', profiles: ['push', 'live'], timeout: 30,
     cmd: ['node', 'qa/airfield.mjs'], verdict: pf,
     why: 'SKYLARK FIELD is a real airfield — runway designators match their headings, the perimeter closes, the launch circle sits on the true crossing, spawn is off the strips and every district has room to stand in' },

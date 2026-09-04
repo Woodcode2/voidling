@@ -39,6 +39,10 @@ const PERIMETER = arr('PERIMETER');
 const SPAWN = (() => { const m = /export const SK_SPAWN: Pt = \[(\d+), (\d+)\]/.exec(src); return [Number(m[1]), Number(m[2])]; })();
 const LAUNCH = (() => { const m = /export const LAUNCH = \{ cx: (\d+), cy: (\d+), rx: (\d+), ry: (\d+) \}/.exec(src); return { cx: +m[1], cy: +m[2], rx: +m[3], ry: +m[4] }; })();
 const RWY = [['03/21', arr('RWY03'), num('RWY03_HALF')], ['09/27', arr('RWY09'), num('RWY09_HALF')], ['15/33', arr('RWY15'), num('RWY15_HALF')]];
+// which strips are LIVE, read off the RUNWAYS literal rather than assumed: the
+// rebuild made 09/27 and 15/33 disused slab a crew can park on, and the spawn
+// now stands on one of them by design
+const LIVE = new Set([...src.matchAll(/name: '([0-9/]+)'[^}]*live: (true|false)/g)].filter(([, , l]) => l === 'true').map(([, n]) => n));
 
 const inside = (px, py, P) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) c = !c; } return c; };
 const dEdge = (px, py, P) => { let m = Infinity; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [x1, y1] = P[j], [x2, y2] = P[i]; const dx = x2 - x1, dy = y2 - y1; const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy || 1))); m = Math.min(m, Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy))); } return m; };
@@ -95,8 +99,8 @@ ok(clear(LAUNCH.cx, LAUNCH.cy) >= LAUNCH.rx, `the whole ${LAUNCH.rx * 2}-wide ci
 console.log('\nD. the spawn is somewhere a child can actually stand');
 ok(inside(SPAWN[0], SPAWN[1], LAND), `it is on the island (${SPAWN})`);
 ok(clear(SPAWN[0], SPAWN[1]) > 300, `it is ${clear(SPAWN[0], SPAWN[1]).toFixed(0)} from the coast, not teetering on the rim`);
-const onRwy = RWY.some(([, pts, half]) => { const [a, b] = [pts[0], pts[pts.length - 1]]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]); const t = Math.max(0, Math.min(1, ((SPAWN[0] - a[0]) * (b[0] - a[0]) + (SPAWN[1] - a[1]) * (b[1] - a[1])) / (L * L))); return Math.hypot(SPAWN[0] - (a[0] + t * (b[0] - a[0])), SPAWN[1] - (a[1] + t * (b[1] - a[1]))) <= half; });
-ok(!onRwy, 'it is on the grass, not in the middle of a runway');
+const onRwy = RWY.filter(([n]) => LIVE.has(n)).some(([, pts, half]) => { const [a, b] = [pts[0], pts[pts.length - 1]]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]); const t = Math.max(0, Math.min(1, ((SPAWN[0] - a[0]) * (b[0] - a[0]) + (SPAWN[1] - a[1]) * (b[1] - a[1])) / (L * L))); return Math.hypot(SPAWN[0] - (a[0] + t * (b[0] - a[0])), SPAWN[1] - (a[1] + t * (b[1] - a[1]))) <= half; });
+ok(!onRwy, `it is off the live runway (${[...LIVE].join(', ')}); the disused slabs are ground`);
 
 console.log('\nE. every district is on the island');
 const regions = [...src.matchAll(/\{ id: '([a-z]+)', name: '([^']+)', density: ([\d.]+),\s*poly: (\[[\s\S]*?\]) \}/g)];
@@ -121,9 +125,10 @@ for (const [, id, name, , polyTxt] of regions) {
 console.log('\nF. every district has room for the things it is supposed to hold');
 const dPath = (px, py, P) => { let m = Infinity; for (let i = 1; i < P.length; i++) { const [x1, y1] = P[i - 1], [x2, y2] = P[i]; const dx = x2 - x1, dy = y2 - y1; const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy || 1))); m = Math.min(m, Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy))); } return m; };
 const placeable = (x, y, clear = 30) => {
+  // only the LIVE runway is an exclusion; the disused slabs are ground (same rule as skPlaceable)
   if (!inside(x, y, LAND)) return false;
   if (((x - LAUNCH.cx) / LAUNCH.rx) ** 2 + ((y - LAUNCH.cy) / LAUNCH.ry) ** 2 <= 1) return false;
-  for (const [, pts, half] of RWY) if (dPath(x, y, pts) < half + clear) return false;
+  for (const [, pts, half] of RWY.filter(([n]) => LIVE.has(n))) if (dPath(x, y, pts) < half + clear) return false;
   if (dPath(x, y, PERIMETER) < halfP + clear) return false;
   return true;
 };
