@@ -1041,6 +1041,22 @@ function remember(raw: string, filled: string): void {
   history.push(filled); if (history.length > HISTORY) history.shift();
 }
 
+/** THE DRONE — which is the owner's actual complaint about "the style", stated
+ *  as a property of the SEQUENCE rather than of any line. Four cards in a row
+ *  opening on the same word read as a metronome however good each one is, and
+ *  no picker in this game has ever looked at the previous card's first word.
+ *  qa/newsfeed.mjs caught it on a seeded run of a world nobody had touched:
+ *  "The rulebook…", "The dog…", "The band…", "The smoker…", back to back.
+ *  This is a PREFERENCE, not a rule — the re-roll below gives up after its
+ *  budget and takes the line anyway — so a thin pool can still repeat an
+ *  opener. It just cannot drone while anything else is available. */
+const opener = (s: string): string => (s.split(/\s+/)[0] || '').replace(/[^A-Za-z']/g, '').toLowerCase();
+function droning(filled: string): boolean {
+  const w = opener(filled);
+  if (!w || history.length < 2) return false;
+  return opener(history[history.length - 1]) === w && opener(history[history.length - 2]) === w;
+}
+
 /**
  * false until the booth has said good afternoon. The FIRST pickGamedayNews()
  * call of a match always returns the sign-on and nothing else can jump ahead of
@@ -1130,7 +1146,11 @@ const clampTier = (t: number): NewsTier => (t <= 0 ? 0 : t >= 2 ? 2 : 1);
  *  anti-repeat memory as everything else, and the same hard ticker clip. */
 function drawPlain(pool: string[], rnd: () => number): string {
   const fresh = pool.filter((l) => !rawHistory.includes(l));
-  const src = fresh.length ? fresh : pool;
+  let src = fresh.length ? fresh : pool;
+  // phase 0 is the pool a child meets FIRST in every match, so it is the last
+  // place a metronome belongs — same preference the tiered pick applies.
+  const varied = src.filter((l) => !droning(l));
+  if (varied.length) src = varied;
   const raw = src[Math.floor(rnd() * src.length) % src.length] ?? pool[0];
   const out = clip(raw, TICKER_MAX);
   remember(raw, out);
@@ -1210,7 +1230,7 @@ export function pickGamedayNews(ctx: GamedayCtx, rnd: () => number = Math.random
   // finished string, so numbers alone can't disguise a repeat. An overlong
   // fill (a very wordy lastMeal) is treated as a miss and re-rolled too.
   const stale = (r: string, o: string): boolean =>
-    rawHistory.includes(r) || history.includes(o) || o.length > TICKER_MAX;
+    rawHistory.includes(r) || history.includes(o) || o.length > TICKER_MAX || droning(o);
 
   let raw = chooseRaw();
   let out = fill(raw, b);

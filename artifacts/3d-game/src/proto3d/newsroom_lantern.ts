@@ -570,11 +570,24 @@ let signedOff = false;   // the tower has said goodnight; it does not come back
  *  They are not now. */
 const RECENT_MAX = 14;
 let recent: string[] = [];
+/** THE DRONE — the owner's complaint about "the style", stated as a property of
+ *  the SEQUENCE rather than of any line: four cards in a row opening on the
+ *  same word read as a metronome however good each one is. `recent` cannot see
+ *  it, because it holds raw TEMPLATES and a template can begin with a token, so
+ *  the opening word has to be taken off the finished line as it goes out. */
+const openers: string[] = [];
+const opener = (s: string): string => (s.split(/\s+/)[0] || '').replace(/[^A-Za-z']/g, '').toLowerCase();
+const droning = (filled: string): boolean => {
+  const w = opener(filled);
+  return !!w && openers.length >= 2
+    && openers[openers.length - 1] === w && openers[openers.length - 2] === w;
+};
 
 export function resetLanternNews(): void {
   signedOn = false;
   signedOff = false;
   recent = [];
+  openers.length = 0;
 }
 
 /** How many distinct lines this world can say, for the census the other
@@ -594,6 +607,16 @@ const TICKER_MAX = 78;
  *  shipped from the call site and both were only visible on a rendered card —
  *  "It ate a guest. mid-sentence.." and "and a truck, in motion was gone".
  *  The pools cannot defend against this, so the substitution point does. */
+/** Every headline leaves through here. There were four separate exits before,
+ *  each clipping and returning on its own, which is exactly how a memory of
+ *  what has just been said ends up missing the sign-on and the morning pool. */
+function air(line: string): string {
+  const out = clip(line, TICKER_MAX);
+  openers.push(opener(out));
+  if (openers.length > 4) openers.shift();
+  return out;
+}
+
 const fragment = (s: string): string => (s.split(/[,.;:]/)[0] || s).trim();
 const clip = (s: string, n: number): string => {
   if (s.length <= n) return s;
@@ -634,16 +657,21 @@ const DIST_NAME: Record<LnDist, string> = {
 export function pickLanternNews(ctx: LanternCtx, rnd: () => number = Math.random): string {
   if (!signedOn) {
     signedOn = true;
-    return clip(SIGN_ON[Math.floor(rnd() * SIGN_ON.length)], TICKER_MAX);
+    return air(SIGN_ON[Math.floor(rnd() * SIGN_ON.length)]);
   }
   // PHASE 0. Still the ordinary evening: no guest, no live state, no tokens.
   if (ctx.morning) {
     const fresh = MORNING.filter((l) => !recent.includes(l));
-    const src = fresh.length ? fresh : MORNING;
+    let src = fresh.length ? fresh : MORNING;
+    // phase 0 is the pool a child meets FIRST in every match, so it is the last
+    // place a metronome belongs — same preference the tiered pick applies. The
+    // morning lines carry no tokens, so the raw line IS the finished line.
+    const varied = src.filter((l) => !droning(l));
+    if (varied.length) src = varied;
     const line = src[Math.floor(rnd() * src.length) % src.length] ?? MORNING[0];
     recent.push(line);
     if (recent.length > RECENT_MAX) recent.shift();
-    return clip(line, TICKER_MAX);
+    return air(line);
   }
   const tier = Math.max(0, Math.min(2, ctx.tier)) as NewsTier;
   // ONCE, AND LAST. tier 2 can start as early as 18% devoured, far too soon for
@@ -652,7 +680,7 @@ export function pickLanternNews(ctx: LanternCtx, rnd: () => number = Math.random
   // uses, for the same reason: a sign-off that fires twice is not an ending.
   if (tier === 2 && !signedOff && ctx.secondsLeft <= 26 && rnd() < 0.45) {
     signedOff = true;
-    return clip(SIGN_OFF[Math.floor(rnd() * SIGN_OFF.length)], TICKER_MAX);
+    return air(SIGN_OFF[Math.floor(rnd() * SIGN_OFF.length)]);
   }
   const dist = ctx.district && BY_DIST[tier][ctx.district] ? ctx.district : null;
   // EVERY pool is filtered through usable() now, not only the wide one. The
@@ -684,8 +712,13 @@ export function pickLanternNews(ctx: LanternCtx, rnd: () => number = Math.random
   for (const cand of order) { const f = cand.filter((h) => !recent.includes(h)); if (f.length) { src = f; break; } }
   if (!src.length) for (const cand of order) if (cand.length) { src = cand; break; }
   if (!src.length) src = GENERAL[tier];
+  // and among what is left, prefer a line that does not open on the word the
+  // last two cards opened on. A preference, not a rule: if every candidate
+  // drones, the pool wins and the card goes out anyway.
+  const varied = src.filter((h) => !droning(fill(h, ctx)));
+  if (varied.length) src = varied;
   const line = src[Math.floor(rnd() * src.length)];
   recent.push(line);
   if (recent.length > RECENT_MAX) recent.shift();
-  return clip(fill(line, ctx), TICKER_MAX);
+  return air(fill(line, ctx));
 }
