@@ -558,6 +558,26 @@ const WORLD_PAR: Record<string, number> = {
   // 150k placeholder feeding the rival lane (leader/lane mean 80%) — par moving
   // down eases the lane, so a convergence pass re-measures after this lands.
   powder: 45000,
+  // SKYLARK FIELD. Measured: qa/ab.mjs 5 skylark child, child mean 46,123
+  // (sd 3,196, range 43,642-51,058), wins 5/5, worst place 1st. 0.75 of the
+  // mean, where MAPLE, LANTERN and POWDER all sit.
+  //
+  // TWO CAVEATS, BOTH ON THE RECORD.
+  //
+  // Measured with NO par at all, because this row did not exist -- which is
+  // the bug qa/worldreg.mjs was written for. An absent par sends rivals.ts
+  // down the OLD scale-invariant ladder, the one nine tuning attempts failed
+  // to fix, and it shows in the numbers: the child took FIRST PLACE in all
+  // five runs and the leader reached only 66.5% of the player. The lane was
+  // not trying. So this figure is a measurement of the child, which is what
+  // par is, but the field it was measured against was the wrong field.
+  //
+  // Par moving in eases or tightens the lane, so the numbers move once this
+  // lands. POWDER PASS carries the identical caveat one world earlier and the
+  // convergence pass it promised is still owed; this one owes the same re-run
+  // of qa/ab.mjs against the calibrated lane, and the bar it has to clear is
+  // the owner's floor -- never below 3rd.
+  skylark: 35000,
 };
 
 
