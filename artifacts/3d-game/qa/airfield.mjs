@@ -107,6 +107,49 @@ for (const [, id, name, , polyTxt] of regions) {
   ok(outp.length === 0, `${id.padEnd(11)} ${name} — ${P.length} points${outp.length ? `, ${outp.length} off the island e.g. (${outp[0]})` : ', all on the island'}`);
 }
 
+// ── F. A DISTRICT MUST HAVE SOMEWHERE TO PUT ANYTHING ──────────────────────
+// Section E proves a district is ON the island. It says nothing about whether
+// anything can STAND in it, and that gap shipped a nearly empty world: the
+// runways are 1,000 wide and scatter is kept 30 clear of them, the perimeter
+// track is 400 wide, and the launch circle is 2,200 across — so a district
+// drawn without checking against all of that can be 85% exclusion zone and
+// still pass every other test here.
+//
+// It did. The first launch field was 15% placeable and its authored grid
+// walked 143 nodes to find FOUR legal ones: a hero district holding four
+// balloons, on a world whose whole promise is ninety.
+console.log('\nF. every district has room for the things it is supposed to hold');
+const dPath = (px, py, P) => { let m = Infinity; for (let i = 1; i < P.length; i++) { const [x1, y1] = P[i - 1], [x2, y2] = P[i]; const dx = x2 - x1, dy = y2 - y1; const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy || 1))); m = Math.min(m, Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy))); } return m; };
+const placeable = (x, y, clear = 30) => {
+  if (!inside(x, y, LAND)) return false;
+  if (((x - LAUNCH.cx) / LAUNCH.rx) ** 2 + ((y - LAUNCH.cy) / LAUNCH.ry) ** 2 <= 1) return false;
+  for (const [, pts, half] of RWY) if (dPath(x, y, pts) < half + clear) return false;
+  if (dPath(x, y, PERIMETER) < halfP + clear) return false;
+  return true;
+};
+/** how much room each district needs, in sampled cells at a 25-unit grid.
+ *  `circle` is exempt: it IS an exclusion zone — the whale's precinct is
+ *  authored inside it and nothing is ever scattered there. */
+const ROOM = { launchfield: [0.55, 2000], arrivals: [0.45, 700], tower: [0.35, 500],
+  hangars: [0.35, 300], breakfast: [0.35, 300], meadow: [0.20, 2000] };
+for (const [, id, name, , polyTxt] of regions) {
+  if (id === 'circle') { console.log(`  ok   ${id.padEnd(11)} ${name} is an exclusion zone by design — authored, never scattered`); continue; }
+  const want = ROOM[id];
+  if (!want) continue;
+  const P = polyTxt.includes('SK_LAND') ? LAND
+    : [...polyTxt.matchAll(/\[\s*(-?\d+)\s*,\s*(-?\d+)\s*\]/g)].map(([, x, y]) => [Number(x), Number(y)]);
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [x, y] of P) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+  let inP = 0, free = 0;
+  for (let x = minX; x <= maxX; x += 25) for (let y = minY; y <= maxY; y += 25) {
+    if (!inside(x, y, P)) continue; inP++;
+    if (placeable(x, y)) free++;
+  }
+  const frac = free / Math.max(1, inP);
+  ok(frac >= want[0] && free >= want[1],
+    `${id.padEnd(11)} ${String(free).padStart(5)} of ${String(inP).padStart(5)} cells free (${(frac * 100).toFixed(0)}%, needs ${(want[0] * 100).toFixed(0)}% and ${want[1]})`);
+}
+
 console.log(bad
   ? `\nFAIL — airfield: ${bad} thing(s) SKYLARK FIELD claims about itself are not true`
   : `\nPASS — airfield: every runway means its own number, the ring closes, and nothing is drawn off the island`);

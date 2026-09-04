@@ -139,16 +139,17 @@ export const SK_REGIONS: SkRegion[] = [
   // the only place in the world where the ratio of stages is hand-authored
   // rather than scattered.
   { id: 'launchfield', name: 'THE LAUNCH FIELD', density: 1.5,
-    poly: [[6500, 3050], [7350, 3250], [7850, 3800], [8050, 4450], [7950, 5150],
-           [7500, 5600], [6900, 5650], [6350, 5250], [6150, 4600], [6200, 3700]] },
+    poly: [[4750, 6600], [5600, 6420], [6500, 6420], [7350, 6560], [7800, 7100],
+           [7900, 7800], [7700, 8500], [7100, 8950], [6300, 9100], [5500, 9000],
+           [4900, 8600], [4600, 7900], [4600, 7200]] },
 
   // THE ARRIVALS FIELD. Wet grass at the 21 threshold on the south-west arm:
   // trailers nose-in, tailgates down, envelopes half-dragged out of their bags,
   // a ticket caravan with one bulb on. The spawn is here, and it looks straight
   // up the runway at a whale.
   { id: 'arrivals', name: 'THE ARRIVALS FIELD', density: 1.1,
-    poly: [[2850, 8500], [3700, 8150], [4450, 8450], [4700, 9050], [4350, 9500],
-           [3600, 9600], [2950, 9350], [2700, 8900]] },
+    poly: [[2950, 6600], [3700, 6450], [4250, 6700], [4400, 7400], [4300, 8100],
+           [3950, 8500], [3300, 8500], [2900, 8000], [2800, 7300]] },
 
   // THE TOWER. The preserved control tower on the south-east shoulder,
   // checkerboard-painted by volunteers every spring, with the met hut, the
@@ -156,21 +157,21 @@ export const SK_REGIONS: SkRegion[] = [
   // and the windsock mast. The Balloonmeister broadcasts from the balcony and
   // does not come down.
   { id: 'tower', name: 'THE TOWER', density: 0.9,
-    poly: [[8100, 7150], [8850, 7000], [9350, 7500], [9400, 8200], [8950, 8700],
-           [8250, 8700], [7900, 8100]] },
+    poly: [[8000, 6350], [8700, 6350], [9150, 6700], [9250, 7250], [8900, 7500],
+           [8250, 7450], [7950, 6950]] },
 
   // THE HANGARS. Two curved-roof sheds behind the tower with their doors
   // half-slid open, running a Sunday flea market inside.
   { id: 'hangars', name: 'THE HANGARS', density: 1.2,
-    poly: [[8300, 8750], [9050, 8750], [9400, 9150], [9150, 9650], [8500, 9750],
-           [8000, 9400], [8050, 8950]] },
+    poly: [[8360, 7320], [8950, 7300], [9330, 7620], [9350, 8080], [9080, 8380],
+           [8600, 8420], [8340, 8150], [8280, 7700]] },
 
   // BREAKFAST ROW. The food vans along the old taxiway spur. Every errand in
   // this world eventually comes here, which is what makes it the crowd's one
   // cross-district destination.
   { id: 'breakfast', name: 'BREAKFAST ROW', density: 1.3,
-    poly: [[6950, 6100], [7700, 6050], [8150, 6450], [8100, 7000], [7600, 7300],
-           [6950, 7250], [6650, 6750]] },
+    poly: [[7250, 4560], [7850, 4500], [8280, 4620], [8500, 4880], [8480, 5180],
+           [8100, 5330], [7600, 5320], [7250, 5140], [7150, 4840]] },
 
   // THE ROUGH — LAST, and its polygon is the whole island, so it is the
   // catch-all exactly as 'rim' is for Powder. The uncut grass in the three
