@@ -6069,6 +6069,10 @@ const CARD_FALLBACK: Record<string, string> = {
   // lantern amber falling into an indigo night — the level's own two colours,
   // so a card that never loads its poster still says the right thing
   lantern: 'radial-gradient(ellipse at 50% 38%, #ffbe6a 0%, #d1452f 34%, #241436 68%, #0e1226 100%)',
+  // skylark is the only rig in the game keyed from the EAST: a dawn balloon
+  // meet, sun still low. Amber at the horizon, the balloons' violet above it,
+  // then the morning blue the fog colour is mixed from (0x232a52).
+  skylark: 'radial-gradient(ellipse at 50% 40%, #ffd6a0 0%, #c99ad8 30%, #6478c8 62%, #232a52 100%)',
 };
 function paintWorldCard(host: HTMLElement, id: string): void {
   host.style.backgroundSize = 'cover';
