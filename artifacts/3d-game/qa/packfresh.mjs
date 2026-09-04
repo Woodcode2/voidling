@@ -88,7 +88,7 @@ for (const w of WORLDS) {
 console.log('');
 if (bad.length) {
   console.log(`FAIL — ${bad.length} of ${WORLDS.length} frame(s) are not photographs of this source.`);
-  console.log('  Reshoot: for w in maple pirate gameday lantern powder; do node qa/shippedlook.mjs 4177 $w; done');
+  console.log('  Reshoot: for w in maple pirate gameday lantern powder skylark; do node qa/shippedlook.mjs 4177 $w; done');
   process.exit(1);
 }
 console.log('PASS — every frame in the pack is a photograph of exactly this source.');

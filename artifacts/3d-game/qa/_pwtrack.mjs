@@ -7,7 +7,7 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 const p = await b.newPage();
 await p.goto('http://127.0.0.1:4177/', { waitUntil: 'domcontentloaded', timeout: 300000 });
-for (const t of ['menu', 'maple', 'pirate', 'gameday', 'lantern', 'powder']) {
+for (const t of ['menu', 'maple', 'pirate', 'gameday', 'lantern', 'powder', 'skylark']) {
   const r = await p.evaluate(async (name) => {
     const buf = await (await fetch(`/assets/music/${name}.mp3`)).arrayBuffer();
     const bytes = buf.byteLength;

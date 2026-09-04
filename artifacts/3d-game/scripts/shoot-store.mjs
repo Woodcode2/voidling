@@ -236,7 +236,7 @@ const SEED = () => {
   //
   // docs/HANDOFF.md lists this as trap #3 and notes four probes had hit it.
   // This is the fifth, and the only one where hitting it cost the artefact.
-  localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+  localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
 };
 await page.addInitScript(SEED);
 

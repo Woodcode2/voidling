@@ -40,8 +40,19 @@
             if (!w) w = localStorage.getItem('voidWorld');
             auto = localStorage.getItem('voidAutoPlay') === '1';
           } catch (e) { /* storage blocked: fall through on defaults */ }
-          if (['maple', 'pirate', 'gameday', 'lantern', 'powder'].indexOf(w) < 0) w = 'maple';
-          var order = auto ? [w, 'menu'] : ['menu', w];
+          // TWO LISTS, BECAUSE THEY ANSWER DIFFERENT QUESTIONS. This was one
+          // five-world list doing both jobs, so a SKYLARK FIELD session was
+          // rewritten to 'maple' here and pre-warmed MAPLE FALLS's track.
+          //   WORLDS  is this a real world? — six of them
+          //   TRACKS  does it have an mp3 to preload? — five, because world 6
+          //           is synth-only (audio3d.ts's burner score) until a track
+          //           is licensed for it. Preloading a file that is not there
+          //           is a guaranteed 404 on every single boot of that world.
+          var WORLDS = ['maple', 'pirate', 'gameday', 'lantern', 'powder', 'skylark'];
+          var TRACKS = ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+          if (WORLDS.indexOf(w) < 0) w = 'maple';
+          var order = (auto ? [w, 'menu'] : ['menu', w])
+            .filter(function (n) { return n === 'menu' || TRACKS.indexOf(n) >= 0; });
           for (var i = 0; i < order.length; i++) {
             var l = document.createElement('link');
             l.rel = 'preload'; l.as = 'fetch'; l.crossOrigin = '';
