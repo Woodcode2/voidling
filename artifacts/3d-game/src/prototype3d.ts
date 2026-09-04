@@ -8911,8 +8911,19 @@ function animate() {
           // finding: beats announced things that weren't happening). The
           // parade starts marching, the goat gets loose beside the player,
           // the chests land, the tower starts to thump.
-          if (bt.cue === 'parade' || bt.cue === 'goat' || bt.cue === 'bandfield') life.cue(bt.cue, voidState.x, voidState.z);
-          else if (bt.cue === 'treasure') spawnBeatTreasure();
+          //
+          // …AND THE WORLD IS TOLD ABOUT EVERY CUE, NOT THREE OF THEM. This was
+          // a hand-typed whitelist — parade, goat, bandfield — so every cue
+          // added after it silently did nothing, and the standing finding it
+          // was written to fix came straight back: POWDER PASS's AVALANCHE beat
+          // has a handler in life.ts that had never once run ("the mountain is
+          // coming to you" — it never came), and SKYLARK FIELD's "THE WHALE IS
+          // GOING UP!!" went up over a whale that lay there. A handler that
+          // does not recognise a name ignores it, so forwarding everything
+          // costs nothing; qa/beattruth.mjs now fails on any cue that reaches
+          // nobody.
+          if (bt.cue) life.cue(bt.cue, voidState.x, voidState.z);
+          if (bt.cue === 'treasure') spawnBeatTreasure();
           else if (bt.cue === 'drum') {
             drumCueT = bt.dur; drumThump = 0;
             if (!drumRef) {

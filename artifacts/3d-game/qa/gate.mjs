@@ -265,6 +265,10 @@ const SUITE = [
     cmd: ['node', 'qa/stickerreg.mjs'], verdict: pf,
     why: 'every world hides things worth finding and every season is something a child can hunt — a world with no stickers ships a picker card whose invitation reads "✨ 0 SECRETS"' },
 
+  { id: 'beattruth', tier: 'feel', profiles: ['push', 'live'], timeout: 30,
+    cmd: ['node', 'qa/beattruth.mjs'], verdict: pf,
+    why: 'every beat that announces something makes it happen — the cue dispatch was a three-name whitelist, so POWDER PASS\'s avalanche had never fired and SKYLARK FIELD\'s whale went up over a whale that lay there' },
+
   { id: 'worldreg', tier: 'build', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/worldreg.mjs'], verdict: pf,
     why: 'every per-world table knows every world the game renders — a missing row is never a crash, it is a silent `?? maple` and a world quietly running on another world\'s numbers' },
