@@ -143,3 +143,14 @@ Measured on a first-ever run: **five distinct values (15, 22, 42, 58, 100) again
   The TEAM UI review proposes an injected-`vh` view in the probe as the standing check.
 - **The first-ever run on the other four worlds** — only Maple was shot with `--first`.
 - **The re-shot pack's own frames** are the record for worlds 2–5; the numbers land with them.
+
+## The gate
+
+`node qa/gate.mjs --profile=push --port=4177` on a quiet box, 00:23-00:52 UTC:
+**PASS, 17/17, every step reached its own conclusion** (log in
+`firstframe-data/gate-firstframe.log`). The 17th is the new `splash` step — six phone
+viewports, every line of type over the art, the doubled name and the dead bar. Its first
+run FAILED, on itself: the bar sampler started after several awaits and on one viewport
+caught a single value. Fixed by collecting from document start, and a zero-glyph read now
+forces the loader up and retries once rather than reporting a broken measurement as a
+verdict. main fast-forwarded to this commit.

@@ -1,0 +1,24 @@
+
+  GATE — profile "push" — 17 step(s) on :4177
+
+   · typecheck          pass    3s
+   · smoke:maple        pass  271s
+   · econ               pass  200s
+   · iapdoc             pass    0s
+   · normals            pass    0s
+   · faceparity         pass  452s
+   · pickerfit          pass   31s
+   · evolvepop          pass    0s
+   · lockedcards        pass   40s
+   · skyfit             pass    0s
+   · splash             pass  733s
+   · albedo             pass    0s
+   · roundlod           pass    0s
+   · safety             pass    0s
+   · privacy            pass    0s
+   · iosname            pass    0s
+   · uisystem           pass   25s
+
+  GATE PASS — 17 step(s), every one reached its own conclusion
+  report: qa/out/gate/report.md
+

@@ -165,3 +165,7 @@ KILLED groups are recorded here, never hidden.
   world's own `introLen + 0.45` (2.65 / 2.65 / 3.85 / 4.05 / 3.95 s), the ghost hand waits a
   beat, nobody speaks over the shot, and the loading bar shows five values instead of one.
   Verdict and the six things deliberately not done: `firstframe.proposal.md`.
+- **2026-09-04 00:23-00:52 UTC — gate on the first-frame build:** `node qa/gate.mjs
+  --profile=push --port=4177` on a quiet box: **PASS, 17/17** (the 17th is the new `splash`
+  step, six phone viewports; its first run failed on its own sampler and was fixed, not
+  loosened). main fast-forwarded to this commit.
