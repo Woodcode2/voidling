@@ -228,7 +228,12 @@ function worldData(wid) {
     // meant to be inside it, exactly as Powder's lake carries authored clutter
     const m = /export const LAUNCH = \{ cx: (\d+), cy: (\d+), rx: (\d+), ry: (\d+) \}/.exec(s);
     if (!m) throw new Error('placement: no LAUNCH in skylark.ts');
-    d.ellipses.push({ name: 'LAUNCH', cx: w3(+m[1]), cz: w3(+m[2]), rx: w3len(+m[3]), rz: w3len(+m[4]) });
+    // PRECINCT, not just an ellipse. The launch circle is painted ON the
+    // runway crossing and it carries the whale, her ground crew, her fan
+    // trailer and her tether pins BY DESIGN — the same relationship bay.ts's
+    // boardwalk has with its furniture, which this file already exempts with
+    // `deck`. Without this the hero prop of the world is a road offence.
+    d.ellipses.push({ name: 'LAUNCH', cx: w3(+m[1]), cz: w3(+m[2]), rx: w3len(+m[3]), rz: w3len(+m[4]), precinct: true });
   }
   if (!KNOWN.includes(wid)) {
     throw new Error(`placement: no roads, piers or precincts are defined for world "${wid}". ` +
@@ -348,6 +353,9 @@ const auditFn = (D) => {
       }
       for (const rd of D.roads) {
         let dist = Infinity; for (const [x, z] of samples) dist = Math.min(dist, pathDist(x, z, rd.pts));
+        // an authored precinct painted on the road carries its own furniture,
+        // exactly as a pedestrian deck does — see the LAUNCH note in worldData
+        if (D.ellipses.some((el) => el.precinct && inEllipse(el, p.cx, p.cz, 0))) continue;
         const depth = (rd.deck ? rd.half - DECK_BAND : rd.half) - dist;
         if (depth > ROAD_LIP) cat(rd.kind === 'road' ? 'road' : rd.kind).push({ p, d: desc(p), depth: +depth.toFixed(2), road: rd.name + (rd.deck ? ' core' : ''), x: p.cx, z: p.cz });
       }
