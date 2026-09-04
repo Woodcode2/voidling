@@ -92,27 +92,27 @@ const SIGN_ON: string[] = [
 // ── PHASE 0: the ordinary morning, before anything arrives ────────────────
 const MORNING: string[] = [
   'Crews are rigging on the launch field. Four people to a basket.',
-  'The fans are running, which is the loudest this field ever gets.',
+  'Fans running, which is the loudest this field ever gets.',
   'A trailer has arrived late and been waved to the far end.',
   'Envelopes are coming out of their bags all down the row.',
-  'The bacon van is open. The queue is already visible from the tower.',
+  'Bacon van open, and the queue is already visible from the tower.',
   'Grete has laid her crown line out to the full thirty metres.',
   'Somebody has tested a burner. Everybody looked up.',
   'The sheep have been asked to move. The sheep have not moved.',
   'Cloud base four thousand and lifting, with nothing in the notams.',
   'Franz cannot find his gloves. Franz has his gloves.',
-  'The flea market is open in hangar two, and tea is thirty pence.',
-  'The windsock is hanging straight down, which is the whole point.',
+  'Flea market open in hangar two, and tea is thirty pence.',
+  'Windsock hanging straight down, which is the whole point.',
   'A dog has been round every basket on the field, once, politely.',
-  'The model aircraft club is set up and has nothing to fly into.',
+  'Model aircraft club set up, with nothing at all to fly into.',
   'Passengers are being walked out to their numbers.',
-  'The fire tender has been polished again. It has still never been used.',
-  'The met balloon is up. It is going straight up, which is ideal.',
+  'Fire tender polished again. It has still never been used.',
+  'Met balloon away, going straight up, which is ideal.',
   'Chairman of the meet reminds crews that the far hedge is not ours.',
   'A gull has taken something from the doughnut trailer.',
   'First light on the tower glazing, nineteen minutes before sunrise.',
   'Old Bess the tractor is out. Old Bess is always out.',
-  'The rosette board has been hung, thirty years of them.',
+  'Rosette board hung, thirty years of them.',
   'Crown lines out, mouths open, fans on, and this is the good bit.',
 ];
 
@@ -122,22 +122,22 @@ const MORNING: string[] = [
 const T0_GENERAL = [
   'A large violet feature is crossing the field at about four knots.',
   'The feature was not forecast. Conditions otherwise remain good.',
-  'The desk is logging a surface obstruction of unusual colour.',
+  'Logging a surface obstruction of unusual colour.',
   'Nothing in this morning\'s notams mentions a violet feature.',
   'Visibility unlimited, with one obstruction, moving, low.',
-  'The met balloon has been released again for a second opinion.',
+  'Met balloon released again for a second opinion.',
   'A {F} has been observed on the launch field. Conditions are good.',
   'The instruments show nothing unusual. The instruments are excellent.',
   'Wind still calm, the feature not affecting the wind.',
   'Crews are asked to note a moving obstruction and carry on rigging.',
-  'The feature is round, violet and about {P} percent of the field wide.',
+  'Round, violet, and about {P} percent of the field wide.',
   'Cloud base unchanged. Surface wind unchanged. One new item.',
   'It ate {M}. That is a surface change, not a weather change.',
-  'The desk has opened a new column on the form for this.',
+  'A new column has been opened on the form for this.',
   'Is the feature forecast? The desk thinks not.',
   'Grete reports the feature is nearer than it was. Noted, thank you.',
   'Conditions at {D} remain suitable for launch.',
-  'The tower can see it from here and is not concerned.',
+  'Tower has it in sight from here and is not concerned.',
   'A second met balloon has confirmed the first met balloon.',
   'It took {M} off the grass without slowing.',
   'The obstruction has no registration, and the desk has asked twice.',
@@ -148,25 +148,25 @@ const T0_GENERAL = [
 // He believes it now, and it changes nothing, because his criteria have not
 // changed. The theory stops and the advice starts, in the same voice. One "!".
 const T1_GENERAL = [
-  'The feature is confirmed and the launch window is extended.',
+  'Feature confirmed, and the launch window is extended.',
   'Crews are asked to keep it on their left and continue.',
   'It has taken {M}. The desk has amended the plate.',
   'Revised: the obstruction is mobile, growing, and still not forecast.',
   'Conditions remain within limits that do not mention this.',
-  'The feature is now {P} percent of the field. Wind still calm.',
+  'Now {P} percent of the field. Wind still calm.',
   'Launch is delayed for those affected. That is most of you.',
   'Mr Pym asks crews to rig away from it. Rig away from it, please.',
-  'The desk has stopped taking new entries for this morning.',
+  'No further entries are being taken for this morning.',
   'How large is the {F} now? Larger than the last reading.',
   'It ate {M} and the desk has crossed it off the entry list.',
-  'The far end of {D} is no longer available for launch.',
+  'Far end of {D} is no longer available for launch.',
   'Everything is still legal. Everything is still calm. Please rig.',
-  'The met balloon went up and did not come down anywhere.',
+  'Met balloon went up and did not come down anywhere.',
   'Crews on the north row: bring your kit in, not out.',
   'The obstruction is between the tower and the whale. Noted.',
-  'The desk is now recording the feature every four minutes.',
+  'Recording the feature every four minutes from now.',
   'Franz has moved his basket twice. Franz is asked to move it again.',
-  'The plate has been amended for the third time this hour!',
+  'Amended the plate for the third time this hour!',
   'Conditions are, on the desk\'s own criteria, improving.',
   'It took {M}. The field is flatter than it was, which helps.',
   'Passengers are asked to stay with their crews for now.',
@@ -182,19 +182,19 @@ const T2_GENERAL = [
   'Every obstruction has been removed from the field, every one.',
   '{R} percent of the field remains and all of it is clear.',
   'Conditions are perfect!! There is nothing left to fly around.',
-  'The plate is now a blank sheet, which is technically ideal.',
+  'Plate is now a blank sheet, which is technically ideal.',
   '{S} seconds of the window remain!! Crews to the high ground.',
   'It ate {M}!! The obstruction count is falling rapidly.',
   'All crews to the far hedge, please. Bring nothing. Bring people.',
-  'The tower is the last item on the plate and the desk is in it.',
+  'Only the tower is left on the plate, and the desk is in it.',
   'The met balloon has nowhere left to be released from.',
   'This is the tower. Everybody who is up is up. Everybody else, walk.',
   '{P} percent of Skylark Field has been cleared for takeoff!!',
-  'The desk has run out of columns and is using the back of the form.',
+  'Out of columns, and now using the back of the form.',
   'Wind calm. Cloud base high. Field: gone. Have a good flight.',
   'Nothing is obstructing anything!! The desk wishes to note that.',
   '{S} seconds!! Do not go back for a basket. Go to the hedge.',
-  'The whale is airborne and so is nearly everybody else.',
+  'Whale is airborne, and so is nearly everybody else.',
   'The last of {D} has gone, logged as excellent conditions.',
   'Everyone is accounted for and most of them are above us.',
 ];
@@ -203,65 +203,65 @@ const T2_GENERAL = [
 const T0_BY_DIST: Record<SkDist, string[]> = {
   launchfield: [
     'Rigging continues on the launch field. Ninety envelopes, all out.',
-    'The launch field reports one violet item among the balloons.',
+    'Launch field reports one violet item among the balloons.',
     'Crews on the launch field are asked to keep their lines short.',
   ],
   arrivals: [
     'A trailer in the arrivals field has been asked to reposition.',
-    'The arrivals field is full. The desk is turning nobody away.',
+    'Arrivals is full, and the desk is turning nobody away.',
     'Envelopes are still coming out of bags down at arrivals.',
   ],
   runway: [
-    'The runway is clear except for the sheep and one other item.',
+    'Runway clear except for the sheep and one other item.',
     'Zero-nine is unobstructed apart from a moving violet feature.',
-    'The centreline is visible for its whole length. Mostly.',
+    'Centreline visible for its whole length. Mostly.',
   ],
   circle: [
-    'The whale is laid out on the launch circle and is enormous.',
+    'Whale is laid out on the launch circle and is enormous.',
     'The launch circle is reserved for the whale and remains so.',
     'Ground crew are walking the whale\'s seams as they do every year.',
   ],
   perimeter: [
     'Marshals on the perimeter report a violet item passing post four.',
-    'The perimeter track is open to marshals and to nobody else.',
+    'Perimeter track is open to marshals and to nobody else.',
     'Post six has called in something round. Thank you, post six.',
   ],
   tower: [
-    'The tower has the feature in sight and is entirely comfortable.',
-    'The met hut confirms the instruments are working perfectly.',
+    'Tower has the feature in sight and is entirely comfortable.',
+    'Met hut confirms the instruments are working perfectly.',
     'Briefing continues on the balcony. All are welcome.',
   ],
   hangars: [
-    'The flea market in hangar two reports brisk trade.',
+    'Flea market in hangar two reports brisk trade.',
     'Hangar one has closed its door, which it has not done in years.',
     'The model aircraft club is watching something and not flying.',
   ],
   breakfast: [
     'Breakfast Row is serving. The queue has not shortened.',
-    'The bacon van reports a large violet customer. It did not order.',
+    'Bacon van reports a large violet customer. It did not order.',
     'Two hundred people are eating and one of them is not.',
   ],
   meadow: [
     'The rough is quiet. Skylarks up, hare out, fence still broken.',
     'Nothing to report from the far side of the field. Nothing at all.',
-    'The old windsock mast is still lying where it fell.',
+    'Old windsock mast is still lying where it fell.',
   ],
 };
 
 const T1_BY_DIST: Record<SkDist, string[]> = {
   launchfield: [
-    'The launch field has lost its north row. The rest are rigging.',
+    'Launch field has lost its north row. The rest are rigging.',
     'Crews on the launch field: leave the kit and walk, please.',
     'Half the envelopes on the field are now on the wrong side of it.',
   ],
   arrivals: [
     'Arrivals is closed. Everything in it has been accounted for.',
-    'The trailers at arrivals are empty and the desk is glad of it.',
+    'Trailers at arrivals are empty, and the desk is glad of it.',
     'Nobody else is coming in. The gate has been left open anyway.',
   ],
   runway: [
     'Zero-nine is obstructed. The sheep have finally moved.',
-    'The runway is no longer available for anything.',
+    'Runway is no longer available for anything.',
     'Both thresholds of one-five have gone. That is unusual.',
   ],
   circle: [
@@ -272,26 +272,26 @@ const T1_BY_DIST: Record<SkDist, string[]> = {
   perimeter: [
     'Marshals are walking the perimeter inward, which is new.',
     'Posts four through eight are no longer answering.',
-    'The perimeter track is the shortest way to the hedge. Use it.',
+    'Shortest way to the hedge is the perimeter track. Use it.',
   ],
   tower: [
-    'The tower is still broadcasting and intends to keep doing so.',
-    'The met hut has been logged as a former structure.',
+    'Tower is still broadcasting and intends to keep doing so.',
+    'Met hut has been logged as a former structure.',
     'Mr Pym is on the balcony and will not be coming down yet.',
   ],
   hangars: [
     'Hangar two has gone and the flea market with it. Nobody was in it.',
     'The tractors have been moved. The tractors moved themselves.',
-    'The rosette board is safe. Somebody carried it out.',
+    'Rosette board is safe. Somebody carried it out.',
   ],
   breakfast: [
     'Breakfast Row is serving from the far end only.',
-    'The coffee horsebox has been towed to the hedge, still serving.',
+    'Coffee horsebox towed to the hedge, still serving.',
     'The bacon van has gone. The bacon van fed everybody first.',
   ],
   meadow: [
-    'The rough is where everybody is walking. Keep walking.',
-    'The hare went that way an hour ago and had the right idea.',
+    'Everybody is walking through the rough. Keep walking.',
+    'That hare went the same way an hour ago and had the right idea.',
     'Skylarks are up. That is the last normal thing on the field.',
   ],
 };
@@ -304,23 +304,23 @@ const T2_BY_DIST: Record<SkDist, string[]> = {
   ],
   arrivals: [
     'Arrivals has gone. Nobody was in arrivals. That was the plan.',
-    'The gate is standing in a field with no field behind it!!',
-    'The ticket caravan has gone and it never did take any money.',
+    'A gate is standing in a field with no field behind it!!',
+    'Ticket caravan has gone, and it never did take any money.',
   ],
   runway: [
     'All three runways are unobstructed!! There are no runways.',
     'Zero-nine has gone. The sheep are up on the hedge, counted.',
-    'The desk confirms the concrete is no longer a factor.',
+    'Concrete is confirmed as no longer a factor.',
   ],
   circle: [
     'The whale is going!! The whole field is going up with her.',
-    'The launch circle is empty and the whale is over the hedge.',
+    'Launch circle is empty and the whale is over the hedge.',
     'She lifted at {S} seconds and took the last of the pins with her.',
   ],
   perimeter: [
-    'The perimeter is gone and the marshals are at the hedge, counted.',
+    'Perimeter is gone, and the marshals are at the hedge, counted.',
     'All posts accounted for!! Every wand, every marshal, every one.',
-    'The track went last, which is fitting, since it drew the outline.',
+    'Track went last, which is fitting, since it drew the outline.',
   ],
   tower: [
     'The tower is the last item on the plate!! The desk is still in it.',
@@ -335,10 +335,10 @@ const T2_BY_DIST: Record<SkDist, string[]> = {
   breakfast: [
     'Breakfast Row has gone and everybody had eaten. Everybody.',
     'The last cup of tea on Skylark Field was poured on the hedge!!',
-    'The urn is up the hill with the crowd, still warm.',
+    'Urn is up the hill with the crowd, still warm.',
   ],
   meadow: [
-    'The rough has gone and everybody who was in it is on the hedge.',
+    'Rough has gone, and everybody who was in it is on the hedge.',
     'The skylarks went up first!! They always did know best.',
     'The hare is fine. Somebody checked. Somebody actually checked.',
   ],
@@ -352,17 +352,17 @@ const T2_BY_DIST: Record<SkDist, string[]> = {
 // removal is an improvement.
 const MEAL_HOUSE: Pools = [[
   'A structure has been removed from the field. Conditions improve.',
-  'The desk has struck one building off the plate.',
+  'One building struck off the plate.',
   '{M} has gone, and the sightline is better for it.',
   'One less thing to fly around, which is the desk\'s whole job.',
 ], [
   'Another structure has gone. The plate is getting simpler!',
-  'The desk has amended the building count. Downward.',
+  'Building count amended. Downward.',
   'It ate {M}. Obstruction removed. Conditions improving.',
   'That was a shed. The desk logged it as a shed and now logs nothing.',
 ], [
   'Every structure on the field is now clear!! Every single one.',
-  'The building count is zero and the desk finds that remarkable.',
+  'Building count is zero, which the desk finds remarkable.',
   'It ate {M}!! Nothing tall remains except this tower.',
 ]];
 
@@ -370,28 +370,28 @@ const MEAL_CAR: Pools = [[
   'A vehicle has been removed from the grass. Noted, thank you.',
   'One trailer fewer at arrivals. The desk was not using it.',
   '{M} has gone from the verge. The verge is clearer.',
-  'The desk logs one vehicle removed and no injuries.',
+  'One vehicle removed, and no injuries.',
 ], [
   'Another vehicle has gone. The spectator band is thinning nicely.',
   'It took {M}. The desk has stopped counting the vehicles.',
   'Old Bess is fine. Old Bess is always fine.',
-  'The retrieve crews have nothing to retrieve with!',
+  'Retrieve crews have nothing to retrieve with!',
 ], [
   'All vehicles are clear of the field!! The desk confirms it.',
   'It ate {M}!! Nobody was in it. Nobody has been in anything.',
-  'The car park is a field again, and then it is not a field.',
+  'Car park is a field again, and then it is not a field.',
 ]];
 
 const MEAL_BIG: Pools = [[
   'A large item has been removed. Sightlines materially improved.',
   '{M} has gone and the desk can now see the far hedge.',
-  'The biggest obstruction on the plate has been struck off.',
+  'Biggest obstruction on the plate has been struck off.',
   'One large item removed. The desk considers that progress.',
 ], [
   'It ate {M}. That was the largest thing on the field!',
-  'The desk has lost its main reference point. Conditions good.',
+  'Lost the main reference point. Conditions good.',
   'Something very large has gone. The instruments did not flinch.',
-  'The plate is down to small items. That is an improvement.',
+  'Plate is down to small items, which is an improvement.',
 ], [
   'The largest items are all clear!! Visibility is now total.',
   'It ate {M}!! The desk has never had a cleaner field.',
@@ -402,11 +402,11 @@ const MEAL_SMALL: Pools = [[
   'A small item has left the inventory. The desk has noted it.',
   'It took {M}. The desk is recording these individually.',
   'Something small has gone from {D}. Conditions unchanged.',
-  'The desk logs a minor removal and no change to the wind.',
+  'Minor removal logged, and no change to the wind.',
 ], [
   'Another small item. The desk has started a second column!',
   'It ate {M}. The list is getting shorter rather than longer.',
-  'The small items are going faster than the desk can write.',
+  'Small items are going faster than the desk can write.',
   'Grete has stopped reporting them. The desk understands.',
 ], [
   'The small items are all gone!! There is nothing to itemise.',
@@ -425,26 +425,26 @@ const BY_MEAL: Record<MealKind, Pools> = {
 const LIVE: Pools = [[
   'The {F} at {D} is logged as a surface obstruction.',
   'A {F} is on the field and has not filed a flight plan.',
-  'The desk is calling it a {F} and does not enjoy the word.',
+  'Calling it a {F}, and the desk does not enjoy the word.',
   'Conditions at {D}: calm, clear, one {F}.',
-  'The {F} is moving at walking pace and is not forecast.',
+  'A {F} is moving at walking pace and is not forecast.',
   '{P} percent of the field is now feature. Wind still calm.',
   'A {F} has been offered a briefing and did not attend.',
   'The met balloon and the {F} are both violet. Unrelated.',
   'Passengers at {D} are asked not to approach the {F}.',
-  'The desk has assigned the {F} no registration and no slot.',
+  'No registration and no slot have been assigned to the {F}.',
   'Grete says the {F} is nearer. Grete has said that four times.',
 ], [
   'The {F} at {D} is larger than at the last reading.',
   'It ate {M}. The desk has amended the plate accordingly.',
   'The {F} is now {P} percent of Skylark Field.',
   'Crews are asked to keep the {F} on their left!',
-  'The desk measured the {F} this morning and the tape ran out.',
+  'Measured the {F} this morning and the tape ran out.',
   'Conditions at {D} are, by the desk\'s own criteria, improving.',
   '{R} percent of the field is still available for launch.',
-  'The {F} has not requested clearance and has not needed it.',
+  'A {F} has not requested clearance and has not needed it.',
   'It took {M} from {D} without slowing.',
-  'The desk is logging the {F} every four minutes now.',
+  'Logging the {F} every four minutes now.',
   'Mr Pym has revised the entry list down to those who are up.',
 ], [
   'The {F} is {P} percent of the field!! Visibility unlimited.',
@@ -465,9 +465,9 @@ const SIGN_OFF: string[] = [
   'All crews accounted for. Ninety-one balloons airborne. A record.',
   'That is the briefing. Wind calm, cloud base high, have a good flight.',
   'Every entry is up, over the hedge, or walking. Nobody is missing.',
-  'The meet is closed. The committee wishes to note the attendance.',
+  'Meet is closed. The committee wishes to note the attendance.',
   'Tomorrow: light winds, high cloud, and no field at all. Goodnight.',
-  'The desk thanks the marshals, who counted everybody. Twice.',
+  'Thanks to the marshals, who counted everybody. Twice.',
   'Skylark Field flew ninety-one this morning, which has never happened.',
   'Mr Pym has read the forecast to the end. He always does.',
   'The sheep are on the hedge. The sheep are, as ever, unbothered.',
@@ -614,7 +614,25 @@ export function pickSkylarkNews(ctx: SkylarkCtx, rnd: () => number = Math.random
   for (const cand of order) { const f = cand.filter((h) => !recent.includes(h)); if (f.length) { src = f; break; } }
   if (!src.length) for (const cand of order) if (cand.length) { src = cand; break; }
   if (!src.length) src = GENERAL[tier];
-  const varied = src.filter((h) => !droning(fill(h, ctx)));
+  // ── THE DRONE GUARD NEEDS SOMEWHERE TO GO ────────────────────────────────
+  // This filtered only the pool already chosen. When that pool is entirely
+  // "The …" the filter returns nothing, the guard gives up, and the drone airs
+  // anyway — so `droning`, which is written to stop a THIRD consecutive
+  // repeat, permitted a FOURTH. qa/newsfeed.mjs caught exactly that on this
+  // world: cards 17-20 of the aired sequence all opened "The".
+  //
+  // The fallback widens across every pool at this tier before it accepts a
+  // repeat: first something unsaid and non-droning anywhere, then anything
+  // non-droning at all. Only a tier with no other opening word in it can now
+  // drone, and it can never do so twice, because the widened search runs again
+  // on the next card. It can only ever REDUCE repetition — every candidate it
+  // considers was already eligible to air.
+  let varied = src.filter((h) => !droning(fill(h, ctx)));
+  if (!varied.length) {
+    const anywhere = [local, meal, live, wide].flat();
+    varied = anywhere.filter((h) => !recent.includes(h) && !droning(fill(h, ctx)));
+    if (!varied.length) varied = anywhere.filter((h) => !droning(fill(h, ctx)));
+  }
   if (varied.length) src = varied;
   const line = src[Math.floor(rnd() * src.length)];
   recent.push(line);

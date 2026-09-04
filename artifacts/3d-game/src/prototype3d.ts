@@ -3611,6 +3611,9 @@ const MED_BY_WORLD: Record<string, string[]> = {
   pirate:  ['evolve', 'combo', 'gold'],
   powder:  ['evolve', 'combo', 'gold'],
   lantern: ['evolve', 'combo', 'gold'],
+  // SKYLARK FIELD has 70 car-tagged props (the retrieve vehicles and the
+  // trailers at arrivals), so 'Rush Hour: eat 6 cars' clears comfortably.
+  skylark: ['cars', 'evolve', 'combo'],
 };
 const HARD_BY_WORLD: Record<string, string[]> = {
   maple:   ['houses', 'rival', 'big'],
@@ -3618,6 +3621,14 @@ const HARD_BY_WORLD: Record<string, string[]> = {
   lantern: ['houses', 'rival', 'big'],
   pirate:  ['cabanas', 'rival', 'big'],
   powder:  ['houses', 'rival'],
+  // ...and no 'houses' here. An airfield has two hangars, a tower and a row of
+  // stalls; qa/questable.mjs measured the house supply at TWO against a quest
+  // that asks for three, so with skylark absent from this table and falling
+  // through to `?? HARD_BY_WORLD.maple` a child was drawn an impossible board.
+  // That is the identical bug this table was created to end, one world later.
+  // Two chips rather than three, as POWDER PASS carries two, because an honest
+  // absence beats tagging a control tower as somebody's house.
+  skylark: ['rival', 'big'],
 };
 const MED_Q = MED_BY_WORLD[pickedWorld] ?? MED_BY_WORLD.maple;
 const HARD_Q = HARD_BY_WORLD[pickedWorld] ?? HARD_BY_WORLD.maple;   // easy rotates daily; 'solo' retired with the menu button
