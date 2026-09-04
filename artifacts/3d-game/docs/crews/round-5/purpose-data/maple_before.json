@@ -1,0 +1,15 @@
+{
+ "world": "maple",
+ "tag": "before",
+ "seed": 7,
+ "sampled": 30,
+ "people": 317,
+ "moving": 310,
+ "still": 0.022,
+ "driftMedian": 0.087,
+ "driftP90": 0.175,
+ "homeMedian": 0.165,
+ "turnMedian": 104.8,
+ "targets": 70,
+ "arrivals": 1
+}

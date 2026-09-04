@@ -51,3 +51,4 @@ qa/out/lookpair/*_after.*
 qa/out/lookpair/*_before[0-9].*
 qa/out/lookpair/*_after[0-9].*
 qa/out/firstframe/
+qa/out/purpose/
