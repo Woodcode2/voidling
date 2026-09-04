@@ -1768,7 +1768,11 @@ function makeSeasonProp(ev: SeasonEvent, i: number): THREE.Object3D {
     // would be one more thing the same colour as everything else. Three
     // saturated fabrics, rotating, so a field of them reads as a meet and not
     // as a print: the meet's own violet, a burner orange and a signal red.
-    const FABRIC = [0x8f6fd8, 0xff8a3a, 0xe4453f];
+    // the third fabric is lifted off pure crimson for the same reason skyfield.ts's
+    // reds are: qa/albedo.mjs's 0.08 bar. A red whose second channel is near zero
+    // in linear space has nothing to darken toward, so a lit gore and a shaded
+    // gore of the same envelope come out identical and the balloon reads flat.
+    const FABRIC = [0x8f6fd8, 0xff8a3a, 0xe4513f];
     const col = FABRIC[i % 3];
     g.add(mergedProp([
       // the basket, and the two uprights the burner hangs from

@@ -5615,6 +5615,35 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     SK.resetPlacement();
     const drop = (mesh: THREE.Object3D, p2: SK.Pt, r: number, rotY?: number, force = false, qk?: string, claim?: number) => {
       const c = claim ?? r;
+      // ── LEGALITY IS drop()'s JOB, NOT THE CALLER'S ────────────────────────
+      // Every scatter pass asked skPlaceable() for itself; the hand-authored
+      // fixed offsets — the met hut at (cx-420, cy+300), the flagpole, the
+      // windsock, the fire tender — asked nobody, because their positions were
+      // chosen by eye against the tower and eye does not know where 15/33 is.
+      // qa/placement.mjs found the met hut standing ON A RUNWAY. Checking here
+      // means a pass cannot forget, and the escape is explicit: `force` is for
+      // the whale on her circle and the hangars on their apron, which are
+      // authored landmarks that outrank the rule.
+      //
+      // AND THE CLEARANCE IS THE PROP'S OWN SIZE. A fixed `clear` says "keep
+      // the CENTRE this far out", which lets a long thin prop legally centred
+      // just outside a strip hang its far end over the lip — two of the three
+      // road offences were exactly that. c*20 is the prop's own reserved
+      // radius in world units, so the thing that gets kept clear is the whole
+      // prop rather than its middle.
+      // TWO DIFFERENT DISTANCES, AND I HAD CONFLATED THEM. `c` is the ground a
+      // prop RESERVES FROM NEIGHBOURS, and it is inflated to beat spotOpen's
+      // 0.62 factor — 12.5 for a standing envelope whose footprint only reaches
+      // 6.8. Feeding that to skPlaceable asked every balloon to stand 250 world
+      // units clear of a runway instead of the 136 it actually occupies, and
+      // the launch field lost a third of its envelopes to a clearance that
+      // meant nothing: big went 106 -> 66, straight through the bar of 100.
+      //
+      // What a runway needs kept off it is the prop's own REACH. r is the eat
+      // radius and a footprint's half-diagonal runs about 1.45x it across this
+      // kit, with a 2-unit floor so a long thin marker cannot centre itself
+      // just outside the lip and hang its far end over.
+      if (!force && !SK.skPlaceable(p2[0], p2[1], Math.max(30, r * 34))) return;
       if (!force && !SK.spotOpen(p2[0], p2[1], c * 20)) return;
       if (force) mesh.userData.authored = true;   // a landmark: the settle pass may never retire it
       const [x3, z3] = P3(p2);
@@ -5692,11 +5721,41 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       // 94, which is the ninety the design promises. A balloon is ~9 units
       // across and the pitch is 11.5, so crews are shoulder to shoulder the way
       // they actually are on a launch field.
-      const PITCH_ALONG = 235, PITCH_ACROSS = 258;
+      // ── THE PITCH HAS TO CLEAR THE BIGGEST PAIR, AND 235 DID NOT ─────────
+      // A standing envelope's footprint is 9.6x9.6, half-diagonal 6.8; two of
+      // them side by side need 13.6 units and this grid gave them 11.75, so
+      // qa/placement.mjs measured them interpenetrating by up to 0.88.
+      //
+      // The `claim` radii passed to drop() did not save it, and the reason is
+      // worth writing down because I had it wrong: spotOpen() (bay.ts:307)
+      // enforces `max((a + b) * 0.45, max(a, b) * 0.62)` — FORTY-FIVE PERCENT
+      // of the sum, deliberately, so small clutter can nestle. Claims sized as
+      // true half-diagonals therefore buy 45% of the separation they look like
+      // they buy: 6.8 + 6.0 reads as 12.8 and enforces 5.76.
+      //
+      // So the spacing is authored in the PITCH, where it is visible.
+      //
+      // AND THE PITCH IS SET BY THE BOXES, NOT BY THEIR CIRCLES. My first fix
+      // used the circumscribed circle — half-diagonal 6.8, so 13.6 between two
+      // standing envelopes — and cost the field a third of its balloons for
+      // nothing: qa/placement.mjs measures oriented-box SAT, and layoutYaw is
+      // 030 +/- 8 degrees, so every envelope on this grid is very nearly
+      // aligned WITH the row it stands in. Along that row the extents that
+      // matter are the half-WIDTHS, not the half-diagonals:
+      //
+      //   standing 4.8 + spilled 5.7 = 10.5, and +8 deg of yaw on each takes
+      //   it to about 11.9. That is the binding pair, and 235 gave 11.75 —
+      //   which is why the overlaps measured 0.88 and not 2.
+      //
+      // 250 gives 12.5 along the row and 13.44 on the staggered diagonal, both
+      // clear of 11.9 with margin. Measured on the real polygon: 101 grid
+      // nodes, 92 of which clear drop()'s runway test — against 90 at the old
+      // pitch, so the field is FULLER than it was and no longer overlaps.
+      const PITCH_ALONG = 250, PITCH_ACROSS = 238;
       const nodes: { p: SK.Pt; stage: number }[] = [];
       let n = 0;
-      for (let i = -14; i <= 14; i++) {
-        for (let j = -13; j <= 13; j++) {
+      for (let i = -20; i <= 20; i++) {
+        for (let j = -18; j <= 18; j++) {
           // stagger alternate rows, the way a real field is pegged
           const along = i * PITCH_ALONG + (j % 2 ? PITCH_ALONG * 0.5 : 0);
           const across = j * PITCH_ACROSS;
@@ -5720,7 +5779,21 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
             : stage === 2 ? SKF.skBalloonCold(cols) : SKF.skBalloonStanding(cols);
         // ONE EDIBLE, ONE RADIUS — see skyfield.ts's header on fadeOccluders
         const r = stage === 0 ? 1.4 : stage === 1 ? 5.2 : stage === 2 ? 4.6 : 4.8;
-        const claim = stage === 0 ? 1.5 : stage === 1 ? 6.0 : stage === 2 ? 5.6 : 6.8;
+        // ── CLAIMS SIZED FOR THE RULE THAT ACTUALLY RUNS ────────────────────
+        // These were the envelopes' true half-diagonals, which is the number
+        // that LOOKS right and is not. spotOpen() (bay.ts:307) enforces
+        //     max((a + b) * 0.45, max(a, b) * 0.62)
+        // so a claim buys 45% of itself against a like-sized neighbour and 62%
+        // against a small one. Against the launch field's scatter of crown
+        // lines and tether pins the 0.62 term is what binds, so the claim has
+        // to be the half-diagonal DIVIDED by 0.62 for a standing envelope to
+        // actually keep a tether pin out of its skirt:
+        //     standing  half-diag 6.79 -> 6.79 / 0.62 = 10.95 -> 12.5 with margin
+        //     spilled   half-diag 5.98 -> 11.0
+        //     cold      half-diag 5.48 -> 10.5
+        //     bagged    half-diag 1.39 -> 3.5
+        // Envelope-against-envelope is held by PITCH_ALONG above, not by these.
+        const claim = stage === 0 ? 3.5 : stage === 1 ? 11.0 : stage === 2 ? 10.5 : 12.5;
         drop(mesh, p2, r, layoutYaw(), false, 'big', claim);
       }
       // PASS TWO — the crew's kit, filling in around what is already standing
@@ -5763,11 +5836,16 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         const b: SK.Pt = [p2[0] + ux * 200, p2[1] + uy * 200];
         drop(SKF.skBalloonBagged(env()), b, 1.4, layoutYaw(), false, 'big');
       }
-      drop(SKF.skTicketCaravan(), [cx + ux * 600, cy + uy * 600], 1.6, layoutYaw() + Math.PI / 2, false, 'house');
+      drop(SKF.skTicketCaravan(), [cx + ux * 600, cy + uy * 600], 1.6, layoutYaw() + Math.PI / 2, false, 'house', 4.2);
       // and the crews already rigging: envelopes spilled out on the wet grass,
       // laid on the same 030 as everything else on this field
+      // the sweep is wider than the field on purpose — pointInPoly and
+      // skPlaceable do the cutting, so widening it costs nothing and fills the
+      // corners the old +/-5/+/-4 could not reach. The launch field's grid
+      // going legal cost the world a dozen envelopes; this is where they come
+      // back, and they come back somewhere a real meet actually rigs.
       const rig: SK.Pt[] = [];
-      for (let i = -5; i <= 5; i++) for (let j = -4; j <= 4; j++) {
+      for (let i = -8; i <= 8; i++) for (let j = -7; j <= 7; j++) {
         const p2: SK.Pt = [cx + ux * (i * 250 + (j % 2 ? 125 : 0)) + vx * j * 280,
           cy + uy * (i * 250 + (j % 2 ? 125 : 0)) + vy * j * 280];
         if (SK.pointInPoly(p2[0], p2[1], R.poly) && SK.skPlaceable(p2[0], p2[1], 130)) rig.push(p2);
@@ -5776,7 +5854,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         const cols = env();
         const stage = i % 2;
         drop(stage === 0 ? SKF.skBalloonSpilled(cols) : SKF.skBalloonCold(cols),
-          p2, stage === 0 ? 5.2 : 4.6, layoutYaw(), false, 'big', stage === 0 ? 6.0 : 5.6);
+          p2, stage === 0 ? 5.2 : 4.6, layoutYaw(), false, 'big', stage === 0 ? 11.0 : 10.5);
       });
     }
     for (const p2 of SK.scatterInRegion(REG('arrivals'), 190, rnd2, 55, { sep: 1.5 })) {
@@ -5796,15 +5874,18 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       cx /= R.poly.length; cy /= R.poly.length;
       drop(SKF.skControlTower(), [cx, cy], 4.2, SK.skFacingCircle(cx, cy), true, 'big');
       drop(SKF.skMetHut(), [cx - 420, cy + 300], 0.8, rnd2() * Math.PI * 2, false, 'small');
-      drop(SKF.skBriefingCaravan(), [cx + 480, cy + 260], 2.0, layoutYaw(), false, 'house');
+      drop(SKF.skBriefingCaravan(), [cx + 480, cy + 260], 2.0, layoutYaw(), false, 'house', 4.2);
       drop(SKF.skFlagpole(), [cx - 300, cy - 420], 0.5, 0, false, 'small');
       drop(SKF.skWindsock(), [cx + 520, cy - 380], 0.5, 0, false, 'small');
       drop(SKF.skFireTender(), [cx + 200, cy + 620], 1.8, layoutYaw() + Math.PI / 2, false, 'car');
     }
-    for (const p2 of SK.scatterInRegion(REG('tower'), 14, rnd2, 150, { sep: 6.0 })) {
+    // SCATTERED envelopes, with no grid to hold them apart, so the claim has to
+    // do it alone: two spilled ones need 11.46 between centres and 2 * 13 * 0.45
+    // = 11.7 buys it. sep matches so the scatter's own hash agrees with drop's.
+    for (const p2 of SK.scatterInRegion(REG('tower'), 20, rnd2, 150, { sep: 9.0 })) {
       const cols = env();
       drop(rnd2() < 0.5 ? SKF.skBalloonSpilled(cols) : SKF.skBalloonCold(cols),
-        p2, rnd2() < 0.5 ? 5.2 : 4.6, layoutYaw(), false, 'big', 6.0);
+        p2, rnd2() < 0.5 ? 5.2 : 4.6, layoutYaw(), false, 'big', 9.0);
     }
     for (const p2 of SK.scatterInRegion(REG('tower'), 110, rnd2, 50, { sep: 1.1 })) {
       const k = rnd2();
@@ -5834,7 +5915,11 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
             if (rr === 0) break;
           }
         }
-        if (best) drop(SKF.skHangar(), best, 5.5, layoutYaw() + Math.PI / 2, true, 'big');
+        // force-placed, but it still has to CLAIM its apron: force skips the
+        // open test, not the claim, and a hangar that claims only its eat
+        // radius lets a retrieve vehicle park through its wall. 7.1x9.1 is a
+        // half-diagonal of 5.77, and 5.77 / 0.62 = 9.3.
+        if (best) drop(SKF.skHangar(), best, 5.5, layoutYaw() + Math.PI / 2, true, 'big', 9.5);
       }
     }
     for (const p2 of SK.scatterInRegion(REG('hangars'), 150, rnd2, 45, { sep: 1.9 })) {
@@ -5869,9 +5954,9 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         drop(mk(), p2, 2.1, layoutYaw() + Math.PI / 2, false, 'car');
       });
     }
-    for (const p2 of SK.scatterInRegion(REG('breakfast'), 10, rnd2, 150, { sep: 6.0 })) {
+    for (const p2 of SK.scatterInRegion(REG('breakfast'), 16, rnd2, 150, { sep: 9.0 })) {
       const cols = env();
-      drop(SKF.skBalloonSpilled(cols), p2, 5.2, layoutYaw(), false, 'big', 6.0);
+      drop(SKF.skBalloonSpilled(cols), p2, 5.2, layoutYaw(), false, 'big', 9.0);
     }
     for (const p2 of SK.scatterInRegion(REG('breakfast'), 180, rnd2, 40, { sep: 1.5 })) {
       const k = rnd2();

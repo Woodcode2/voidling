@@ -85,13 +85,13 @@ const SKIRT_D = 0x2c3350;      // THE SKIRT AND CROWN RING — periwinkle-black.
  *  twelve-colour envelope averages to grey. Each triple is [gore A, gore B,
  *  gore C] and they alternate round the crown. */
 export const ENVELOPE: [number, number, number][] = [
-  [0xe4443a, 0xf5b731, 0xf2ede4],   // red / gold / white — the classic
+  [0xe4513a, 0xf5b731, 0xf2ede4],   // red / gold / white — the classic
   [0x2f6fd0, 0x63c6f0, 0xf2ede4],   // two blues and white
   [0x2e9e5b, 0xf5b731, 0xf2ede4],   // green / gold / white
   [0xd8425f, 0xf2ede4, 0x7a3fb0],   // rose / white / violet
   [0xf06a25, 0xf5c542, 0x2c3350],   // orange / yellow / dark
   [0x7a3fb0, 0xf2ede4, 0x63c6f0],   // violet / white / sky
-  [0xf5b731, 0x2e9e5b, 0xe4443a],   // gold / green / red
+  [0xf5b731, 0x2e9e5b, 0xe4513a],   // gold / green / red
   [0x1d4f9e, 0xf2ede4, 0xf5b731],   // deep blue / white / gold
 ];
 
@@ -363,7 +363,7 @@ export function skTrailer(): THREE.Object3D {
     part(box(), 0x8f6f42, 1.85, 0.24, 0, 0, 0, -0.35, 1.0, 0.14, 1.7),
     part(cyl(0.5, 0.5, 10), SKIRT_D, 0.6, 0.34, 0.92, 0, 0, Math.PI / 2, 0.68, 0.22, 0.68),
     part(cyl(0.5, 0.5, 10), SKIRT_D, 0.6, 0.34, -0.92, 0, 0, Math.PI / 2, 0.68, 0.22, 0.68),
-    part(cyl(0.5, 0.5, 10), 0xe4443a, 1.0, 0.92, 0, 0, 0, Math.PI / 2, 0.85, 1.5, 0.85),
+    part(cyl(0.5, 0.5, 10), 0xe4513a, 1.0, 0.92, 0, 0, 0, Math.PI / 2, 0.85, 1.5, 0.85),
     part(cyl(0.06, 0.06, 6), STEEL_D, -2.0, 0.5, 0, 0, 0, 1.35, 1, 1.1, 1),
   ]);
 }
@@ -394,7 +394,7 @@ export function skControlTower(): THREE.Object3D {
     const y = 0.8 + ring * 1.15;
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2;
-      const col = (ring + i) % 2 ? 0xd83a34 : CANVAS_W;
+      const col = (ring + i) % 2 ? 0xd84c34 : CANVAS_W;
       p.push(part(box(), col, Math.cos(a) * (W * 0.5 + 0.02), y, Math.sin(a) * (W * 0.5 + 0.02),
         0, -a, 0, 0.10, 1.0, W * 0.52));
     }
@@ -472,8 +472,8 @@ export function skWindsock(): THREE.Object3D {
 /** A small vintage fire tender that has never been used, immaculate. */
 export function skFireTender(): THREE.Object3D {
   return mergedProp([
-    part(box(), 0xb42a24, 0, 0.78, 0, 0, 0, 0, 3.0, 0.85, 1.5),
-    part(box(), 0x8e1f1b, 0.75, 1.45, 0, 0, 0, 0, 1.3, 0.75, 1.4),
+    part(box(), 0xb43e24, 0, 0.78, 0, 0, 0, 0, 3.0, 0.85, 1.5),
+    part(box(), 0x8e2f1b, 0.75, 1.45, 0, 0, 0, 0, 1.3, 0.75, 1.4),
     part(box(), 0x9fc4e8, 1.25, 1.50, 0, 0, 0, 0, 0.35, 0.50, 1.25),
     part(cyl(0.5, 0.5, 10), 0xe8e2d0, -0.9, 1.35, 0, 0, 0, Math.PI / 2, 0.55, 1.1, 0.55),
     part(box(), STEEL, -0.2, 1.30, 0, 0, 0, 0, 1.4, 0.14, 1.3),
@@ -629,7 +629,7 @@ export function skModelPlaneStand(): THREE.Object3D {
     part(box(), 0x8f6f42, 0.80, 0.36, 0, 0, 0, 0, 0.10, 0.72, 0.60),
     part(box(), 0x8f6f42, -0.80, 0.36, 0, 0, 0, 0, 0.10, 0.72, 0.60),
   ];
-  const cols = [0xe4443a, 0xf2ede4, 0x2f6fd0];
+  const cols = [0xe4513a, 0xf2ede4, 0x2f6fd0];
   for (let i = 0; i < 3; i++) {
     const x = -0.6 + i * 0.6;
     p.push(part(cyl(0.04, 0.04, 6), STEEL_D, x, 0.86, 0, 0, 0, 0, 1, 0.28, 1));

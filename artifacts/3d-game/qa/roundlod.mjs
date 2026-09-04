@@ -57,7 +57,34 @@ const BASELINE = 154;
 // happens in the same commit that lowers BASELINE, with the arithmetic in
 // the commit message. 39018 = 39242 measured on the pre-harvest tree,
 // minus 224: two 14x10 -> 10x8 (tailgate.ts:869,883).
-const TRI_BASELINE = 39018;
+//
+// ── A SECOND LEGITIMATE CASE, WHICH THE LINE ABOVE DID NOT ANTICIPATE ──────
+// A NEW WORLD. The rule as written has exactly one way to go up, and shipping
+// world 6 is not it — so this probe went red the first time it ran after
+// SKYLARK FIELD landed, on a delta of one sphere.
+//
+//   39158 = 39018 + 140: skyfield.ts:99, `const sph = () =>
+//   new THREE.SphereGeometry(0.5, 10, 8)`, one shared cached geometry at
+//   2*10*(8-1) = 140 triangles.
+//
+// Priced rather than waved through, and the reasoning is on the record so the
+// next reader can disagree with it:
+//
+//   * It is ONE definition for the whole kit. skyfield.ts routes all twenty of
+//     its sphere sites through a single cached geometry; alpine, luxe,
+//     nightmarket and tailgate each declare theirs inline, which is how they
+//     came to hold 23, 63, 14 and 31 separate calls at nine different
+//     resolutions between them. One shared sphere is the shape this probe
+//     wants more of, not less.
+//   * 10x8 is NOT under-bar debt — the debt line is single-digit on BOTH axes
+//     — and it is finer than the resolution most shipped kits use for the same
+//     job. BASELINE stays at 154 because this adds nothing to it.
+//   * It is never the hero silhouette. World 6 is a field of balloons and not
+//     one envelope is a sphere: they are built by goreDome() at 12 gores,
+//     purpose-made so the gores reach the crown. sph() in that file is a
+//     sheep's body, a hare, a flower, and the whale's eye. A 10x8 eye is not
+//     the "visibly octagonal planter dome" this probe was written about.
+const TRI_BASELINE = 39158;
 
 const DIR = 'src/proto3d';
 const files = readdirSync(DIR).filter((f) => f.endsWith('.ts'));
