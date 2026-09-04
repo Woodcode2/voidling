@@ -195,6 +195,9 @@ const T0_GENERAL = [
   '{P} percent of the market has been enjoyed by our guest so far.',
   'Ponta reports that the guest liked {M} very much indeed.',
   'Our guest is in {D} and having, we think, a lovely time.',
+  'A family has finished their skewers and is watching from the stone stair.',
+  'The queue at Eleven Bowls has not moved and nobody minds.',
+  'A child in a new fox mask has asked to see the purple one again.',
 ];
 const T0_BY_DIST: Record<LnDist, string[]> = {
   torii: ['Please count the gates on your way in. It is traditional.',
@@ -272,6 +275,9 @@ const T1_GENERAL = [
   'Is {D} still there or is that another blank in the ledger?',
   'Management notes that {R} percent of the market remains.',
   'Ponta says the guest ate {M} and looked round for more.',
+  'Attendance is unchanged. Management finds this remarkable.',
+  'The families on the stone stair have been counted twice and match.',
+  'The queue at Eleven Bowls is four long and holding, which is something.',
 ];
 const T1_BY_DIST: Record<LnDist, string[]> = {
   torii: ['One of the gates is missing. We are counting them again.',
@@ -340,6 +346,8 @@ const T2_GENERAL = [
   'It took {M} and did not slow down, so up the stair.',
   '{R} percent of the market is still standing. Everybody up the valley.',
   '{S} seconds, and the drum is still going, so walk toward it.',
+  'The crowd on the stone stair is singing!! Nobody has told them to stop.',
+  'Everybody who was eating is now walking, and most are still eating.',
 ];
 const T2_BY_DIST: Record<LnDist, string[]> = {
   torii: ['The gate is going. GET THROUGH THE GATE.',
@@ -430,6 +438,7 @@ const MEAL_CAR: Pools = [[
   'Three carts are gone from the ledger. So are the lunches inside them.',
   'One barrow is missing and its owner is still holding the handles.',
   'Whose bicycle was that? Management will look into it, from up here.',
+  'Management has logged a bicycle as returned. It was not returned.',
   'Management wants {M} back by morning, please!',
   'Management has sent the guest a bill for {M}, twice.',
 ], [
@@ -540,7 +549,6 @@ const LIVE: Pools = [[
   'Leave {D} now. NOW. Take the person next to you.',
   'It ate {M}!! Leave the rest and get to the bamboo path.',
   'A {F} is standing exactly where {D} used to be.',
-  'The gate is still saying welcome and there is nothing behind it now.',
   'Everything below the bamboo path is gone. Everybody above it is safe.',
   'Is anybody still at {D}? Do not answer, just climb.',
   'Nine hundred lanterns are out. One is still going up the valley.',

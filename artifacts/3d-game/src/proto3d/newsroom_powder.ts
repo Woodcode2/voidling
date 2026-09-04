@@ -197,6 +197,8 @@ const T0_GENERAL = [
   '{D} reports nothing wrong, twice, without being asked.',
   'The desk can confirm {R} percent of the valley is present and correct.',
   'Item: {M} is off the piste map as a precaution.',
+  'The nine o\'clock list had four items. This is the ten o\'clock list.',
+  'Mrs. Tannen has phoned to ask if the list is longer. It is not.',
 ];
 const T0_BY_DIST: Record<PwDist, string[]> = {
   village: ['The chalets report nothing missing except one gnome and one fence.',
@@ -270,6 +272,9 @@ const T1_GENERAL = [
   'The void is in {D}. Do not be in {D}.',
   'Witnesses saw {M} go. The desk saw the paperwork go.',
   'Vern reports {M} gone and his gritting route with it.',
+  'The eleven o\'clock list is shorter than the ten o\'clock list was.',
+  'A caller asks which items came off the list. None of them did.',
+  'Grete phoned the desk at eleven. The desk phoned Grete back at once.',
 ];
 const T1_BY_DIST: Record<PwDist, string[]> = {
   village: ['Three chalets are now two chalets. The desk will count again at noon.',
@@ -338,6 +343,8 @@ const T2_GENERAL = [
   'It took {M} without slowing. The High Shoulder, everyone.',
   '{R} percent of the valley remains. The bulletin remains with it.',
   '{S} seconds!! Uphill, and bring the sled for the little ones.',
+  'The noon list has one item on it!! The desk has read it out twice.',
+  'This list is shorter than the last list, and so is the valley.',
 ];
 const T2_BY_DIST: Record<PwDist, string[]> = {
   village: ['The village is going!! Out the uphill doors, everyone.',
@@ -439,6 +446,7 @@ const MEAL_BIG: Pools = [[
   'Grete says {M} is not where she left it.',
   'Was the lift always this short, or has somebody borrowed the rest?',
   'The snowman contest has lost its tent. The judges\' lunch was inside it.',
+  'Grete says a pylon came out of the mountain like a birthday candle.',
 ], [
   // ── BEAT 3 · ALARM ──
   'The lodge roof went in one piece and the fireplace is still lit!',
@@ -449,7 +457,7 @@ const MEAL_BIG: Pools = [[
   'Norm saw {M} go and went back to his fishing hole.',
 ], [
   // ── BEAT 4 · PANIC ──
-  'The last pylon has gone!! The cable is lying in the snow like string.',
+  'The last pylon has gone!! The cable came down after it, all of it.',
   'That was {M}!! Nothing that big is left to read out.',
   'Is anything that big left? Only the school, and the school is shut.',
   'The plough is up here with us and it is the biggest thing left.',
@@ -500,6 +508,7 @@ const LIVE: Pools = [[
   'Franz asked the {F} to stop on the nursery slope. It stopped.',
   'School is shut for snow, and the {F} gets no credit for it.',
   'One item on the closure list, and it is the school, not {D}.',
+  'Item four on the list is a blue mitten. Item five is {M}.',
   'Top story: the record icicles. Second story, briefly: a {F}.',
   'The skaters report the ice is fine, in a noticeably smaller circle.',
   'Asked about {M}, the desk would rather discuss the snow.',
@@ -513,6 +522,7 @@ const LIVE: Pools = [[
   'Cocoa at the lodge is free now, and nobody is stopping for it.',
   'A {F} is at the school gate. School is shut anyway, for snow.',
   'Has anybody got the cat? The desk will wait while you check.',
+  'The desk measured a {F} this morning and the tape ran out.',
   'The sled hill is shut and is, the desk notes, no longer a hill.',
   'Added under the school on the closure list: {M}.',
   'The dog from the lift queue is up the hill already, ahead of everyone.',
@@ -523,7 +533,7 @@ const LIVE: Pools = [[
   'It has taken {D}!! Everybody from there is up here, counted.',
   '{S} seconds, and the cocoa is going round the drift.',
   'Is anybody still at {D}? Shout once, then climb.',
-  '{P} percent gone!! The desk has reached item two of the list.',
+  '{P} percent gone!! The desk is still on item one.',
   '{S} seconds!! Franz has taught four beginners to stop, and to run.',
   'What is left is {R} percent, and it is all standing up here.',
   'The lift queue is at the very top now, and it is still a queue.',
