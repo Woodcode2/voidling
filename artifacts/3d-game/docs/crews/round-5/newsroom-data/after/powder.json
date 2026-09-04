@@ -1,0 +1,155 @@
+{
+ "world": "powder",
+ "seed": 7,
+ "cards": 20,
+ "matchT": 3.1,
+ "repeats": 0,
+ "uniqueHeads": 20,
+ "openerRun": 2,
+ "openerWord": "the",
+ "unresolvedTokens": 0,
+ "twoSentencePct": 0.3,
+ "questionPct": 0.1,
+ "feed": [
+  {
+   "i": 0,
+   "r": 0.9,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "Good morning, the valley! Grit stocks are described as ample.",
+   "cls": "show"
+  },
+  {
+   "i": 1,
+   "r": 0.9,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "The chairlift ran empty for an hour this morning, just to warm up.",
+   "cls": "show"
+  },
+  {
+   "i": 2,
+   "r": 0.9,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "A toboggan train of eleven children took the Home Run in one piece.",
+   "cls": "show"
+  },
+  {
+   "i": 3,
+   "r": 0.9,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "Every chalet chimney is going and the valley smells of toast.",
+   "cls": "show"
+  },
+  {
+   "i": 4,
+   "r": 0.9,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "Entries for the snowman contest close at noon and stand at eleven.",
+   "cls": "show"
+  },
+  {
+   "i": 5,
+   "r": 1.4,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "The lift opens at nine and the queue formed at seven.",
+   "cls": "show"
+  },
+  {
+   "i": 6,
+   "r": 1.4,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "Grete reports the top station is above the clouds and smug about it.",
+   "cls": "show"
+  },
+  {
+   "i": 7,
+   "r": 2.2,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "A purple guest is doing the rounds of the village. Uninvited but tidy.",
+   "cls": "show"
+  },
+  {
+   "i": 8,
+   "r": 2.2,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "The chairlift swung over something purple. Maintenance found smooth snow.",
+   "cls": "show"
+  },
+  {
+   "i": 9,
+   "r": 3.2,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "The grit road through the village is gritted. Vern says so twice.",
+   "cls": "show"
+  },
+  {
+   "i": 10,
+   "r": 3.2,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "Is the patch at the village on the piste map? The map says no.",
+   "cls": "show"
+  },
+  {
+   "i": 11,
+   "r": 3.2,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "A purple something crossed the Home Run at nine. The groomer will fix it.",
+   "cls": "show"
+  },
+  {
+   "i": 12,
+   "r": 4.4,
+   "brand": "📋 CLOSURES SPECIAL",
+   "head": "Anything you put down is going, so do not put anything down!",
+   "cls": "worried show"
+  },
+  {
+   "i": 13,
+   "r": 4.4,
+   "brand": "📋 CLOSURES SPECIAL",
+   "head": "The village is walking uphill in good order, cocoa first.",
+   "cls": "worried show"
+  },
+  {
+   "i": 14,
+   "r": 6,
+   "brand": "🏔️ THE LAST BULLETIN",
+   "head": "It has taken the village!! Everybody from there is up here, counted.",
+   "cls": "panic show"
+  },
+  {
+   "i": 15,
+   "r": 6,
+   "brand": "🏔️ THE LAST BULLETIN",
+   "head": "The register at the top is complete and 99 percent of the valley is not.",
+   "cls": "panic show"
+  },
+  {
+   "i": 16,
+   "r": 8,
+   "brand": "🏔️ THE LAST BULLETIN",
+   "head": "It has taken the ski rack!! Franz is carrying the skis himself.",
+   "cls": "panic show"
+  },
+  {
+   "i": 17,
+   "r": 8,
+   "brand": "🏔️ THE LAST BULLETIN",
+   "head": "What is left is 99 percent, and it is all standing up here.",
+   "cls": "panic show"
+  },
+  {
+   "i": 18,
+   "r": 11,
+   "brand": "🏔️ THE LAST BULLETIN",
+   "head": "Whose bobble hat is that, and is it too late to fetch it?",
+   "cls": "panic show"
+  },
+  {
+   "i": 19,
+   "r": 11,
+   "brand": "🏔️ THE LAST BULLETIN",
+   "head": "There goes a snack!! The list is no longer alphabetical.",
+   "cls": "panic show"
+  }
+ ]
+}

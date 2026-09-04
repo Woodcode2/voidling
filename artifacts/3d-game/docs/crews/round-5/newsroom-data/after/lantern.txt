@@ -1,0 +1,42 @@
+THE LANTERN FEED — 20 cards, SEED=7, in the order a child meets them
+==============================================================================
+[r 0.9] 🏮 MARKET COURTESY
+         Good evening, night market! Madam Yuzu scrubbed the bathhouse stair twice.
+[r 0.9] 🏮 MARKET COURTESY
+         The offering box at the shrine has one coin in it and a small stone.
+[r 0.9] 🏮 MARKET COURTESY
+         Ponta has sold his first dumpling of the night and would like a photograph.
+[r 0.9] 🏮 MARKET COURTESY
+         Kasa the umbrella is up. It is a clear night. Kasa is aware of this.
+[r 0.9] 🏮 MARKET COURTESY
+         The canal is still and the moon is in it, which is the usual arrangement.
+[r 1.4] 🏮 MARKET COURTESY
+         The drum tower is quiet. The drum tower is nearly always quiet.
+[r 1.4] 🏮 MARKET COURTESY
+         Ponta ate nine of his own dumplings before selling any. This is the record.
+[r 2.2] 🏮 MARKET COURTESY
+         Ponta wrapped a traffic cone to take away. The guest ate the paper.
+[r 2.2] 🏮 MARKET COURTESY
+         Correction: the thing by stall four is a guest, not a puddle.
+[r 3.2] 🏮 MARKET COURTESY
+         The guest is 1 percent of the way round and has not stopped for tea.
+[r 3.2] 🏮 MARKET COURTESY
+         The guest ate the koi food and left the koi entirely alone.
+[r 3.2] 🏮 MARKET COURTESY
+         Ponta has handed the guest a skewer, a napkin and the plate.
+[r 4.4] 📜 MANAGEMENT NOTICE
+         Eleven stalls have stopped trading. Their owners are fine. Their stalls are
+[r 4.4] 📜 MANAGEMENT NOTICE
+         The Warden requests that guests keep to the lit path, where there is one.
+[r   6] 🥁 THE DRUM TOWER
+         The COLOSSUS has 1 percent of the market and wants the stair too.
+[r   6] 🥁 THE DRUM TOWER
+         It is coming up the row. UP THE ROW. Go sideways!
+[r   8] 🥁 THE DRUM TOWER
+         Nine hundred lanterns are out. One is still going up the valley.
+[r   8] 🥁 THE DRUM TOWER
+         The canal has no water in it and the boats are sitting on stones.
+[r  11] 🥁 THE DRUM TOWER
+         One dumpling stopped it for a moment!! Then it took the stall.
+[r  11] 🥁 THE DRUM TOWER
+         Lantern Row is gone. All of it. Leave the carts.

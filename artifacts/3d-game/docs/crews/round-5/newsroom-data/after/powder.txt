@@ -1,0 +1,42 @@
+THE POWDER FEED — 20 cards, SEED=7, in the order a child meets them
+==============================================================================
+[r 0.9] 📻 THE VALLEY BULLETIN
+         Good morning, the valley! Grit stocks are described as ample.
+[r 0.9] 📻 THE VALLEY BULLETIN
+         The chairlift ran empty for an hour this morning, just to warm up.
+[r 0.9] 📻 THE VALLEY BULLETIN
+         A toboggan train of eleven children took the Home Run in one piece.
+[r 0.9] 📻 THE VALLEY BULLETIN
+         Every chalet chimney is going and the valley smells of toast.
+[r 0.9] 📻 THE VALLEY BULLETIN
+         Entries for the snowman contest close at noon and stand at eleven.
+[r 1.4] 📻 THE VALLEY BULLETIN
+         The lift opens at nine and the queue formed at seven.
+[r 1.4] 📻 THE VALLEY BULLETIN
+         Grete reports the top station is above the clouds and smug about it.
+[r 2.2] 📻 THE VALLEY BULLETIN
+         A purple guest is doing the rounds of the village. Uninvited but tidy.
+[r 2.2] 📻 THE VALLEY BULLETIN
+         The chairlift swung over something purple. Maintenance found smooth snow.
+[r 3.2] 📻 THE VALLEY BULLETIN
+         The grit road through the village is gritted. Vern says so twice.
+[r 3.2] 📻 THE VALLEY BULLETIN
+         Is the patch at the village on the piste map? The map says no.
+[r 3.2] 📻 THE VALLEY BULLETIN
+         A purple something crossed the Home Run at nine. The groomer will fix it.
+[r 4.4] 📋 CLOSURES SPECIAL
+         Anything you put down is going, so do not put anything down!
+[r 4.4] 📋 CLOSURES SPECIAL
+         The village is walking uphill in good order, cocoa first.
+[r   6] 🏔️ THE LAST BULLETIN
+         It has taken the village!! Everybody from there is up here, counted.
+[r   6] 🏔️ THE LAST BULLETIN
+         The register at the top is complete and 99 percent of the valley is not.
+[r   8] 🏔️ THE LAST BULLETIN
+         It has taken the ski rack!! Franz is carrying the skis himself.
+[r   8] 🏔️ THE LAST BULLETIN
+         What is left is 99 percent, and it is all standing up here.
+[r  11] 🏔️ THE LAST BULLETIN
+         Whose bobble hat is that, and is it too late to fetch it?
+[r  11] 🏔️ THE LAST BULLETIN
+         There goes a snack!! The list is no longer alphabetical.
