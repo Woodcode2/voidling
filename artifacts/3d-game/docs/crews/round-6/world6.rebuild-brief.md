@@ -107,6 +107,31 @@ other three kits in the game.
 | The wardrobe | **no skylark entry** in `OUTFIT` — all 461 people fall to `OUTFIT.cozy` (Maple's suburb): no hat, no wear list, no prop | `life.ts:893–1001` |
 | Stage ratio | stated three different ways — 5:4:3:2, 4:4:3:3, and computed 2:4:3:5 | `skyfield.ts:47`, `island.ts:5766–5770` |
 
+### The crowd, measured
+
+The crowd survey read the 57-line skylark block against everything `life.ts`
+already knows how to do.
+
+| Fact | Number | Where |
+|---|---|---|
+| Roles cast | **1 of 32** (`kid`). Adults: **0 hats, 0 hand props, 1 garment** (`tee`), 1 shoe | `life.ts:4227` passes no `PersonOpts` |
+| Why | the district id is not an `OUTFIT` key, so every adult falls to `OUTFIT.cozy` — the identical bug `life.ts:952–954` records finding and fixing on Game Day | `life.ts:893`, `:1001` |
+| **What the crowd says** | **Maple's suburb pool**: *"my hedge. my rules."*, *"bin day tomorrow!"*, *"a Tuggle sign appeared overnight"* — at a balloon festival. Panic: *"tell my cat I love her!!"* (the unstyled generic pool). **0 authored skylark crowd lines** | `AMBIENT` / `PANIC` have no skylark keys; `life.ts:5793` fall-through |
+| Kids | **~79 in swimwear**, ~47 in armbands, ~24 in rubber rings, on a cold dawn airfield — `makeCast('kid')` is Pirate Bay's and skylark passes it through. The only world whose children **do not skip** | `life.ts:1260–1272`, `:4227` |
+| What everyone does, frame to frame | walk a 30–44 u straight leg for 20–50 s, stand 2.5–6 s in one shared empty-handed miming pose. **~88% of the match walking in a straight line.** Six cohorts, one behaviour | `life.ts:2763–2782`, `:2950–2966` |
+| The 48 "spectators" | on the pre-errand **random-walk jiggle** in a 6 u tether — never stand, never dwell; the exact motion `qa/purpose.mjs` was written to shame | `life.ts:4276`, `leg: 0` |
+| Job animations that exist | **8** — event manager, kids skip, working, conga, campaigning, protesting, heckling, dancing — one `userData` slot, zero per-frame cost. **Skylark uses 0** | `life.ts:2827–2947` |
+| Hand props | **free at render time** — they weld into the arm mesh that already exists, tinted per person. Maple's campaigner carries leaflets, the server a coffeepot, the coach a clipboard, the dogwalker a leash *and an actual dog on it*. **Skylark carries none** | `life.ts:1160–1166`, `:5050–5056` |
+| The "marshal" | a static post (`skMarshalPost`); the sheep, hare and skylark are static decor | `island.ts:6025`, `skyfield.ts:563` |
+| Leader/follower and a route driver | exist — and are scoped inside Maple's block; a guide leading tourists needs them hoisted | `life.ts:4821`, `:4792` |
+| Bubbles | a single 120-point pool wired to the eat burst; no emitter API | `prototype3d.ts:2935–2950` |
+| Speech bandwidth | **2 bubble slots**; one crowd line every 1.8–3.0 s across 455 people | `bubbles.ts:97`, `life.ts:5766` |
+
+Two more items the rebuild owes the cast, then: **a voice** — `SKYLARK_VOICE_AMBIENT`
+and `_PANIC` pools in the field's own register, keyed per role, so a marshal and
+a tourist do not say the same thing — and **children dressed for a dawn field**,
+in anoraks and bobble hats, who skip.
+
 ---
 
 ## 2. THE TARGET IMAGE
@@ -368,7 +393,7 @@ goes somewhere. Standing still is not a job.
 | **Mr Pym** | 1 | tower balcony | horn (exists — a megaphone) | stands, turns to face the newest departure | white shirt, tie, the only person who never moves |
 | **Dog walker** | 6 | rough, bank | leash (exists) | the long way round | as today |
 
-Four engine additions, all small:
+Six engine additions, all small:
 
 - **Five new hand kinds** — `rope`, `paddle`, `bubblewand`, `camera`, `crook`,
   `balloon` — in the arm-pivot space `life.ts:785` already defines.
@@ -380,6 +405,14 @@ Four engine additions, all small:
 - **A wardrobe**: `OUTFIT` gains an entry per skylark district — hats, hi-vis,
   aprons, anoraks, the wear list and the shoe list — so nobody on this field
   falls through to Maple's suburb.
+- **A voice**: `SKYLARK_VOICE_AMBIENT` / `_PANIC` in `newsroom_skylark.ts`, keyed
+  per role — a marshal ("keep behind the rope, please"), a tourist ("is that one
+  going next?"), ground crew ("hold it — hold it — go"), a kid ("the WHALE!") —
+  registered the way `MAPLE_VOICE_*` and `GAMEDAY_VOICE_*` are, so nobody on
+  this field says "bin day tomorrow".
+- **Kids for a dawn field**: a `kid` override for skylark — anoraks, bobble hats,
+  no swimwear, `dancer.mode = 2` so they skip, and a kid speed band as Game Day
+  gives them.
 
 Acceptance is measured: **≥ 90% of people cast in a role with a hand prop or a
 uniform silhouette**, `qa/purpose.mjs` still passing (journeys ≥ 1/3, drift
@@ -529,6 +562,8 @@ These are not preferences.
 | 19 | Shipped frame: modal colour share / colour buckets | ≤ 20% / ≥ 800 (Maple 1,005) | `qa/shippedlook.mjs` |
 | 20 | Props with r < 1, as a share | ≤ 50% (today 91%) | `qa/_edcount.mjs` |
 | 21 | Every person has an `OUTFIT` entry for their district | 100% | `qa/jobs.mjs` |
+| 21a | Crowd lines drawn from a skylark pool / kids in swimwear | 100% / 0 | `qa/jobs.mjs` |
+| 21b | People in a job pose or carrying a prop at any sampled instant | ≥ 40% (today ~12% empty-handed) | `qa/jobs.mjs` |
 | 22 | The gate | 30 + 3 green | `qa/gate.mjs --profile=push` |
 
 ---
