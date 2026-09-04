@@ -40,7 +40,7 @@ export type StickerTier = 'common' | 'rare' | 'legendary';
 export interface Sticker {
   /** stable id — this is the save key and the art filename. Never rename. */
   id: string;
-  world: 'maple' | 'pirate' | 'gameday' | 'lantern' | 'powder';
+  world: 'maple' | 'pirate' | 'gameday' | 'lantern' | 'powder' | 'skylark';
   /** what the child is told they found */
   name: string;
   /** which district it hides in — shown in the book as the hunting ground */
@@ -338,9 +338,88 @@ const MOONFEST: Sticker[] = [
     art: 'a full moon reflected in a small round dark pool ringed with stones' },
 ];
 
+const SKYLARK: Sticker[] = [
+  // WORLD 6. Twelve, the same count POWDER PASS carries, spread across all nine
+  // districts so no part of the field is a place with nothing in it. The voice
+  // is the field's own — dry, technical, and fond of the people it is about.
+  { id: 'whale-rosette', world: 'skylark', name: "The Whale's Rosette", where: 'The Launch Circle', biome: 'circle',
+    hint: 'Best special shape, eleven years running. She has never once been judged.', tier: 'legendary',
+    art: 'a large blue prize rosette with long ribbons pinned to a wicker balloon basket' },
+  { id: 'pyms-anemometer', world: 'skylark', name: "Mr Pym's Anemometer", where: 'The Tower', biome: 'tower',
+    hint: 'Accurate to a tenth of a knot. It has never been asked the right question.', tier: 'legendary',
+    art: 'a small brass cup anemometer spinning on top of a weathered wooden post' },
+  { id: 'first-skylark', world: 'skylark', name: 'The First Skylark', where: 'The Rough', biome: 'meadow',
+    hint: 'Up before the burners every morning, singing at nothing in particular.', tier: 'legendary',
+    art: 'a small brown skylark hovering above long meadow grass, wings blurred' },
+  { id: 'gretes-binoculars', world: 'skylark', name: "Grete's Binoculars", where: 'The Perimeter', biome: 'perimeter',
+    hint: 'She saw it first. She has mentioned this four times.', tier: 'rare',
+    art: 'a pair of old black binoculars hanging by their strap from a wooden fence post' },
+  { id: 'sheep-of-zero-nine', world: 'skylark', name: 'The Sheep Of Zero Nine', where: 'The Runway', biome: 'runway',
+    hint: 'Asked to move since 1968. Position unchanged.', tier: 'rare',
+    art: 'a single woolly sheep standing calmly on a mown grass runway' },
+  { id: 'rosette-board', world: 'skylark', name: 'The Rosette Board', where: 'The Hangars', biome: 'hangars',
+    hint: 'Thirty years of them. The committee reads it like a family album.', tier: 'rare',
+    art: 'a wooden board covered in dozens of faded coloured prize rosettes' },
+  { id: 'hares-form', world: 'skylark', name: "The Hare's Form", where: 'The Rough', biome: 'meadow',
+    hint: 'A dent in the long grass, exactly hare-shaped, recently vacated.', tier: 'rare',
+    art: 'a hare-shaped hollow pressed into a patch of long meadow grass' },
+  { id: 'franz-gloves', world: 'skylark', name: "Franz's Gloves", where: 'The Launch Field', biome: 'launchfield',
+    hint: 'He cannot find them. They are in his pocket. They are always in his pocket.', tier: 'common',
+    art: 'a pair of thick brown leather gauntlet gloves lying on mown grass' },
+  { id: 'last-bacon-roll', world: 'skylark', name: 'The Last Bacon Roll', where: 'Breakfast Row', biome: 'breakfast',
+    hint: 'Made at half past four. Still warm. Nobody will admit to wanting it.', tier: 'common',
+    art: 'a bacon roll on a paper napkin beside a large steel tea urn' },
+  { id: 'thirty-pence-teapot', world: 'skylark', name: 'The Thirty Pence Teapot', where: 'The Hangars', biome: 'hangars',
+    hint: 'Tea is thirty pence. It has been thirty pence since the flea market began.', tier: 'common',
+    art: 'a big dented aluminium teapot on a trestle table' },
+  { id: 'old-windsock', world: 'skylark', name: 'The Old Windsock', where: 'The Runway', biome: 'runway',
+    hint: 'Came down in the March gales. Nobody has been in a hurry about it.', tier: 'common',
+    art: 'a faded orange striped windsock lying on grass beside its fallen mast' },
+  { id: 'retrieve-map', world: 'skylark', name: 'The Retrieve Map', where: 'The Arrivals Field', biome: 'arrivals',
+    hint: 'Folded wrong for thirty years, and it has never once got anybody lost.', tier: 'common',
+    art: 'a creased paper road map folded badly on the bonnet of a green land rover' },
+];
+
+const SNOWDAY: Sticker[] = [
+  // POWDER PASS declared SNOW DAY and hid nothing in it. Every other season
+  // carries four; for eighteen days a year world 5's season was a ribbon, a
+  // palette swap and a book that opened on the same twelve cells as any other
+  // day. qa/stickerreg.mjs fails on a season nobody can hunt.
+  { id: 'snow-day-bell', world: 'powder', event: 'snowday', name: 'The Snow Day Bell', where: 'The Village', biome: 'village',
+    hint: 'Rung once, at six in the morning, by somebody who has waited all year.', tier: 'legendary',
+    art: 'a brass handbell standing upright in deep snow outside a school door' },
+  { id: 'thermos-of-record', world: 'powder', event: 'snowday', name: 'The Bottomless Thermos', where: 'The Lodge', biome: 'lodge',
+    hint: 'Poured eleven cups. Has not been refilled. The lodge does not discuss it.', tier: 'rare',
+    art: 'a battered tartan thermos flask with its cup beside it on a timber bench' },
+  { id: 'abandoned-homework', world: 'powder', event: 'snowday', name: 'The Abandoned Homework', where: 'The Village', biome: 'village',
+    hint: 'Due Monday. Monday has been cancelled.', tier: 'common',
+    art: 'an open school exercise book half buried in snow, pages lifting' },
+  { id: 'sledding-queue-sign', world: 'powder', event: 'snowday', name: 'The Forty Minute Sign', where: 'The Home Run', biome: 'piste',
+    hint: 'Forty minutes from this point. Nobody has ever left the queue.', tier: 'common',
+    art: 'a hand-painted wooden sign on a post standing in trampled snow' },
+];
+
+const NIGHTGLOW: Sticker[] = [
+  // SKYLARK FIELD's season. The night glow is the real thing a balloon meet is
+  // famous for: nobody flies, the envelopes stand tethered after dark and every
+  // burner fires together on a count. Four, as every other season carries four.
+  { id: 'glow-baton', world: 'skylark', event: 'nightglow', name: "The Glow Conductor's Baton", where: 'The Launch Circle', biome: 'circle',
+    hint: 'Ninety-one burners, on the count of three. He has never needed a second go.', tier: 'legendary',
+    art: 'a slim white conductor baton resting on the rim of a wicker balloon basket' },
+  { id: 'tethered-whale', world: 'skylark', event: 'nightglow', name: 'The Whale, Lit', where: 'The Launch Field', biome: 'launchfield',
+    hint: 'She does not fly tonight. She glows, which the committee prefers.', tier: 'rare',
+    art: 'a whale shaped hot air balloon standing tethered and glowing from within at night' },
+  { id: 'glow-programme', world: 'skylark', event: 'nightglow', name: 'The Night Glow Programme', where: 'Breakfast Row', biome: 'breakfast',
+    hint: 'Sixpence. Lists every balloon in the order they will light.', tier: 'common',
+    art: 'a folded paper programme with a hot air balloon printed on the cover' },
+  { id: 'last-burner', world: 'skylark', event: 'nightglow', name: 'The Last Burner', where: 'The Tower', biome: 'tower',
+    hint: 'Fires one beat after the rest, every year, by somebody who cannot count.', tier: 'common',
+    art: 'a single hot air balloon burner firing a bright flame upward against a dark sky' },
+];
+
 export const STICKERS: Sticker[] = [
-  ...MAPLE, ...PIRATE, ...GAMEDAY, ...LANTERN, ...POWDER,
-  ...HARVEST, ...REGATTA, ...HOMECOMING, ...MOONFEST,
+  ...MAPLE, ...PIRATE, ...GAMEDAY, ...LANTERN, ...POWDER, ...SKYLARK,
+  ...HARVEST, ...REGATTA, ...HOMECOMING, ...MOONFEST, ...SNOWDAY, ...NIGHTGLOW,
 ];
 // VISIBILITY IS THE ONE RULE, APPLIED IN ONE PLACE. A seasonal sticker exists
 // — to the placer, the book grid, every count and every hint — while its

@@ -254,6 +254,10 @@ const SUITE = [
     cmd: ['node', 'qa/worldlists.mjs'], verdict: pf,
     why: 'no probe in qa/ believes in a game with fewer worlds than exist — the gate itself had a five-world list on the day world 6 shipped, and twenty-three probes were still frozen at world 4' },
 
+  { id: 'stickerreg', tier: 'quality', profiles: ['push', 'live'], timeout: 30,
+    cmd: ['node', 'qa/stickerreg.mjs'], verdict: pf,
+    why: 'every world hides things worth finding and every season is something a child can hunt — a world with no stickers ships a picker card whose invitation reads "✨ 0 SECRETS"' },
+
   { id: 'worldreg', tier: 'build', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/worldreg.mjs'], verdict: pf,
     why: 'every per-world table knows every world the game renders — a missing row is never a crash, it is a silent `?? maple` and a world quietly running on another world\'s numbers' },

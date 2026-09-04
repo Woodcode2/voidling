@@ -1731,6 +1731,39 @@ function makeSeasonProp(ev: SeasonEvent, i: number): THREE.Object3D {
       part(cyl(), 0x6b4a33, 0.06, 0.16, -0.30, 0, 0, Math.PI / 2, 0.10, 1.34, 0.10),
       part(cone(), col, 0.70, 0.40, 0, 0, 0, -Math.PI / 2, 0.40, 0.34, 0.60),
     ]));
+  } else if (ev.id === 'nightglow') {
+    // THE NIGHT GLOW — "every burner on the field, on the count of three."
+    // A tethered envelope standing on the grass with its burner lit: the one
+    // evening nobody flies, so the balloon is UP but going nowhere.
+    //
+    // THE CROWN RULE, from skyfield.ts's header, applies here as much as it
+    // does to the forty envelopes on the launch field: the gores reach the
+    // crown so the top reads as a pinwheel rather than a dome, a dark crown
+    // ring sits at the very top as the pupil, and the skirt below is a
+    // contrasting dark lifted clear of the ground so the envelope reads as
+    // standing rather than melting into the grass.
+    //
+    // …and, like SNOW DAY's sleds, COLOUR IS THE POINT. This season runs in
+    // MAY on a green field under a warm low sun — a green or a pale envelope
+    // would be one more thing the same colour as everything else. Three
+    // saturated fabrics, rotating, so a field of them reads as a meet and not
+    // as a print: the meet's own violet, a burner orange and a signal red.
+    const FABRIC = [0x8f6fd8, 0xff8a3a, 0xe4453f];
+    const col = FABRIC[i % 3];
+    g.add(mergedProp([
+      // the basket, and the two uprights the burner hangs from
+      part(cyl(), 0xb08d5a, 0, 0.22, 0, 0, 0, 0, 0.46, 0.44, 0.46),
+      part(cyl(), 0x6b6b7a, 0.16, 0.62, 0, 0, 0, 0, 0.05, 0.52, 0.05),
+      part(cyl(), 0x6b6b7a, -0.16, 0.62, 0, 0, 0, 0, 0.05, 0.52, 0.05),
+      // THE FLAME, the whole reason this season exists. Bright, warm, and the
+      // brightest thing on the prop, sitting in the mouth where a burner is.
+      part(cone(), 0xffd23f, 0, 1.02, 0, 0, 0, 0, 0.30, 0.44, 0.30),
+      // the dark skirt, lifted clear, so the envelope stands off the grass
+      part(cone(), 0x3a3350, 0, 1.30, 0, 0, 0, 0, 0.86, 0.52, 0.86),
+      // the envelope, and the crown ring reading as its pupil
+      part(sph(), col, 0, 2.16, 0, 0, 0, 0, 1.62, 1.86, 1.62),
+      part(cyl(), 0x3a3350, 0, 2.96, 0, 0, 0, 0, 0.36, 0.10, 0.36),
+    ]));
   } else {
     // An id that is not in EVENTS cannot arrive through eventForWorld(); this is
     // the corrupt-value path. It gets a lantern rather than an invisible prop,
