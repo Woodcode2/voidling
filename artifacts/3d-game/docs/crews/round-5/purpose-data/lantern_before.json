@@ -6,10 +6,11 @@
  "people": 971,
  "moving": 971,
  "still": 0,
- "driftMedian": 0.255,
- "driftP90": 0.554,
- "homeMedian": 0.832,
- "turnMedian": 91.6,
- "targets": 151,
- "arrivals": 254
+ "driftMedian": 0.245,
+ "driftP90": 0.569,
+ "homeMedian": 0.833,
+ "turnMedian": 91.5,
+ "journeys": 73,
+ "travellers": 73,
+ "travellerPct": 0.075
 }
