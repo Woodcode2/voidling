@@ -79,11 +79,40 @@ const flags = Object.fromEntries(argv.filter((a) => a.startsWith('--')).map((a) 
 const pos = argv.filter((a) => !a.startsWith('--'));
 const WORLD = pos[0] || 'all';
 const PORT = pos[1] || '4177';
-const WORLDS = WORLD === 'all' ? ['maple', 'pirate', 'gameday', 'lantern', 'powder'] : [WORLD];
+// THE WORLD LIST IS READ FROM THE SOURCE OF TRUTH, NOT TYPED HERE. island.ts's
+// WorldId union is the only place that knows how many worlds this game has, and
+// a probe with its own hand-typed copy silently stops covering the newest one —
+// the world 6 contract found fifteen probes in exactly that state, each printing
+// a clean verdict about a game that had moved on.
+const ALL_WORLDS = (() => {
+  const src = fs.readFileSync(new URL('../src/proto3d/island.ts', import.meta.url), 'utf8');
+  const m = /export type WorldId =([^;]+);/.exec(src);
+  if (!m) throw new Error('placement: cannot read the WorldId union from src/proto3d/island.ts');
+  const ids = [...m[1].matchAll(/'([a-z0-9]+)'/g)].map(([, id]) => id);
+  if (!ids.length) throw new Error('placement: WorldId union parsed to nothing');
+  return ids;
+})();
+const WORLDS = WORLD === 'all' ? ALL_WORLDS : [WORLD];
+/** The worlds worldData() below can actually describe. It lives up here rather
+ *  than beside the chain because the startup assertion needs it, and a list that
+ *  is checked is worth more than a list that is adjacent. */
+const KNOWN = ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
 const SHOTS = flags.shots || null;
 const SHOTS_PER_CAT = Number(flags.n || 3);
 const JSON_OUT = flags.json || null;
 const SRC = process.env.SRC ? new URL('file://' + path.resolve(process.env.SRC) + '/') : new URL('../src/', import.meta.url);
+
+// AND THE TWO LISTS MUST AGREE. KNOWN is what worldData() can describe; the
+// WorldId union is what the game ships. A world in the union and not in KNOWN is
+// the exact hole this file had: auditable in name, unauditable in fact.
+{
+  const missing = ALL_WORLDS.filter((w) => !KNOWN.includes(w));
+  if (missing.length) {
+    console.log(`FAIL — placement: ${missing.join(', ')} ship in WorldId but worldData() cannot describe ` +
+      `${missing.length > 1 ? 'them' : 'it'}. Add the case before auditing, or the audit says "road 0 ok" and passes.`);
+    process.exit(1);
+  }
+}
 
 // ── bars (3D units; 1 unit = 20 world units; the void starts ~0.8 radius) ─
 const ROAD_LIP = 0.25;     // a footprint this far onto the asphalt is ON the road
@@ -147,6 +176,13 @@ function worldData(wid) {
     d.roads.push({ name: 'CANAL', pts: P(pts('CANAL', s)), half: w3len(num(/export const CANAL_HALF = (\d+);/, s, 'CANAL_HALF')), kind: 'water' });
     const e = ellipse('BATHHOUSE', s); d.ellipses.push({ name: e.name, cx: w3(e.cx), cz: w3(e.cy), rx: w3len(e.rx), rz: w3len(e.ry) });
   }
+  // EVERY WORLD MUST BE KNOWN HERE. Until 2026-09-04 this chain was five ifs
+  // with no default and no throw, so a world it had never heard of got an empty
+  // road set, an empty pier set and no ellipses — and the audit then printed
+  // "road 0 ok / roadend 0 ok" and PASSED. A sixth world would have been born
+  // clean against the one instrument built for the owner's sharpest complaint.
+  // The guard is at the END of the chain rather than the top so it lists what
+  // it does know.
   if (wid === 'powder') {
     const s = read('proto3d/powder.ts');
     d.roads.push({ name: 'GRIT', pts: P(pts('GRIT', s)), half: w3len(num(/export const GRIT_HALF = (\d+);/, s, 'GRIT_HALF')), kind: 'road' });
@@ -155,6 +191,11 @@ function worldData(wid) {
     // snowmen and drifts onto it by design, so a prop on it is info — a TREE
     // rooted in it (qk 'pine') is water
     for (const n of ['LODGE', 'LAKE']) { const e = ellipse(n, s); d.ellipses.push({ name: e.name, cx: w3(e.cx), cz: w3(e.cy), rx: w3len(e.rx), rz: w3len(e.ry), ice: n === 'LAKE' }); }
+  }
+  if (!KNOWN.includes(wid)) {
+    throw new Error(`placement: no roads, piers or precincts are defined for world "${wid}". ` +
+      `Add its case to worldData() before auditing it — an unknown world reports ` +
+      `"road 0 ok" and passes, which is worse than no audit at all. Known: ${KNOWN.join(', ')}.`);
   }
   return d;
 }
@@ -461,5 +502,11 @@ for (const wid of WORLDS) {
 }
 await b.close();
 if (JSON_OUT) fs.writeFileSync(JSON_OUT, JSON.stringify(results, null, 1));
-console.log(`\nPLACEMENT ${anyFail ? 'FAIL' : 'PASS'} — ${WORLDS.join(',')}  (bars: road lip ${ROAD_LIP}, float ${FLOAT_TOL}, buried top ${SUNK_TOL}, overlap ${OVERLAP_TOL}, door ${DOOR_CLEAR}, ground ${GROUND_H})`);
+// A BARE "PASS — " / "FAIL — " LINE, because that is what qa/gate.mjs's verdict
+// matcher reads. It used to print "PLACEMENT PASS — ", which matches nothing,
+// and a step whose verdict cannot be parsed cannot be registered.
+console.log(`\nplacement bars: road lip ${ROAD_LIP}, float ${FLOAT_TOL}, buried top ${SUNK_TOL}, overlap ${OVERLAP_TOL}, door ${DOOR_CLEAR}, ground ${GROUND_H}`);
+console.log(anyFail
+  ? `FAIL — placement: ${WORLDS.join(',')} — props standing somewhere they did not earn`
+  : `PASS — placement: ${WORLDS.join(',')} — every prop earns the spot it stands on`);
 process.exit(anyFail ? 1 : 0);
