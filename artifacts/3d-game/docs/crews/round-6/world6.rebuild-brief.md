@@ -30,6 +30,12 @@ never called.
 MAPLE FALLS — a sleepy autumn town — has one hot-air balloon drifting in its sky,
 animated every frame. SKYLARK FIELD, the balloon festival, has zero.
 
+The shipped play frame (`qa/out/shippedlook/skylark_look.png`, 430×932): the
+void on a flat saturated lawn, one person, four grass tufts, a flower clump,
+the corner of a blue box. No balloon, no runway, no tower, no sky. **43.7% of
+the pixels are one green.** Two soft shadows in the lower half are cast by
+something out of frame — the closest the frame comes to showing a balloon.
+
 The design document (`world6.design.md`) said, before a line was written, *"That
 one rule is the whole level, a six-year-old works it out in ten seconds."* The
 judge on that design said *"write the probe before the mechanic."* The mechanic
@@ -62,6 +68,7 @@ three other instructions from the same page that were not carried out.
 | Beats | 4 (design demanded 6); beat 1 is the only opener in the game that changes nothing on screen | `prototype3d.ts:3958` |
 | Beat cues that reach the world | `parade`, `goat`, `bandfield` only — a hand-typed whitelist. `sheep`, `whale` never fire | `prototype3d.ts:8914` |
 | …and Powder's `avalanche` | **never fires either.** "The mountain is coming to you" — it has never come. 22 snowballs never created | same line; `life.ts:4179` handler unreachable |
+| `qa/beattruth.mjs` (new, gate) | **FAILED** on `avalanche` before the dispatch fix; **PASSES** after, with `sheep`, `whale`, `contest` frozen as named debt | commit `c17dc56` |
 | Renderer | shadow maps ON (PCF, half-rate); EffectComposer + UnrealBloom; per-world Fog(420–1500); sprites/points in use; contact-shadow discs | `prototype3d.ts:143–230`, `:158`, `island.ts:656` |
 | Look-up pose | `limbs.head.rotation.x` already animated (0.3, −0.12) — looking up is a number, not a new pose | `life.ts:2855`, `:2901` |
 | Sensitivity of the one land change | runway half 500→260 and perimeter 200→170: placeable **41.0% → 55.9%** (+36% usable). Two runways + a 900 circle: **63.4%** (+55%) | sweep on the real coast |
@@ -75,6 +82,30 @@ written"* list, and what shipped:
 | The ascension, as a third prop state, denominator decremented, probe first | Not built. `devouredPct = consumed / initialMass`; `initialMass` only ratchets up |
 | Six beats; beat 1 becomes "the first balloon of the morning going up" | Four; beat 1 names what is already happening |
 | The whale lies, stands, then leaves | Lies |
+
+### The kit, measured
+
+The prop-kit survey instantiated all 50 factories and compared them to the
+other three kits in the game.
+
+| Fact | Number | Where |
+|---|---|---|
+| Factories / parts per factory | **50 factories, 9.4 parts each** — the most names and the least matter (luxe 35.3, tailgate 23.8, alpine 20.6) | `skyfield.ts`, instrumented `part()` |
+| **The balloon envelope** | **36 tapered boxes, zero round parts** — so `mergedProp` puts it on the FLAT-shaded material | `goreDome()`, `skyfield.ts:109–131` |
+| Balloons standing, in the whole world | **29** of 150 envelopes; 121 lie flat | census at SEED=7 |
+| Tallest object on the field | **9.48 u** (`skBalloonStanding`); nothing over 10 | height census |
+| Gloss | **never registered** — 0.43% of vertices glossy, 0.00% strong (Powder 58.5%, Game Day 29.5%). Every steel frame, bottle, van and tower is dead matte | `registerGloss`: 0 calls |
+| Glow | **1 placed glow prop**, 0.26 u across. `skPilotFlame` — the kit's only fire — is never placed. Breakfast Row, "the warmest-lit thing on the field" per its own header, is unlit | `PROP_GLOW_MAT` uses |
+| Colours graded by `formsep` | **19%** — 64 of 79 hexes are inline literals the probe cannot see. Every envelope colour and the whale's cobalt are ungraded | `qa/formsep.mjs:132` |
+| The control tower — the only landmark silhouette | **6 facet directions**, 100% axis-aligned: a stack of boxes. Median distinct facets: skyfield 22, alpine 78, luxe 152 | face-normal census |
+| Props with r < 1 | **91%** — 2,782 of 3,051, from three grass factories totalling 20 parts. Game Day: 28% | census |
+| Colour buckets in the shipped frame | **522**, 5th of 6 worlds; one green is 43.7% | 4-bit histogram |
+| Triangles | **1.57M** vs Game Day's 4.06M — **2.5M of headroom** | scene traversal |
+| Dead factories | `skWhaleStanding` (52 parts, the kit's biggest), `skBurnerFrame`, `skPilotFlame` — never placed | `grep -rn` |
+| Special shapes the design promised | **1 of 5** (whale; no bee, teapot, tortoise, cottage). Also absent: the retrieve Land Rover, the met balloon, the lattice windsock | `world6.design.md:396` |
+| Festival infrastructure | **none** — 0 tents, marquees, banners, bunting, barriers, gantries, stages, toilets. Tailgate has canopy, pennant string, banner, ticket gate, portaloo | `grep` |
+| The wardrobe | **no skylark entry** in `OUTFIT` — all 461 people fall to `OUTFIT.cozy` (Maple's suburb): no hat, no wear list, no prop | `life.ts:893–1001` |
+| Stage ratio | stated three different ways — 5:4:3:2, 4:4:3:3, and computed 2:4:3:5 | `skyfield.ts:47`, `island.ts:5766–5770` |
 
 ---
 
@@ -290,6 +321,21 @@ Where it comes from, in order of yield:
    (3D).
 5. **The rock stacks** on the north coast — four to six, 9–14 units tall,
    `big`, the vertical landmark the poster frame is missing.
+6. **The kit gets its matter back.** 9.4 parts per factory becomes **≥ 20**
+   (alpine's figure) on every prop the camera reaches; the tower stops being a
+   box stack (balcony, railings, glazing bars, a mast, an anemometer); the
+   whale keeps her 52 parts and *is placed standing*. The 140-part house
+   budget exists to be used.
+7. **The five special shapes**, as promised: the whale, a bee, a teapot, a
+   tortoise, a cottage with a chimney — each its own factory, each in a
+   different stage, because from overhead they are the only non-circular
+   discs on the field and they stop the launch field reading as a pattern.
+8. **Festival infrastructure**: a marquee, four gazebos, bunting strung
+   between every pair of flagpoles, a banner over the arrivals gate, crowd
+   barriers along the perimeter fence, a PA on a gantry by the tower, a
+   toilet block, the retrieve Land Rover (the sticker book already names
+   her), the met balloon on its string, two lattice windsock masts that
+   disagree.
 
 ### 3D. THE CAST — five hundred people, every one with a job
 
@@ -322,7 +368,7 @@ goes somewhere. Standing still is not a job.
 | **Mr Pym** | 1 | tower balcony | horn (exists — a megaphone) | stands, turns to face the newest departure | white shirt, tie, the only person who never moves |
 | **Dog walker** | 6 | rough, bank | leash (exists) | the long way round | as today |
 
-Three engine additions, all small:
+Four engine additions, all small:
 
 - **Five new hand kinds** — `rope`, `paddle`, `bubblewand`, `camera`, `crook`,
   `balloon` — in the arm-pivot space `life.ts:785` already defines.
@@ -331,6 +377,9 @@ Three engine additions, all small:
   walking. Spectators also swing arms (the clap). Tourists fire a flash sprite.
 - **Bubbles**: 6–10 sprites per cleaner dwell, rising 3 u/s with a sine wobble,
   popping at 4–6s. Sprites exist; this is a particle behaviour of ~30 lines.
+- **A wardrobe**: `OUTFIT` gains an entry per skylark district — hats, hi-vis,
+  aprons, anoraks, the wear list and the shoe list — so nobody on this field
+  falls through to Maple's suburb.
 
 Acceptance is measured: **≥ 90% of people cast in a role with a hand prop or a
 uniform silhouette**, `qa/purpose.mjs` still passing (journeys ≥ 1/3, drift
@@ -388,6 +437,24 @@ whole-frame difference. It has to be *used*.
 - **Motion.** Nothing on a AAA field is still: fans spin (rotation.y), envelopes
   in Cold stage **breathe** (scale.y ±2% at 0.3 Hz), flags and the windsock
   stream, bubbles rise, shadows slide, balloons bob.
+- **The envelope is round.** `goreDome()` builds a balloon out of 36 boxes and
+  the engine shades it flat. It becomes a lathed gore surface — a real curved
+  envelope with the gores as a colour band, not as geometry — so it lands on
+  the smooth material, catches the dawn as a sphere does, and reads as fabric.
+  This is the one object the owner asked for, and it has to be the best thing
+  in the kit.
+- **Gloss.** The kit registers a gloss palette like every other kit does:
+  steel (burner frames, bottles, the tower's glazing bars) strong; painted
+  metal (vans, the tractor, the caravans) medium; wicker, canvas and grass
+  none. Target **≥ 40% of vertices glossy** (Game Day 29.5%, Powder 58.5%).
+- **Glow.** A `lit()` helper as alpine declares one. Every burner is a
+  `PROP_GLOW_MAT` mesh; the bacon van's hatch, the tea urn, the tower's
+  windows and the doughnut trailer's sign glow warm; `skPilotFlame` is placed
+  under every standing envelope. Target **≥ 120 placed glow meshes** (today:
+  1).
+- **Name every colour.** 64 of 79 hexes are inline literals `qa/formsep.mjs`
+  cannot grade. Every hex in the kit becomes a named constant — the envelope
+  liveries first — so "skylark passes at 68/68" means 79/79.
 - **The renderer's rules stay**: merged props, vertex colours, no textures in
   the kit, 14×10 spheres for anything the camera gets close to (the whale's
   eye, `qa/roundlod.mjs`), one edible one radius.
@@ -457,7 +524,12 @@ These are not preferences.
 | 14 | Newsroom | 0 repeats, opener run ≤ 2 | `qa/newsfeed.mjs` |
 | 15 | Par | re-measured, 5 matches, worst place ≤ 3rd | `qa/ab.mjs` |
 | 16 | Frame budget | inside today's | `qa/trackprofile.mjs --gate` |
-| 17 | The gate | 29 + 3 green | `qa/gate.mjs --profile=push` |
+| 17 | Kit: parts per placed factory / gloss share / placed glow meshes | ≥ 20 / ≥ 40% / ≥ 120 | `qa/kitfit.mjs` extended |
+| 18 | Kit: named colours / envelope on the smooth material | 100% / yes | `qa/formsep.mjs` |
+| 19 | Shipped frame: modal colour share / colour buckets | ≤ 20% / ≥ 800 (Maple 1,005) | `qa/shippedlook.mjs` |
+| 20 | Props with r < 1, as a share | ≤ 50% (today 91%) | `qa/_edcount.mjs` |
+| 21 | Every person has an `OUTFIT` entry for their district | 100% | `qa/jobs.mjs` |
+| 22 | The gate | 30 + 3 green | `qa/gate.mjs --profile=push` |
 
 ---
 
