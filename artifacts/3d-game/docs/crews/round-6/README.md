@@ -49,3 +49,49 @@ verified each one by reading the source rather than taking the report:
   added, and nothing anywhere says so. This is the contract's own thesis,
   already true: *a world added to the game must be added to every table, and the
   tables keyed by an if-chain are the silent ones.*
+
+## The owner's decision — 2026-09-04
+
+> "These are all really excellent. Let's go with the first one. But later once
+> we're live let's explore the other two. Build the first one to AAA quality."
+
+**SKYLARK FIELD is the build.** FEEDING TIME (Crater Park Zoo) and TIDE TABLE are
+held for post-launch and are recorded in full in `world6.design.md` so neither
+has to be re-derived.
+
+A disused grass-and-concrete airfield floating in space, and once a year, for one
+morning, a hundred hot air balloons come to it. A match is that morning —
+trailers arriving in the dark to the mass ascension at sunrise, compressed to
+three minutes. **The food escapes upwards.** Eat the balloon first and you get
+the balloon; eat the ropes first and it goes up without you, and everybody waves
+at it.
+
+### What must be settled BEFORE the land module is written
+
+The concept's own judge named two, and neither is a matter of opinion:
+
+1. **Occlusion.** A twenty-metre standing envelope at 225° down can hide the
+   child's own void, which this game may never do. Measure it at 430×932 with a
+   stand-in before any balloon factory is written. If the answer is "balloons
+   must be shorter than they are", the world survives; if it is "the field holds
+   four standing at once", the promise thins and the design changes.
+2. **Starvation.** It is the smallest island proposed (~35 Mu² against Powder's
+   45) and three runways at half-width 500 cover half of it. Powder starved its
+   child driver at 403–3,253 points on 843 edibles against Maple's 5,790. Count
+   before `WORLD_PAR` is written, not after.
+
+And two the judge found in the concept's own geometry, to be fixed on paper:
+**three of the six runway thresholds as written fall off the island**, and **two
+of the three runway designators disagree with their own bearings.**
+
+### And two instrument gaps that must close first
+
+From `world6.contract.md`, both verified by reading the source. These go in
+before world 6's land module exists, because otherwise the world is built against
+an instrument that cannot see it:
+
+- `qa/placement.mjs` is in **no gate profile** (`grep -c placement qa/gate.mjs`
+  → 0). The auditor built for "you have trees on roads" runs only when somebody
+  remembers.
+- `worldData()` at `qa/placement.mjs:125` has five `if`s, no default and no
+  throw. Point it at an unknown world and it prints `road 0 ok` and PASSES.
