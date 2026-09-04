@@ -161,3 +161,31 @@ The island is its own shape now, nothing is standing in an invisible pond and
 nothing is standing in space. The 2,417 road hits are the next silent
 obligation and the biggest one: **the populate block**. Until SKYLARK FIELD has
 its own, props are scattered by a fallback that has never heard of a runway.
+
+## The placement ceiling, verified
+
+`SEED=7 node qa/placement.mjs <world> 4177 --ceiling=qa/placement.baseline.json`,
+all five shipped worlds, on the build at the gate registration:
+
+```
+PASS — placement: maple    PASS — placement: lantern
+PASS — placement: pirate   PASS — placement: powder
+PASS — placement: gameday
+```
+
+434 offenders held under a frozen ceiling — **held, not fixed**, and the audit
+now says so in its own output every run. Registered as push gate step 22.
+
+Two things about that number are worth stating plainly, because both were
+tempting to hide:
+
+- **It is A1's residue, not a discovery and not a regression.** Stream A1
+  measured this game, diagnosed it prop by prop, and fixed the bulk of it —
+  Maple's overlap 451 → 116, Pirate's road 109 → 15, Lantern's water 378 → 3.
+  What nobody did was wire the probe in, so the residue has been unguarded.
+- **`SEED=7` does not pin this audit**, which I assumed it would and it does
+  not. Two seeded runs on one build: maple `inside` 4 → 3 and `overlap`
+  113 → 116; pirate `offisland` 5 → 4 and `overlap` 56 → 59. Everything else
+  reproduced exactly. Those four categories carry +3 of headroom; the other
+  eleven are exact. The headroom is an admission that the measurement is noisy,
+  not permission for three more offenders.
