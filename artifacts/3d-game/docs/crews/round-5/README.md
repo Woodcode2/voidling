@@ -187,3 +187,6 @@ KILLED groups are recorded here, never hidden.
   turning down from ~100°/s to 1-10°/s**, and Maple's placement row bit-identical, so no
   seeded draw was added. Verdict and four recorded corrections to my own work — including a
   paired run that compared the same code to itself — in `purpose.proposal.md`.
+- **06:40 UTC — gate on the purpose build:** `node qa/gate.mjs --profile=push --port=4177`
+  on a quiet box: **PASS, 18/18** (the 18th is the new `purpose` step, all five worlds,
+  1614s). main fast-forwarded to this commit.

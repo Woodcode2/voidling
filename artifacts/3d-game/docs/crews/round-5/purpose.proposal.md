@@ -156,6 +156,13 @@ change reads inside 3, overlap 116 — identical to the row Stream A recorded fo
   as "went in and came out" to a six-year-old at a top-down camera. A real version needs ~12
   samples per leg; three would buy the appearance of a fix.
 
+## The gate
+
+`node qa/gate.mjs --profile=push --port=4177` on a quiet box, 05:33-06:40 UTC:
+**PASS, 18/18, every step reached its own conclusion** (log in
+`purpose-data/gate-purpose.log`). The 18th is the new `purpose` step — all five worlds, 1614
+seconds, the same bars this proposal pre-registered. main fast-forwarded to this commit.
+
 ## What I could not verify
 
 - **Frame cost on a real device.** The design removes work (a standing person's three
