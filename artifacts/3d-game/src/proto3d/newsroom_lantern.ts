@@ -666,7 +666,12 @@ export function pickLanternNews(ctx: LanternCtx, rnd: () => number = Math.random
     // phase 0 is the pool a child meets FIRST in every match, so it is the last
     // place a metronome belongs — same preference the tiered pick applies. The
     // morning lines carry no tokens, so the raw line IS the finished line.
-    const varied = src.filter((l) => !droning(l));
+    // …and when NOTHING unsaid opens on a different word, take a line that has
+    // already been said over a third card opening the same way. There is only
+    // one pool here, so the tiered pick's widen-across-pools has nowhere to go;
+    // what it can trade instead is freshness for variety.
+    let varied = src.filter((l) => !droning(l));
+    if (!varied.length) varied = MORNING.filter((l) => !droning(l));
     if (varied.length) src = varied;
     const line = src[Math.floor(rnd() * src.length) % src.length] ?? MORNING[0];
     recent.push(line);
@@ -713,9 +718,26 @@ export function pickLanternNews(ctx: LanternCtx, rnd: () => number = Math.random
   if (!src.length) for (const cand of order) if (cand.length) { src = cand; break; }
   if (!src.length) src = GENERAL[tier];
   // and among what is left, prefer a line that does not open on the word the
-  // last two cards opened on. A preference, not a rule: if every candidate
-  // drones, the pool wins and the card goes out anyway.
-  const varied = src.filter((h) => !droning(fill(h, ctx)));
+  // last two cards opened on.
+  //
+  // THIS USED TO SEARCH ONLY THE POOL ALREADY CHOSEN — "a preference, not a
+  // rule: if every candidate drones, the pool wins and the card goes out
+  // anyway". That is how a guard written to stop a THIRD consecutive repeat
+  // let a FOURTH through on SKYLARK FIELD, where qa/newsfeed.mjs caught four
+  // cards running that opened "The". The pool it had picked was entirely "The
+  // ...", so the filter came back empty and the guard simply gave up while
+  // three other pools sat there full of other words.
+  //
+  // So the fallback widens across every pool at this tier before it accepts a
+  // repeat: first something unsaid and non-droning anywhere, then anything
+  // non-droning at all. It can only ever REDUCE repetition — every candidate
+  // it considers was already eligible to air on this card.
+  let varied = src.filter((h) => !droning(fill(h, ctx)));
+  if (!varied.length) {
+    const anywhere = [local, meal, live, wide].flat();
+    varied = anywhere.filter((h) => !recent.includes(h) && !droning(fill(h, ctx)));
+    if (!varied.length) varied = anywhere.filter((h) => !droning(fill(h, ctx)));
+  }
   if (varied.length) src = varied;
   const line = src[Math.floor(rnd() * src.length)];
   recent.push(line);

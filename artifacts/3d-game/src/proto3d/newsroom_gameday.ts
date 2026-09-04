@@ -1149,7 +1149,16 @@ function drawPlain(pool: string[], rnd: () => number): string {
   let src = fresh.length ? fresh : pool;
   // phase 0 is the pool a child meets FIRST in every match, so it is the last
   // place a metronome belongs — same preference the tiered pick applies.
-  const varied = src.filter((l) => !droning(l));
+  //
+  // …and when NOTHING unsaid opens on a different word, take a line that has
+  // already been said over a third card opening the same way. There is only
+  // one pool here, so the tiered pick's widen-across-pools has nowhere to go;
+  // what it can trade instead is freshness for variety. A repeated line reads
+  // as the station having a short script. Three cards in a row opening on the
+  // same word reads as the station being broken, which is the failure
+  // qa/newsfeed.mjs measures.
+  let varied = src.filter((l) => !droning(l));
+  if (!varied.length) varied = pool.filter((l) => !droning(l));
   if (varied.length) src = varied;
   const raw = src[Math.floor(rnd() * src.length) % src.length] ?? pool[0];
   const out = clip(raw, TICKER_MAX);
