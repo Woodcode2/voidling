@@ -135,6 +135,16 @@ for (const { WORLD, v } of RUNS) {
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
   await p.addInitScript(({ seed, first }) => {
     try { localStorage.clear(); if (!first) { localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1'); } localStorage.setItem('voidDailyLast', new Date().toDateString()); localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder'); } catch { }
+    // THE BAR'S VALUES, COLLECTED FROM DOCUMENT START. Sampling from the probe
+    // side begins after several awaits, and on a warm load the build can be
+    // most of the way done by then — one run at 440x956 saw a single value and
+    // failed a gate for it. This starts with the document.
+    window.__ffPcts = [];
+    (function poll() {
+      const el = document.getElementById('lPct');
+      if (el) { const v = el.textContent.trim(); if (v && window.__ffPcts[window.__ffPcts.length - 1] !== v) window.__ffPcts.push(v); }
+      requestAnimationFrame(poll);
+    })();
     if (seed !== null) { let s = seed >>> 0; Math.random = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   }, { seed: SEED, first: FIRST });
   // 1. THE BOOT LOADER — the literal first frame of the app. Static markup with
@@ -150,15 +160,8 @@ for (const { WORLD, v } of RUNS) {
   // THE BAR MOVES. Sample #lPct across the build: a loader that shows one value
   // for the whole wait is the "is it frozen?" signal (the owner's own frame
   // reads 0% under "Waking the void family…", the LAST stage).
-  const pcts = await p.evaluate(() => new Promise((res) => {
-    const seen = new Set(), t0 = performance.now();
-    const tick = () => {
-      const el = document.getElementById('lPct'); if (el) seen.add(el.textContent.trim());
-      const up = document.querySelector('#loadScr.show, #loadScr.boot');
-      if (!up || performance.now() - t0 > 60000) res([...seen]); else requestAnimationFrame(tick);
-    };
-    tick();
-  }));
+  await p.waitForFunction(() => !document.querySelector('#loadScr.boot') || (window.__ffPcts || []).length > 2, null, { timeout: 300000 }).catch(() => { });
+  const pcts = await p.evaluate(() => [...new Set(window.__ffPcts || [])]);
   rec.loaderPcts = pcts;
   console.log(`  loader bar: ${pcts.length} distinct value(s) — ${pcts.join(' ')}`);
   if (pcts.length < 3) { fails++; console.log(`  FAIL-LINE ${WORLD} ${VP.width}x${VP.height}: the loading bar showed ${pcts.length} value(s) for the whole build`); }
