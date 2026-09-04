@@ -6064,6 +6064,29 @@ const CARD_ART: Record<string, string> = {
   // and is exactly this world. The poster set the art direction, not the
   // other way round: blue winter dusk, aurora sky, warm windows on snow.
   powder: '/assets/hf/hf_20260730_000329_762b5f44-3c3d-4030-8429-099f02691b5e.png',
+  // SKYLARK FIELD has no entry here yet, and this is the reason, on the record.
+  //
+  // Two takes were painted to the same brief as worlds 3-5 — the world itself
+  // as a small floating island against the cosmos, landmarks legible at card
+  // size, no void in frame — a dawn balloon meet: three mown grass runways
+  // crossing, forty envelopes at four stages of inflation, the whale lying on
+  // her side, the tower glazing catching first light, sheep on the rough.
+  //
+  //   hf_20260904_175218_7e696395-fbec-4ba2-a7a2-9b02e2b5bdf5.png
+  //   hf_20260904_175218_f5a3b880-2309-49d4-9c1a-63b2a7ab05f2.png
+  //
+  // They cannot be VENDORED from the container this was built in.
+  // scripts/asset-refs.mjs requires every /assets/hf/ reference to exist on
+  // disk before the build guard passes, and ORIGINS.hf —
+  // d8j0ntlcm91z4.cloudfront.net — is refused by this environment's network
+  // policy: the proxy answers 403 to CONNECT, every time. Writing the path
+  // without the file would break the guard for everyone, so the path is not
+  // written. Vendoring is one curl of each URL above into public/assets/hf/
+  // wherever the CDN is reachable, then a line here.
+  //
+  // The card is NOT blank meanwhile — CARD_FALLBACK carries skylark in its own
+  // dawn amber, balloon violet and morning blue, which is the whole reason that
+  // table exists. qa/worldreg.mjs prints this debt on every gate run.
 };
 // A CARD IS NEVER BLANK. This set the background and hoped: if the file 404s —
 // which is exactly what every /assets/hf path does inside an iOS bundle that

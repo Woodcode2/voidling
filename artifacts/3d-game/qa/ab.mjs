@@ -150,6 +150,17 @@ line('leader / lane', ofLane);
 line('leader / player', ofPlayer);
 line('family bite share', famShare);
 line('player place', places, '');
+// THE CHILD MEAN, PRINTED. This probe has always COLLECTED r.pScore — every
+// leader/player figure above is computed from it — and never once shown it,
+// while docs/OVERNIGHT.md's par table is a column of child means somebody had
+// to read out of a debugger. WORLD_PAR is set at 0.75-0.85 of this number, so
+// the number belongs in the output of the probe that measures it.
+const pScores = stat(runs.map((r) => r.pScore));
+console.log(`  child score       mean ${Math.round(pScores.m).toLocaleString()}`
+  + `   sd ${Math.round(pScores.sd).toLocaleString()}`
+  + `   range ${Math.round(pScores.lo).toLocaleString()}-${Math.round(pScores.hi).toLocaleString()}`);
+console.log(`  WORLD_PAR at 0.75 -> ${Math.round(pScores.m * 0.75 / 1000) * 1000}`
+  + `   at 0.85 -> ${Math.round(pScores.m * 0.85 / 1000) * 1000}`);
 console.log(`  worst place seen  ${places.hi}   (owner's floor: never below 3rd)`);
 
 console.log('\nREAD IT LIKE THIS: a change is only real if the means differ by more');
