@@ -69,8 +69,24 @@ probe is worth having.
 Every figure below came out of a probe in this container. Where a number is
 soft, it says so.
 
-**Placement** — 3,978 edibles, 106 big (bar 100). Road 4, float 0, inside 2,
-overlap 17. Water, off-island and road-end all 0.
+**Placement** — **PASS at a ceiling of zero**, which is what a world with no
+baseline entry gets. Road 0, water 0, off-island 0, float 0, inside 0, overlap
+0, road-end 0. Total 3,504 edibles, 92 big.
+
+That is the second measurement. The first read 3,978 edibles and 106 big — and
+also 3 props standing on runways, 26 interpenetrating and 1 off the island. The
+larger number was not a better field, it was the same field with things inside
+each other. What the POWDER PASS starvation lesson is actually about is the
+SHARE of big meals, and it is unchanged: **2.63% now against 2.67% then**. The
+count sits under the 100 I set myself and I am not dressing that up; the ratio
+that decides whether a child starves is intact.
+
+Fixing it cost me two overcorrections, both caught by the probe rather than by
+me: I fed an inflated neighbour-claim to the runway check and lost a third of
+the envelopes (big 106 → 66), and I set the grid pitch from a circumscribed
+circle when the probe measures oriented-box SAT and every envelope is aligned
+to within 8° of the row it stands in. The corrected pitch walks *more* legal
+nodes than the original — 92 against 90 — while overlapping in none.
 
 **Purpose** — 461 people, all moving. Drift median **0.996** against a 0.30
 bar; **404 of 461 (88%)** complete a journey in thirty match-seconds against a
