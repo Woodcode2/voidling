@@ -332,6 +332,30 @@ const VOICE_PANIC: Record<string, string[]> = {
 
 // mesh is nullable in practice: the train mover is pushed on every world but
 // only BUILT on Maple, so it reports null on the other three. See the gate.
+// ── ERRANDS ────────────────────────────────────────────────────────────────
+// "Every chat bubble, every person moving, there's got to be a purpose behind
+// that." (the owner). A townsperson's idle behaviour was ang += rand(-1,1)*dt*3
+// on a leash: measured over 30 match-seconds at SEED=7, the median person walked
+// 11.5 units for every 1 unit of progress and 8-21% of them ever completed a
+// journey (qa/purpose.mjs, docs/crews/round-5/purpose-data/). This gives them
+// somewhere to be: walk a leg, stand there with your hands busy, pick the next.
+//
+// `leg` is OPT-IN, per call site. Omit it and the person keeps today's random
+// walk byte for byte — which is why the zoo animals stay in their baked pens,
+// the parade column stays a column, the conga line stays a line, and a sixth
+// world costs nobody an afternoon.
+//
+// INVARIANT: paceMul < 2.4 on every world. The contagion ping runs at base*2.4
+// and a flee at base*3.4, so the void outranks the errand by speed as well as
+// by branch order.
+const ERR = {
+  D0: 2.5, D1: 6.0,      // dwell seconds at the destination
+  TURN: 0.9,             // radians of heading persistence between legs (E[cos] = 0.87)
+  LEASH: 3.0,            // a person's district is leg * LEASH from home…
+  SPREAD: 0.15,          // …and a leg is leg * (1 +/- SPREAD)
+  REAIM: 12,             // frames between heading refreshes (a Smi: allocates nothing)
+};
+
 interface Mover {
   mesh: THREE.Object3D | null;
   /** fast movers are EXEMPT from the stagger bands: chop visibility scales
@@ -2570,7 +2594,7 @@ export function createLife(
   // 90-second match standing in interior water, one of them 6 units from the
   // river centreline for 21 seconds straight.
   const wet = (x: number, z: number, m: number) => WID === 'maple' && inWater3(x, z, m);
-  function addWanderer(mesh: THREE.Object3D, hx: number, hz: number, tether: number, base: number, fear: number, radius: number, biome: string, panicLines?: string[], voice?: string) {
+  function addWanderer(mesh: THREE.Object3D, hx: number, hz: number, tether: number, base: number, fear: number, radius: number, biome: string, panicLines?: string[], voice?: string, leg?: number, paceMul = 1) {
     if (!biomeAt(hx, hz) || wet(hx, hz, 8)) return;   // don't spawn anyone off the coastline, or in the water
     // …and nobody lives on the void's opening square. The owner's report was
     // "he starts on top of a person": this is the single choke point every
@@ -2588,6 +2612,46 @@ export function createLife(
     const stand = (px: number, pz: number) => !!biomeAt(px, pz) && !wet(px, pz, 0)
       && !!biomeAt(px + Math.cos(ang) * 2, pz + Math.sin(ang) * 2);
     let greetCd = rand(0, 5);   // LANTERN NIGHT: when this spirit last offered you something
+    // ── THE ERRAND. Nine slots; `reAim` and `blocked` are a small integer and a
+    // boolean, so they cost no boxed number per write. In steady state a walking
+    // person writes `legT` and a standing one writes `dwell` — the same two
+    // writes today's random walk makes to `ang` and `slideT`, because a straight
+    // leg stops writing `ang` at all.
+    const errand = leg !== undefined && leg > 0;
+    const pace = base * paceMul;
+    const stopR2 = Math.max(1.1, pace * 0.55) ** 2;      // arrival ring, sized to speed
+    // an authored tether still contains the person: a leg never takes anyone
+    // further from home than the larger of its own district and that tether.
+    const leash2 = Math.max((leg ?? 0) * ERR.LEASH, tether) ** 2;
+    let gx = hx, gz = hz;              // the goal
+    // the first stop is staggered so the crowd does not step off together —
+    // reusing greetCd, already drawn above, spends NO new build-time draw and
+    // so leaves every downstream seeded placement bit-identical.
+    let dwell = errand ? greetCd * 1.2 : 0;
+    let legT = 0;                      // give-up backstop
+    let reAim = 0;                     // frames until the heading is refreshed
+    let blocked = false;               // the slide fired: this leg is unwalkable
+    // Hoisted for the reason recorded above: never build a closure in update().
+    const retarget = () => {
+      const px = mesh.position.x, pz = mesh.position.z;
+      const hdx = hx - px, hdz = hz - pz;
+      // HEADING PERSISTENCE is what makes consecutive legs chain rather than
+      // cancel: a strict home-and-back ping-pong scores a drift of zero because
+      // the net displacement of a completed round trip is nothing.
+      let a0 = ang + rand(-ERR.TURN, ERR.TURN);
+      if (hdx * hdx + hdz * hdz > leash2) a0 = Math.atan2(hdz, hdx) + rand(-0.6, 0.6);
+      for (let k = 0; k < 3; k++) {
+        const a = a0 + (k ? rand(-2.2, 2.2) : 0);
+        const L = leg! * rand(1 - ERR.SPREAD, 1 + ERR.SPREAD);
+        const tx = px + Math.cos(a) * L, tz = pz + Math.sin(a) * L;
+        if (!biomeAt(tx, tz) || wet(tx, tz, 4) || nearSpawn(tx, tz)) continue;
+        gx = tx; gz = tz; ang = a; legT = L / pace * 2 + 4; reAim = ERR.REAIM;
+        return;
+      }
+      // nowhere to go: head home, which is by construction somewhere it can stand
+      gx = hx; gz = hz; ang = Math.atan2(hdz, hdx);
+      legT = Math.hypot(hdx, hdz) / pace * 2 + 4; reAim = ERR.REAIM;
+    };
     mesh.userData.ptsMult = 1.5;   // moving prey beats furniture of the same size
     mesh.userData.mover = true;    // steers itself — the magnet must never grab it
     const cs = contactShadow(radius * 0.55);   // grounded on every quality tier
@@ -2670,9 +2734,35 @@ export function createLife(
         } else {
           if (dist > vR + fear + 40) fled = false;
           if (slideT <= 0) {
-            ang += rand(-1, 1) * dt * 3;
-            const hd = Math.hypot(mesh.position.x - hx, mesh.position.z - hz);
-            if (hd > tether) ang = Math.atan2(hz - mesh.position.z, hx - mesh.position.x);
+            if (!errand) {
+              ang += rand(-1, 1) * dt * 3;
+              const hd = Math.hypot(mesh.position.x - hx, mesh.position.z - hz);
+              if (hd > tether) ang = Math.atan2(hz - mesh.position.z, hx - mesh.position.x);
+            } else if (dwell > 0) {
+              dwell -= dt; spd = 0;              // standing at the destination
+            } else if (calmT > 0) {
+              spd = pace * 0.6;                  // the establishing shot is a stroll,
+                                                 // and no new goal is drawn under it
+            } else {
+              spd = pace;
+              // the slide fallback firing IS the signal that this leg is
+              // unwalkable — without this a walker grinds along a coastline for
+              // the whole give-up timer at three biomeAt tests a frame
+              if (blocked) { blocked = false; dwell = rand(0.4, 1.2); retarget(); }
+              else {
+                const gdx = gx - mesh.position.x, gdz = gz - mesh.position.z;
+                const d2 = gdx * gdx + gdz * gdz;
+                // ARRIVE AND AIM in the same breath. Arriving without picking the
+                // next goal parks the crowd forever: the spawn goal is the spawn
+                // point, so the first frame arrives, dwells, and arrives again.
+                if (d2 < stopR2) { dwell = rand(ERR.D0, ERR.D1); retarget(); }
+                else if ((legT -= dt) <= 0) { dwell = rand(0.4, 1.2); retarget(); }
+                // …and the heading self-heals from every writer above it —
+                // guest, flee, the tether return, contagion, the slide — rather
+                // than trusting five call sites to set a flag.
+                else if (--reAim <= 0) { reAim = ERR.REAIM; ang = Math.atan2(gdz, gdx); }
+              }
+            }
             // contagion: a fresh scream nearby sends this ped scurrying too
             // (the calm window skips the loop outright — it used to build a
             // throwaway empty array per idle ped per frame to iterate nothing,
@@ -2685,17 +2775,20 @@ export function createLife(
             }
           }
         }
+        if (spd > 0) {   // a person standing still bought three point-in-polygon
+                         // tests a frame to displace itself by zero
         let nx = mesh.position.x + Math.cos(ang) * spd * dt, nz = mesh.position.z + Math.sin(ang) * spd * dt;
         if (!stand(nx, nz)) {
           // blocked (coast/water): slide sideways and COMMIT to it for half a
           // second, only reverse as a last resort
           for (const alt of [ang + Math.PI / 2, ang - Math.PI / 2, ang + Math.PI]) {
             const ax2 = mesh.position.x + Math.cos(alt) * spd * dt, az2 = mesh.position.z + Math.sin(alt) * spd * dt;
-            if (biomeAt(ax2, az2) && !wet(ax2, az2, 0) && biomeAt(ax2 + Math.cos(alt) * 2, az2 + Math.sin(alt) * 2)) { ang = alt; nx = ax2; nz = az2; slideT = 0.5; break; }
+            if (biomeAt(ax2, az2) && !wet(ax2, az2, 0) && biomeAt(ax2 + Math.cos(alt) * 2, az2 + Math.sin(alt) * 2)) { ang = alt; nx = ax2; nz = az2; slideT = 0.5; blocked = true; break; }
           }
         }
         if (biomeAt(nx, nz) && !wet(nx, nz, 0)) { mesh.position.x = nx; mesh.position.z = nz; }
-        else if (hop > 0) hop = 0;   // pinned: stop the panic bounce so nothing vibrates in place
+        else { blocked = true; if (hop > 0) hop = 0; }   // pinned: stop the panic bounce so nothing vibrates in place
+        }
         // THE HEAD LEADS THE TURN. Snapping the whole body to the travel
         // heading every frame is what made everyone read as a sliding brick:
         // the body now eases toward the heading and the head takes up the
@@ -2833,6 +2926,23 @@ export function createLife(
             limbs.torso.rotation.z = -Math.sin(beat * 0.5) * 0.2;    // hips lead the sway
             limbs.torso.rotation.y = Math.sin(beat) * 0.22;
           }
+        } else if (limbs && dwell > 0 && spd === 0) {
+          // ── STOPPED, WITH SOMETHING TO DO. The walk branch below advances a
+          // standing person's limbs by 0.055 radians of amplitude: at the far
+          // camera's 12.5 px per unit that is a third of a pixel, so a person
+          // who has arrived somewhere reads as a statue. This is the WORKING
+          // pose (mode 3's shape, 20x the amplitude) applied by state rather
+          // than by a stored mode — a mode would fall through to the dance
+          // catch-all when it is 0, and would still be set when the void
+          // interrupts the dwell, freezing the legs of somebody sprinting.
+          // Flee, contagion and the guest branch all set spd > 0, so this pose
+          // ends on the frame the void starts to matter.
+          limbs.phase += dt * 2.2;
+          const s3 = Math.sin(limbs.phase), s4 = Math.sin(limbs.phase + 1.1);
+          limbs.la.rotation.x = -1.1 + s3 * 0.42; limbs.ra.rotation.x = -1.1 + s4 * 0.42;
+          limbs.la.rotation.z = 0.3; limbs.ra.rotation.z = -0.3;
+          limbs.torso.rotation.x = 0.24 + s3 * 0.09; limbs.torso.rotation.y = s3 * 0.12;
+          limbs.ll.rotation.x = 0; limbs.rl.rotation.x = 0;
         } else if (limbs) {
           // ── WALK / IDLE / FLEE, one branch. The phase always advances (so a
           // standing person breathes and shifts weight instead of being a
@@ -2970,11 +3080,11 @@ export function createLife(
   const KID_ROLES: Role[] = ['kid', 'ballplayer'];
   // one place where "put a named townsperson here" is implemented
   const townie = (role: Role, x: number, z: number, dress: string, side?: number,
-                  tether = 16, spd = rand(3.4, 5.6), fear = 18, pan?: string[]) => {
+                  tether = 16, spd = rand(3.4, 5.6), fear = 18, pan?: string[], leg?: number) => {
     const p = makeCast(role, dress, side);
     if (KID_ROLES.includes(role)) p.userData.dancer = { t: rand(0, 6), spin: 1, mode: 2 };
     return addWanderer(p, x, z, tether, spd, fear,
-      KID_ROLES.includes(role) ? 1.9 : 2.4, dress, pan, VOICE_OF[role]);
+      KID_ROLES.includes(role) ? 1.9 : 2.4, dress, pan, VOICE_OF[role], leg);
   };
   // rooted, doing a job: campaigning (5), protesting (6), heckling (7),
   // working with both hands (3) or running the show (1)
@@ -3004,7 +3114,7 @@ export function createLife(
       // one in six is off-message: the house on a red street with a blue sign
       const wear = Math.random() < 0.17 ? (side === DINKLE ? HOLLIS : DINKLE) : side;
       if (role === 'campaigner') rooted(role, hx, hz, dress, 5, wear);
-      else townie(role, hx, hz, dress, wear, edge ? 28 : 20, rand(4, 7));
+      else townie(role, hx, hz, dress, wear, edge ? 28 : 20, rand(4, 7), 18, undefined, 32);
     }
     // ── YARD SIGNS. The cheapest possible statement of allegiance and the one
     // that reads from the very top of the camera's travel: a verge of them in
@@ -3095,7 +3205,10 @@ export function createLife(
         x, z,
         role === 'manager' ? 2 : role === 'kid' ? 26 : 22,
         role === 'manager' ? rand(0.2, 0.5) : role === 'kid' ? rand(6.5, 9) : rand(3.5, 6.5),
-        18, role === 'kid' ? 1.9 : 2.4, biome, undefined, VOICE_OF[role]);
+        18, role === 'kid' ? 1.9 : 2.4, biome, undefined, VOICE_OF[role],
+        // the front is a promenade: amenity to amenity, one stretch at a time.
+        // The manager is posted behind his desk and stays there.
+        role === 'manager' ? 0 : 26);
     };
     const CAST: [BAY.BayBiome, string, [Role, number][]][] = [
       // THE RESORT — the machine: guests being waited on, staff doing the waiting
@@ -3561,7 +3674,7 @@ export function createLife(
       const p = makeCast(role, 'market');
       if (role === 'kid') p.userData.dancer = { t: rand(0, 6), spin: 1, mode: 2 };
       addWanderer(p, x, z, role === 'kid' ? 34 : 30, role === 'kid' ? rand(6, 8.5) : rand(4, 6.5),
-        18, role === 'kid' ? 1.9 : 2.4, 'oldtown', undefined, VOICE_OF[role]);
+        18, role === 'kid' ? 1.9 : 2.4, 'oldtown', undefined, VOICE_OF[role], 30);
     }
 
     // ══ 4. DANCE COVE ═════════════════════════════════════════════════════
@@ -3837,7 +3950,7 @@ export function createLife(
       bathhouse: 'bathhouse', onsen: 'onsen', bamboo: 'bamboo',
     };
     const lnPlace = (wx: number, wy: number, id: LN.LnBiome,
-                     o?: { kid?: boolean; tether?: number; speed?: number }) => {
+                     o?: { kid?: boolean; tether?: number; speed?: number; leg?: number }) => {
       const dress = DRESS[id];
       const p = o?.kid ? makeCast('kid', dress) : makePerson(dress);
       const [x, z] = g3([wx, wy]);
@@ -3849,7 +3962,11 @@ export function createLife(
       // approach reads as a charge, and this is somebody crossing a market to
       // offer you a skewer.
       addWanderer(p, x, z, o?.tether ?? 7, o?.speed ?? rand(0.35, 0.95),
-        16, o?.kid ? 1.9 : 2.4, dress, undefined, undefined);
+        16, o?.kid ? 1.9 : 2.4, dress, undefined, undefined,
+        // the stall pitch is 230 world units = 11.5 in 3D, so a 20-unit leg is
+        // two stalls down the row. 1.3x pace against a 3.4x flee and a 2.4x
+        // contagion ping: the void still outranks a shopper 2.6 times over.
+        o?.leg ?? 20, 1.3);
     };
 
     // Density per district, in people. LANTERN ROW carries the level.
@@ -3913,11 +4030,11 @@ export function createLife(
   if (worldId() === 'powder') {
     const pwRegion = (id: PW.PwBiome) => PW.PW_REGIONS.find((r) => r.id === id)!;
     const pwPlace = (wx: number, wy: number, id: PW.PwBiome,
-                     o?: { kid?: boolean; tether?: number; speed?: number }) => {
+                     o?: { kid?: boolean; tether?: number; speed?: number; leg?: number }) => {
       const p = o?.kid ? makeCast('kid', id) : makePerson(id);
       const [x, z] = g3([wx, wy]);
       addWanderer(p, x, z, o?.tether ?? 9, o?.speed ?? rand(0.8, 1.6),
-        16, o?.kid ? 1.9 : 2.4, id, undefined, undefined);
+        16, o?.kid ? 1.9 : 2.4, id, undefined, undefined, o?.leg ?? 24, 1.15);
     };
     const PW_CAST: [PW.PwBiome, number, number][] = [
       ['village', 90, 20],     // the square, the road, everyone's front step
@@ -4080,7 +4197,7 @@ export function createLife(
     };
     /** Place one person, facing the stadium. `voice` is a newsroom_gameday key. */
     const gdPlace = (wx: number, wy: number, id: GD.GdBiome, voice: string,
-                     o?: { kid?: boolean; tether?: number; speed?: number; col?: number }) => {
+                     o?: { kid?: boolean; tether?: number; speed?: number; col?: number; leg?: number }) => {
       const dress = DRESS[id];
       const p = o?.kid
         ? makeCast('kid', dress)
@@ -4103,7 +4220,11 @@ export function createLife(
       const rec = addWanderer(p, x, z,
         o?.tether ?? (o?.kid ? 14 : 10),
         o?.speed ?? (o?.kid ? rand(1.6, 2.6) : rand(0.5, 1.4)),
-        18, o?.kid ? 1.9 : 2.4, dress, undefined, voice);
+        18, o?.kid ? 1.9 : 2.4, dress, undefined, voice,
+        // LOT_AISLE is 340 world = 17 in 3D, so a leg is one aisle and a row.
+        // A site that authors a tight tether can write `leg: 0` beside it and
+        // keep its box — see the lot crowd at tether 5.
+        o?.leg ?? 22, 1.25);
       // EVERYONE FACES THE BOWL. gdFacingStadium is a world-space bearing and
       // the mesh's forward is +X, so the sign flips going into 3D — the same
       // conversion the car headings use.
@@ -4168,7 +4289,7 @@ export function createLife(
         // short tether, low speed: these people are STANDING AROUND A GRILL,
         // not commuting. It is the same trick the dance floor uses at the
         // resort, for the opposite feeling.
-        gdPlace(wx, wy, 'lot', voice, { tether: 5, speed: rand(0.3, 0.8) });
+        gdPlace(wx, wy, 'lot', voice, { tether: 5, speed: rand(0.3, 0.8), leg: 0 });
       }
     }
 
