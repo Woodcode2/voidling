@@ -158,7 +158,10 @@ export function skBalloonSpilled(cols: [number, number, number] = ENVELOPE[1]): 
     p.push(part(box(), col, x, 0.16, z, 0, Math.sin(t * Math.PI) * 0.22, 0, L / 14 + 0.12, 0.30, wide));
   }
   // the mouth end, gathered, and the crown end with its dark ring lying flat
-  p.push(part(cyl(0.5, 0.5, 10), SKIRT_D, -L * 0.5 - 0.2, 0.22, 0, Math.PI / 2, 0, 0, 1.5, 0.34, 1.5));
+  // the gathered mouth: a cylinder on its side, so its RADIUS is its vertical
+  // half-height. At y=0.22 with a 0.75 radius the mouth sat 0.53 UNDER the
+  // grass — invisible in a screenshot and 2,477 'sunk' rows in the audit.
+  p.push(part(cyl(0.5, 0.5, 10), SKIRT_D, -L * 0.5 - 0.2, 0.78, 0, Math.PI / 2, 0, 0, 1.5, 0.34, 1.5));
   p.push(part(torus(0.10, 12), SKIRT_D, L * 0.5 + 0.1, 0.20, 1.0, Math.PI / 2, 0, 0, 1.5, 1.5, 1.5));
   return mergedProp(p);
 }
@@ -174,7 +177,7 @@ export function skBalloonCold(cols: [number, number, number] = ENVELOPE[2]): THR
     const rr = 0.9 + Math.sin(t * Math.PI) * 2.5;
     p.push(part(cyl(0.5, 0.5, 10), col, -4.2 + t * 8.4, rr * 0.55, 0, 0, 0, Math.PI / 2, rr, 1.0, rr));
   }
-  p.push(part(torus(0.12, 12), SKIRT_D, -4.6, 0.85, 0, 0, 0, Math.PI / 2, 1.9, 1.9, 1.9));
+  p.push(part(torus(0.12, 12), SKIRT_D, -4.6, 1.20, 0, 0, 0, Math.PI / 2, 1.9, 1.9, 1.9));
   p.push(part(cyl(0.5, 0.5, 8), STEEL_D, 4.7, 0.55, 0, 0, 0, Math.PI / 2, 0.9, 0.5, 0.9));
   return mergedProp(p);
 }
@@ -227,7 +230,7 @@ export function skWhaleLying(): THREE.Object3D {
     // fat at the head, tapering to the tail stock
     const wide = 2.0 + Math.sin(Math.min(1, t * 1.35) * Math.PI) * 7.4;
     const col = t > 0.30 && t < 0.86 && i % 3 === 0 ? BELLY : BLUE;
-    p.push(part(cyl(0.5, 0.5, 10), col, x, 0.9, z, 0, 0, Math.PI / 2, wide, L / 26 + 0.3, wide * 0.55));
+    p.push(part(cyl(0.5, 0.5, 10), col, x, 0.30 + wide * 0.5, z, 0, 0, Math.PI / 2, wide, L / 26 + 0.3, wide * 0.55));
   }
   // the tail flukes, flat on the ground
   p.push(part(box(), BLUE_D, L * 0.5 + 1.6, 0.22, 5.6, 0, 0.5, 0, 7.5, 0.35, 3.2));
@@ -235,11 +238,11 @@ export function skWhaleLying(): THREE.Object3D {
   // one pectoral fin, spread
   p.push(part(box(), BLUE_D, -L * 0.24, 0.24, 7.4, 0, 0.35, 0, 6.0, 0.32, 2.6));
   // THE EYE — and it is the reason a child says "there was a WHALE"
-  p.push(part(sph(), 0xf7f7f2, -L * 0.42, 2.4, 4.1, 0, 0, 0, 2.1, 2.1, 1.0));
-  p.push(part(sph(), 0x121826, -L * 0.42 - 0.35, 2.5, 4.5, 0, 0, 0, 1.15, 1.15, 0.7));
-  p.push(part(sph(), 0xffffff, -L * 0.42 - 0.6, 2.85, 4.7, 0, 0, 0, 0.4, 0.4, 0.3));
+  p.push(part(sph(), 0xf7f7f2, -L * 0.42, 3.6, 4.1, 0, 0, 0, 2.1, 2.1, 1.0));
+  p.push(part(sph(), 0x121826, -L * 0.42 - 0.35, 3.7, 4.5, 0, 0, 0, 1.15, 1.15, 0.7));
+  p.push(part(sph(), 0xffffff, -L * 0.42 - 0.6, 4.05, 4.7, 0, 0, 0, 0.4, 0.4, 0.3));
   // the mouth line, a long dark seam
-  p.push(part(box(), BLUE_D, -L * 0.36, 0.55, 0, 0, 0.06, 0, 13.0, 0.22, 8.4));
+  p.push(part(box(), BLUE_D, -L * 0.36, 1.10, 0, 0, 0.06, 0, 13.0, 0.22, 8.4));
   return mergedProp(p);
 }
 
@@ -607,7 +610,11 @@ export function skTrestleTable(): THREE.Object3D {
 
 /** A board of rosettes from thirty previous meets. */
 export function skRosetteWall(): THREE.Object3D {
-  const p = [part(box(), 0x8f6f42, 0, 0.95, 0, 0, 0, 0, 1.8, 1.3, 0.10)];
+  const p = [
+    part(box(), 0x8f6f42, 0, 0.95, 0, 0, 0, 0, 1.8, 1.3, 0.10),
+    part(cyl(0.05, 0.06, 6), 0x7a5c36, 0.75, 0.15, 0, 0, 0, 0, 1, 0.32, 1),
+    part(cyl(0.05, 0.06, 6), 0x7a5c36, -0.75, 0.15, 0, 0, 0, 0, 1, 0.32, 1),
+  ];
   const cols = [0xd8443a, 0x2f6fd0, 0xf5b731, 0x2e9e5b, 0x7a3fb0];
   for (let i = 0; i < 9; i++) {
     p.push(part(cyl(0.5, 0.5, 8), cols[i % 5], -0.65 + (i % 3) * 0.65, 1.35 - Math.floor(i / 3) * 0.42, 0.08, Math.PI / 2, 0, 0, 0.26, 0.06, 0.26));
@@ -617,7 +624,11 @@ export function skRosetteWall(): THREE.Object3D {
 
 /** The model aircraft club's table, three little models on stands. */
 export function skModelPlaneStand(): THREE.Object3D {
-  const p = [part(box(), 0xc8b98a, 0, 0.72, 0, 0, 0, 0, 1.9, 0.10, 0.7)];
+  const p = [
+    part(box(), 0xc8b98a, 0, 0.72, 0, 0, 0, 0, 1.9, 0.10, 0.7),
+    part(box(), 0x8f6f42, 0.80, 0.36, 0, 0, 0, 0, 0.10, 0.72, 0.60),
+    part(box(), 0x8f6f42, -0.80, 0.36, 0, 0, 0, 0, 0.10, 0.72, 0.60),
+  ];
   const cols = [0xe4443a, 0xf2ede4, 0x2f6fd0];
   for (let i = 0; i < 3; i++) {
     const x = -0.6 + i * 0.6;
@@ -632,6 +643,8 @@ export function skModelPlaneStand(): THREE.Object3D {
 export function skTeaUrn(): THREE.Object3D {
   return mergedProp([
     part(box(), 0xc8b98a, 0, 0.70, 0, 0, 0, 0, 1.1, 0.10, 0.7),
+    part(box(), 0x8f6f42, 0.45, 0.35, 0, 0, 0, 0, 0.10, 0.70, 0.60),
+    part(box(), 0x8f6f42, -0.45, 0.35, 0, 0, 0, 0, 0.10, 0.70, 0.60),
     part(cyl(0.5, 0.5, 10), STEEL, 0, 1.05, 0, 0, 0, 0, 0.44, 0.60, 0.44),
     part(cyl(0.5, 0.5, 10), STEEL_D, 0, 1.38, 0, 0, 0, 0, 0.36, 0.10, 0.36),
     part(box(), 0x2b2f38, 0.24, 0.90, 0, 0, 0, 0, 0.10, 0.14, 0.08),
@@ -824,7 +837,7 @@ export function skFenceRun(): THREE.Object3D {
 export function skCollapsedWindsockPole(): THREE.Object3D {
   return mergedProp([
     part(cyl(0.06, 0.08, 6), RUST, 0, 0.12, 0, 0, 0, Math.PI / 2, 1, 4.2, 1),
-    part(torus(0.05, 8), RUST, 2.0, 0.14, 0, 0, 0.4, Math.PI / 2, 0.5, 0.5, 0.5),
+    part(torus(0.05, 8), RUST, 2.0, 0.30, 0, 0, 0.4, Math.PI / 2, 0.5, 0.5, 0.5),
     part(box(), 0x8f8b80, -2.2, 0.08, 0, 0, 0, 0, 0.5, 0.16, 0.5),
   ]);
 }

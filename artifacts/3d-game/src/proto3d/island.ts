@@ -5624,6 +5624,21 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     };
     const REG = (id: SK.SkBiome) => SK.SK_REGIONS.find((r2) => r2.id === id)!;
     const rnd2 = Math.random;
+    /** PAINT AND LIGHTS ARE NOT FOOD. Everything a runway carries by design —
+     *  the threshold numerals, the centreline, the painted launch ring, the
+     *  blue edge lights still on from the night — goes on the ground WITHOUT
+     *  becoming an edible. place() adds an edible, and an edible on a runway is
+     *  exactly what qa/placement.mjs is built to catch: the first run of this
+     *  block filed 278 road offences, every one of them a marking that is
+     *  supposed to be there. A child cannot eat a painted 09. */
+    const paint = (mesh: THREE.Object3D, p2: SK.Pt, rotY = 0) => {
+      const [x3, z3] = P3(p2);
+      if (!insideIsland3(x3, z3)) return;
+      mesh.position.set(x3, 0, z3);
+      mesh.rotation.y = rotY;
+      mesh.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.receiveShadow = true; });
+      scene.add(mesh);
+    };
     const pick = <T,>(a: T[]): T => a[Math.floor(rnd2() * a.length) % a.length];
     /** an envelope colour triple, so ninety balloons are not ninety of one */
     const env = () => pick(SKF.ENVELOPE);
@@ -5671,45 +5686,50 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const ux = Math.sin((30 * Math.PI) / 180), uy = -Math.cos((30 * Math.PI) / 180);
       const vx = -uy, vy = ux;
       const cx = (minX + maxX) * 0.5, cy = (minY + maxY) * 0.5;
-      const PITCH_ALONG = 340, PITCH_ACROSS = 420;
+      // MEASURED, not chosen. At 340/420 over ±6/±5 the grid walked 143 nodes
+      // and found 41 legal ones; at 230/260 over ±12/±11 it walks 575 and finds
+      // 94, which is the ninety the design promises. A balloon is ~9 units
+      // across and the pitch is 11.5, so crews are shoulder to shoulder the way
+      // they actually are on a launch field.
+      const PITCH_ALONG = 230, PITCH_ACROSS = 260;
+      const nodes: { p: SK.Pt; stage: number }[] = [];
       let n = 0;
-      for (let i = -6; i <= 6; i++) {
-        for (let j = -5; j <= 5; j++) {
+      for (let i = -12; i <= 12; i++) {
+        for (let j = -11; j <= 11; j++) {
           // stagger alternate rows, the way a real field is pegged
           const along = i * PITCH_ALONG + (j % 2 ? PITCH_ALONG * 0.5 : 0);
           const across = j * PITCH_ACROSS;
           const p2: SK.Pt = [cx + ux * along + vx * across, cy + uy * along + vy * across];
           if (!SK.pointInPoly(p2[0], p2[1], R.poly)) continue;
           if (!SK.skPlaceable(p2[0], p2[1], 30)) continue;
-          // 5 : 4 : 3 : 2 — bagged, spilled, cold, standing
-          const roll = n % 14;
-          const stage = roll < 5 ? 0 : roll < 9 ? 1 : roll < 12 ? 2 : 3;
-          const cols = env();
-          const mesh = stage === 0 ? SKF.skBalloonBagged(cols)
-            : stage === 1 ? SKF.skBalloonSpilled(cols)
-              : stage === 2 ? SKF.skBalloonCold(cols) : SKF.skBalloonStanding(cols);
-          // ONE EDIBLE, ONE RADIUS — see skyfield.ts's header on fadeOccluders
-          const r = stage === 0 ? 1.4 : stage === 1 ? 5.2 : stage === 2 ? 4.6 : 4.8;
-          drop(mesh, p2, r, layoutYaw(), false, 'big');
+          // 4 : 4 : 3 : 3 — bagged, spilled, cold, standing. The bagged share
+          // came down from 5 because a bag is the one stage that is NOT a big
+          // meal, and a field whose food is mostly grass is the trap Powder
+          // fell into: measured, 0.6% of its edibles are large against Maple's
+          // 8.1%, which is why it starved a child driver on points.
+          nodes.push({ p: p2, stage: n % 14 < 4 ? 0 : n % 14 < 8 ? 1 : n % 14 < 11 ? 2 : 3 });
           n++;
-          // every balloon has a basket beside it, and a crewed one has its kit
-          if (stage >= 1) {
-            const off: SK.Pt = [p2[0] - vx * 150, p2[1] - vy * 150];
-            drop(SKF.skBasket(), off, 0.9, layoutYaw(), false, 'small');
-          }
-          if (stage >= 2) {
-            const off2: SK.Pt = [p2[0] + ux * 190, p2[1] + uy * 190];
-            drop(SKF.skInflatorFan(), off2, 0.8, layoutYaw() + Math.PI, false, 'small');
-          }
-          if (stage === 3) {
-            const off3: SK.Pt = [p2[0] - ux * 170, p2[1] - uy * 170];
-            drop(SKF.skCylinderPair(), off3, 0.6, rnd2() * Math.PI * 2, false, 'small');
-          }
         }
+      }
+      // PASS ONE — every envelope, before any of the small kit exists
+      for (const { p: p2, stage } of nodes) {
+        const cols = env();
+        const mesh = stage === 0 ? SKF.skBalloonBagged(cols)
+          : stage === 1 ? SKF.skBalloonSpilled(cols)
+            : stage === 2 ? SKF.skBalloonCold(cols) : SKF.skBalloonStanding(cols);
+        // ONE EDIBLE, ONE RADIUS — see skyfield.ts's header on fadeOccluders
+        const r = stage === 0 ? 1.4 : stage === 1 ? 5.2 : stage === 2 ? 4.6 : 4.8;
+        drop(mesh, p2, r, layoutYaw(), false, 'big');
+      }
+      // PASS TWO — the crew's kit, filling in around what is already standing
+      for (const { p: p2, stage } of nodes) {
+        if (stage >= 1) drop(SKF.skBasket(), [p2[0] - vx * 150, p2[1] - vy * 150], 0.9, layoutYaw(), false, 'small');
+        if (stage >= 2) drop(SKF.skInflatorFan(), [p2[0] + ux * 190, p2[1] + uy * 190], 0.8, layoutYaw() + Math.PI, false, 'small');
+        if (stage === 3) drop(SKF.skCylinderPair(), [p2[0] - ux * 170, p2[1] - uy * 170], 0.6, rnd2() * Math.PI * 2, false, 'small');
       }
     }
     // the launch field's own small stuff, scattered between the rows
-    for (const p2 of SK.scatterInRegion(REG('launchfield'), 90, rnd2, 40)) {
+    for (const p2 of SK.scatterInRegion(REG('launchfield'), 260, rnd2, 40)) {
       const k = rnd2();
       const m = k < 0.34 ? SKF.skCrownLine() : k < 0.58 ? SKF.skTetherPin()
         : k < 0.78 ? SKF.skCylinderPair() : SKF.skTussock();
@@ -5737,8 +5757,22 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         drop(SKF.skBalloonBagged(env()), b, 1.4, layoutYaw(), false, 'big');
       }
       drop(SKF.skTicketCaravan(), [cx + ux * 600, cy + uy * 600], 1.6, layoutYaw() + Math.PI / 2, false, 'house');
+      // and the crews already rigging: envelopes spilled out on the wet grass,
+      // laid on the same 030 as everything else on this field
+      const rig: SK.Pt[] = [];
+      for (let i = -5; i <= 5; i++) for (let j = -4; j <= 4; j++) {
+        const p2: SK.Pt = [cx + ux * (i * 250 + (j % 2 ? 125 : 0)) + vx * j * 280,
+          cy + uy * (i * 250 + (j % 2 ? 125 : 0)) + vy * j * 280];
+        if (SK.pointInPoly(p2[0], p2[1], R.poly) && SK.skPlaceable(p2[0], p2[1], 30)) rig.push(p2);
+      }
+      rig.forEach((p2, i) => {
+        const cols = env();
+        const stage = i % 3;
+        drop(stage === 0 ? SKF.skBalloonSpilled(cols) : stage === 1 ? SKF.skBalloonCold(cols) : SKF.skBalloonBagged(cols),
+          p2, stage === 0 ? 5.2 : stage === 1 ? 4.6 : 1.4, layoutYaw(), false, 'big');
+      });
     }
-    for (const p2 of SK.scatterInRegion(REG('arrivals'), 55, rnd2, 60)) {
+    for (const p2 of SK.scatterInRegion(REG('arrivals'), 190, rnd2, 55)) {
       const k = rnd2();
       const m = k < 0.3 ? SKF.skBalloonBagged(env()) : k < 0.5 ? SKF.skBasket()
         : k < 0.68 ? SKF.skCylinderPair() : k < 0.85 ? SKF.skTussock() : SKF.skSpectatorCar();
@@ -5760,7 +5794,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       drop(SKF.skWindsock(), [cx + 520, cy - 380], 0.5, 0, false, 'small');
       drop(SKF.skFireTender(), [cx + 200, cy + 620], 1.8, layoutYaw() + Math.PI / 2, false, 'car');
     }
-    for (const p2 of SK.scatterInRegion(REG('tower'), 30, rnd2, 60)) {
+    for (const p2 of SK.scatterInRegion(REG('tower'), 110, rnd2, 50)) {
       const k = rnd2();
       drop(k < 0.5 ? SKF.skPerimeterCone() : k < 0.8 ? SKF.skTaxiwaySign() : SKF.skTussock(),
         p2, 0.4, rnd2() * Math.PI * 2, false, 'small');
@@ -5776,7 +5810,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       drop(SKF.skHangar(), [cx - 340, cy - 120], 5.5, layoutYaw() + Math.PI / 2, true, 'big');
       drop(SKF.skHangar(), [cx + 380, cy + 160], 5.5, layoutYaw() + Math.PI / 2, true, 'big');
     }
-    for (const p2 of SK.scatterInRegion(REG('hangars'), 60, rnd2, 45)) {
+    for (const p2 of SK.scatterInRegion(REG('hangars'), 150, rnd2, 45)) {
       const k = rnd2();
       const m = k < 0.34 ? SKF.skTrestleTable() : k < 0.52 ? SKF.skVintageTractor()
         : k < 0.66 ? SKF.skModelPlaneStand() : k < 0.80 ? SKF.skRosetteWall()
@@ -5808,7 +5842,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         drop(mk(), p2, 2.1, layoutYaw() + Math.PI / 2, false, 'car');
       });
     }
-    for (const p2 of SK.scatterInRegion(REG('breakfast'), 70, rnd2, 40)) {
+    for (const p2 of SK.scatterInRegion(REG('breakfast'), 180, rnd2, 40)) {
       const k = rnd2();
       const m = k < 0.34 ? SKF.skPicnicBench() : k < 0.60 ? SKF.skStrawBale()
         : k < 0.76 ? SKF.skWheelieBin() : k < 0.90 ? SKF.skTussock() : SKF.skSpectatorCar();
@@ -5830,19 +5864,15 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const yaw = Math.atan2(ux, -uy);
       // the two threshold numerals, at each end, reading up the strip
       const recip = String((Number(name) + 18) % 36 || 36).padStart(2, '0');
-      const n1 = SKF.skThresholdNumerals(name, 2.4); n1.rotation.y = yaw;
-      place(n1, ...P3([a[0] + ux * 260, a[1] + uy * 260]), 3.2);
-      const n2 = SKF.skThresholdNumerals(recip, 2.4); n2.rotation.y = yaw + Math.PI;
-      place(n2, ...P3([b[0] - ux * 260, b[1] - uy * 260]), 3.2);
+      paint(SKF.skThresholdNumerals(name, 2.4), [a[0] + ux * 260, a[1] + uy * 260], yaw);
+      paint(SKF.skThresholdNumerals(recip, 2.4), [b[0] - ux * 260, b[1] - uy * 260], yaw + Math.PI);
       // the centreline, and the blue edge lights still on from the night
       for (let d = 700; d < L - 700; d += 260) {
-        const dash = SKF.skCentrelineDash(); dash.rotation.y = yaw;
-        place(dash, ...P3([a[0] + ux * d, a[1] + uy * d]), 0.5);
+        paint(SKF.skCentrelineDash(), [a[0] + ux * d, a[1] + uy * d], yaw);
       }
       for (let d = 400; d < L - 400; d += 520) {
         for (const sgn of [-1, 1]) {
-          const p2: SK.Pt = [a[0] + ux * d - uy * sgn * half, a[1] + uy * d + ux * sgn * half];
-          place(SKF.skRunwayEdgeLight(), ...P3(p2), 0.3);
+          paint(SKF.skRunwayEdgeLight(), [a[0] + ux * d - uy * sgn * half, a[1] + uy * d + ux * sgn * half], 0);
         }
       }
       // THE SHEEP ARE ON THE RUNWAY. They are on it every year. place() rather
@@ -5863,8 +5893,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     for (let i = 0; i < 40; i++) {
       const a = (i / 40) * Math.PI * 2;
       const p2: SK.Pt = [SK.LAUNCH.cx + Math.cos(a) * SK.LAUNCH.rx, SK.LAUNCH.cy + Math.sin(a) * SK.LAUNCH.ry];
-      const mk = SKF.skLaunchCircleMarker(); mk.rotation.y = a + Math.PI / 2;
-      place(mk, ...P3(p2), 0.4);
+      paint(SKF.skLaunchCircleMarker(), p2, a + Math.PI / 2);
     }
 
     // 8. THE PERIMETER TRACK — marshals' cones and posts along the ring, and a
@@ -5874,15 +5903,20 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const T = SK.PERIMETER;
       for (let i = 0; i < T.length - 1; i++) {
         const [x1, y1] = T[i], [x2, y2] = T[i + 1];
+        // 260 units in from the centreline, which is 60 clear of the track's
+        // own edge: a marshal stands BESIDE the track with a light wand, and a
+        // cone on the tarmac is a cone in the way
+        const nx = -(y2 - y1), ny = (x2 - x1), nl = Math.hypot(nx, ny) || 1;
         for (const t of [0.25, 0.75]) {
-          const p2: SK.Pt = [x1 + (x2 - x1) * t, y1 + (y2 - y1) * t];
+          const bx = x1 + (x2 - x1) * t, by = y1 + (y2 - y1) * t;
+          const inward = ((6000 - bx) * nx + (6000 - by) * ny) > 0 ? 1 : -1;
+          const p2: SK.Pt = [bx + (nx / nl) * 260 * inward, by + (ny / nl) * 260 * inward];
+          if (!SK.skPlaceable(p2[0], p2[1], 10)) continue;
           const m = t < 0.5 ? SKF.skPerimeterCone() : SKF.skMarshalPost();
-          const mm = m; mm.rotation.y = rnd2() * Math.PI * 2;
-          mm.userData.qk = 'small';
-          place(mm, ...P3(p2), 0.4);
+          drop(m, p2, 0.4, rnd2() * Math.PI * 2, false, 'small');
         }
         // the spectator band, just outside the track, facing the field
-        if (i % 2 === 0) {
+        if (true) {
           const mx = (x1 + x2) * 0.5, my = (y1 + y2) * 0.5;
           const inx = 6000 - mx, iny = 6000 - my, il = Math.hypot(inx, iny) || 1;
           const p2: SK.Pt = [mx - (inx / il) * 260, my - (iny / il) * 260];
@@ -5896,14 +5930,14 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
 
     // 9. THE ROUGH — the uncut grass in the three bites, dressed off distToEdge
     //    with a band rather than a polygon, exactly as Powder dresses its rim.
-    for (const p2 of SK.scatterLand(420, rnd2, 30, [120, 1500])) {
+    for (const p2 of SK.scatterLand(950, rnd2, 26, [110, 1800])) {
       const k = rnd2();
       const m = k < 0.42 ? SKF.skTussock() : k < 0.66 ? SKF.skWildflowerClump()
         : k < 0.82 ? SKF.skThistle() : k < 0.92 ? SKF.skFencePost() : SKF.skFenceRun();
       drop(m, p2, k < 0.92 ? 0.34 : 1.0, rnd2() * Math.PI * 2, false, 'small');
     }
     // …and the three things a child hunts for out there
-    for (const p2 of SK.scatterLand(14, rnd2, 40, [200, 1400])) {
+    for (const p2 of SK.scatterLand(22, rnd2, 40, [200, 1400])) {
       drop(SKF.skSkylark(), p2, 0.30, rnd2() * Math.PI * 2, false, 'small');
     }
     for (const p2 of SK.scatterLand(3, rnd2, 60, [300, 1300])) {
@@ -5913,7 +5947,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       drop(SKF.skCollapsedWindsockPole(), p2, 1.2, rnd2() * Math.PI * 2, false, 'small');
     }
     // the general field: more grass everywhere the rows are not
-    for (const p2 of SK.scatterLand(520, rnd2, 30)) {
+    for (const p2 of SK.scatterLand(900, rnd2, 26)) {
       const k = rnd2();
       const m = k < 0.55 ? SKF.skTussock() : k < 0.85 ? SKF.skWildflowerClump() : SKF.skThistle();
       drop(m, p2, 0.32, rnd2() * Math.PI * 2, false, 'small');

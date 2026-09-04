@@ -195,6 +195,17 @@ const SUITE = [
     cmd: ['node', 'qa/packfresh.mjs'], verdict: pf,
     why: 'the studio pack is a photograph of THIS source — two rounds were spent on a build that no longer existed' },
 
+  // y = 0 IS THE GROUND PLANE, and until 2026-09-04 nothing checked it. It is
+  // the first house rule every prop kit in this game states, and the only proof
+  // was qa/placement.mjs — which needs a browser, only sees props that actually
+  // got placed, and reports a COORDINATE, so ONE bad factory shows up as
+  // hundreds of offences in hundreds of places. SKYLARK FIELD's kit filed 2,477
+  // 'sunk' and 43 'float' rows that way; this named the six factories at fault
+  // in one static run with no browser and no port.
+  { id: 'kitfit', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 180,
+    cmd: ['node', 'qa/kitfit.mjs'], verdict: pf,
+    why: 'every prop in the newest kit sits on y=0 and is a single merged mesh — nothing floats, nothing is buried, nothing splits into pieces the occlusion fade would ghost separately' },
+
   // A SEASON IS A WORLD-SHAPED TABLE KEYED BY AN IF-CHAIN, which is the exact
   // shape the world 6 contract counts ~140 of and a compiler catches twelve.
   // This one shipped: Powder Pass wore Lantern Night's moon lanterns for
