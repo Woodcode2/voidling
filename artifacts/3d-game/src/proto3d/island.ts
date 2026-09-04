@@ -5702,7 +5702,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
           const across = j * PITCH_ACROSS;
           const p2: SK.Pt = [cx + ux * along + vx * across, cy + uy * along + vy * across];
           if (!SK.pointInPoly(p2[0], p2[1], R.poly)) continue;
-          if (!SK.skPlaceable(p2[0], p2[1], 30)) continue;
+          if (!SK.skPlaceable(p2[0], p2[1], 130)) continue;
           // 4 : 4 : 3 : 3 — bagged, spilled, cold, standing. The bagged share
           // came down from 5 because a bag is the one stage that is NOT a big
           // meal, and a field whose food is mostly grass is the trap Powder
@@ -5770,14 +5770,13 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       for (let i = -5; i <= 5; i++) for (let j = -4; j <= 4; j++) {
         const p2: SK.Pt = [cx + ux * (i * 250 + (j % 2 ? 125 : 0)) + vx * j * 280,
           cy + uy * (i * 250 + (j % 2 ? 125 : 0)) + vy * j * 280];
-        if (SK.pointInPoly(p2[0], p2[1], R.poly) && SK.skPlaceable(p2[0], p2[1], 30)) rig.push(p2);
+        if (SK.pointInPoly(p2[0], p2[1], R.poly) && SK.skPlaceable(p2[0], p2[1], 130)) rig.push(p2);
       }
       rig.forEach((p2, i) => {
         const cols = env();
-        const stage = i % 3;
-        drop(stage === 0 ? SKF.skBalloonSpilled(cols) : stage === 1 ? SKF.skBalloonCold(cols) : SKF.skBalloonBagged(cols),
-          p2, stage === 0 ? 5.2 : stage === 1 ? 4.6 : 1.4, layoutYaw(), false, 'big',
-          stage === 0 ? 6.0 : stage === 1 ? 5.6 : 1.5);
+        const stage = i % 2;
+        drop(stage === 0 ? SKF.skBalloonSpilled(cols) : SKF.skBalloonCold(cols),
+          p2, stage === 0 ? 5.2 : 4.6, layoutYaw(), false, 'big', stage === 0 ? 6.0 : 5.6);
       });
     }
     for (const p2 of SK.scatterInRegion(REG('arrivals'), 190, rnd2, 55, { sep: 1.5 })) {
@@ -5802,7 +5801,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       drop(SKF.skWindsock(), [cx + 520, cy - 380], 0.5, 0, false, 'small');
       drop(SKF.skFireTender(), [cx + 200, cy + 620], 1.8, layoutYaw() + Math.PI / 2, false, 'car');
     }
-    for (const p2 of SK.scatterInRegion(REG('tower'), 110, rnd2, 50)) {
+    for (const p2 of SK.scatterInRegion(REG('tower'), 110, rnd2, 50, { sep: 1.1 })) {
       const k = rnd2();
       drop(k < 0.5 ? SKF.skPerimeterCone() : k < 0.8 ? SKF.skTaxiwaySign() : SKF.skTussock(),
         p2, 0.4, rnd2() * Math.PI * 2, false, 'small');
@@ -5833,7 +5832,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         if (best) drop(SKF.skHangar(), best, 5.5, layoutYaw() + Math.PI / 2, true, 'big');
       }
     }
-    for (const p2 of SK.scatterInRegion(REG('hangars'), 150, rnd2, 45)) {
+    for (const p2 of SK.scatterInRegion(REG('hangars'), 150, rnd2, 45, { sep: 1.9 })) {
       const k = rnd2();
       const m = k < 0.34 ? SKF.skTrestleTable() : k < 0.52 ? SKF.skVintageTractor()
         : k < 0.66 ? SKF.skModelPlaneStand() : k < 0.80 ? SKF.skRosetteWall()
@@ -5865,7 +5864,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         drop(mk(), p2, 2.1, layoutYaw() + Math.PI / 2, false, 'car');
       });
     }
-    for (const p2 of SK.scatterInRegion(REG('breakfast'), 180, rnd2, 40)) {
+    for (const p2 of SK.scatterInRegion(REG('breakfast'), 180, rnd2, 40, { sep: 1.5 })) {
       const k = rnd2();
       const m = k < 0.34 ? SKF.skPicnicBench() : k < 0.60 ? SKF.skStrawBale()
         : k < 0.76 ? SKF.skWheelieBin() : k < 0.90 ? SKF.skTussock() : SKF.skSpectatorCar();
@@ -5949,7 +5948,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
           const p2: SK.Pt = [mx - (inx / il) * 260, my - (iny / il) * 260];
           if (SK.onSkylarkLand(p2[0], p2[1]) && SK.skPlaceable(p2[0], p2[1], 20)) {
             drop(SKF.skSpectatorCar(pick([0x8ea3c4, 0xc4a08e, 0x9ec4a0, 0xd0d0c8])), p2, 1.7,
-              Math.atan2(inx, iny), false, 'car');
+              Math.atan2(inx, iny), false, 'car', 2.4);
           }
         }
       }

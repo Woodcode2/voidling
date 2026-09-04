@@ -139,9 +139,9 @@ export const SK_REGIONS: SkRegion[] = [
   // the only place in the world where the ratio of stages is hand-authored
   // rather than scattered.
   { id: 'launchfield', name: 'THE LAUNCH FIELD', density: 1.5,
-    poly: [[4750, 6600], [5600, 6420], [6500, 6420], [7350, 6560], [7800, 7100],
-           [7900, 7800], [7700, 8500], [7100, 8950], [6300, 9100], [5500, 9000],
-           [4900, 8600], [4600, 7900], [4600, 7200]] },
+    poly: [[4350, 6550], [5300, 6350], [6400, 6330], [7450, 6450], [8050, 6950],
+           [8200, 7750], [8000, 8550], [7350, 9050], [6400, 9250], [5400, 9150],
+           [4700, 8750], [4300, 8000], [4250, 7200]] },
 
   // THE ARRIVALS FIELD. Wet grass at the 21 threshold on the south-west arm:
   // trailers nose-in, tailgates down, envelopes half-dragged out of their bags,
