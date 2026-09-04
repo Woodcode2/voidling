@@ -1,0 +1,155 @@
+{
+ "world": "powder",
+ "seed": 7,
+ "cards": 20,
+ "matchT": 3,
+ "repeats": 0,
+ "uniqueHeads": 20,
+ "openerRun": 2,
+ "openerWord": "the",
+ "unresolvedTokens": 0,
+ "twoSentencePct": 0.25,
+ "questionPct": 0,
+ "feed": [
+  {
+   "i": 0,
+   "r": 0.9,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "Good morning, the valley! Closures so far: the school. Stay tuned.",
+   "cls": "show"
+  },
+  {
+   "i": 1,
+   "r": 0.9,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "The lift opens at nine and the queue formed at seven.",
+   "cls": "show"
+  },
+  {
+   "i": 2,
+   "r": 0.9,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "Icicles on the school gutter have reached the record, and school is shut.",
+   "cls": "show"
+  },
+  {
+   "i": 3,
+   "r": 0.9,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "Cocoa at the lodge is two coins, or one if you carried firewood up.",
+   "cls": "show"
+  },
+  {
+   "i": 4,
+   "r": 0.9,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "Nothing is closed except the school, and the school is very closed.",
+   "cls": "show"
+  },
+  {
+   "i": 5,
+   "r": 1.4,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "Franz is teaching the beginners to stop, his least favourite lesson.",
+   "cls": "show"
+  },
+  {
+   "i": 6,
+   "r": 1.4,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "The lodge has lit the big fireplace and the smoke goes straight up.",
+   "cls": "show"
+  },
+  {
+   "i": 7,
+   "r": 2.2,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "Witnesses call it a MUNCHKIN. The desk calls it a drift with opinions.",
+   "cls": "show"
+  },
+  {
+   "i": 8,
+   "r": 2.2,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "A purple guest is doing the rounds of the village. Uninvited but tidy.",
+   "cls": "show"
+  },
+  {
+   "i": 9,
+   "r": 3.2,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "The chalets report nothing missing except one gnome and one fence.",
+   "cls": "show"
+  },
+  {
+   "i": 10,
+   "r": 3.2,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "The grit road through the village is gritted. Vern says so twice.",
+   "cls": "show"
+  },
+  {
+   "i": 11,
+   "r": 3.2,
+   "brand": "📻 THE VALLEY BULLETIN",
+   "head": "Mrs. Tannen asks if school is shut because of the void. No. It is snow.",
+   "cls": "show"
+  },
+  {
+   "i": 12,
+   "r": 4.4,
+   "brand": "📋 CLOSURES SPECIAL",
+   "head": "The village is walking uphill in good order, cocoa first.",
+   "cls": "worried show"
+  },
+  {
+   "i": 13,
+   "r": 4.4,
+   "brand": "📋 CLOSURES SPECIAL",
+   "head": "Chalets are advised to lock their doors and stop being near the void.",
+   "cls": "worried show"
+  },
+  {
+   "i": 14,
+   "r": 6,
+   "brand": "🏔️ THE LAST BULLETIN",
+   "head": "The valley is closed, and the valley is, increasingly, the reason.",
+   "cls": "panic show"
+  },
+  {
+   "i": 15,
+   "r": 6,
+   "brand": "🏔️ THE LAST BULLETIN",
+   "head": "The village is going!! Out the uphill doors, everyone.",
+   "cls": "panic show"
+  },
+  {
+   "i": 16,
+   "r": 8,
+   "brand": "🏔️ THE LAST BULLETIN",
+   "head": "Mrs. Tannen is at the top taking a register. Everyone answers.",
+   "cls": "panic show"
+  },
+  {
+   "i": 17,
+   "r": 8,
+   "brand": "🏔️ THE LAST BULLETIN",
+   "head": "Everything is shut!! The bulletin has never felt so prepared.",
+   "cls": "panic show"
+  },
+  {
+   "i": 18,
+   "r": 11,
+   "brand": "🏔️ THE LAST BULLETIN",
+   "head": "Leave the chalets. Take the children, the cat and the cocoa.",
+   "cls": "panic show"
+  },
+  {
+   "i": 19,
+   "r": 11,
+   "brand": "🏔️ THE LAST BULLETIN",
+   "head": "The last gnome has been rescued from the last fence. Go up.",
+   "cls": "panic show"
+  }
+ ]
+}

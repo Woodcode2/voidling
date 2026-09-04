@@ -1,0 +1,42 @@
+THE GAMEDAY FEED — 20 cards, SEED=7, in the order a child meets them
+==============================================================================
+[r 0.9] 🏈 GAME DAY LIVE
+         Good morning, Marston! The band is under the north stand, warming up.
+[r 0.9] 🏈 GAME DAY LIVE
+         The lot opened at six and the lot has been full since seven.
+[r 0.9] 🏈 GAME DAY LIVE
+         The practice field is empty and the sprinklers are running anyway.
+[r 0.9] 🏈 GAME DAY LIVE
+         The PA is asking about a blue sedan in row B for the ninth time.
+[r 0.9] 🏈 GAME DAY LIVE
+         Bill Ordway has a new notebook, a new pen and nothing to write yet.
+[r 1.4] 🏈 GAME DAY LIVE
+         The waffle stand has run out of waffles and it is not yet ten.
+[r 1.4] 🏈 GAME DAY LIVE
+         Sixty two degrees, no wind, one small cloud with no plans.
+[r 2.2] 🏈 GAME DAY LIVE
+         Doreen has brought a casserole and it is going round the entire lot.
+[r 2.2] 🏈 GAME DAY LIVE
+         It ate a snack. The stadium is calling that a parking matter.
+[r 3.2] 🏈 GAME DAY LIVE
+         Hank has the call. A GOBBLIN is down at the tailgate.
+[r 3.2] 🏈 GAME DAY LIVE
+         A television is on the back of a pickup, running off a generator.
+[r 3.2] 🏈 GAME DAY LIVE
+         Ernie has been at grill nine since Thursday. He has not left it once.
+[r 4.4] ⚠️ BOOTH ALERT
+         Row B has gone and the blue sedan is still blocking what is left of it.
+[r 4.4] ⚠️ BOOTH ALERT
+         Still snacking on a snack and an entire folding table.
+[r   6] 🚨 STILL ON AIR
+         Doreen's casserole is going along the front row and it is still warm.
+[r   6] 🚨 STILL ON AIR
+         The tailgate has GONE!! Ernie is cooking off the tailgate of a truck.
+[r   8] 🚨 STILL ON AIR
+         The generator is running and the television is showing a lot of static.
+[r   8] 🚨 STILL ON AIR
+         There are two of them at the tailgate now. Two. Up the hill we go.
+[r  11] 🚨 STILL ON AIR
+         That is 1 percent DEVOURED. The other 99 percent is on the hill.
+[r  11] 🚨 STILL ON AIR
+         Ernie handed out the last sausage and then packed up. A total pro.

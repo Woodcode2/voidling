@@ -1,0 +1,155 @@
+{
+ "world": "gameday",
+ "seed": 7,
+ "cards": 20,
+ "matchT": 3,
+ "repeats": 0,
+ "uniqueHeads": 20,
+ "openerRun": 3,
+ "openerWord": "the",
+ "unresolvedTokens": 0,
+ "twoSentencePct": 0.3,
+ "questionPct": 0,
+ "feed": [
+  {
+   "i": 0,
+   "r": 0.9,
+   "brand": "🏈 GAME DAY LIVE",
+   "head": "Good morning, Marston! The band is under the north stand, warming up.",
+   "cls": "show"
+  },
+  {
+   "i": 1,
+   "r": 0.9,
+   "brand": "🏈 GAME DAY LIVE",
+   "head": "The lot opened at six and the lot has been full since seven.",
+   "cls": "show"
+  },
+  {
+   "i": 2,
+   "r": 0.9,
+   "brand": "🏈 GAME DAY LIVE",
+   "head": "The practice field is empty and the sprinklers are running anyway.",
+   "cls": "show"
+  },
+  {
+   "i": 3,
+   "r": 0.9,
+   "brand": "🏈 GAME DAY LIVE",
+   "head": "The PA is asking about a blue sedan in row B for the ninth time.",
+   "cls": "show"
+  },
+  {
+   "i": 4,
+   "r": 0.9,
+   "brand": "🏈 GAME DAY LIVE",
+   "head": "Bill Ordway has a new notebook, a new pen and nothing to write yet.",
+   "cls": "show"
+  },
+  {
+   "i": 5,
+   "r": 1.4,
+   "brand": "🏈 GAME DAY LIVE",
+   "head": "The waffle stand has run out of waffles and it is not yet ten.",
+   "cls": "show"
+  },
+  {
+   "i": 6,
+   "r": 1.4,
+   "brand": "🏈 GAME DAY LIVE",
+   "head": "Sixty two degrees, no wind, one small cloud with no plans.",
+   "cls": "show"
+  },
+  {
+   "i": 7,
+   "r": 2.2,
+   "brand": "🏈 GAME DAY LIVE",
+   "head": "Doreen has brought a casserole and it is going round the entire lot.",
+   "cls": "show"
+  },
+  {
+   "i": 8,
+   "r": 2.2,
+   "brand": "🏈 GAME DAY LIVE",
+   "head": "It ate a snack. The stadium is calling that a parking matter.",
+   "cls": "show"
+  },
+  {
+   "i": 9,
+   "r": 3.2,
+   "brand": "🏈 GAME DAY LIVE",
+   "head": "Hank has the call. A GOBBLIN is down at the tailgate.",
+   "cls": "show"
+  },
+  {
+   "i": 10,
+   "r": 3.2,
+   "brand": "🏈 GAME DAY LIVE",
+   "head": "A television is on the back of a pickup, running off a generator.",
+   "cls": "show"
+  },
+  {
+   "i": 11,
+   "r": 3.2,
+   "brand": "🏈 GAME DAY LIVE",
+   "head": "Ernie has been at grill nine since Thursday. He has not left it once.",
+   "cls": "show"
+  },
+  {
+   "i": 12,
+   "r": 4.4,
+   "brand": "⚠️ BOOTH ALERT",
+   "head": "Row B has gone and the blue sedan is still blocking what is left of it.",
+   "cls": "worried show"
+  },
+  {
+   "i": 13,
+   "r": 4.4,
+   "brand": "⚠️ BOOTH ALERT",
+   "head": "Still snacking on a snack and an entire folding table.",
+   "cls": "worried show"
+  },
+  {
+   "i": 14,
+   "r": 6,
+   "brand": "🚨 STILL ON AIR",
+   "head": "Doreen's casserole is going along the front row and it is still warm.",
+   "cls": "panic show"
+  },
+  {
+   "i": 15,
+   "r": 6,
+   "brand": "🚨 STILL ON AIR",
+   "head": "The tailgate has GONE!! Ernie is cooking off the tailgate of a truck.",
+   "cls": "panic show"
+  },
+  {
+   "i": 16,
+   "r": 8,
+   "brand": "🚨 STILL ON AIR",
+   "head": "The generator is running and the television is showing a lot of static.",
+   "cls": "panic show"
+  },
+  {
+   "i": 17,
+   "r": 8,
+   "brand": "🚨 STILL ON AIR",
+   "head": "There are two of them at the tailgate now. Two. Up the hill we go.",
+   "cls": "panic show"
+  },
+  {
+   "i": 18,
+   "r": 11,
+   "brand": "🚨 STILL ON AIR",
+   "head": "That is 1 percent DEVOURED. The other 99 percent is on the hill.",
+   "cls": "panic show"
+  },
+  {
+   "i": 19,
+   "r": 11,
+   "brand": "🚨 STILL ON AIR",
+   "head": "Ernie handed out the last sausage and then packed up. A total pro.",
+   "cls": "panic show"
+  }
+ ]
+}

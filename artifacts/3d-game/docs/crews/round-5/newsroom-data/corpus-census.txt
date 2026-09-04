@@ -1,0 +1,11 @@
+# THE NEWSROOM'S CORPUS, per world — the census behind the thin-worlds stream
+# (long string literals in each world's newsroom module; qa/_qkcensus-style source count)
+#  world     lines   with '?'   %      per-meal pools   LIVE pool
+#  maple       812       46    5.7   yes              yes
+#  pirate      499       31    6.2   yes              yes
+#  gameday     880       19    2.2   yes              yes
+#  lantern     245        7    2.9   NONE             NONE
+#  powder      237        5    2.1   NONE             NONE
+#
+# Lantern and Powder carry under a third of their siblings and have neither
+# class of live-state pool. newsroom_lantern.ts says so in its own header.

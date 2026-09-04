@@ -1,0 +1,155 @@
+{
+ "world": "lantern",
+ "seed": 7,
+ "cards": 20,
+ "matchT": 3,
+ "repeats": 1,
+ "uniqueHeads": 19,
+ "openerRun": 2,
+ "openerWord": "the",
+ "unresolvedTokens": 0,
+ "twoSentencePct": 0.35,
+ "questionPct": 0,
+ "feed": [
+  {
+   "i": 0,
+   "r": 0.9,
+   "brand": "🏮 MARKET COURTESY",
+   "head": "Good evening, night market! Madam Yuzu scrubbed the bathhouse stair twice.",
+   "cls": "show"
+  },
+  {
+   "i": 1,
+   "r": 0.9,
+   "brand": "🏮 MARKET COURTESY",
+   "head": "The offering box at the shrine has one coin in it and a small stone.",
+   "cls": "show"
+  },
+  {
+   "i": 2,
+   "r": 0.9,
+   "brand": "🏮 MARKET COURTESY",
+   "head": "Ponta has sold his first dumpling of the night and would like a photograph.",
+   "cls": "show"
+  },
+  {
+   "i": 3,
+   "r": 0.9,
+   "brand": "🏮 MARKET COURTESY",
+   "head": "Kasa the umbrella is up. It is a clear night. Kasa is aware of this.",
+   "cls": "show"
+  },
+  {
+   "i": 4,
+   "r": 0.9,
+   "brand": "🏮 MARKET COURTESY",
+   "head": "The canal is still and the moon is in it, which is the usual arrangement.",
+   "cls": "show"
+  },
+  {
+   "i": 5,
+   "r": 1.4,
+   "brand": "🏮 MARKET COURTESY",
+   "head": "The drum tower is quiet. The drum tower is nearly always quiet.",
+   "cls": "show"
+  },
+  {
+   "i": 6,
+   "r": 1.4,
+   "brand": "🏮 MARKET COURTESY",
+   "head": "Somebody has left a paper fan on the moon bridge for the third night.",
+   "cls": "show"
+  },
+  {
+   "i": 7,
+   "r": 2.2,
+   "brand": "🏮 MARKET COURTESY",
+   "head": "Correction: the thing by stall four is a guest, not a puddle.",
+   "cls": "show"
+  },
+  {
+   "i": 8,
+   "r": 2.2,
+   "brand": "🏮 MARKET COURTESY",
+   "head": "Tea has been poured for the purple guest. That is the eleventh pot.",
+   "cls": "show"
+  },
+  {
+   "i": 9,
+   "r": 3.2,
+   "brand": "🏮 MARKET COURTESY",
+   "head": "The stone stair has one step fewer than it had this morning.",
+   "cls": "show"
+  },
+  {
+   "i": 10,
+   "r": 3.2,
+   "brand": "🏮 MARKET COURTESY",
+   "head": "The stallholders would like it known that theirs is the best stall.",
+   "cls": "show"
+  },
+  {
+   "i": 11,
+   "r": 3.2,
+   "brand": "🏮 MARKET COURTESY",
+   "head": "Skewers, dumplings, sweet things. The order does not matter.",
+   "cls": "show"
+  },
+  {
+   "i": 12,
+   "r": 4.4,
+   "brand": "📜 MANAGEMENT NOTICE",
+   "head": "Eleven stalls have stopped trading. Their owners are fine. Their stalls are",
+   "cls": "worried show"
+  },
+  {
+   "i": 13,
+   "r": 4.4,
+   "brand": "📜 MANAGEMENT NOTICE",
+   "head": "The Warden requests that guests keep to the lit path, where there is one.",
+   "cls": "worried show"
+  },
+  {
+   "i": 14,
+   "r": 6,
+   "brand": "🥁 THE DRUM TOWER",
+   "head": "The Warden is still lighting lamps. There is nothing left to light.",
+   "cls": "panic show"
+  },
+  {
+   "i": 15,
+   "r": 6,
+   "brand": "🥁 THE DRUM TOWER",
+   "head": "It is coming up the row. UP THE ROW. Go sideways!",
+   "cls": "panic show"
+  },
+  {
+   "i": 16,
+   "r": 8,
+   "brand": "🥁 THE DRUM TOWER",
+   "head": "Ponta gave the last dumplings away on the stair. All of them.",
+   "cls": "panic show"
+  },
+  {
+   "i": 17,
+   "r": 8,
+   "brand": "🥁 THE DRUM TOWER",
+   "head": "The canal has no water in it and the boats are sitting on stones.",
+   "cls": "panic show"
+  },
+  {
+   "i": 18,
+   "r": 11,
+   "brand": "🥁 THE DRUM TOWER",
+   "head": "Lantern Row is gone. All of it. Leave the carts.",
+   "cls": "panic show"
+  },
+  {
+   "i": 19,
+   "r": 11,
+   "brand": "🥁 THE DRUM TOWER",
+   "head": "It is coming up the row. UP THE ROW. Go sideways!",
+   "cls": "panic show"
+  }
+ ]
+}

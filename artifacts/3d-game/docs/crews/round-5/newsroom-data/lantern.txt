@@ -1,0 +1,42 @@
+THE LANTERN FEED — 20 cards, SEED=7, in the order a child meets them
+==============================================================================
+[r 0.9] 🏮 MARKET COURTESY
+         Good evening, night market! Madam Yuzu scrubbed the bathhouse stair twice.
+[r 0.9] 🏮 MARKET COURTESY
+         The offering box at the shrine has one coin in it and a small stone.
+[r 0.9] 🏮 MARKET COURTESY
+         Ponta has sold his first dumpling of the night and would like a photograph.
+[r 0.9] 🏮 MARKET COURTESY
+         Kasa the umbrella is up. It is a clear night. Kasa is aware of this.
+[r 0.9] 🏮 MARKET COURTESY
+         The canal is still and the moon is in it, which is the usual arrangement.
+[r 1.4] 🏮 MARKET COURTESY
+         The drum tower is quiet. The drum tower is nearly always quiet.
+[r 1.4] 🏮 MARKET COURTESY
+         Somebody has left a paper fan on the moon bridge for the third night.
+[r 2.2] 🏮 MARKET COURTESY
+         Correction: the thing by stall four is a guest, not a puddle.
+[r 2.2] 🏮 MARKET COURTESY
+         Tea has been poured for the purple guest. That is the eleventh pot.
+[r 3.2] 🏮 MARKET COURTESY
+         The stone stair has one step fewer than it had this morning.
+[r 3.2] 🏮 MARKET COURTESY
+         The stallholders would like it known that theirs is the best stall.
+[r 3.2] 🏮 MARKET COURTESY
+         Skewers, dumplings, sweet things. The order does not matter.
+[r 4.4] 📜 MANAGEMENT NOTICE
+         Eleven stalls have stopped trading. Their owners are fine. Their stalls are
+[r 4.4] 📜 MANAGEMENT NOTICE
+         The Warden requests that guests keep to the lit path, where there is one.
+[r   6] 🥁 THE DRUM TOWER
+         The Warden is still lighting lamps. There is nothing left to light.
+[r   6] 🥁 THE DRUM TOWER
+         It is coming up the row. UP THE ROW. Go sideways!
+[r   8] 🥁 THE DRUM TOWER
+         Ponta gave the last dumplings away on the stair. All of them.
+[r   8] 🥁 THE DRUM TOWER
+         The canal has no water in it and the boats are sitting on stones.
+[r  11] 🥁 THE DRUM TOWER
+         Lantern Row is gone. All of it. Leave the carts.
+[r  11] 🥁 THE DRUM TOWER
+         It is coming up the row. UP THE ROW. Go sideways!

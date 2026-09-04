@@ -1,0 +1,42 @@
+THE POWDER FEED — 20 cards, SEED=7, in the order a child meets them
+==============================================================================
+[r 0.9] 📻 THE VALLEY BULLETIN
+         Good morning, the valley! Closures so far: the school. Stay tuned.
+[r 0.9] 📻 THE VALLEY BULLETIN
+         The lift opens at nine and the queue formed at seven.
+[r 0.9] 📻 THE VALLEY BULLETIN
+         Icicles on the school gutter have reached the record, and school is shut.
+[r 0.9] 📻 THE VALLEY BULLETIN
+         Cocoa at the lodge is two coins, or one if you carried firewood up.
+[r 0.9] 📻 THE VALLEY BULLETIN
+         Nothing is closed except the school, and the school is very closed.
+[r 1.4] 📻 THE VALLEY BULLETIN
+         Franz is teaching the beginners to stop, his least favourite lesson.
+[r 1.4] 📻 THE VALLEY BULLETIN
+         The lodge has lit the big fireplace and the smoke goes straight up.
+[r 2.2] 📻 THE VALLEY BULLETIN
+         Witnesses call it a MUNCHKIN. The desk calls it a drift with opinions.
+[r 2.2] 📻 THE VALLEY BULLETIN
+         A purple guest is doing the rounds of the village. Uninvited but tidy.
+[r 3.2] 📻 THE VALLEY BULLETIN
+         The chalets report nothing missing except one gnome and one fence.
+[r 3.2] 📻 THE VALLEY BULLETIN
+         The grit road through the village is gritted. Vern says so twice.
+[r 3.2] 📻 THE VALLEY BULLETIN
+         Mrs. Tannen asks if school is shut because of the void. No. It is snow.
+[r 4.4] 📋 CLOSURES SPECIAL
+         The village is walking uphill in good order, cocoa first.
+[r 4.4] 📋 CLOSURES SPECIAL
+         Chalets are advised to lock their doors and stop being near the void.
+[r   6] 🏔️ THE LAST BULLETIN
+         The valley is closed, and the valley is, increasingly, the reason.
+[r   6] 🏔️ THE LAST BULLETIN
+         The village is going!! Out the uphill doors, everyone.
+[r   8] 🏔️ THE LAST BULLETIN
+         Mrs. Tannen is at the top taking a register. Everyone answers.
+[r   8] 🏔️ THE LAST BULLETIN
+         Everything is shut!! The bulletin has never felt so prepared.
+[r  11] 🏔️ THE LAST BULLETIN
+         Leave the chalets. Take the children, the cat and the cocoa.
+[r  11] 🏔️ THE LAST BULLETIN
+         The last gnome has been rescued from the last fence. Go up.
