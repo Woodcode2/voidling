@@ -37,12 +37,22 @@
 //  TEMPLATES. {M} is the last thing eaten, {D} the district the player is
 //  standing in, {P} the percent devoured, {R} the percent still standing,
 //  {F} the player's form, {S} seconds left. Every one is real live state, so
-//  the market is narrating the child's own run back to them. This world has no
-//  LIVE pool and no per-meal pools, so the token lines at the foot of each
-//  T*_GENERAL are the ONLY route live state has to the ticker here — keep them.
+//  the market is narrating the child's own run back to them. There are TWO
+//  routes for it now: the token lines at the foot of each T*_GENERAL, and the
+//  MEAL_* and LIVE pools below, written in round 5. The header used to say
+//  this world had neither "so keep the token lines" — as if that were the
+//  design. The census that opened the newsroom stream measured it: 245 lines
+//  here against Maple Falls's 812, no per-meal pool, no LIVE pool. It was not
+//  a design. It was the gap, and it is what the child heard.
 // ══════════════════════════════════════════════════════════════════════════
 
+import { mealKind, type MealKind } from './newsroom';
+
 export type NewsTier = 0 | 1 | 2;
+
+/** Three tiers of one pool — the shape every newsroom in the game already
+ *  uses, named here because this file now has five more of them. */
+type Pools = [string[], string[], string[]];
 
 /** District ids are the RENAMED ones biomeAt returns — island.ts translates
  *  three of lantern.ts's names at the boundary and this file must agree with
@@ -373,6 +383,172 @@ const SIGN_OFF: string[] = [
   'The recording is still saying please enjoy the market. Let it finish.',
 ];
 
+// ── WHAT IT JUST ATE ───────────────────────────────────────────────────────
+//  ctx.lastMeal is free text from the call site — it never says "a stall" or
+//  "a lantern", because the game tags HOUSE and CAR and sizes the rest. Four
+//  buckets is everything the API can actually tell apart, so the market gets
+//  four, and the classifier is the Bugle's own: one table of meal names feeds
+//  every world, so one classifier reads it.
+//  The market's angle on all four: whatever went in was a courtesy, an
+//  amenity, or an item of lost property, and the guest is very welcome to it.
+const MEAL_HOUSE: Pools = [[
+  // ── BEAT 2 · DENIAL ──
+  'Our guest went inside {M} and has not come out.',
+  'A stall has been enjoyed in full. Please try the two beside it.',
+  'Whose shop was that? We are grateful for their generosity.',
+  'A {F} has been given a whole building to keep.',
+  'A building has gone to our guest, with the shelves still inside it.',
+  'The guest has taken a whole roof. We hope the guest was comfortable.',
+], [
+  // ── BEAT 3 · ALARM ──
+  'The shop pulled its shutters down on the way in, which counts as closed.',
+  'Management looked up what {M} cost and had to lie down.',
+  'Was that the teahouse? The teahouse is a garden now.',
+  'A whole building has gone and nobody upstairs can say which one.',
+  'Management has issued the guest a receipt. The guest ate the receipt.',
+  'Good news! The building the guest ate was one of the smaller ones.',
+], [
+  // ── BEAT 4 · PANIC ──
+  'It has eaten a building and it is looking at the next one!!',
+  'It ate {M} and there is not a plank of it left.',
+  'The last building has gone. The recording still says welcome, welcome.',
+  'Every shop on the row is gone!! Leave the shopping. Bring the children.',
+  'Do not shelter in a doorway. It is a door standing on its own now.',
+  'The lanterns are still lit and there is nothing left to hang them on.',
+]];
+
+const MEAL_CAR: Pools = [[
+  // ── BEAT 2 · DENIAL ──
+  'Our guest has borrowed {M} and need not hurry it back.',
+  'A cart has rolled into the purple guest. The guest is very sorry.',
+  'Who owns the cart outside Eleven Bowls? It is in the guest now.',
+  'Guests are asked not to leave their carts inside the purple guest.',
+  'The delivery bike has gone off with our guest and they seem to get along.',
+  'The guest has taken {M} for a turn around the canal.',
+], [
+  // ── BEAT 3 · ALARM ──
+  'Three carts are gone from the ledger. So are the lunches inside them.',
+  'One barrow is missing and its owner is still holding the handles.',
+  'Whose bicycle was that? Management will look into it, from up here.',
+  'Management wants {M} back by morning, please!',
+  'Management has sent the guest a bill for {M}, twice.',
+], [
+  // ── BEAT 4 · PANIC ──
+  'It ate {M} and left one wheel. Then it ate the wheel.',
+  'Do not go back for the cart!! The cart is not coming back either.',
+  'There are {S} seconds left and nothing left to ride, so run!!',
+  'The market is still saying boats are complimentary!! There are no boats.',
+]];
+
+const MEAL_BIG: Pools = [[
+  // ── BEAT 2 · DENIAL ──
+  'Has anybody seen the big bell? It was here at the start of the evening.',
+  'The Warden has crossed {M} off his list of lamps.',
+  'The market\'s biggest lantern is inside the guest and is still lit.',
+  'Something enormous has gone and the koi did not wake up.',
+  'The guest has eaten the biggest thing on the row. We will find a bigger one.',
+  'Ponta has offered the guest a dumpling to go with {M}.',
+], [
+  // ── BEAT 3 · ALARM ──
+  'The ledger counts {M} as one item, which cannot be right.',
+  'Eleven Bowls has offered Management another bowl. Management said yes!',
+  'The great gate is down to one post, which we are counting as a gate.',
+  'Madam Yuzu would like the bathhouse listed as a very large item.',
+  'Management asks the guest to eat smaller things from now on.',
+  'Was that the whole teahouse? Nobody upstairs is willing to look.',
+], [
+  // ── BEAT 4 · PANIC ──
+  'The moon bridge went in one bite!! Take the stone stair instead.',
+  'The thank you message is still playing. Somebody is drumming. Climb.',
+  'We have nothing bigger to give it. Everybody up the bamboo path.',
+  'The paper fan is fine. {M} is gone. Up the stair.',
+  'It is taller than the shrine now. Nobody goes back for anything.',
+]];
+
+const MEAL_SMALL: Pools = [[
+  // ── BEAT 2 · DENIAL ──
+  'The guest has had {M} and is eyeing the next stall.',
+  'Would the owner of {M} collect it? The guest has it.',
+  'The guest ate the koi food and left the koi entirely alone.',
+  'Ponta has handed the guest a skewer, a napkin and the plate.',
+  'A cushion was offered to the guest and is now inside the guest.',
+  'A bin lid and somebody\'s supper have gone. How lovely.',
+], [
+  // ── BEAT 3 · ALARM ──
+  'Management has logged {M} under snacks and moved on.',
+  'A broom has been swallowed. It was a very good broom.',
+  'The guest ate {M} and then the crate it came in.',
+  'Madam Yuzu wants {M} back and she wants it back tonight!',
+  'Is a missing stool worth writing down? Management has written it down.',
+  'A stallholder has his lunch in his pocket and will not take it out.',
+], [
+  // ── BEAT 4 · PANIC ──
+  'It stopped to eat {M}, and that is our head start. Go.',
+  'It has eaten every bin on the row and is now starting on the steps!!',
+  'One dumpling stopped it for a moment!! Then it took the stall.',
+  'Leave the buckets. Leave the crates. It is welcome to them.',
+  'Whose supper is that on the step? Bring it and run.',
+  'It has {S} seconds and it is spending them on small things.',
+]];
+
+const BY_MEAL: Record<MealKind, Pools> = {
+  house: MEAL_HOUSE, car: MEAL_CAR, big: MEAL_BIG, small: MEAL_SMALL,
+};
+
+// ── LIVE / TEMPLATED ───────────────────────────────────────────────────────
+//  {F} form  {M} last meal  {P} pct  {R} 100-pct  {S} seconds  {D} district.
+//  Those SIX and no others. Never open a line with {D} or {M}: both arrive
+//  lower case and a sentence starts with a capital.
+const LIVE: Pools = [[
+  // ── BEAT 2 · DENIAL ──
+  'A {F} is dining with us tonight and there is no charge.',
+  'Would the guest care for {M}? We seem to have run out.',
+  'The market thanks our guest for visiting {D}. Twice.',
+  'Ponta wrapped {M} to take away. The guest ate the paper.',
+  'Our guest has grown into a {F} and the gate could not be prouder.',
+  'A child has given the guest a sweet and run off giggling.',
+  'The guest is a {F} now, which the market considers very healthy.',
+  'The guest is {P} percent of the way round and has not stopped for tea.',
+  'Madam Yuzu has put out a bigger towel. The {F} did not want it.',
+  'The guest ate {M} and has been voted our best guest yet.',
+  'The koi woke up to look at the {F} and have gone back to sleep.',
+  'A boy asked what {M} tasted like. It went back for more.',
+], [
+  // ── BEAT 3 · ALARM ──
+  'The stocktake found {M} missing, and the room it was in.',
+  'Management would like {M} back and does not expect it.',
+  'Stock check at {D}. Nothing. Next street. Also nothing.',
+  'The ledger says {P} percent gone and the ledger is usually right.',
+  'How much of {D} is left? Nobody upstairs wants to say.',
+  'The inventory now lists a {F} under fixtures and fittings.',
+  'The teahouse has counted its forty cups and reached eleven.',
+  'The bill now includes {D}. Nobody is adding it up any more.',
+  'The lost property office has been lost. Please do not report this.',
+  'A {F} has been given one stall number and is using all of them.',
+  'One guest came in tonight and {P} percent of the market went out!',
+  '{R} percent of the market is left and everybody is on the stone stair.',
+  'Management has written to the guest. The guest has eaten the letter.',
+  'Nine hundred lanterns were lit tonight. Four hundred are still lit.',
+  'Please collect your things from {D}. There is no rush.',
+], [
+  // ── BEAT 4 · PANIC ──
+  'The {F} has {P} percent of the market and wants the stair too.',
+  'It has eaten {D} and is now looking uphill.',
+  '{S} seconds left!! Do not go back for a lantern. Not one.',
+  'That was {M}, and the drum has not stopped since.',
+  '{R} percent of the market is standing and all of it is uphill.',
+  'Leave {D} now. NOW. Take the person next to you.',
+  'It ate {M}!! Leave the rest and get to the bamboo path.',
+  'A {F} is standing exactly where {D} used to be.',
+  'The gate is still saying welcome and there is nothing behind it now.',
+  'Everything below the bamboo path is gone. Everybody above it is safe.',
+  'Is anybody still at {D}? Do not answer, just climb.',
+  'Nine hundred lanterns are out. One is still going up the valley.',
+  'The man with the mop is still calling it a pond. He is on the roof.',
+  '{S} seconds!! Do not carry anything. Carry the small ones.',
+  'The last boat is being carried up the stair. It is not a small boat.',
+]];
+
 // ── the pools, per tier ────────────────────────────────────────────────────
 const GENERAL: [string[], string[], string[]] = [T0_GENERAL, T1_GENERAL, T2_GENERAL];
 const BY_DIST: [Record<LnDist, string[]>, Record<LnDist, string[]>, Record<LnDist, string[]>] =
@@ -380,6 +556,11 @@ const BY_DIST: [Record<LnDist, string[]>, Record<LnDist, string[]>, Record<LnDis
 
 let signedOn = false;
 let signedOff = false;   // the tower has said goodnight; it does not come back
+/** How many headlines back the ticker remembers. SIX was shallower than a
+ *  match is long — qa/newsfeed.mjs caught this world repeating itself inside
+ *  one 26-card run — and the pools were too small to hold a deeper memory.
+ *  They are not now. */
+const RECENT_MAX = 14;
 let recent: string[] = [];
 
 export function resetLanternNews(): void {
@@ -394,6 +575,7 @@ export function lanternNewsCount(): number {
   let n = SIGN_ON.length + MORNING.length + SIGN_OFF.length;
   for (const g of GENERAL) n += g.length;
   for (const d of BY_DIST) for (const k of Object.keys(d)) n += d[k as LnDist].length;
+  for (const p of [MEAL_HOUSE, MEAL_CAR, MEAL_BIG, MEAL_SMALL, LIVE]) for (const t of p) n += t.length;
   return n;
 }
 
@@ -424,7 +606,8 @@ function fill(t: string, c: LanternCtx): string {
 }
 
 /** A countdown line with two and a half minutes left is a weather report, not
- *  an evacuation. The other three newsrooms all gate {S}; this one did not. */
+ *  an evacuation. The other three newsrooms all gate {S}; this one did not.
+ *  Applied to all four pools at the call site, not just the general one. */
 const usable = (t: string, c: LanternCtx): boolean =>
   !(t.includes('{S}') && c.secondsLeft > 70);
 
@@ -436,8 +619,9 @@ const DIST_NAME: Record<LnDist, string> = {
 };
 
 /** One headline. The sign-on is guaranteed first; after that it is a weighted
- *  pick between the district's own lines and the general pool, biased toward
- *  the district because a market narrating the street you are standing in is
+ *  pick across four pools — the district's own lines, what the guest just ate,
+ *  the live templated lines, and the general voice — biased toward the street
+ *  the child is standing in, because a market narrating the street you are on is
  *  the whole reason this file is per-district. */
 export function pickLanternNews(ctx: LanternCtx, rnd: () => number = Math.random): string {
   if (!signedOn) {
@@ -450,7 +634,7 @@ export function pickLanternNews(ctx: LanternCtx, rnd: () => number = Math.random
     const src = fresh.length ? fresh : MORNING;
     const line = src[Math.floor(rnd() * src.length) % src.length] ?? MORNING[0];
     recent.push(line);
-    if (recent.length > 6) recent.shift();
+    if (recent.length > RECENT_MAX) recent.shift();
     return clip(line, TICKER_MAX);
   }
   const tier = Math.max(0, Math.min(2, ctx.tier)) as NewsTier;
@@ -463,15 +647,37 @@ export function pickLanternNews(ctx: LanternCtx, rnd: () => number = Math.random
     return clip(SIGN_OFF[Math.floor(rnd() * SIGN_OFF.length)], TICKER_MAX);
   }
   const dist = ctx.district && BY_DIST[tier][ctx.district] ? ctx.district : null;
-  const local = dist ? BY_DIST[tier][dist] : [];
-  // 55% local when there is a local pool — enough that the street is usually
-  // the subject, not so much that the general voice never gets a turn
+  // EVERY pool is filtered through usable() now, not only the wide one. The
+  // {S} gate used to sit on GENERAL alone, which was correct while GENERAL
+  // held the only templated lines; the moment the meal and live pools landed,
+  // a "{S} seconds" headline could have gone out with two and a half minutes
+  // still on the clock.
+  const local = dist ? BY_DIST[tier][dist].filter((h) => usable(h, ctx)) : [];
+  const meal = BY_MEAL[mealKind(ctx.lastMeal)][tier].filter((h) => usable(h, ctx));
+  const live = LIVE[tier].filter((h) => usable(h, ctx));
   const wide = GENERAL[tier].filter((h) => usable(h, ctx));
-  const pool = local.length && rnd() < 0.55 ? local : wide;
-  const fresh = pool.filter((h) => !recent.includes(h));
-  const src = fresh.length ? fresh : (pool.length ? pool : wide);
+  // ~34% district / ~22% what it just ate / ~28% live / ~16% general when we
+  // know where the guest is, and meal-and-live-heavy when we do not. The same
+  // split the Bugle runs on (newsroom.ts), for the same reason: the paper
+  // should mostly be about the thing that just happened to you. The market's share of that is the courtesy announcement.
+  const r = rnd();
+  const order: string[][] = local.length
+    ? (r < 0.34 ? [local, live, wide]
+      : r < 0.56 ? [meal, live, wide]
+        : r < 0.84 ? [live, wide, local]
+          : [wide, local, live])
+    : (r < 0.30 ? [meal, live, wide]
+      : r < 0.68 ? [live, wide] : [wide, live]);
+  // Take the FIRST pool in that order with something unsaid in it. The old
+  // code picked a pool and then looked for a fresh line inside it, so a small
+  // exhausted pool went straight back to a repeat while three other pools sat
+  // there full. Only when every pool is exhausted does a line get said twice.
+  let src: string[] = [];
+  for (const cand of order) { const f = cand.filter((h) => !recent.includes(h)); if (f.length) { src = f; break; } }
+  if (!src.length) for (const cand of order) if (cand.length) { src = cand; break; }
+  if (!src.length) src = GENERAL[tier];
   const line = src[Math.floor(rnd() * src.length)];
   recent.push(line);
-  if (recent.length > 6) recent.shift();
+  if (recent.length > RECENT_MAX) recent.shift();
   return clip(fill(line, ctx), TICKER_MAX);
 }

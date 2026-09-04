@@ -292,10 +292,10 @@ const LANTERN: WorldReact = {
 // catastrophe. The reader has been on since 5am and will not be hurried.
 const POWDER: WorldReact = {
   landmark: [
-    '{X} has been removed from the piste map. The piste map is next.',
-    '{X} is gone. The council will revisit the matter in spring.',
-    'We have lost {X}. The closure list has been amended accordingly.',
-    '{X} was there at the 7am bulletin. The 8am bulletin differs.',
+    '{X} is off the piste map. The map is next.',
+    '{X} is gone. The council meets in spring.',
+    'We have lost {X}. The list has been amended.',
+    '{X} was on the 7am bulletin. The 8am differs.',
   ],
   beat: [
     [ // sled hour
@@ -311,7 +311,7 @@ const POWDER: WorldReact = {
     [ // snowman contest
       'The snowman contest is down to fewer entrants than registered.',
       'Chairman Frost has retained his title by remaining in one piece.',
-      'Judging is delayed. Several entries have been, in the official term, unentered.',
+      'Judging is delayed. Several entries have been, officially, unentered.',
     ],
     [ // avalanche
       'The mountain has let go. The void has been advised. The void seems pleased.',
@@ -320,8 +320,8 @@ const POWDER: WorldReact = {
     ],
   ],
   evolve: [
-    'The void is now classified {F}. The classification office has closed early.',
-    'Officials confirm the void has reached {F} status. Officials are leaving.',
+    'The void is now classified {F}. The classification office is shut.',
+    'Officials confirm the void is now {F}. Officials are leaving.',
     'The void has been upgraded to {F}. The grit budget has not.',
   ],
   rivalGone: [

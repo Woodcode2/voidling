@@ -235,9 +235,23 @@ const SUITE = [
     cmd: ['node', 'qa/switch.mjs', w, PORT], verdict: pf,
     why: `switching to ${w} reloads, lands on the gate, and the tap starts a scored match` })),
 
-  { id: 'newsstyle', tier: 'words', profiles: ['live'], timeout: 120,
+  // Promoted to the push profile in round 5. It is a one-second static read of
+  // five source files with no browser and no port, and on the run that added
+  // POWDER PASS to its world list it immediately found seven shipped lines
+  // whose worst-case token fill overruns the ticker. A check that cheap, which
+  // catches that, has no business waiting for the live profile.
+  { id: 'newsstyle', tier: 'words', profiles: ['push', 'live'], timeout: 120,
     cmd: ['node', 'qa/newsstyle.mjs'], verdict: re(/^clean$/m, /\d+ problem\(s\)/),
     why: 'the newsroom house style holds across every world and every beat' },
+
+  // THE POOLS ARE NOT THE PAPER. newsstyle reads what the newsroom COULD say
+  // and newsarc reads the shape of the beats; neither can see what the picker,
+  // the anti-repeat memory and the tier weighting actually put on the ticker
+  // one card after another, which is the only thing a child ever meets. SEED
+  // is pinned so a failure is reproducible rather than a story about a seed.
+  { id: 'newsfeed', tier: 'words', profiles: ['push', 'live'], timeout: 2400,
+    cmd: ['node', 'qa/newsfeed.mjs', PORT], env: { SEED: '7' }, verdict: pf,
+    why: 'the aired sequence holds: no headline twice inside one match, no run of four cards opening on the same word, no token reaching the child as braces' },
 
   ...WORLDS.map(w => ({ id: `newsarc:${w}`, tier: 'words', profiles: ['live'], timeout: 600,
     cmd: ['node', 'qa/newsarc.mjs'], env: { ARC_WORLD: w }, verdict: exitCode,

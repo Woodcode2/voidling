@@ -46,12 +46,21 @@
 //  standing in, {P} the percent devoured, {R} the percent still standing,
 //  {F} the player's form, {S} seconds left. Every one is real live state, so
 //  the desk is reading the child's own run back to them off the closure
-//  list. This world has no LIVE pool and no per-meal pools — same shape as
-//  Lantern Night — so the token lines at the foot of each T*_GENERAL are the
-//  ONLY route live state has to the ticker here. Keep them.
+//  list. Two routes carry that now: the token lines at the foot of each
+//  T*_GENERAL, and the MEAL_* and LIVE pools below, written in round 5. The
+//  header used to call the absence of those pools "the same shape as Lantern
+//  Night", which was true and was not a defence — the census measured 237
+//  lines here against Maple Falls's 812, with neither pool present. Lantern
+//  Night has both now. So does the closures desk.
 // ══════════════════════════════════════════════════════════════════════════
 
+import { mealKind, type MealKind } from './newsroom';
+
 export type NewsTier = 0 | 1 | 2;
+
+/** Three tiers of one pool — the shape every newsroom in the game already
+ *  uses, named here because this file now has five more of them. */
+type Pools = [string[], string[], string[]];
 
 /** District ids exactly as biomeAt returns them for this world — powder.ts's
  *  ids are all new words in the shared Biome union, so unlike lantern there
@@ -369,6 +378,159 @@ const SIGN_OFF: string[] = [
   'Goodnight from the closures desk, which is a drift, with a view.',
 ];
 
+// ── WHAT IT JUST ATE ───────────────────────────────────────────────────────
+//  ctx.lastMeal is free text from the call site and it never names a chalet or
+//  a chairlift: the game tags HOUSE and CAR and sizes everything else, so four
+//  buckets is the whole vocabulary. The classifier is the Bugle's, imported
+//  rather than copied — one meal-name table upstream, one reader of it.
+//  The desk's angle on all four: it is a closure, it is on the list, and the
+//  list is accurate as of this morning.
+const MEAL_HOUSE: Pools = [[
+  // ── BEAT 2 · DENIAL ──
+  'It has eaten {M}. The desk has filed that under snow.',
+  'Why is that chimney still smoking with no chalet under it?',
+  'The hire shack has gone and the skis are standing there in rows.',
+  'The plough went past and waved at the gap where a chalet was.',
+  'A chalet has gone and its cat is sitting where the sofa was.',
+], [
+  // ── BEAT 3 · ALARM ──
+  'The sled hut, the tourist office and a chalet are now one closure.',
+  'Two chalets have gone. Franz saved the skis and left the sofa.',
+  'Is your chalet still where you left it this morning?',
+  'Mrs. Tannen has lost her chalet and taken the register with her.',
+  'That was {M}. Everybody got out in their slippers.',
+], [
+  // ── BEAT 4 · PANIC ──
+  'That was {M}!! Out of the chalets and up the hill.',
+  'A chalet has just gone!! Its fire was still going at the time.',
+  'Another chalet has gone since the last item on this list.',
+  'Take the little ones up the hill and leave the chalets to it.',
+  'There are {S} seconds left and no chalets. Up the hill, everybody.',
+  'Is there anybody still indoors, with not much indoors left?',
+]];
+
+const MEAL_CAR: Pools = [[
+  // ── BEAT 2 · DENIAL ──
+  'One car is missing and the closure list is already being retyped.',
+  'A car has gone from under its snow. The snow is still car shaped.',
+  'Where has the grit lorry got to? Vern says it is doing the top road.',
+  'It ate {M} and the desk has moved on to the weather.',
+  'The plough went out at eight and has not come back for its lunch.',
+], [
+  // ── BEAT 3 · ALARM ──
+  'Half the cars will not start, so half the cars are being pushed.',
+  'It took {M} with the wipers still going.',
+  'Has anybody seen the grit lorry, or should the desk close the top road?',
+  'One car alarm went off. Every other alarm in the village joined in.',
+  'The last two cars are leaving together and one of them is towing a sled!',
+], [
+  // ── BEAT 4 · PANIC ──
+  'Everything with wheels is going uphill!! Everything else is being carried.',
+  'It took {M} and the hat of snow it was wearing.',
+  'The road has gone!! The cars that were on it went up an hour ago.',
+  '{S} seconds. The last car up has nine children and a dog in it.',
+  'Every car has gone, so the desk has closed the car park to be certain.',
+]];
+
+const MEAL_BIG: Pools = [[
+  // ── BEAT 2 · DENIAL ──
+  'The lift pass still includes {M} at no extra charge.',
+  'The sled hill is missing its top half and the sledders have not noticed.',
+  'Grete says {M} is not where she left it.',
+  'Was the lift always this short, or has somebody borrowed the rest?',
+  'The snowman contest has lost its tent. The judges\' lunch was inside it.',
+], [
+  // ── BEAT 3 · ALARM ──
+  'The lodge roof went in one piece and the fireplace is still lit!',
+  'Franz is not upset about the lodge. Franz is upset about the skis inside.',
+  'Chairman Frost watched the whole thing go and did not move his carrot.',
+  'Anyone holding a ticket for {M} may keep the ticket.',
+  'Can it really eat something that big? Grete says it just did.',
+  'Norm saw {M} go and went back to his fishing hole.',
+], [
+  // ── BEAT 4 · PANIC ──
+  'The last pylon has gone!! The cable is lying in the snow like string.',
+  'That was {M}!! Nothing that big is left to read out.',
+  'Is anything that big left? Only the school, and the school is shut.',
+  'The plough is up here with us and it is the biggest thing left.',
+  'The desk is pleased to report that the mountain is still here.',
+]];
+
+const MEAL_SMALL: Pools = [[
+  // ── BEAT 2 · DENIAL ──
+  'Franz has lost a ski pole and would like it noted that he had two.',
+  'It took {M}, and a snowman has been asked what he saw.',
+  'Has the school gate gone, and does that mean school is open?',
+  'The dog is being blamed for {M}. The dog was asleep.',
+  'Somebody\'s lunch box has gone from the lift queue. The queue has not moved.',
+  'A squirrel has taken a bun from the lodge steps, in broad daylight.',
+], [
+  // ── BEAT 3 · ALARM ──
+  'Anything you put down is going, so do not put anything down!',
+  'The lost property box has gone, and {M} was in it.',
+  'Hold on to your cocoa. It has taken three cups off the sundeck.',
+  'Three fence posts have gone and the fence is still standing up.',
+  'It took the sign for the sled hill and left the sled hill alone.',
+  'It took {M} off a doorstep and did not wipe its feet.',
+], [
+  // ── BEAT 4 · PANIC ──
+  'It has taken the last bucket!! Vern was using the last bucket.',
+  '{S} seconds left, and it has stopped for {M}.',
+  'Nobody is to go back for a lunch box. Not even that lunch box.',
+  'It has taken the ski rack!! Franz is carrying the skis himself.',
+  'Whose bobble hat is that, and is it too late to fetch it?',
+  'Somebody threw it {M} to keep it busy. That did not work.',
+]];
+
+const BY_MEAL: Record<MealKind, Pools> = {
+  house: MEAL_HOUSE, car: MEAL_CAR, big: MEAL_BIG, small: MEAL_SMALL,
+};
+
+// ── LIVE / TEMPLATED ───────────────────────────────────────────────────────
+//  {F} form  {M} last meal  {P} pct  {R} 100-pct  {S} seconds  {D} district.
+//  Those SIX and no others. Never open a line with {D} or {M}: both arrive
+//  lower case and a sentence starts with a capital.
+const LIVE: Pools = [[
+  // ── BEAT 2 · DENIAL ──
+  'The desk is calling it a {F} and does not enjoy the word.',
+  'A squirrel has run up the {F} and come down the other side.',
+  'A {F} has joined the lift queue. It has not pushed once.',
+  'Is the patch at {D} on the piste map? The map says no.',
+  'Vern gritted a ring around the {F} and it did not slip once.',
+  'Franz asked the {F} to stop on the nursery slope. It stopped.',
+  'School is shut for snow, and the {F} gets no credit for it.',
+  'One item on the closure list, and it is the school, not {D}.',
+  'Top story: the record icicles. Second story, briefly: a {F}.',
+  'The skaters report the ice is fine, in a noticeably smaller circle.',
+  'Asked about {M}, the desk would rather discuss the snow.',
+], [
+  // ── BEAT 3 · ALARM ──
+  'The desk has crossed {M} off the map with a ruler.',
+  'Everything is shut except the lodge, and the lodge has buns!',
+  'Vern was still gritting towards {M} when it went.',
+  'Closures at {D}: all of them, which is the whole entry.',
+  'It took {M} and left the sign that named it standing.',
+  'Cocoa at the lodge is free now, and nobody is stopping for it.',
+  'A {F} is at the school gate. School is shut anyway, for snow.',
+  'Has anybody got the cat? The desk will wait while you check.',
+  'The sled hill is shut and is, the desk notes, no longer a hill.',
+  'Added under the school on the closure list: {M}.',
+  'The dog from the lift queue is up the hill already, ahead of everyone.',
+], [
+  // ── BEAT 4 · PANIC ──
+  'There goes {M}!! The list is no longer alphabetical.',
+  'The register at the top is complete and {R} percent of the valley is not.',
+  'It has taken {D}!! Everybody from there is up here, counted.',
+  '{S} seconds, and the cocoa is going round the drift.',
+  'Is anybody still at {D}? Shout once, then climb.',
+  '{P} percent gone!! The desk has reached item two of the list.',
+  '{S} seconds!! Franz has taught four beginners to stop, and to run.',
+  'What is left is {R} percent, and it is all standing up here.',
+  'The lift queue is at the very top now, and it is still a queue.',
+  'Mind the drop where {D} used to be, and keep climbing.',
+  'It ate {M} and the desk crossed it off before it landed.',
+]];
+
 // ── the pools, per tier ────────────────────────────────────────────────────
 const GENERAL: [string[], string[], string[]] = [T0_GENERAL, T1_GENERAL, T2_GENERAL];
 const BY_DIST: [Record<PwDist, string[]>, Record<PwDist, string[]>, Record<PwDist, string[]>] =
@@ -376,6 +538,11 @@ const BY_DIST: [Record<PwDist, string[]>, Record<PwDist, string[]>, Record<PwDis
 
 let signedOn = false;
 let signedOff = false;   // the desk has said goodnight; it does not come back
+/** How many headlines back the ticker remembers. SIX was shallower than a
+ *  match is long — qa/newsfeed.mjs caught this world repeating itself inside
+ *  one 26-card run — and the pools were too small to hold a deeper memory.
+ *  They are not now. */
+const RECENT_MAX = 14;
 let recent: string[] = [];
 
 export function resetPowderNews(): void {
@@ -390,6 +557,7 @@ export function powderNewsCount(): number {
   let n = SIGN_ON.length + MORNING.length + SIGN_OFF.length;
   for (const g of GENERAL) n += g.length;
   for (const d of BY_DIST) for (const k of Object.keys(d)) n += d[k as PwDist].length;
+  for (const p of [MEAL_HOUSE, MEAL_CAR, MEAL_BIG, MEAL_SMALL, LIVE]) for (const t of p) n += t.length;
   return n;
 }
 
@@ -419,7 +587,8 @@ function fill(t: string, c: PowderCtx): string {
 }
 
 /** A countdown line with two and a half minutes left is a weather report,
- *  not an evacuation — same gate all five newsrooms hold on {S}. */
+ *  not an evacuation — same gate all five newsrooms hold on {S}. Applied to
+ *  all four pools at the call site, not just the general one. */
 const usable = (t: string, c: PowderCtx): boolean =>
   !(t.includes('{S}') && c.secondsLeft > 70);
 
@@ -432,8 +601,9 @@ const DIST_NAME: Record<PwDist, string> = {
 };
 
 /** One headline. The sign-on is guaranteed first; after that it is a weighted
- *  pick between the district's own lines and the general pool, biased toward
- *  the district because a bulletin naming the slope you are standing on is
+ *  pick across four pools — the district's own lines, what the guest just ate,
+ *  the live templated lines, and the general voice — biased toward the street
+ *  the child is standing in, because a bulletin naming the slope you are on is
  *  the whole reason this file is per-district. */
 export function pickPowderNews(ctx: PowderCtx, rnd: () => number = Math.random): string {
   if (!signedOn) {
@@ -446,7 +616,7 @@ export function pickPowderNews(ctx: PowderCtx, rnd: () => number = Math.random):
     const src = fresh.length ? fresh : MORNING;
     const line = src[Math.floor(rnd() * src.length) % src.length] ?? MORNING[0];
     recent.push(line);
-    if (recent.length > 6) recent.shift();
+    if (recent.length > RECENT_MAX) recent.shift();
     return clip(line, TICKER_MAX);
   }
   const tier = Math.max(0, Math.min(2, ctx.tier)) as NewsTier;
@@ -460,15 +630,37 @@ export function pickPowderNews(ctx: PowderCtx, rnd: () => number = Math.random):
     return clip(SIGN_OFF[Math.floor(rnd() * SIGN_OFF.length)], TICKER_MAX);
   }
   const dist = ctx.district && BY_DIST[tier][ctx.district] ? ctx.district : null;
-  const local = dist ? BY_DIST[tier][dist] : [];
-  // 55% local when there is a local pool — enough that the slope underfoot is
-  // usually the subject, not so much that the desk never reads the wide list
+  // EVERY pool is filtered through usable() now, not only the wide one. The
+  // {S} gate used to sit on GENERAL alone, which was correct while GENERAL
+  // held the only templated lines; the moment the meal and live pools landed,
+  // a "{S} seconds" headline could have gone out with two and a half minutes
+  // still on the clock.
+  const local = dist ? BY_DIST[tier][dist].filter((h) => usable(h, ctx)) : [];
+  const meal = BY_MEAL[mealKind(ctx.lastMeal)][tier].filter((h) => usable(h, ctx));
+  const live = LIVE[tier].filter((h) => usable(h, ctx));
   const wide = GENERAL[tier].filter((h) => usable(h, ctx));
-  const pool = local.length && rnd() < 0.55 ? local : wide;
-  const fresh = pool.filter((h) => !recent.includes(h));
-  const src = fresh.length ? fresh : (pool.length ? pool : wide);
+  // ~34% district / ~22% what it just ate / ~28% live / ~16% general when we
+  // know where the guest is, and meal-and-live-heavy when we do not. The same
+  // split the Bugle runs on (newsroom.ts), for the same reason: the paper
+  // should mostly be about the thing that just happened to you. The desk's share of that is the closure list.
+  const r = rnd();
+  const order: string[][] = local.length
+    ? (r < 0.34 ? [local, live, wide]
+      : r < 0.56 ? [meal, live, wide]
+        : r < 0.84 ? [live, wide, local]
+          : [wide, local, live])
+    : (r < 0.30 ? [meal, live, wide]
+      : r < 0.68 ? [live, wide] : [wide, live]);
+  // Take the FIRST pool in that order with something unsaid in it. The old
+  // code picked a pool and then looked for a fresh line inside it, so a small
+  // exhausted pool went straight back to a repeat while three other pools sat
+  // there full. Only when every pool is exhausted does a line get said twice.
+  let src: string[] = [];
+  for (const cand of order) { const f = cand.filter((h) => !recent.includes(h)); if (f.length) { src = f; break; } }
+  if (!src.length) for (const cand of order) if (cand.length) { src = cand; break; }
+  if (!src.length) src = GENERAL[tier];
   const line = src[Math.floor(rnd() * src.length)];
   recent.push(line);
-  if (recent.length > 6) recent.shift();
+  if (recent.length > RECENT_MAX) recent.shift();
   return clip(fill(line, ctx), TICKER_MAX);
 }

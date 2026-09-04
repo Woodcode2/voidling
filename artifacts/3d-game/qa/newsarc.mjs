@@ -66,7 +66,13 @@ const STICKER_NAME = Object.fromEntries(
 
 const BASE = process.env.HITCH_URL || 'http://localhost:4177/';
 const WORLD = process.env.ARC_WORLD || 'maple';
-const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader'] });
+// The container has one chromium, at a fixed path, and it needs --no-sandbox
+// as root. Every other probe in qa/ launches this way; this one did not, and
+// because it is a live-profile step it had not been asked to launch in this
+// environment since. It threw "please run npx playwright install" on the first
+// attempt of round 5.
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+  args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 const fail = [];
 const ok = (cond, msg) => { console.log(`  ${cond ? 'ok  ' : 'FAIL'} ${msg}`); if (!cond) fail.push(msg); };
 

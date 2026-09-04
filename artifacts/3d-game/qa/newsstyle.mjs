@@ -33,8 +33,12 @@
 import fs from 'node:fs';
 
 const DIR = new URL('../src/proto3d/', import.meta.url);
+// POWDER PASS was missing from this list for its whole life — the file shipped
+// with four worlds while the game shipped five, so the newest newsroom was the
+// one nobody metered. It is here now.
 const F = { maple: 'newsroom_maple.ts', pirate: 'newsroom.ts',
-  gameday: 'newsroom_gameday.ts', lantern: 'newsroom_lantern.ts' };
+  gameday: 'newsroom_gameday.ts', lantern: 'newsroom_lantern.ts',
+  powder: 'newsroom_powder.ts' };
 
 /** [start,end) of `const NAME ... = <literal>;` — bracket-matched, because a
  *  headline containing "];" would truncate any regex that tried this. */
@@ -96,14 +100,16 @@ for (const [w, f] of Object.entries(F)) {
   // is the pool a child sees FIRST in every single match.
   const beats = [['sign-on', strs(grab(src, 'SIGN_ON')), null],
     ['morning', strs(grab(src, 'MORNING')), null]];
-  // LANTERN NIGHT keeps its tiers in three separate consts; the other three
-  // share one `Pools` triple, and only they have LIVE and per-meal pools.
-  if (w === 'lantern') for (let t = 0; t < 3; t++) beats.push([`tier${t}`, strs(grab(src, `T${t}_GENERAL`)), t]);
-  else {
-    for (const name of ['GENERAL', 'LIVE', 'MEAL_HOUSE', 'MEAL_CAR', 'MEAL_BIG', 'MEAL_SMALL']) {
-      const label = name === 'GENERAL' ? 'tier' : name.replace('MEAL_', 'meal-').toLowerCase() + ' ';
-      tiersOf(grab(src, name)).forEach((p, t) => beats.push([`${label}${t}`, p, t]));
-    }
+  // LANTERN NIGHT and POWDER PASS keep their GENERAL tiers in three separate
+  // consts; the other three share one `Pools` triple. All five have LIVE and
+  // the four per-meal pools now — until round 5 the last two had neither, and
+  // this branch used that absence as the reason to meter nothing but GENERAL.
+  const splitGeneral = w === 'lantern' || w === 'powder';
+  if (splitGeneral) for (let t = 0; t < 3; t++) beats.push([`tier${t}`, strs(grab(src, `T${t}_GENERAL`)), t]);
+  for (const name of ['GENERAL', 'LIVE', 'MEAL_HOUSE', 'MEAL_CAR', 'MEAL_BIG', 'MEAL_SMALL']) {
+    if (name === 'GENERAL' && splitGeneral) continue;
+    const label = name === 'GENERAL' ? 'tier' : name.replace('MEAL_', 'meal-').toLowerCase() + ' ';
+    tiersOf(grab(src, name)).forEach((p, t) => beats.push([`${label}${t}`, p, t]));
   }
   beats.push(['sign-off', strs(grab(src, 'SIGN_OFF')), null]);
 
@@ -172,7 +178,9 @@ for (const [w, f] of Object.entries(F)) {
   const RIVALS = ['WOBBLES', 'GLITZ', 'BITSY', 'CHOMPZILLA', 'DOZER', 'NIBBLES'];
   console.log('\nreact');
   let n = 0, one = 0, two = 0;
-  for (const w of ['MAPLE', 'PIRATE', 'GAMEDAY', 'LANTERN']) {
+  // POWDER was missing here too, and newsroom_react.ts has had a POWDER pool
+  // since the world shipped. A pool nobody meters is a pool nobody read.
+  for (const w of ['MAPLE', 'PIRATE', 'GAMEDAY', 'LANTERN', 'POWDER']) {
     const pool = strs(grab(src, w));
     if (pool.length < 20) fail('react', w, `only ${pool.length} lines`, '');
     for (const line of pool) {
