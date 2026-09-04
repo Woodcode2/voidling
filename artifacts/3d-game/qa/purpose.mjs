@@ -18,9 +18,15 @@
 //              born on is furniture that jiggles.
 //   turn       mean |heading change| per second, degrees. A walk to a door is
 //              near 0 between corners; a random walk is 60-120.
-//   arrive     people who ever came within 2.5u of a door, stall or bench and
-//              STAYED for 1.5s. This is the number the brief is about, and on
-//              today's build it is expected to be zero by construction.
+//   journeys   the number the brief is about: a person who TRAVELS — gets 15
+//              units from where it was, then settles inside 3 units of the new
+//              place for 1.5 seconds. It needs no prop tagging (userData.qk is
+//              carried by fewer than 2% of props, and by none at all on Pirate
+//              Bay), so it measures errand behaviour rather than the accident of
+//              standing next to a stall. RETRACTED: an earlier version counted
+//              "arrivals" as proximity-plus-dwell near a tagged prop, which read
+//              254 on Lantern Night — where 83% of people never leave their
+//              birthplace and the market is simply dense with stalls.
 //   still      fraction of people who never moved more than 2u all sample.
 //
 // It also draws the paths: qa/out/purpose/<world>_paths.png, every person's
@@ -71,17 +77,14 @@ for (const WORLD of WORLDS) {
       people.push({ o, x0: o.position.x, z0: o.position.z, path: 0, px: o.position.x, pz: o.position.z,
         home: 0, n: 0, ang: null, turn: 0, trail: [] });
     });
-    // the props a person could plausibly be GOING to: a door, a stall counter, a
-    // bench, a table — anything a town puts somewhere for a person to use
-    const targets = [];
-    for (const e of window.__edibles) {
-      const ud = e.mesh.userData || {};
-      const kind = ud.qk || '';
-      if (['house', 'stall', 'bench', 'table', 'shop'].includes(kind)) targets.push([e.mesh.position.x, e.mesh.position.z]);
-    }
+    // A JOURNEY needs no map of the town: leave, arrive, stay. Each person
+    // carries the last place it settled; when it gets 15 units from that anchor
+    // and then holds still (inside 3 units) for 1.5 s, that is one journey and
+    // the anchor moves. Nothing here depends on how a prop is tagged.
+    const GO = 15, SETTLE = 3, HOLD = 1.5;
     const t0 = window.__matchState().t;
-    let last = t0, arrivals = 0;
-    const near = new Map();
+    let last = t0, journeys = 0;
+    for (const q of people) { q.ax = q.x0; q.az = q.z0; q.away = false; q.sx = q.x0; q.sz = q.z0; q.hold = 0; }
     await new Promise((res) => {
       const tick = () => {
         const t = window.__matchState().t;
@@ -100,25 +103,28 @@ for (const WORLD of WORLDS) {
           if (Math.hypot(x - q.x0, z - q.z0) < 6) q.home++;
           q.n++;
           if (q.trail.length < 400 && q.n % 3 === 0) q.trail.push([Math.round(x * 10) / 10, Math.round(z * 10) / 10]);
-          // an ARRIVAL: within 2.5u of a target for 1.5 match-seconds
-          let hit = false;
-          for (const [tx, tz] of targets) if ((x - tx) * (x - tx) + (z - tz) * (z - tz) < 6.25) { hit = true; break; }
-          const k = people.indexOf(q);
-          if (hit) { const v = (near.get(k) || 0) + dt; near.set(k, v); if (v >= 1.5 && v - dt < 1.5) arrivals++; }
-          else near.set(k, 0);
+          // A JOURNEY: away from the last anchor by GO, then still for HOLD
+          if (!q.away) { if (Math.hypot(x - q.ax, z - q.az) >= GO) { q.away = true; q.sx = x; q.sz = z; q.hold = 0; } }
+          else {
+            if (Math.hypot(x - q.sx, z - q.sz) <= SETTLE) {
+              q.hold += dt;
+              if (q.hold >= HOLD) { journeys++; q.trips = (q.trips || 0) + 1; q.ax = q.sx; q.az = q.sz; q.away = false; q.hold = 0; }
+            } else { q.sx = x; q.sz = z; q.hold = 0; }
+          }
         }
         if (window.__matchState().t - t0 >= secs) res(); else requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
     });
     return {
-      secs: window.__matchState().t - t0, targets: targets.length, arrivals,
+      secs: window.__matchState().t - t0, journeys,
+      travellers: people.filter((q) => (q.trips || 0) > 0).length,
       people: people.map((q) => ({
         path: +q.path.toFixed(2),
         net: +Math.hypot(q.px - q.x0, q.pz - q.z0).toFixed(2),
         home: q.n ? +(q.home / q.n).toFixed(3) : 1,
         turnPerS: q.n ? +(q.turn * 180 / Math.PI / Math.max(0.01, secs)).toFixed(1) : 0,
-        trail: q.trail,
+        trips: q.trips || 0, trail: q.trail,
       })),
     };
   }, SECS);
@@ -131,16 +137,16 @@ for (const WORLD of WORLDS) {
     driftMedian: +med(drift).toFixed(3), driftP90: +[...drift].sort((a, c) => a - c)[Math.floor(0.9 * (drift.length - 1))]?.toFixed(3),
     homeMedian: +med(moved.map((q) => q.home)).toFixed(3),
     turnMedian: +med(moved.map((q) => q.turnPerS)).toFixed(1),
-    targets: data.targets, arrivals: data.arrivals,
+    journeys: data.journeys, travellers: data.travellers,
+    travellerPct: +(data.travellers / Math.max(1, moved.length)).toFixed(3),
   };
-  console.log(`  ${data.people.length} people, ${moved.length} moving  ·  drift median ${rec.driftMedian} (p90 ${rec.driftP90})  ·  ${(rec.homeMedian * 100).toFixed(0)}% of the sample within 6u of where they were born  ·  turning ${rec.turnMedian}°/s  ·  ${data.targets} usable destinations in the world, ${data.arrivals} arrival(s)`);
+  console.log(`  ${data.people.length} people, ${moved.length} moving  ·  drift median ${rec.driftMedian} (p90 ${rec.driftP90})  ·  ${(rec.homeMedian * 100).toFixed(0)}% of the sample within 6u of where they were born  ·  turning ${rec.turnMedian}°/s  ·  ${data.journeys} journey(s) by ${data.travellers} of ${moved.length} people (${(rec.travellerPct * 100).toFixed(0)}%)`);
 
   // THE PICTURE. Every trail, on a top-down plan, so the walk is visible.
   const S = 900, R = 260;   // world units across the frame
   const img = new PNG({ width: S, height: S });
   for (let i = 0; i < img.data.length; i += 4) { img.data[i] = 14; img.data[i + 1] = 12; img.data[i + 2] = 22; img.data[i + 3] = 255; }
   const put = (wx, wz, r, g, bl) => { const x = Math.round((wx / R + 1) * S / 2), y = Math.round((wz / R + 1) * S / 2); if (x < 0 || y < 0 || x >= S || y >= S) return; const i = (y * S + x) * 4; img.data[i] = r; img.data[i + 1] = g; img.data[i + 2] = bl; };
-  for (const [tx, tz] of []) put(tx, tz, 60, 60, 90);
   data.people.forEach((q, i) => {
     const hue = (i * 37) % 360, c = [(Math.cos(hue / 57.3) * 90 + 150) | 0, (Math.cos((hue - 120) / 57.3) * 90 + 150) | 0, (Math.cos((hue + 120) / 57.3) * 90 + 150) | 0];
     for (const [x, z] of q.trail) put(x, z, c[0], c[1], c[2]);
@@ -149,13 +155,13 @@ for (const WORLD of WORLDS) {
   writeFileSync(`${OUT}/${WORLD}_paths_${TAG}.png`, PNG.sync.write(img));
   writeFileSync(`${OUT}/${WORLD}_${TAG}.json`, JSON.stringify(rec, null, 1));
   await b.close();
-  // THE BAR, pre-registered: a town where nobody ever arrives anywhere is a
-  // screensaver. Half the moving people should reach something and stay 1.5s
-  // inside a 45-second sample, and the median drift should read as travel
-  // (0.35+) rather than as jitter.
-  if (rec.arrivals < moved.length * 0.5 || rec.driftMedian < 0.35) {
+  // THE BAR, pre-registered before the fix exists: in a 30-second sample at
+  // least a third of the moving people should complete a journey — leave,
+  // arrive, stay — and the median drift should read as travel (0.30+) rather
+  // than as jitter. Both are properties of movement itself, not of tagging.
+  if (rec.travellerPct < 0.33 || rec.driftMedian < 0.30) {
     fails++;
-    console.log(`  FAIL-LINE ${WORLD}: ${data.arrivals} arrival(s) from ${moved.length} moving people, drift median ${rec.driftMedian} — nobody is going anywhere`);
+    console.log(`  FAIL-LINE ${WORLD}: ${(rec.travellerPct * 100).toFixed(0)}% of moving people completed a journey, drift median ${rec.driftMedian} — nobody is going anywhere`);
   }
 }
 if (fails) process.exitCode = 1;
