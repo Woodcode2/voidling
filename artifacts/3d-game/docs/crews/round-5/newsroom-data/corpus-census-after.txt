@@ -1,0 +1,42 @@
+# THE NEWSROOM'S CORPUS, per world — the census behind the thin-worlds stream,
+# recounted AFTER the two thin worlds were filled.
+#
+# METHOD — one method, run over both snapshots, so the two tables compare:
+#   every DISTINCT single-quoted string literal of 25 characters or more that
+#   contains a space, anywhere in the world's newsroom module, minus the two
+#   *_VOICE_AMBIENT / *_VOICE_PANIC records — those are crowd chatter above
+#   people's heads, not the paper. Comments are skipped, so an apostrophe in
+#   prose cannot swallow a pool. The probe is qa/_newscensus.mjs.
+#
+#   This is NOT the method behind corpus-census.txt beside this file, and the
+#   numbers differ: that one walked a list of pool NAMES, and Maple Falls and
+#   Game Day keep their district pools in separate consts that BY_DIST only
+#   references — so it read those two worlds' pools through a different route
+#   and put Maple at 812 where this puts it at 558. Lantern and Powder barely
+#   move between the two methods (245/237 there, 237/229 here) because they are
+#   the two worlds with the least of everything. The gap the stream was opened
+#   on is the same gap under either count.
+#
+# BEFORE — 4e5ed44, the state this stream opened on
+#  world     lines   with "?"     %    per-meal   LIVE
+#  maple      558       32     5.7    yes        yes
+#  pirate     487       26     5.3    yes        yes
+#  gameday    492       13     2.6    yes        yes
+#  lantern    237        6     2.5    NONE       NONE
+#  powder     229        4     1.7    NONE       NONE
+#
+# AFTER — the two thin worlds carry per-meal and LIVE pools for the first time
+#  world     lines   with "?"     %    per-meal   LIVE
+#  maple      558       32     5.7    yes        yes
+#  pirate     487       26     5.3    yes        yes
+#  gameday    492       13     2.6    yes        yes
+#  lantern    355       18     5.1    yes        yes
+#  powder     337       17     5.0    yes        yes
+#
+# lantern  237 -> 355 lines, questions 2.5% -> 5.1%   (+110 in the new pools,
+#                                                      +8 crowd lines in GENERAL)
+# powder   229 -> 337 lines, questions 1.7% -> 5.0%   (+101 in the new pools,
+#                                                      +7 clock lines in GENERAL)
+#
+# Both were the only two worlds in the game with NONE under per-meal and NONE
+# under LIVE, and both files' headers described that absence as the design.
