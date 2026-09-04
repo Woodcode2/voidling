@@ -195,6 +195,15 @@ const SUITE = [
     cmd: ['node', 'qa/packfresh.mjs'], verdict: pf,
     why: 'the studio pack is a photograph of THIS source — two rounds were spent on a build that no longer existed' },
 
+  // A SEASON IS A WORLD-SHAPED TABLE KEYED BY AN IF-CHAIN, which is the exact
+  // shape the world 6 contract counts ~140 of and a compiler catches twelve.
+  // This one shipped: Powder Pass wore Lantern Night's moon lanterns for
+  // eighteen days a year because nobody wrote a snow-day branch when the fifth
+  // world arrived. Zero seconds, no browser, no port.
+  { id: 'seasonprop', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
+    cmd: ['node', 'qa/seasonprop.mjs'], verdict: pf,
+    why: 'every limited-time season dresses its own world — no world wears another world\'s seasonal props' },
+
   { id: 'roundlod', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/roundlod.mjs'], verdict: pf,
     why: 'no NEW round thing ships under the 14x10 bar island.ts states — the debt is frozen at 154 and visible every run' },

@@ -1609,6 +1609,13 @@ function makeSeasonProp(ev: SeasonEvent, i: number): THREE.Object3D {
   const sph = () => new THREE.SphereGeometry(0.5, 8, 6);
   const cyl = () => new THREE.CylinderGeometry(0.5, 0.5, 1, 6);
   const cone = () => new THREE.ConeGeometry(0.5, 1, 5);
+  /** Lantern Night's moon lantern, in one place because two branches want it:
+   *  the MOON FESTIVAL, which is its home, and the corrupt-id fallback. */
+  const moonLantern = () => mergedProp([
+    part(cyl(), 0x8a4a2f, 0, 0.14, 0, 0, 0, 0, 0.42, 0.28, 0.42),
+    part(sph(), 0xffe9a8, 0, 0.66, 0, 0, 0, 0, 0.92, 0.98, 0.92),
+    part(cyl(), 0x8a4a2f, 0, 1.16, 0, 0, 0, 0, 0.34, 0.12, 0.34),
+  ]);
   const g = new THREE.Group();
   if (ev.id === 'harvest') {
     // a pumpkin, in three sizes so a verge of them reads as a crop not a print
@@ -1633,13 +1640,41 @@ function makeSeasonProp(ev: SeasonEvent, i: number): THREE.Object3D {
       part(cyl(), 0xd8d2c4, 0, 0.95, 0, 0, 0, 0, 0.12, 1.9, 0.12),
       part(cone(), col, 0.42, 1.62, 0, 0, 0, -Math.PI / 2, 0.95, 0.36, 0.07),
     ]));
-  } else {
-    // moonfest: a warm little moon lantern on a stand
+  } else if (ev.id === 'moonfest') {
+    // a warm little moon lantern on a stand
+    g.add(moonLantern());
+  } else if (ev.id === 'snowday') {
+    // SNOW DAY — "all schools closed. all sledding mandatory." A sled, left
+    // exactly where its owner left it.
+    //
+    // THIS BRANCH DID NOT EXIST UNTIL 2026-09-04, AND THE SEASON DID. seasons.ts
+    // declares snowday for Powder Pass from 18 December to 4 January; this chain
+    // tested harvest, regatta and homecoming and sent everything else to the
+    // moon lantern. So for eighteen days a year the snow valley at blue dusk was
+    // dressed with forty-four of LANTERN NIGHT's warm paper lanterns, and
+    // nothing anywhere said so — seasons.ts's own header still reads "sized to
+    // four worlds". qa/seasonprop.mjs now fails on any season without its own
+    // branch, which is the only reason this is a comment and not still a bug.
+    //
+    // COLOUR IS THE POINT. alpine.ts's rule is that white on white disappears
+    // from this camera — a roof that is white to the edge merges with the ground
+    // and the building vanishes. A season prop that vanishes is not a season
+    // prop, so the sleds are the three loudest things in the valley, and the
+    // runners are dark so the whole object reads as SITTING ON the snow.
+    const col = i % 3 === 0 ? 0xd94a3a : i % 3 === 1 ? 0x3aa0d9 : 0xf0b429;
     g.add(mergedProp([
-      part(cyl(), 0x8a4a2f, 0, 0.14, 0, 0, 0, 0, 0.42, 0.28, 0.42),
-      part(sph(), 0xffe9a8, 0, 0.66, 0, 0, 0, 0, 0.92, 0.98, 0.92),
-      part(cyl(), 0x8a4a2f, 0, 1.16, 0, 0, 0, 0, 0.34, 0.12, 0.34),
+      part(cyl(), col, 0, 0.30, 0, 0, 0, 0, 1.30, 0.14, 0.78),
+      part(cyl(), 0x6b4a33, 0.06, 0.16, 0.30, 0, 0, Math.PI / 2, 0.10, 1.34, 0.10),
+      part(cyl(), 0x6b4a33, 0.06, 0.16, -0.30, 0, 0, Math.PI / 2, 0.10, 1.34, 0.10),
+      part(cone(), col, 0.70, 0.40, 0, 0, 0, -Math.PI / 2, 0.40, 0.34, 0.60),
     ]));
+  } else {
+    // An id that is not in EVENTS cannot arrive through eventForWorld(); this is
+    // the corrupt-value path. It gets a lantern rather than an invisible prop,
+    // because 44 empty groups scattered across an island is a worse failure than
+    // a wrong-but-visible one — and qa/seasonprop.mjs makes sure no real season
+    // ever lands here again.
+    g.add(moonLantern());
   }
   return g;
 }
