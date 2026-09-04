@@ -262,6 +262,14 @@ const SUITE = [
     cmd: ['node', 'qa/airfield.mjs'], verdict: pf,
     why: 'SKYLARK FIELD is a real airfield — runway designators match their headings, the perimeter closes, the launch circle sits on the true crossing, spawn is off the strips and every district has room to stand in' },
 
+  { id: 'formsep', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 60,
+    cmd: ['node', 'qa/formsep.mjs'], verdict: pf,
+    why: 'every palette colour can show a shape under its own world\'s key — a prop whose top and side render the same colour has no form, measured as CIE76 dE with no renderer involved' },
+
+  { id: 'blackprops', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 120,
+    cmd: ['node', 'qa/blackprops.mjs'], verdict: pf,
+    why: 'no prop face renders as a flat black hole — every pure-black region in a shipped frame is concave enough to be a shadow' },
+
   { id: 'roundlod', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/roundlod.mjs'], verdict: pf,
     why: 'no NEW round thing ships under the 14x10 bar island.ts states — the debt is frozen at 154 and visible every run' },

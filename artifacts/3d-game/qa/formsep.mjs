@@ -54,13 +54,29 @@ const INK_BY_DESIGN = new Map([
 const LIT = 0.85, SHADED = 0.40;
 
 // Per-world key, from WORLD_LIGHT in prototype3d.ts x the RIG's 1.31 payback.
-const KEY = { maple: 1.75, pirate: 1.75, gameday: 2.55, lantern: 0.55, powder: 1.15 };
+// EACH WORLD'S KEY, READ OUT OF THE GAME RATHER THAN COPIED FROM IT. This was
+// a hand-typed five-world literal, so SKYLARK FIELD was not merely ungraded —
+// it was INVISIBLE. WORLDS defaults to Object.keys(KEY), so world 6 never
+// entered the loop, never tripped the too-small-a-sample check, and the report
+// simply had no line for it. A probe that omits a world entirely is worse than
+// one that fails it.
+const KEY = (() => {
+  const src = readFileSync('src/prototype3d.ts', 'utf8');
+  const m = /const WORLD_LIGHT[^=]*=\s*\{/.exec(src);
+  if (!m) throw new Error('formsep: cannot find WORLD_LIGHT in src/prototype3d.ts');
+  const out = {};
+  for (const [, w, i] of src.slice(m.index).matchAll(/^\s{2}([a-z0-9]+):\s*\{[^}]*?sunI:\s*([0-9.]+)/gms)) {
+    out[w] = Number(i);
+  }
+  if (Object.keys(out).length < 2) throw new Error('formsep: WORLD_LIGHT parsed to nothing usable');
+  return out;
+})();
 const RIG = 1.31;
 // Which module belongs to which world. mainstreet/island are shared furniture.
 // Modules whose props belong to ONE world.
 const OWN = {
   maple: ['mainstreet.ts'], pirate: ['luxe.ts'], gameday: ['tailgate.ts'],
-  lantern: ['nightmarket.ts'], powder: ['alpine.ts'],
+  lantern: ['nightmarket.ts'], powder: ['alpine.ts'], skylark: ['skyfield.ts'],
 };
 // Modules whose props are placed in EVERY world, so their colours have to
 // survive the darkest key as well as the brightest.
@@ -72,7 +88,12 @@ const SHARED = ['island.ts', 'life.ts', 'curio.ts', 'defense.ts', 'store3d.ts', 
 const NO_PALETTE = new Set(['bay.ts', 'palette.ts', 'void3d.ts', 'audio3d.ts', 'fx.ts', 'rivals.ts',
   'bubbles.ts', 'gloss.ts', 'telemetry.ts', 'assets3d.ts', 'hats.ts', 'gameday.ts', 'powder.ts',
   'lantern.ts', 'newsroom.ts', 'newsroom_arc.ts', 'newsroom_react.ts', 'newsroom_gameday.ts',
-  'newsroom_lantern.ts', 'newsroom_maple.ts', 'newsroom_powder.ts']);
+  'newsroom_lantern.ts', 'newsroom_maple.ts', 'newsroom_powder.ts',
+  // WORLD 6. skylark.ts is the LAND — a coast ring, three runway centrelines,
+  // nine region polygons and the maths that answers "is this point placeable".
+  // It paints nothing. skyfield.ts is where every colour on that field lives,
+  // so that is the module this probe grades, and it is in OWN above.
+  'skylark.ts', 'newsroom_skylark.ts']);
 // A world whose module yields almost nothing has not been EXAMINED, and a
 // probe that reports "1 colour cannot show form" over a sample of three is
 // giving false comfort about the other forty. The first run of this file found
@@ -139,16 +160,50 @@ if (unclassified.length) {
 const thin = WORLDS.filter((w) => (rows.filter((r) => r.w === w).length) < MIN_SAMPLE);
 
 const exempt = (r) => INK_BY_DESIGN.has(`${r.name}|${r.hex.toLowerCase()}`);
-const bad = rows.filter((r) => r.de < MIN_DE && !exempt(r)).sort((a, b) => a.de - b.de);
+
+// ── FIVE COLOURS OF INHERITED DEBT, FROZEN AT THEIR MEASURED NUMBERS ───────
+// These are NOT exemptions and they are NOT design. They are five colours on
+// two SHIPPED worlds that genuinely cannot show a shape under their own key —
+// near-black structural paint on the two darkest levels in the game, where a
+// lit face lands at rgb(0,0,2) and a shaded one at rgb(0,0,0).
+//
+// They are frozen rather than fixed here because repainting two shipped worlds
+// is an art decision that needs a picture, not a probe: the lift that clears
+// ΔE 6 under Lantern's 0.55 key is large enough to change how a night market
+// reads, and that judgement belongs with the studio and a screenshot, not with
+// the commit that added world 6. Freezing is what let this probe enter the
+// gate at all — it has been sitting outside every profile, which is why five
+// colours went unexamined and why SKYLARK FIELD was ungraded until today.
+//
+// The freeze can only ever SHRINK. A sixth colour under the bar fails. A frozen
+// colour that gets WORSE fails. A frozen colour that is fixed fails, so the
+// entry cannot outlive the debt. Same rule as qa/placement.baseline.json.
+const FROZEN = new Map([
+  ['lantern|PLINTH|0x2a2336', 0.8],
+  ['lantern|CASE|0x2a2038', 1.2],
+  ['lantern|BLACK_L|0x39344a', 3.8],
+  ['powder|CHAR|0x2a2e38', 5.7],
+  ['powder|PLINTH|0x2a2336', 6.0],
+]);
+const frozenKey = (r) => `${r.w}|${r.name}|${r.hex.toLowerCase()}`;
+const under = rows.filter((r) => r.de < MIN_DE && !exempt(r));
+const newlyBad = under.filter((r) => !FROZEN.has(frozenKey(r)));
+// a frozen colour that has drifted DOWN is a regression the freeze must not hide
+const worse = under.filter((r) => FROZEN.has(frozenKey(r)) && r.de < FROZEN.get(frozenKey(r)) - 0.05);
+// …and one that has been fixed means the entry is stale and should be deleted
+const healed = [...FROZEN.keys()].filter((k) => !under.some((r) => frozenKey(r) === k));
+
+const bad = [...newlyBad, ...worse].sort((a, b) => a.de - b.de);
 const byWorld = {};
 for (const r of rows) (byWorld[r.w] ||= []).push(r);
 
 console.log('');
 for (const [w, rs] of Object.entries(byWorld)) {
-  const under = rs.filter((r) => r.de < MIN_DE && !exempt(r));
+  const u = rs.filter((r) => r.de < MIN_DE && !exempt(r));
+  const fz = u.filter((r) => FROZEN.has(frozenKey(r))).length;
   console.log(`  ${w.padEnd(9)} ${String(rs.length).padStart(3)} palette colours, `
-    + `${String(under.length).padStart(2)} cannot show form (ΔE < ${MIN_DE})`
-    + (under.length ? `  — ${under.slice(0, 6).map((r) => r.name).join(', ')}` : ''));
+    + `${String(u.length).padStart(2)} cannot show form (ΔE < ${MIN_DE})`
+    + (u.length ? `  — ${u.slice(0, 6).map((r) => r.name).join(', ')}${fz ? ` (${fz} frozen)` : ''}` : ''));
 }
 console.log('');
 if (thin.length) {
@@ -170,6 +225,11 @@ if (bad.length) {
   console.log(`\nFAIL — ${bad.length} palette colour(s) cannot show a shape under their own world's key`);
   process.exit(1);
 }
+if (healed.length) {
+  for (const k of healed) console.log(`  · FROZEN entry ${k} is above the bar now. Delete it — a freeze must not outlive its debt`);
+  console.log(`\nFAIL — ${healed.length} frozen entry/entries no longer apply`);
+  process.exit(1);
+}
 console.log(`PASS — every palette colour outside the ${INK_BY_DESIGN.size} exempted as line-work `
-  + `separates a lit face from a shaded one `
-  + `by at least ΔE ${MIN_DE} (worst ${Math.min(...rows.map((r) => r.de)).toFixed(1)})`);
+  + `and the ${FROZEN.size} frozen as inherited debt separates a lit face from a shaded one `
+  + `by at least ΔE ${MIN_DE}`);
