@@ -19,6 +19,7 @@ import * as GD from './gameday';
 import * as LN from './lantern';
 import * as PW from './powder';
 import * as AL from './alpine';
+import * as SK from './skylark';
 // MAPLE FALLS speaks for itself: newsroom_maple exports its townsfolk voices in
 // exactly the shape of the VOICE_AMBIENT / VOICE_PANIC pools below, keyed by
 // the same voice ids the cast carries (politician, protester, gossip, farmer,
@@ -4202,6 +4203,78 @@ export function createLife(
           b.m.rotation.x += dt2 * 4;
         }
       } });
+    }
+  }
+
+  // ══ SKYLARK FIELD: three hundred people, and every one of them is fetching ══
+  //
+  // THIS IS THE BEST PURPOSE WORLD IN THE GAME AND IT IS NOT CLOSE, because a
+  // balloon crew's entire morning IS an errand: carry a basket off a trailer,
+  // walk it to a pegged spot, put it down, stand round it with your hands busy.
+  // That is exactly the shape addWanderer's `leg` opt-in rewards — leave a
+  // place, cross real ground, settle, hold — and it is why this world's people
+  // should clear qa/purpose.mjs without the pushing Maple and Pirate needed.
+  //
+  // The legs are LONG here on purpose. The launch field is 3,900 world units
+  // across and a crew's walk from the trailers to their spot is most of it, so
+  // `leg` runs 34-44 against Powder's 24: a journey needs 15 3D units (300
+  // world) to count, and a walk that clears it three times over is a walk a
+  // child can actually watch happen.
+  if (worldId() === 'skylark') {
+    const skRegion = (id: SK.SkBiome) => SK.SK_REGIONS.find((r) => r.id === id)!;
+    const skPlace = (wx: number, wy: number, id: SK.SkBiome,
+                     o?: { kid?: boolean; tether?: number; speed?: number; leg?: number; pace?: number }) => {
+      const p = o?.kid ? makeCast('kid', id) : makePerson(id);
+      const [x, z] = g3([wx, wy]);
+      addWanderer(p, x, z, o?.tether ?? 10, o?.speed ?? rand(0.8, 1.5),
+        16, o?.kid ? 1.9 : 2.4, id, undefined, undefined, o?.leg ?? 38, o?.pace ?? 1.2);
+    };
+    // ── the crews, district by district ──────────────────────────────────
+    // The launch field carries the most because that is where the balloons
+    // are and a balloon is four people; Breakfast Row is second because every
+    // errand in this world eventually ends at a van.
+    const SK_CAST: [SK.SkBiome, number, number, number][] = [
+      ['launchfield', 150, 26, 42],   // four crew to a basket, ninety baskets
+      ['arrivals', 62, 30, 40],       // trailers, tailgates, envelopes coming out
+      ['breakfast', 46, 26, 34],      // the queue, and everybody who walked to it
+      ['hangars', 34, 26, 30],        // the Sunday flea market, browsing
+      ['tower', 26, 30, 34],          // the briefing, the met hut, the flagpole
+      ['meadow', 40, 40, 44],         // dog walkers and the long way round
+    ];
+    for (const [id, n, clear, leg] of SK_CAST) {
+      const r = skRegion(id);
+      if (!r) continue;
+      for (const [wx, wy] of SK.scatterInRegion(r, n, Math.random, clear))
+        skPlace(wx, wy, id, { kid: Math.random() < 0.34, leg });
+    }
+    // THE PERIMETER IS A BEAT, NOT A SCATTER. Marshals walk between numbered
+    // posts, stand a while, walk to the next — the most legible journey in the
+    // game because the route is drawn on the ground under them.
+    {
+      const T = SK.PERIMETER;
+      for (let i = 0; i < T.length - 1; i += 2) {
+        const [x1, y1] = T[i], [x2, y2] = T[i + 1];
+        const nx = -(y2 - y1), ny = (x2 - x1), nl = Math.hypot(nx, ny) || 1;
+        const mx = (x1 + x2) * 0.5, my = (y1 + y2) * 0.5;
+        const inward = ((6000 - mx) * nx + (6000 - my) * ny) > 0 ? 1 : -1;
+        const wx = mx + (nx / nl) * 300 * inward, wy = my + (ny / nl) * 300 * inward;
+        if (!SK.onSkylarkLand(wx, wy)) continue;
+        skPlace(wx, wy, 'perimeter', { tether: 30, leg: 44, speed: rand(0.9, 1.3) });
+      }
+    }
+    // THE PASSENGERS, and they are the only crowd in this game authored to
+    // look UP. They walk from the gate to a numbered balloon and stand beside
+    // it with their heads back, which is the whole promise of the world in one
+    // pose: the thing they are waiting for is going to leave the ground.
+    for (const [wx, wy] of SK.scatterInRegion(skRegion('launchfield'), 34, Math.random, 40)) {
+      skPlace(wx, wy, 'launchfield', { kid: Math.random() < 0.5, leg: 30, speed: rand(0.6, 1.0) });
+    }
+    // …and the ones with nowhere to be: spectators along the fence, who came to
+    // watch and have therefore already arrived. leg 0 keeps them local, exactly
+    // as Game Day's lot crowd does — a world where EVERY person is striding
+    // somewhere reads as an evacuation, not a morning out.
+    for (const [wx, wy] of SK.scatterLand(48, Math.random, 40, [260, 900])) {
+      skPlace(wx, wy, 'meadow', { tether: 6, leg: 0, kid: Math.random() < 0.4 });
     }
   }
 
