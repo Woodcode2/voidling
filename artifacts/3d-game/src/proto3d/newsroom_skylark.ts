@@ -639,3 +639,204 @@ export function pickSkylarkNews(ctx: SkylarkCtx, rnd: () => number = Math.random
   if (recent.length > RECENT_MAX) recent.shift();
   return air(fill(line, ctx));
 }
+
+// ── THE CROWD'S OWN VOICES ─────────────────────────────────────────────────
+//  Keyed by the voice ids the cast carries (life.ts VOICE_OF): crew, pilot,
+//  marshal, cleaner, tea, van, guide, tourist, ticket, shepherd, spectator,
+//  pym, kid. A driver talks like crew and a photographer like a tourist, so
+//  neither has a key of its own. Same shape as MAPLE_VOICE_* and GAMEDAY_
+//  VOICE_*, selected per world in createLife and never merged into the module
+//  tables — before these existed the whole field fell through to Maple's pools
+//  and a balloon crew at first light said "bin day tomorrow!".
+//
+//  AMBIENT is the ordinary morning: cold feet, a queue, a thing about to leave
+//  the ground. PANIC is the void arriving, "!!" like every other world's
+//  screams. Nothing here that a 4+ rating would flag: no drink, nobody hurt,
+//  everybody makes the hedge. A bubble is one line on a phone, so nothing
+//  gets to be a sentence and a half.
+export const SKYLARK_VOICE_AMBIENT: Record<string, string[]> = {
+  // four to a basket, and every one of them has done this since they were nine
+  crew: [
+    'hold it — hold it — GO', 'crown line! who has the crown line?',
+    'fan on. mind your feet.', 'four to a basket, always four',
+    'she is standing up nicely', 'that is the last of the pegs',
+    'burner check. everybody back.', 'mouth open — keep it open',
+    'tail line to me, please', 'wet grass, dry envelope, good',
+    'we rigged her in eleven minutes', 'north row is nearly up',
+  ],
+  // clipboard, leather jacket, thirty years, still nervous before every lift
+  pilot: [
+    'wind calm. cloud base high.', 'I have never seen it this still',
+    'briefing said 030 and I believe it', 'passengers to their numbers',
+    'thirty years and still nervous', 'one more burner test, then we go',
+    'we lift when the tower says', 'do not step on the crown line',
+    'the sheep are on the runway again', 'my envelope is older than you',
+  ],
+  // hi-vis, a paddle, a numbered post, and the whole field behind a rope
+  marshal: [
+    'keep behind the rope, please', 'post four to tower. all quiet.',
+    'behind the rope. thank you.', 'not there. THERE. thank you.',
+    'post six has a dog. again.', 'twenty-two posts, all walked',
+    'mind the crown line, sir', 'hi-vis on, wand up, counting',
+    'that is a tether, not a bench', 'tower says stand by. so stand by.',
+  ],
+  // blue overalls, a bucket, a bubble wand: the kids follow the bubbles and
+  // stay off the kit, which is the entire reason for the wand
+  cleaner: [
+    'wet wipes do nothing on dew', 'a hundred baskets, one bucket',
+    'bubbles keep the kids off the kit', 'mud on the tower step again',
+    'somebody dropped a rosette', 'this broom is older than the meet',
+    'sweep it wet, sweep it twice', 'the kids follow the bubbles, see',
+    'nobody wipes their boots. nobody.', 'that is not litter, that is a glove',
+  ],
+  // the urn. thirty pence, and it has been thirty pence for a long time
+  tea: [
+    'tea is thirty pence. still.', 'urn is on. urn is always on.',
+    'milk first, and I will not argue', 'bacon van is that way, love',
+    'two sugars for the pilots', 'my flask is older than the tower',
+    'sit down, you look frozen', 'the crews drink it by the gallon',
+    'somebody has taken my tray again', 'tea, then the sunrise. that order.',
+  ],
+  // the bacon van hatch, open before the birds
+  van: [
+    'bacon or egg, love? both?', 'queue is to the fence. lovely.',
+    'the tower has a standing order', 'thirty rolls in the first hour',
+    'ketchup is at the end. THE END.', 'we open before the birds',
+    'that pilot has had four', 'doughnuts are twenty minutes',
+    'mind the step. everybody says it.', 'the crews eat like the sheep',
+  ],
+  // red jacket, a placard on a stick, a group that will not keep together
+  guide: [
+    'this way, please. THIS way.', 'that one is the whale. the big one.',
+    'ninety-one entries this year', 'follow the flag. I have the flag.',
+    'no, that is a windsock. same idea.', 'the balcony is the tower. yes.',
+    'keep together. we lose one a year.', 'and that is Old Meg. the tractor.',
+    'four people lift a balloon. four.', 'the meadow is the sheep\'s. by law.',
+    'photos at the circle, then tea',
+  ],
+  // bright coat, wet feet, a camera, and the same question all morning
+  tourist: [
+    'is that one going next?', 'is it going up? is it going up?',
+    'the big one is a whale. a WHALE.', 'we drove from Kettering for this',
+    'you can hear the burner from here', 'no, THAT one. with the stripes.',
+    'my feet are soaked and I love it', 'which one is the whale? oh.',
+    'they said sunrise. where is it?', 'that is a good photo. that one.',
+    'I want the balloon-shaped one', 'four hundred photos and it is not up',
+  ],
+  // the caravan at the gate: programmes, wristbands, no refunds, it is a field
+  ticket: [
+    'programme? it has a map in it.', 'wristband on. no, the OTHER wrist.',
+    'parking is the field. all of it.', 'ninety-one entries. it is on the board.',
+    'gates opened at five. FIVE.', 'children free. dogs on leads.',
+    'the whale goes last. it says so.', 'have you got a wristband? lovely.',
+    'tea is that way, whale is THAT way', 'no refunds. it is a field.',
+  ],
+  // forty ewes on runway 09 since March, and a crook that has never been needed
+  shepherd: [
+    'the sheep have not moved. no.', 'runway is grass. sheep eat grass.',
+    'asked them nicely. twice.', 'they have been on 09 since March',
+    'the dog is not interested either', 'ninety balloons and they never look up',
+    'they will move when they move', 'thirty years, same forty ewes',
+    'one of them likes the burner noise', 'tower can ask them itself',
+  ],
+  // flask, chair, fence. the same square of grass every year since their dad
+  spectator: [
+    'we come every year. every year.', 'this is the good bit. the standing up.',
+    'flask, chair, fence. sorted.', 'that one is called Grete. I asked.',
+    'we stand here. we always stand here.', 'you hear the burner before you see it',
+    'she is going up. she is. wait.', 'my dad brought me. I bring them.',
+    'best morning of the year, this', 'the whale is worth the wait',
+    'programme says sunrise. nine minutes.',
+  ],
+  // the Balloonmeister, off the balcony, in the voice of the briefing
+  pym: [
+    'wind calm. cloud base high. we fly.', 'crews to your numbers, please',
+    'that was not in the notams', 'the instruments are excellent',
+    'sunrise in eleven minutes', 'conditions are, frankly, ideal',
+    'the sheep are being asked to move', 'met balloon away. straight up. good.',
+    'ninety-one entries. all present.', 'briefing in four minutes. balcony.',
+    'have a good flight. all of you.',
+  ],
+  // an anorak, a bobble hat, a balloon on a string, and the whale
+  kid: [
+    'the WHALE!', 'is it going up NOW?', 'I can hear the fire thing!',
+    'that one is MINE. I picked it.', 'my balloon! my balloon is red!',
+    'bubbles! BUBBLES!', 'can we go in the basket? can we?',
+    'the sheep looked at me', 'it is bigger than our HOUSE',
+    'I am not cold. I am NOT.', 'up up up up up!',
+  ],
+};
+
+export const SKYLARK_VOICE_PANIC: Record<string, string[]> = {
+  crew: [
+    'DROP THE LINE!! LEAVE IT!!', 'get in the basket!! GET IN!!',
+    'leave the envelope!! RUN!!', 'it has the trailer!! GO!!',
+    'pull the pins!! PULL THEM!!', 'up!! we go up NOW!!',
+    'never mind the fan!! MOVE!!',
+  ],
+  pilot: [
+    'PULL THE PINS!! WE GO NOW!!', 'everybody in!! NOW!!',
+    'it is not in the notams!!', 'burn!! BURN!! full burn!!',
+    'leave the trailer!! LEAVE IT!!', 'up is the only way out!!',
+  ],
+  marshal: [
+    'BEHIND THE ROPE!! ALL OF YOU!!', 'to the hedge!! TO THE HEDGE!!',
+    'post four to tower!! it is HERE!!', 'walk!! do not run!! oh, RUN!!',
+    'leave the rope!! LEAVE IT!!', 'this way!! THIS way!!',
+    'I am counting you!! keep together!!',
+  ],
+  cleaner: [
+    'MY BUCKET!! it ate my BUCKET!!', 'never mind the broom!! GO!!',
+    'it is eating the MESS!!', 'up the tower!! UP!!',
+    'leave it!! it is only litter!!', 'I just swept that!! I JUST—!!',
+  ],
+  tea: [
+    'THE URN!! save the URN!!', 'up the hill!! bring the flask!!',
+    'it drank the TEA!!', 'leave the cups!! LEAVE THEM!!',
+    'it has the bacon van!! oh no!!', 'everybody OUT of the queue!!',
+  ],
+  van: [
+    'CLOSE THE HATCH!! CLOSE IT!!', 'it ate the DOUGHNUT trailer!!',
+    'out the back!! OUT THE BACK!!', 'leave the rolls!! GO!!',
+    'up the hedge!! bring the tongs!!', 'thirty years of bacon!! GONE!!',
+  ],
+  guide: [
+    'THIS WAY!! everybody THIS way!!', 'follow the FLAG!! FOLLOW IT!!',
+    'it is not on the tour!! RUN!!', 'keep together!! keep TOGETHER!!',
+    'to the hedge!! do not stop for tea!!', 'I said we lose one every year!!',
+  ],
+  tourist: [
+    'it ate the BALLOON!!', 'is that part of it?! IS IT?!',
+    'RUN!! no, the other way!!', 'take the photo!! no!! RUN!!',
+    'Kettering!! we are going BACK!!', 'it is going for the WHALE!!',
+    'up the hedge!! leave the bag!!',
+  ],
+  ticket: [
+    'NO WRISTBAND, NO— oh, just RUN!!', 'it ate the CARAVAN!!',
+    'gates are open!! GO THROUGH THEM!!', 'leave the float!! LEAVE IT!!',
+    'the programme does not mention this!!', 'everybody OUT!! free of charge!!',
+  ],
+  shepherd: [
+    'the SHEEP!! it is at the SHEEP!!', 'come by!! COME BY!! oh, hedge!!',
+    'NOW they move!! now!!', 'up the bank!! all forty!! GO!!',
+    'leave the crook!! LEAVE IT!!', 'get on, get on, GET ON!!',
+  ],
+  spectator: [
+    'MY CHAIR!! it has my CHAIR!!', 'up the hedge!! BRING THE FLASK!!',
+    'every year!! never THIS!!', 'grab the kids!! GRAB THEM!!',
+    'it is not a balloon!! RUN!!', 'hold the fence!! no!! LET GO!!',
+    'this way!! keep TOGETHER!!',
+  ],
+  // he does not break format even now; the register does
+  pym: [
+    'ALL CREWS!! lift!! LIFT NOW!!', 'it is not forecast!! it is HERE!!',
+    'balcony!! everybody to the balcony!!', 'the instruments!! MY instruments!!',
+    'conditions have changed!! GO!!', 'everybody UP!! that is the briefing!!',
+  ],
+  kid: [
+    'it ate the WHALE!!', 'MUM!! it is coming!!',
+    'my balloon!! MY BALLOON!!', 'run!! it is BIG!!',
+    'I want to go in the basket NOW!!', 'is it a balloon?! it is NOT!!',
+    'up the hedge!! carry me!!',
+  ],
+};

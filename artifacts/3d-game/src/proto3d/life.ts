@@ -31,6 +31,11 @@ import { MAPLE_VOICE_AMBIENT, MAPLE_VOICE_PANIC } from './newsroom_maple';
 // …and GAME DAY's, which are keyed the same way again: fan, superfan, cheer,
 // band, ref, coach, mascot, cook, student, parent, vendor, steward.
 import { GAMEDAY_VOICE_AMBIENT, GAMEDAY_VOICE_PANIC } from './newsroom_gameday';
+// …and SKYLARK FIELD's: crew, pilot, marshal, cleaner, tea, van, guide,
+// tourist, ticket, shepherd, spectator, pym, kid. Before these existed every
+// adult on the airfield fell through to Maple's pools and said "bin day
+// tomorrow!" at first light.
+import { SKYLARK_VOICE_AMBIENT, SKYLARK_VOICE_PANIC } from './newsroom_skylark';
 
 // Pirate Bay's geometry is authored in WORLD units (0..12000, centre 6000);
 // life places things in 3D. Same conversion island.ts uses for everything else.
@@ -1336,6 +1341,10 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
     la: arms[0], ra: arms[1], ll: legs[0], rl: legs[1], torso: body, head: hd,
     phase: Math.random() * 6, bob: 0.028 + Math.random() * 0.016,
   } as Limbs;
+  // what the right hand carries, by name. The geometry is welded into the arm
+  // by now, so this is the only way the runtime can tell a camera from a
+  // clipboard — the look-up (addWanderer) fires a flash on one and not the other.
+  g.userData.prop = o?.prop;
   return g;
 }
 
@@ -2421,6 +2430,126 @@ function makeLoco(isLoco: boolean): THREE.Group {
 
 const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
 
+// ── SOAP BUBBLES ──────────────────────────────────────────────────────────────
+// Skylark's cleaners carry a bubble wand, and a wand that never blows anything
+// is a stick. One THREE.Points for the whole field: 64 soft discs on a 32-px
+// radial-gradient texture, so the entire effect is a single draw call and no
+// per-person object — the only budget a 400-person world has left. A popped
+// disc is swap-removed and the draw range shrinks; nothing is ever "hidden" by
+// parking it under the ground. Built on the first emit, so the five worlds
+// without a cleaner never allocate it.
+const SOAP_MAX = 64;
+let _softDisc: THREE.CanvasTexture | null = null;
+/** a white disc with a bright rim and a soft edge — shared by the bubbles and
+ *  the camera flash. A plain fade-out read as fog at 32 px; the rim is what
+ *  makes it a bubble. */
+function softDiscTex(): THREE.CanvasTexture {
+  if (_softDisc) return _softDisc;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 32;
+  const cx = cv.getContext('2d')!;
+  const grd = cx.createRadialGradient(16, 16, 1, 16, 16, 16);
+  grd.addColorStop(0, 'rgba(255,255,255,0.95)');
+  grd.addColorStop(0.55, 'rgba(255,255,255,0.40)');
+  grd.addColorStop(0.85, 'rgba(255,255,255,0.70)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  cx.fillStyle = grd; cx.fillRect(0, 0, 32, 32);
+  _softDisc = new THREE.CanvasTexture(cv);
+  return _softDisc;
+}
+function makeSoapBubbles(scene: THREE.Scene) {
+  const pos = new Float32Array(SOAP_MAX * 3);
+  const bx = new Float32Array(SOAP_MAX), age = new Float32Array(SOAP_MAX);
+  const life = new Float32Array(SOAP_MAX), ph = new Float32Array(SOAP_MAX);
+  let live = 0;
+  let geo: THREE.BufferGeometry | null = null, attr: THREE.BufferAttribute | null = null;
+  const ensure = () => {
+    if (geo) return;
+    geo = new THREE.BufferGeometry();
+    attr = new THREE.BufferAttribute(pos, 3); attr.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('position', attr); geo.setDrawRange(0, 0);
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+      map: softDiscTex(), size: 1.1, color: 0xffffff, transparent: true, opacity: 0.55,
+      depthWrite: false, sizeAttenuation: true,
+    }));
+    pts.frustumCulled = false;   // the bounding sphere is computed once and the discs drift
+    pts.renderOrder = 2;
+    scene.add(pts);
+  };
+  return {
+    /** how many discs are in the air right now (QA reads it) */
+    get live() { return live; },
+    /** n discs at (x, 1.4, z) with 0.6 of jitter; anything past the cap is dropped */
+    emit(x: number, z: number, n: number) {
+      ensure();
+      for (let k = 0; k < n && live < SOAP_MAX; k++) {
+        const i = live++;
+        bx[i] = x + rand(-0.6, 0.6);
+        pos[i * 3] = bx[i]; pos[i * 3 + 1] = 1.4; pos[i * 3 + 2] = z + rand(-0.6, 0.6);
+        age[i] = 0; life[i] = rand(4, 6); ph[i] = rand(0, Math.PI * 2);
+      }
+    },
+    update(dt: number) {
+      if (!live || !geo || !attr) return;
+      for (let i = 0; i < live;) {
+        age[i] += dt;
+        if (age[i] >= life[i]) {
+          // pop: the last live disc takes this slot
+          const j = --live;
+          if (i !== j) {
+            bx[i] = bx[j]; age[i] = age[j]; life[i] = life[j]; ph[i] = ph[j];
+            pos[i * 3] = pos[j * 3]; pos[i * 3 + 1] = pos[j * 3 + 1]; pos[i * 3 + 2] = pos[j * 3 + 2];
+          }
+          continue;
+        }
+        pos[i * 3 + 1] += 3 * dt;                                            // 3 u/s up
+        pos[i * 3] = bx[i] + Math.sin(age[i] * Math.PI * 4 + ph[i]) * 0.4;   // ±0.4 at 2 Hz
+        i++;
+      }
+      geo.setDrawRange(0, live);
+      attr.needsUpdate = true;
+    },
+    reset() { live = 0; if (geo) geo.setDrawRange(0, 0); },
+  };
+}
+
+// ── THE FLASH ────────────────────────────────────────────────────────────────
+// A tourist's camera going off as a balloon lifts. Four additive sprites for
+// the whole world, each on loan for 0.15 s: a 2.4-unit disc at the play
+// camera is about thirty pixels, which is a flash and not a lamp. depthTest
+// off so the head it sits on cannot swallow it. Built on the first fire, like
+// the bubbles, so the other worlds never carry it.
+const FLASH_N = 4;
+function makeFlashes(scene: THREE.Scene) {
+  const sprites: THREE.Sprite[] = [];
+  const left = new Float32Array(FLASH_N);
+  const ensure = () => {
+    if (sprites.length) return;
+    const m = new THREE.SpriteMaterial({
+      map: softDiscTex(), color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending,
+      depthWrite: false, depthTest: false,
+    });
+    for (let i = 0; i < FLASH_N; i++) {
+      const s = new THREE.Sprite(m);
+      s.visible = false; s.scale.set(2.4, 2.4, 1); s.renderOrder = 3; s.frustumCulled = false;
+      scene.add(s); sprites.push(s);
+    }
+  };
+  return {
+    fire(x: number, y: number, z: number) {
+      ensure();
+      let i = 0;   // a free sprite, else the one nearest to going out
+      for (let k = 1; k < FLASH_N; k++) if (left[k] < left[i]) i = k;
+      left[i] = 0.15;
+      sprites[i].position.set(x, y, z); sprites[i].visible = true;
+    },
+    update(dt: number) {
+      for (let i = 0; i < sprites.length; i++)
+        if (left[i] > 0 && (left[i] -= dt) <= 0) sprites[i].visible = false;
+    },
+    reset() { for (let i = 0; i < sprites.length; i++) { left[i] = 0; sprites[i].visible = false; } },
+  };
+}
+
 export function createLife(
   scene: THREE.Scene,
   addEdible: AddEdible,
@@ -2461,7 +2590,34 @@ export function createLife(
   // it unconditionally at the top of update() instead, where it cannot be
   // skipped by anything.
   const tickClock = (dt: number) => { pingClock += dt; calmT = Math.max(0, calmT - dt); };
-  const peds: { mesh: THREE.Object3D; biome: string; panic: number; voice?: string }[] = [];
+  // `lookT`/`flash` are SKYLARK's: seconds left of a head-back look at a
+  // departing balloon, and of a camera flash. Optional on the type because the
+  // DJ and the mayor are pushed here as bare records; addWanderer's record
+  // always carries both.
+  const peds: { mesh: THREE.Object3D; biome: string; panic: number; voice?: string; lookT?: number; flash?: number }[] = [];
+  // ── SKYLARK: the bubbles, the flash, and the look-up ─────────────────────
+  // Two shared objects for the whole field (makeSoapBubbles / makeFlashes,
+  // above): nothing here is per person. The cue listener is registered once,
+  // on every world, because `cues` fans out by name and no other world sends
+  // 'lift' or 'telegraph'.
+  const bubbles = makeSoapBubbles(scene);
+  const flashes = makeFlashes(scene);
+  cues.push((n, x, z) => {
+    if (n === 'match') {
+      bubbles.reset(); flashes.reset();
+      for (const p of peds) if (p.lookT !== undefined) { p.lookT = 0; p.flash = 0; }
+      return;
+    }
+    if ((n !== 'lift' && n !== 'telegraph') || x === undefined || z === undefined) return;
+    // a lift holds the field for 2.5 s, a burner pulse for 1.2; a pulse that
+    // lands mid-lift must not cut the longer look short
+    const hold = n === 'lift' ? 2.5 : 1.2;
+    for (const p of peds) {
+      if (p.lookT === undefined) continue;
+      const ddx = p.mesh.position.x - x, ddz = p.mesh.position.z - z;
+      if (ddx * ddx + ddz * ddz < 1600) p.lookT = Math.max(p.lookT, hold);   // 40 units
+    }
+  });
 
   // ── WHICH TOWN IS TALKING ────────────────────────────────────────────────
   // newsroom_maple's voice pools are keyed identically to VOICE_AMBIENT /
@@ -2632,17 +2788,23 @@ export function createLife(
       'never mind the towels!! GO!!', 'six hundred years!! DRY!!'],
   };
   const OWN_AMBIENT: Record<string, string[]> =
-    WID === 'maple' ? MAPLE_VOICE_AMBIENT : WID === 'gameday' ? GAMEDAY_VOICE_AMBIENT : {};
+    WID === 'maple' ? MAPLE_VOICE_AMBIENT : WID === 'gameday' ? GAMEDAY_VOICE_AMBIENT
+      : WID === 'skylark' ? SKYLARK_VOICE_AMBIENT : {};
   const OWN_PANIC: Record<string, string[]> =
-    WID === 'maple' ? MAPLE_VOICE_PANIC : WID === 'gameday' ? GAMEDAY_VOICE_PANIC : {};
+    WID === 'maple' ? MAPLE_VOICE_PANIC : WID === 'gameday' ? GAMEDAY_VOICE_PANIC
+      : WID === 'skylark' ? SKYLARK_VOICE_PANIC : {};
   // Pirate Bay's own pools ARE the module tables, so it falls through to them.
   // Game Day must NOT: 'kid' and 'staff' exist there and a child at a football
   // game has no business talking about a swim-up bar. On Game Day the module
   // tables are only reachable for a voice key Game Day never assigns.
+  // Skylark Field the same, for the same 'kid': before it had pools of its own
+  // the whole airfield fell through and said "bin day tomorrow!". An unknown
+  // key on either world returns null and the caller's biome pools take over.
+  const ownOnly = WID === 'gameday' || WID === 'skylark';
   const ambPool = (v?: string): string[] | null =>
-    (v ? (OWN_AMBIENT[v] || (WID === 'gameday' ? null : VOICE_AMBIENT[v]) || null) : null);
+    (v ? (OWN_AMBIENT[v] || (ownOnly ? null : VOICE_AMBIENT[v]) || null) : null);
   const panPool = (v?: string): string[] | null =>
-    (v ? (OWN_PANIC[v] || (WID === 'gameday' ? null : VOICE_PANIC[v]) || null) : null);
+    (v ? (OWN_PANIC[v] || (ownOnly ? null : VOICE_PANIC[v]) || null) : null);
 
   // ── cars: grid-locked lanes with real arc turns ──────────────────────────
   // The car model's nose points +X, so heading comes from the velocity vector:
@@ -2902,6 +3064,13 @@ export function createLife(
     const stand = (px: number, pz: number) => !!biomeAt(px, pz) && !wet(px, pz, 0)
       && !!biomeAt(px + Math.cos(ang) * 2, pz + Math.sin(ang) * 2);
     let greetCd = rand(0, 5);   // LANTERN NIGHT: when this spirit last offered you something
+    // ── SKYLARK: the look-up and the wand. `lookBack` is the half second the
+    // head takes to come down after a look; `flashed` makes it one flash per
+    // look rather than one per frame (the record's `flash` is only how long
+    // the sprite is lit); `bubT`/`wasDwell` pace the cleaner's wand at a dwell
+    // start and every 1.5 s after. Four slots and no draws, so every seeded
+    // placement downstream is bit-identical.
+    let lookBack = 0, flashed = false, bubT = 0, wasDwell = false;
     // ── THE ERRAND. Nine slots; `reAim` and `blocked` are a small integer and a
     // boolean, so they cost no boxed number per write. In steady state a walking
     // person writes `legT` and a standing one writes `dwell` — the same two
@@ -2966,11 +3135,11 @@ export function createLife(
     const cs = contactShadow(radius * 0.55);   // grounded on every quality tier
     mesh.add(cs);
     mesh.position.set(hx, 0, hz); setShadow(mesh); scene.add(mesh); addEdible(mesh, radius);
-    const rec = { mesh, biome, panic: 0, voice };
+    const rec = { mesh, biome, panic: 0, voice, lookT: 0, flash: 0 };
     peds.push(rec);
     movers.push({
       mesh,
-      update(dt, _t, vx, vz, vR) {
+      update(dt, t, vx, vz, vR) {
         if (eaten(mesh)) return;
         const dx = mesh.position.x - vx, dz = mesh.position.z - vz;
         const dist = Math.hypot(dx, dz);
@@ -3043,7 +3212,13 @@ export function createLife(
         } else {
           if (dist > vR + fear + 40) fled = false;
           if (slideT <= 0) {
-            if (!errand) {
+            if (rec.lookT > 0) {
+              // SKYLARK: a balloon is leaving. Stand and watch it — no leg, no
+              // dwell tick, the errand resumes where it stopped. The contagion
+              // loop below still runs, so a scream nearby ends the look: the
+              // void outranks the balloon by branch order, as it does the errand.
+              spd = 0;
+            } else if (!errand) {
               ang += rand(-1, 1) * dt * 3;
               const hd = Math.hypot(mesh.position.x - hx, mesh.position.z - hz);
               if (hd > tether) ang = Math.atan2(hz - mesh.position.z, hx - mesh.position.x);
@@ -3111,6 +3286,51 @@ export function createLife(
         const limbs = mesh.userData.limbs as Limbs | undefined;
         const dnc = mesh.userData.dancer as
           { t: number; spin: number; mode?: number; px?: number; pz?: number } | undefined;
+        // ── SKYLARK: THE LOOK-UP ─────────────────────────────────────────
+        // `lookT` is set by the 'lift'/'telegraph' cue on everybody within 40
+        // units. While it runs the walker is held (above), the head goes back
+        // to -0.85, and when it ends the head comes down over half a second.
+        // `lookW` is the look's weight this frame: 1 while it holds, easing to
+        // 0 on the way down, applied AFTER the pose chain so a job keeps its
+        // arms and only lends its head — a guide pointing up keeps pointing.
+        // The neutral is written before the chain so the branches that never
+        // touch head.x (walk, dwell, skip) have a 0 to come back to; the ones
+        // that do (working, heckling, 8-13) overwrite it.
+        const role = mesh.userData.role as string | undefined;
+        let lookW = 0;
+        if (rec.lookT > 0) {
+          if (spd > 0) rec.lookT = 0;   // a runner has stopped watching
+          else {
+            rec.lookT -= dt; lookBack = 0.5; lookW = 1;
+            if (!flashed && (role === 'tourist' || role === 'photographer') && mesh.userData.prop === 'camera') {
+              // one flash per look, at the camera: eye height, a little ahead
+              // of the face. sin/cos of the body yaw IS the facing (see the
+              // rotation.y formula above), so no extra trig.
+              flashed = true; rec.flash = 0.15;
+              flashes.fire(mesh.position.x + Math.sin(mesh.rotation.y) * 0.7, mesh.position.y + 2.6,
+                mesh.position.z + Math.cos(mesh.rotation.y) * 0.7);
+            }
+          }
+        } else if (lookBack > 0) {
+          lookBack = Math.max(0, lookBack - dt); lookW = lookBack * 2;
+        }
+        if (rec.lookT <= 0) flashed = false;
+        if (rec.flash > 0) rec.flash = Math.max(0, rec.flash - dt);
+        if (limbs && lookW > 0) limbs.head.rotation.x = 0;
+        // ── SKYLARK: THE WAND. A cleaner standing at the end of an errand
+        // blows 6-10 bubbles as they stop and 6-10 more every 1.5 s until they
+        // walk again. The broom half of the cleaners never do.
+        if (role === 'cleaner' && mesh.userData.prop !== 'broom') {
+          const standing = dwell > 0 && spd === 0;
+          if (standing) {
+            bubT -= dt;
+            if (!wasDwell || bubT <= 0) {
+              bubbles.emit(mesh.position.x, mesh.position.z, 6 + Math.floor(Math.random() * 5));
+              bubT = 1.5;
+            }
+          }
+          wasDwell = standing;
+        }
         if (dnc && dnc.mode === 1 && hop <= 0) {
           // ── EVENT MANAGER: rooted to the spot, one arm sweeping the crowd
           // toward whatever is scheduled next. Same userData slot as the
@@ -3206,6 +3426,87 @@ export function createLife(
             limbs.torso.rotation.y = Math.sin(b) * 0.26;
             limbs.head.rotation.y = Math.sin(b * 0.5) * 0.4;
           }
+        } else if (dnc && dnc.mode === 8 && hop <= 0) {
+          // ── SWEEPING: the tower step, the hangar apron, the same square of
+          // concrete since five. Stooped, the broom arm working a short arc at
+          // 1.2 Hz and the trunk turning with it — from 46° up a bent back is
+          // two pixels and the yaw is the whole read.
+          dnc.t += dt;
+          const w = dnc.t * Math.PI * 2.4, s = Math.sin(w);
+          if (limbs) {
+            limbs.torso.rotation.x = 0.2;
+            limbs.torso.rotation.y = s * 0.15;
+            limbs.ra.rotation.x = -0.6 + s * 0.3;                    // -0.9 … -0.3
+            limbs.ra.rotation.z = -0.18;
+            limbs.la.rotation.x = -0.45 + Math.sin(w - 0.6) * 0.25;   // the other hand, a beat behind
+            limbs.la.rotation.z = 0.25;
+            limbs.head.rotation.x = 0.25;
+            limbs.ll.rotation.x = 0; limbs.rl.rotation.x = 0;
+          }
+        } else if (dnc && dnc.mode === 9 && hop <= 0) {
+          // ── POINTING UP: the guide, and Mr Pym on his balcony. One arm
+          // straight up at the thing everybody came for, the trunk turning
+          // slowly to take in the whole sky.
+          dnc.t += dt;
+          if (limbs) {
+            limbs.ra.rotation.x = -2.6; limbs.ra.rotation.z = -0.12;
+            limbs.la.rotation.x = 0.1; limbs.la.rotation.z = 0.1;
+            limbs.head.rotation.x = -0.7;
+            limbs.torso.rotation.x = -0.05;
+            limbs.torso.rotation.y = Math.sin(dnc.t * Math.PI * 0.6) * 0.3;   // 0.3 Hz
+            limbs.ll.rotation.x = 0; limbs.rl.rotation.x = 0;
+          }
+        } else if (dnc && dnc.mode === 10 && hop <= 0) {
+          // ── CAMERA UP: both hands at the face, and the only motion is the
+          // sway of somebody holding their breath for the shot.
+          dnc.t += dt;
+          if (limbs) {
+            limbs.la.rotation.x = -2.0; limbs.ra.rotation.x = -2.0;
+            limbs.la.rotation.z = 0.2; limbs.ra.rotation.z = -0.2;
+            limbs.head.rotation.x = -0.5;
+            limbs.torso.rotation.z = Math.sin(dnc.t * 1.3) * 0.03;
+            limbs.torso.rotation.y = Math.sin(dnc.t * 0.7) * 0.05;
+            limbs.ll.rotation.x = 0; limbs.rl.rotation.x = 0;
+          }
+        } else if (dnc && dnc.mode === 11 && hop <= 0) {
+          // ── ROPE: crew on a crown line. Both arms forward and up, leaning
+          // back against an envelope that is trying to stand, one foot braced
+          // ahead. The line breathes at 1 Hz so the hold is not a statue.
+          dnc.t += dt;
+          const pull = Math.sin(dnc.t * Math.PI * 2) * 0.05;
+          if (limbs) {
+            limbs.la.rotation.x = -1.6 + pull; limbs.ra.rotation.x = -1.6 + pull;
+            limbs.la.rotation.z = 0.18; limbs.ra.rotation.z = -0.18;
+            limbs.torso.rotation.x = -0.18 - pull;
+            limbs.head.rotation.x = -0.6;
+            limbs.ll.rotation.x = 0.28; limbs.rl.rotation.x = -0.28;
+          }
+        } else if (dnc && dnc.mode === 12 && hop <= 0) {
+          // ── WAVE: everybody at the whale. Right arm straight up and going
+          // side to side at 2 Hz — the one gesture the top-down camera keeps
+          // whole, because it happens in the plane the camera can see.
+          dnc.t += dt;
+          const w = Math.sin(dnc.t * Math.PI * 4);
+          if (limbs) {
+            limbs.ra.rotation.x = -2.4; limbs.ra.rotation.z = w * 0.4;
+            limbs.la.rotation.x = 0.05; limbs.la.rotation.z = 0.08;
+            limbs.head.rotation.x = -0.45;
+            limbs.torso.rotation.z = w * 0.03;
+            limbs.ll.rotation.x = 0; limbs.rl.rotation.x = 0;
+          }
+        } else if (dnc && dnc.mode === 13 && hop <= 0) {
+          // ── SERVING: the urn, the bacon hatch. Both hands out front under
+          // the tray, the trunk turning between the queue and the counter.
+          dnc.t += dt;
+          const s = Math.sin(dnc.t * 1.6);
+          if (limbs) {
+            limbs.la.rotation.x = -1.2; limbs.ra.rotation.x = -1.2;
+            limbs.la.rotation.z = 0.22; limbs.ra.rotation.z = -0.22;
+            limbs.torso.rotation.y = s * 0.2;
+            limbs.head.rotation.y = s * 0.3;
+            limbs.head.rotation.x = 0.08;
+            limbs.ll.rotation.x = 0; limbs.rl.rotation.x = 0;
+          }
         } else if (dnc && hop <= 0) {
           // ── DANCING: everyone on the floor is on the SAME beat (a shared
           // clock), arms up, hips swinging, bobbing on the downbeat. Offset
@@ -3235,6 +3536,26 @@ export function createLife(
             limbs.torso.rotation.z = -Math.sin(beat * 0.5) * 0.2;    // hips lead the sway
             limbs.torso.rotation.y = Math.sin(beat) * 0.22;
           }
+        } else if (limbs && rec.lookT > 0) {
+          // ── THE LOOK-UP, for anybody without a job to keep their hands in:
+          // arms down, weight back, and a spectator claps. The head is done
+          // below the chain, for everyone at once.
+          limbs.phase += dt * 1.1;
+          const s = Math.sin(limbs.phase);
+          limbs.ll.rotation.x = 0; limbs.rl.rotation.x = 0;
+          limbs.torso.rotation.x = -0.08; limbs.torso.rotation.y = s * 0.04;
+          limbs.head.rotation.y = 0;
+          if (role === 'spectator') {
+            // a clap every half second or so, the two arms mirrored so the
+            // hands meet in the middle
+            const c = Math.sin(t * 14) * 0.35;
+            limbs.la.rotation.x = -1.3 + c; limbs.ra.rotation.x = -1.3 - c;
+            limbs.la.rotation.z = 0.32; limbs.ra.rotation.z = -0.32;
+          } else {
+            limbs.la.rotation.x = s * 0.05; limbs.ra.rotation.x = -s * 0.05;
+            limbs.la.rotation.z = 0; limbs.ra.rotation.z = 0;
+          }
+          if (hop <= 0) mesh.position.y = 0;
         } else if (limbs && dwell > 0 && spd === 0) {
           // ── STOPPED, WITH SOMETHING TO DO. The walk branch below advances a
           // standing person's limbs by 0.055 radians of amplitude: at the far
@@ -3279,6 +3600,10 @@ export function createLife(
           limbs.torso.rotation.y = -sw * 0.30;
           limbs.head.rotation.y = sw * 0.16 + Math.max(-0.6, Math.min(0.6, dyaw * 0.8));
         }
+        // SKYLARK: the head, for everyone at once — -0.85 while the look holds,
+        // then a straight blend from there back to whatever the pose above
+        // wrote (or the 0 written before the chain) over lookBack's half second.
+        if (limbs && lookW > 0) limbs.head.rotation.x += (-0.85 - limbs.head.rotation.x) * lookW;
         // the blob stays ON the ground while its owner hops / skips / dances —
         // computed last so the bob branches above are already applied
         cs.position.y = 0.045 - mesh.position.y;
@@ -6216,6 +6541,9 @@ export function createLife(
   return {
     update(dt, t, vx, vz, vR, gate = Infinity) {
       tickClock(dt);
+      // SKYLARK's two shared effects tick here, beside the clock, for the same
+      // reason the clock does: neither is a mover and neither may be gated.
+      bubbles.update(dt); flashes.update(dt);
       lastVX = vx; lastVZ = vz;
       // ── THE CROWD OUTSIDE THE FRAME ────────────────────────────────────
       // This was `for (const m of movers) m.update(...)` with no cull of any
