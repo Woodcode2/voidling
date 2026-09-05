@@ -3046,7 +3046,7 @@ export function createLife(
   // 90-second match standing in interior water, one of them 6 units from the
   // river centreline for 21 seconds straight.
   const wet = (x: number, z: number, m: number) => WID === 'maple' && inWater3(x, z, m);
-  function addWanderer(mesh: THREE.Object3D, hx: number, hz: number, tether: number, base: number, fear: number, radius: number, biome: string, panicLines?: string[], voice?: string, leg?: number, paceMul = 1) {
+  function addWanderer(mesh: THREE.Object3D, hx: number, hz: number, tether: number, base: number, fear: number, radius: number, biome: string, panicLines?: string[], voice?: string, leg?: number, paceMul = 1, stops?: [number, number][]) {
     if (!biomeAt(hx, hz) || wet(hx, hz, 8)) return;   // don't spawn anyone off the coastline, or in the water
     // …and nobody lives on the void's opening square. The owner's report was
     // "he starts on top of a person": this is the single choke point every
@@ -3090,9 +3090,23 @@ export function createLife(
     let legT = 0;                      // give-up backstop
     let reAim = 0;                     // frames until the heading is refreshed
     let blocked = false;               // the slide fired: this leg is unwalkable
+    // SKYLARK FIELD: a job is a ROUTE, not a random walk. `stops` are 3D
+    // points walked in order and repeated — a cleaner's bins, a tea lady's
+    // van and baskets, a marshal's two posts — so the errand loop's arrival,
+    // dwell and give-up machinery stays exactly as it is and only the choice
+    // of the next goal changes. A stop that cannot be reached is given up on
+    // by legT like any leg, and the next one is tried.
+    let stopI = 0;
     // Hoisted for the reason recorded above: never build a closure in update().
     const retarget = () => {
       const px = mesh.position.x, pz = mesh.position.z;
+      if (stops && stops.length) {
+        const st = stops[stopI++ % stops.length];
+        const L = Math.hypot(st[0] - px, st[1] - pz);
+        gx = st[0]; gz = st[1]; ang = Math.atan2(st[1] - pz, st[0] - px);
+        legT = L / pace * 2 + 4; reAim = ERR.REAIM;
+        return;
+      }
       const hdx = hx - px, hdz = hz - pz;
       // HEADING PERSISTENCE is what makes consecutive legs chain rather than
       // cancel: a strict home-and-back ping-pong scores a drift of zero because
@@ -3284,8 +3298,12 @@ export function createLife(
         if (hop > 0) { hop -= dt; mesh.position.y = Math.abs(Math.sin(hop * 12)) * 0.8; } else mesh.position.y = 0;
         // walk cycle: arms + legs swing with travel speed
         const limbs = mesh.userData.limbs as Limbs | undefined;
-        const dnc = mesh.userData.dancer as
-          { t: number; spin: number; mode?: number; px?: number; pz?: number } | undefined;
+        const dnc0 = mesh.userData.dancer as
+          { t: number; spin: number; mode?: number; px?: number; pz?: number; atDwell?: boolean } | undefined;
+        // a job worn only at the stop (`atDwell`): the walk cycle owns the legs
+        // between stops, and the sweeping / camera / serving pose takes over the
+        // moment the errand loop stands the person still
+        const dnc = dnc0 && dnc0.atDwell && !(dwell > 0 && spd === 0) ? undefined : dnc0;
         // ── SKYLARK: THE LOOK-UP ─────────────────────────────────────────
         // `lookT` is set by the 'lift'/'telegraph' cue on everybody within 40
         // units. While it runs the walker is held (above), the head goes back
@@ -3436,7 +3454,7 @@ export function createLife(
           if (limbs) {
             limbs.torso.rotation.x = 0.2;
             limbs.torso.rotation.y = s * 0.15;
-            limbs.ra.rotation.x = -0.6 + s * 0.3;                    // -0.9 … -0.3
+            limbs.ra.rotation.x = -0.3 + s * 0.15;                   // -0.45 … -0.15: the broom is a shoulder lever; any higher and the head leaves the grass
             limbs.ra.rotation.z = -0.18;
             limbs.la.rotation.x = -0.45 + Math.sin(w - 0.6) * 0.25;   // the other hand, a beat behind
             limbs.la.rotation.z = 0.25;
@@ -3461,7 +3479,10 @@ export function createLife(
           // sway of somebody holding their breath for the shot.
           dnc.t += dt;
           if (limbs) {
-            limbs.la.rotation.x = -2.0; limbs.ra.rotation.x = -2.0;
+            // -1.25, not the spec's -2.0: the camera prop is welded at chest
+            // height in front, and -2.0 carries it into the head (Implementer
+            // A's geometry check) — -1.25 puts it at eye level in front of the face
+            limbs.la.rotation.x = -1.25; limbs.ra.rotation.x = -1.25;
             limbs.la.rotation.z = 0.2; limbs.ra.rotation.z = -0.2;
             limbs.head.rotation.x = -0.5;
             limbs.torso.rotation.z = Math.sin(dnc.t * 1.3) * 0.03;
@@ -4836,59 +4857,251 @@ export function createLife(
   // child can actually watch happen.
   if (worldId() === 'skylark') {
     const skRegion = (id: SK.SkBiome) => SK.SK_REGIONS.find((r) => r.id === id)!;
-    const skPlace = (wx: number, wy: number, id: SK.SkBiome,
-                     o?: { kid?: boolean; tether?: number; speed?: number; leg?: number; pace?: number }) => {
-      const p = o?.kid ? makeCast('kid', id) : makePerson(id);
-      const [x, z] = g3([wx, wy]);
-      addWanderer(p, x, z, o?.tether ?? 10, o?.speed ?? rand(0.8, 1.5),
-        16, o?.kid ? 1.9 : 2.4, id, undefined, undefined, o?.leg ?? 38, o?.pace ?? 1.2);
-    };
-    // ── the crews, district by district ──────────────────────────────────
-    // The launch field carries the most because that is where the balloons
-    // are and a balloon is four people; Breakfast Row is second because every
-    // errand in this world eventually ends at a van.
-    const SK_CAST: [SK.SkBiome, number, number, number][] = [
-      ['launchfield', 150, 26, 42],   // four crew to a basket, ninety baskets
-      ['arrivals', 62, 30, 40],       // trailers, tailgates, envelopes coming out
-      ['breakfast', 46, 26, 34],      // the queue, and everybody who walked to it
-      ['hangars', 34, 26, 30],        // the Sunday flea market, browsing
-      ['tower', 26, 30, 34],          // the briefing, the met hut, the flagpole
-      ['meadow', 40, 40, 44],         // dog walkers and the long way round
-    ];
-    for (const [id, n, clear, leg] of SK_CAST) {
-      const r = skRegion(id);
-      if (!r) continue;
-      for (const [wx, wy] of SK.scatterInRegion(r, n, Math.random, clear))
-        skPlace(wx, wy, id, { kid: Math.random() < 0.34, leg });
-    }
-    // THE PERIMETER IS A BEAT, NOT A SCATTER. Marshals walk between numbered
-    // posts, stand a while, walk to the next — the most legible journey in the
-    // game because the route is drawn on the ground under them.
+    // ══ THE CAST — five hundred people, every one with a job (brief §3D) ═══
+    //
+    // The owner's ask, verbatim: "I want characters in this level to have a
+    // job. Some guys are cleaning and have bubbles. Some people help
+    // tourists." Measured before this block: 455 people, ONE role ('kid'),
+    // zero hand props on any adult, every district id falling through to
+    // Maple's suburb wardrobe and Maple's suburb lines. Every person cast here
+    // has a role (a silhouette, a colour, a carried thing) and a loop that
+    // goes somewhere real: the destinations are the props island.ts tagged
+    // with a `kind` — vans, bins, trailers, the caravan, the tower, the sheep
+    // — and the balloons themselves.
     {
-      const T = SK.PERIMETER;
-      for (let i = 0; i < T.length - 1; i += 2) {
-        const [x1, y1] = T[i], [x2, y2] = T[i + 1];
-        const nx = -(y2 - y1), ny = (x2 - x1), nl = Math.hypot(nx, ny) || 1;
-        const mx = (x1 + x2) * 0.5, my = (y1 + y2) * 0.5;
-        const inward = ((6000 - mx) * nx + (6000 - my) * ny) > 0 ? 1 : -1;
-        const wx = mx + (nx / nl) * 300 * inward, wy = my + (ny / nl) * 300 * inward;
-        if (!SK.onSkylarkLand(wx, wy)) continue;
-        skPlace(wx, wy, 'perimeter', { tether: 30, leg: 44, speed: rand(0.9, 1.3) });
+      const byKind = (k: string): THREE.Object3D[] => {
+        const out: THREE.Object3D[] = [];
+        scene.traverse((o) => { if (o.userData.kind === k) out.push(o); });
+        return out;
+      };
+      const balloons: { m: THREE.Object3D; stage: number; cols?: [number, number, number] }[] = [];
+      scene.traverse((o) => {
+        const b = o.userData.balloon as { stage: number; cols?: [number, number, number] } | undefined;
+        if (b && b.stage >= 1 && b.stage <= 3) balloons.push({ m: o, stage: b.stage, cols: b.cols });
+      });
+      const at = (o: THREE.Object3D): [number, number] => [o.position.x, o.position.z];
+      const off = (x: number, z: number, d: number, a = Math.random() * Math.PI * 2): [number, number] => [x + Math.cos(a) * d, z + Math.sin(a) * d];
+      const nearest = <T extends { position: THREE.Vector3 }>(list: T[], x: number, z: number, r: number): T[] =>
+        list.filter((o) => Math.hypot(o.position.x - x, o.position.z - z) < r)
+          .sort((p, q) => Math.hypot(p.position.x - x, p.position.z - z) - Math.hypot(q.position.x - x, q.position.z - z));
+      const dressAt = (x: number, z: number): string => (biomeAt(x, z) as string | null) ?? 'meadow';
+      const crewSide = (cols?: [number, number, number]): number => {
+        const i = cols ? SKF.ENVELOPE.indexOf(cols) : -1;
+        return (i >= 0 ? i : Math.floor(Math.random() * 3)) % 3;
+      };
+      const pick2 = <T,>(a: T[]): T => a[Math.floor(Math.random() * a.length)];
+      /** One person in a role at a 3D point. `stops` makes the errand a ROUTE
+       *  (addWanderer walks them in order and repeats); `mode` is a rooted job
+       *  animation; `dwellMode` is the same, worn only while standing at a
+       *  stop; `leg` alone is the ordinary errand loop. */
+      const cast = (role: Role, x: number, z: number, o?: {
+        leg?: number; mode?: number; dwellMode?: number; side?: number; speed?: number;
+        tether?: number; stops?: [number, number][]; face?: number; kid?: boolean;
+      }) => {
+        const dress = dressAt(x, z);
+        const p = makeCast(role, dress, o?.side);
+        if (o?.mode !== undefined) p.userData.dancer = { t: rand(0, 6), spin: 1, mode: o.mode };
+        else if (o?.dwellMode !== undefined) p.userData.dancer = { t: rand(0, 6), spin: 1, mode: o.dwellMode, atDwell: true };
+        else if (role === 'kid') p.userData.dancer = { t: rand(0, 6), spin: 1, mode: 2 };
+        const leg = o?.stops ? 20 : (o?.leg ?? 0);
+        const rec = addWanderer(p, x, z, o?.tether ?? 10, o?.speed ?? rand(0.8, 1.4), 16,
+          role === 'kid' ? 1.9 : 2.4, dress, undefined, VOICE_OF[role], leg, role === 'kid' ? 1.4 : 1.2, o?.stops);
+        if (rec && o?.face !== undefined) rec.mesh.rotation.y = o.face;
+        return rec;
+      };
+      const vans = byKind('van'), bins = byKind('bin'), trailers = byKind('trailer'), sheep = byKind('sheep');
+      const kit = byKind('crewkit'), caravan = byKind('caravan')[0], tower = byKind('tower')[0];
+      const [lcx, lcz] = g3([SK.LAUNCH.cx, SK.LAUNCH.cy]);
+      const [spx, spz] = g3(SK.SK_SPAWN);
+
+      // ── GROUND CREW and PILOTS — a balloon is people. Two crew on a standing
+      // envelope, one on a cold or spilled one, in overalls the colour of
+      // their own envelope, walking basket -> their kit -> a peg and back
+      // with a coil of rope on the arm. A pilot stands at the basket of every
+      // standing envelope with a clipboard, working through the checks.
+      for (const b of balloons) {
+        const [bx, bz] = at(b.m);
+        const myKit = nearest(kit, bx, bz, 9).slice(0, 2);
+        const n = b.stage === 3 ? 2 : 1;
+        for (let i = 0; i < n; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const [sx, sz] = off(bx, bz, 3.2, a);
+          const stops: [number, number][] = [off(bx, bz, 2.6, a + 0.6), ...myKit.map((k) => off(k.position.x, k.position.z, 1.2)), off(bx, bz, 6.5, a + 2.4)];
+          cast('crew', sx, sz, { side: crewSide(b.cols), stops, tether: 16, speed: rand(0.8, 1.2) });
+        }
+        if (b.stage === 3) {
+          const [px, pz] = off(bx, bz, 2.0);
+          cast('pilot', px, pz, { mode: 3, tether: 2, speed: 0.2, face: Math.atan2(bx - px, bz - pz) });
+        }
       }
-    }
-    // THE PASSENGERS, and they are the only crowd in this game authored to
-    // look UP. They walk from the gate to a numbered balloon and stand beside
-    // it with their heads back, which is the whole promise of the world in one
-    // pose: the thing they are waiting for is going to leave the ground.
-    for (const [wx, wy] of SK.scatterInRegion(skRegion('launchfield'), 34, Math.random, 40)) {
-      skPlace(wx, wy, 'launchfield', { kid: Math.random() < 0.5, leg: 30, speed: rand(0.6, 1.0) });
-    }
-    // …and the ones with nowhere to be: spectators along the fence, who came to
-    // watch and have therefore already arrived. leg 0 keeps them local, exactly
-    // as Game Day's lot crowd does — a world where EVERY person is striding
-    // somewhere reads as an evacuation, not a morning out.
-    for (const [wx, wy] of SK.scatterLand(48, Math.random, 40, [260, 900])) {
-      skPlace(wx, wy, 'meadow', { tether: 6, leg: 0, kid: Math.random() < 0.4 });
+
+      // ── MARSHALS — post to post along the perimeter track, and along the live
+      // runway's edges, with an orange paddle. The most legible journey in the
+      // game because the route is painted on the ground under them.
+      {
+        const T = SK.PERIMETER;
+        for (let i = 0; i < T.length - 1; i += 2) {
+          const [x1, y1] = T[i], [x2, y2] = T[i + 1];
+          const nx = -(y2 - y1), ny = (x2 - x1), nl = Math.hypot(nx, ny) || 1;
+          const mx = (x1 + x2) * 0.5, my = (y1 + y2) * 0.5;
+          const inward = ((6000 - mx) * nx + (6000 - my) * ny) > 0 ? 1 : -1;
+          const wx = mx + (nx / nl) * 300 * inward, wy = my + (ny / nl) * 300 * inward;
+          if (!SK.onSkylarkLand(wx, wy)) continue;
+          const [x, z] = g3([wx, wy]);
+          const [ax, az] = g3([x1 + (nx / nl) * 300 * inward, y1 + (ny / nl) * 300 * inward]);
+          const [bx2, bz2] = g3([x2 + (nx / nl) * 300 * inward, y2 + (ny / nl) * 300 * inward]);
+          cast('marshal', x, z, { stops: [[ax, az], [bx2, bz2]], tether: 40, speed: rand(0.9, 1.3) });
+        }
+        const rwy = SK.LIVE_RUNWAYS[0];
+        if (rwy) {
+          const [p0, p1] = rwy.pts;
+          const dx = p1[0] - p0[0], dy = p1[1] - p0[1], L = Math.hypot(dx, dy);
+          const nx = -dy / L, ny = dx / L;
+          for (let i = 1; i <= 5; i++) for (const side of [-1, 1]) {
+            const t = i / 6;
+            const wx = p0[0] + dx * t + nx * (rwy.half + 120) * side, wy = p0[1] + dy * t + ny * (rwy.half + 120) * side;
+            if (!SK.onSkylarkLand(wx, wy)) continue;
+            const [x, z] = g3([wx, wy]);
+            const [ax, az] = g3([wx - (dx / L) * 320, wy - (dy / L) * 320]);
+            const [bx2, bz2] = g3([wx + (dx / L) * 320, wy + (dy / L) * 320]);
+            cast('marshal', x, z, { stops: [[ax, az], [bx2, bz2]], tether: 30, speed: rand(0.9, 1.2) });
+          }
+        }
+      }
+
+      // ── CLEANERS — bin to bin to bin, a bucket and a wand; at each bin they
+      // stop and the wand makes bubbles (life.ts's emitter, driven off the
+      // dwell). Half carry a broom instead and sweep while they stand.
+      {
+        const starts = bins.length >= 4 ? bins : [];
+        for (let i = 0; i < 14; i++) {
+          const home = starts.length ? pick2(starts) : null;
+          const [hx, hz] = home ? off(home.position.x, home.position.z, 2) : g3(pick2(SK.scatterInRegion(skRegion(i % 2 ? 'breakfast' : 'arrivals'), 1, Math.random, 40)));
+          const route = home ? nearest(bins, hx, hz, 60).slice(0, 4).map((bn) => off(bn.position.x, bn.position.z, 1.4)) : undefined;
+          cast('cleaner', hx, hz, { stops: route, leg: route ? undefined : 24, tether: 30, speed: rand(0.7, 1.0), dwellMode: i % 2 ? 8 : undefined, side: i % 2 });
+        }
+      }
+
+      // ── BREAKFAST ROW — the tea ladies walk an urn to a basket and back; the
+      // van crews serve from the hatch. Every errand on this field ends here.
+      for (const v of vans) {
+        const [vx0, vz0] = at(v);
+        for (let i = 0; i < 2; i++) {
+          const targets = nearest(balloons.map((b) => b.m), vx0, vz0, 90);
+          const stops: [number, number][] = [off(vx0, vz0, 2.6), ...[0, 1].map(() => { const t = targets.length ? pick2(targets) : v; return off(t.position.x, t.position.z, 3); })];
+          const [sx, sz] = off(vx0, vz0, 3);
+          cast('tealady', sx, sz, { stops, tether: 60, speed: rand(0.8, 1.0) });
+        }
+        const [cx2, cz2] = off(vx0, vz0, 2.4);
+        cast('vancrew', cx2, cz2, { mode: 13, tether: 2, speed: 0.2, face: Math.atan2(vx0 - cx2, vz0 - cz2) + Math.PI });
+        if (Math.random() < 0.5) { const [c3, c4] = off(vx0, vz0, 3.2); cast('vancrew', c3, c4, { mode: 13, tether: 2, speed: 0.2 }); }
+      }
+
+      // ── GUIDES AND THEIR TOURISTS — a guide with a placard leads five people
+      // from the caravan, out to the launch circle to look at the whale, then
+      // to a van. The five walk the same route at the same pace, spaced behind
+      // her, which from 46 degrees up is a line following a raised sign.
+      {
+        const gate: [number, number] = caravan ? off(caravan.position.x, caravan.position.z, 4) : [spx + 8, spz];
+        for (let g = 0; g < 10; g++) {
+          const circle = off(lcx, lcz, 34, Math.atan2(gate[1] - lcz, gate[0] - lcx) + (Math.random() - 0.5) * 0.8);
+          const van = vans.length ? at(pick2(vans)) : gate;
+          const route: [number, number][] = [gate, circle, off(van[0], van[1], 4), off(gate[0], gate[1], 6)];
+          const start = route[Math.floor(Math.random() * route.length)];
+          const [sx, sz] = off(start[0], start[1], 1.5);
+          cast('guide', sx, sz, { stops: route, tether: 400, speed: 0.95 });
+          for (let k = 0; k < 5; k++) {
+            const [tx, tz] = off(sx, sz, 2.2 + k * 1.6, Math.atan2(sz - route[0][1], sx - route[0][0]) + (Math.random() - 0.5) * 0.5);
+            cast('tourist', tx, tz, { stops: route, tether: 400, speed: 0.95 });
+          }
+        }
+      }
+
+      // ── THE PUBLIC — tourists in every open district, cameras up, wandering
+      // toward whatever is standing; kids skipping between them.
+      const PUBLIC: [SK.SkBiome, number, number][] = [
+        ['launchfield', 46, 30], ['arrivals', 22, 30], ['breakfast', 22, 26], ['hangars', 24, 26], ['tower', 12, 30], ['meadow', 22, 40],
+      ];
+      for (const [id, n, leg] of PUBLIC) {
+        const r = skRegion(id);
+        if (!r) continue;
+        for (const [wx, wy] of SK.scatterInRegion(r, n, Math.random, 26)) {
+          const [x, z] = g3([wx, wy]);
+          cast(Math.random() < 0.22 ? 'kid' : 'tourist', x, z, { leg, tether: 12 });
+        }
+      }
+
+      // ── PHOTOGRAPHERS — vantage to vantage on the perimeter bank and the
+      // tower, tripod down, camera up, move on.
+      {
+        const T = SK.PERIMETER;
+        const vantages: [number, number][] = [];
+        for (let i = 1; i < T.length - 1; i += 4) {
+          const [x1, y1] = T[i], inx = 6000 - x1, iny = 6000 - y1, il = Math.hypot(inx, iny) || 1;
+          const wx = x1 + (inx / il) * 320, wy = y1 + (iny / il) * 320;
+          if (SK.onSkylarkLand(wx, wy)) vantages.push(g3([wx, wy]));
+        }
+        if (tower) vantages.push(off(tower.position.x, tower.position.z, 7));
+        for (let i = 0; i < 6 && vantages.length >= 2; i++) {
+          const route = [0, 1, 2].map(() => pick2(vantages));
+          const [sx, sz] = off(route[0][0], route[0][1], 2);
+          cast('photographer', sx, sz, { stops: route, tether: 400, speed: rand(0.8, 1.0), dwellMode: 10 });
+        }
+      }
+
+      // ── TICKET SELLERS — caravan to the gate and back with the leaflets.
+      if (caravan) {
+        const [cx3, cz3] = at(caravan);
+        for (let i = 0; i < 4; i++) {
+          const gateP: [number, number] = [cx3 + (spx - cx3) * 0.5 + rand(-3, 3), cz3 + (spz - cz3) * 0.5 + rand(-3, 3)];
+          const [sx, sz] = off(cx3, cz3, 3.5);
+          cast('ticket', sx, sz, { stops: [off(cx3, cz3, 3.2), gateP], tether: 60, speed: rand(0.8, 1.1) });
+        }
+      }
+
+      // ── CHASE DRIVERS — trailer to their envelope and back with the tape;
+      // the retrieve crew is the one part of a balloon meet that never stops.
+      for (const tr of trailers) {
+        const [tx, tz] = at(tr);
+        const mine = nearest(balloons.map((b) => b.m), tx, tz, 40).slice(0, 2);
+        for (let i = 0; i < 2; i++) {
+          const [sx, sz] = off(tx, tz, 3);
+          const stops: [number, number][] = [off(tx, tz, 2.8), ...mine.map((m) => off(m.position.x, m.position.z, 3))];
+          cast('driver', sx, sz, { stops, tether: 50, speed: rand(0.9, 1.3), side: i });
+        }
+      }
+
+      // ── THE SHEPHERDS — two of them, walking at the sheep on 09 with crooks.
+      // The sheep do not move (the 'sheep' beat is owed — qa/beattruth.mjs
+      // FROZEN); the shepherds walk at them anyway, which is the joke.
+      if (sheep.length) {
+        for (let i = 0; i < 2; i++) {
+          const s0 = pick2(sheep);
+          const route = nearest(sheep, s0.position.x, s0.position.z, 40).slice(0, 4).map((s) => off(s.position.x, s.position.z, 1.6));
+          const [sx, sz] = off(s0.position.x, s0.position.z, 3);
+          cast('shepherd', sx, sz, { stops: route.length >= 2 ? route : undefined, leg: route.length >= 2 ? undefined : 20, tether: 40, speed: rand(0.7, 0.9) });
+        }
+      }
+
+      // ── SPECTATORS — the fence line, come to watch and therefore already
+      // arrived (leg 0 keeps them local, as Game Day's lot crowd is).
+      for (const [wx, wy] of SK.scatterLand(50, Math.random, 40, [260, 900])) {
+        const [x, z] = g3([wx, wy]);
+        cast('spectator', x, z, { leg: 0, tether: 6, speed: rand(0.4, 0.8) });
+      }
+
+      // ── MR PYM — on the tower, the only person on the field who never moves,
+      // the megaphone up, turned toward whatever is going next.
+      if (tower) {
+        const [px, pz] = off(tower.position.x, tower.position.z, 5.5, Math.atan2(lcz - tower.position.z, lcx - tower.position.x));
+        cast('pym', px, pz, { mode: 9, tether: 1, speed: 0.1, face: Math.atan2(lcx - px, lcz - pz) });
+      }
+
+      // ── DOG WALKERS — the long way round, as today.
+      for (const [wx, wy] of SK.scatterInRegion(skRegion('meadow'), 6, Math.random, 40)) {
+        const [x, z] = g3([wx, wy]);
+        cast('dogwalker', x, z, { leg: 44, tether: 40 });
+      }
     }
     // ══ THE ASCENSION — "get them before they go up" (brief §3B) ═══════════
     //
@@ -4976,7 +5189,12 @@ export function createLife(
       const fire = (e: Env) => {
         e.pulse = 0;
         const b = e.m.userData.balloon as { telegraphAt?: number };
-        if (b.telegraphAt === undefined) b.telegraphAt = mt;
+        if (b.telegraphAt === undefined) {
+          b.telegraphAt = mt;
+          // the first pulse is the field's cue: everybody within forty units
+          // looks up (the listener above), the crew step back
+          for (const f of cues) f('telegraph', e.m.position.x, e.m.position.z);
+        }
         sfx?.('burner');
       };
       const begin = (e: Env) => {
@@ -5072,6 +5290,7 @@ export function createLife(
             if (since >= 8) {
               e.phase = 3; e.t = 0; e.vy = 0; e.nextPulse = rand(5, 9); fire(e);
               (m.userData.balloon as { departAt?: number }).departAt = mt;
+              for (const f of cues) f('lift', m.position.x, m.position.z);   // heads back, cameras up, a clap on the bank
               if (discN < DISC_CAP) e.disc = discN++;
               if (e.stage === 4 && !cascade) { cascade = true; cascadeAt = mt + 1.0; }
             }

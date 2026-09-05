@@ -22,8 +22,10 @@ const WORLD = A[1] || 'skylark';
 // the brief's table, as minimums a build must hold (the table's own numbers
 // are targets; these are the floor below which the field stops reading)
 const TABLE = {
-  crew: 120, pilot: 60, marshal: 16, cleaner: 10, tealady: 5, vancrew: 4, guide: 6,
-  tourist: 40, photographer: 4, ticket: 2, driver: 12, shepherd: 1, spectator: 30, kid: 15, pym: 1, dogwalker: 3,
+  // pilots stand only at STANDING envelopes (38 on the field), drivers two to a
+  // trailer (5 trailers): the floors follow what the field can seat
+  crew: 120, pilot: 30, marshal: 16, cleaner: 10, tealady: 5, vancrew: 4, guide: 6,
+  tourist: 40, photographer: 4, ticket: 2, driver: 8, shepherd: 1, spectator: 30, kid: 15, pym: 1, dogwalker: 3,
 };
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });

@@ -409,6 +409,22 @@ Where it comes from, in order of yield:
 
 ### 3D. THE CAST — five hundred people, every one with a job
 
+> **BUILT, not yet measured** — commits `016c04f` (hands, roles, wardrobe),
+> `040be7e` (voice, look-up, bubbles, six job animations) and the director's
+> cast block. The engine additions below all exist: eight hand kinds (the
+> six here plus `bucket` and `broom`), the `lift`/`telegraph` look-up, the
+> bubble emitter, `OUTFIT` entries for all ten skylark ids,
+> `SKYLARK_VOICE_*`, the kid override. Casting runs on ROUTES: `addWanderer`
+> takes `stops` (walked in order and repeated) so a cleaner goes bin to bin
+> and a marshal post to post; a job pose can be worn only at the stop
+> (`dancer.atDwell`). Owed from the table: the crew's step-back and rope-hold
+> on their own balloon's telegraph (the look-up covers them for now), the
+> guide's conga is five tourists on the same route rather than a true
+> follower chain, the shepherd's sheep do not move (the `sheep` beat, §3E),
+> and Mr Pym does not yet turn to the newest departure. Measured next by
+> `qa/jobs.mjs` (new; roles per district against this table) and
+> `qa/purpose.mjs`.
+
 The engine already has what this needs: `Role` with uniform silhouettes
 (`life.ts:1234`), `makeCast(role, dress)`, 16 hand-prop kinds, and an errand
 loop (`leg`, dwell 2.5–6s, leash 3×). World 6 cast 358 people with none of it.
