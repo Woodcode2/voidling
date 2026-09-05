@@ -5816,30 +5816,28 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         drop(mesh, p2, r, layoutYaw(), false, 'big', claim);
       }
       // PASS TWO — the crew's kit, filling in around what is already standing
-      // ── THE KIT GOES IN THE GAPS, AND THE GAPS ARE MEASURED ──────────────
-      // These offsets (190 across, 230 along) were authored for the old
-      // 340x420 grid and never revisited when the pitch tightened to 250x238:
-      // 230 along is 20 units short of the NEXT node, so spotOpen refused
-      // nearly every fan and bottle, and the survey counted 36 of 176 kit
-      // items on the field. A standing envelope's dome is 4.6 in radius (184
-      // world across); at this pitch the gap between two domes is 66 world
-      // along and 54 across, and the MIDPOINTS — 125 along, 119 across — sit
-      // 27-33 world (1.35-1.65 units) clear of either dome's edge, which a
-      // basket (0.8 half-width), a fan (0.68) or a bottle pair (0.5) all
-      // fit inside with room. So the kit stands at the midpoints, asks the
-      // runway rule itself, and is forced past spotOpen — whose inflated
-      // balloon claims (12.5 for a 6.8 footprint, to keep tether pins out of
-      // skirts) would otherwise keep a crew's own basket out of its crew.
-      // The claim is still made, so the small-kit scatter below keeps clear.
+      // ── THE KIT STANDS WHERE THE RULES LET IT, AND THAT IS THE EDGES ─────
+      // The density survey counted 36 of 176 kit items and I tried to fix it
+      // by forcing the kit into the gaps between domes (125 along, 119
+      // across — the measured midpoints, 1.35-1.65 units clear of a ROUND
+      // dome's edge). qa/placement.mjs then filed 37 overlaps: a standing
+      // envelope's footprint is its 9.6x9.6 bounding box, the grid runs
+      // diagonal to that box, and a basket at the midpoint sits 0.9 inside
+      // the box's corner. The probe over-approximates a dome, but the gate
+      // is the gate, and the deeper truth is that at a 250x238 pitch the
+      // field reads from above as one mass of domes: a basket between two
+      // of them is invisible. So the kit asks spotOpen like everything else
+      // and lands at the rows' ends and edges (measured: 54 pieces), where a
+      // crew's kit can be seen. The 176 was the wrong target for this pitch.
       const kit = (mk: () => THREE.Object3D, p2: SK.Pt, r: number, yaw: number) => {
-        if (!SK.skPlaceable(p2[0], p2[1], 30)) return;
+        if (!SK.skPlaceable(p2[0], p2[1], 15)) return;
         const m = mk(); m.userData.kind = 'crewkit';   // QA: counted by qa/_skcensus.mjs
-        drop(m, p2, r, yaw, true, 'small', r + 0.9);
+        drop(m, p2, r, yaw, false, 'small', r + 0.9);
       };
       for (const { p: p2, stage } of nodes) {
-        if (stage >= 1) kit(() => SKF.skBasket(), [p2[0] + vx * 119, p2[1] + vy * 119], 0.9, layoutYaw());
-        if (stage >= 2) kit(() => SKF.skInflatorFan(), [p2[0] + ux * 125, p2[1] + uy * 125], 0.8, layoutYaw() + Math.PI);
-        if (stage === 3) kit(() => SKF.skCylinderPair(), [p2[0] - vx * 119, p2[1] - vy * 119], 0.6, rnd2() * Math.PI * 2);
+        if (stage >= 1) kit(() => SKF.skBasket(), [p2[0] - vx * 190, p2[1] - vy * 190], 0.9, layoutYaw());
+        if (stage >= 2) kit(() => SKF.skInflatorFan(), [p2[0] + ux * 230, p2[1] + uy * 230], 0.8, layoutYaw() + Math.PI);
+        if (stage === 3) kit(() => SKF.skCylinderPair(), [p2[0] - ux * 210, p2[1] - uy * 210], 0.6, rnd2() * Math.PI * 2);
       }
     }
     // the launch field's own small stuff, scattered between the rows
