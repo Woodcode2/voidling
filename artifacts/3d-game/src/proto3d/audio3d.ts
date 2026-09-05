@@ -28,6 +28,8 @@ import MUSIC_MANIFEST from './music-manifest.json';
 type Ctx = AudioContext;
 
 export interface Audio3D {
+  /** SKYLARK FIELD's burner on demand (the ascension's telegraph pulse) */
+  skBurnerHit(): void;
   pop(combo: number, mealR?: number, voidR?: number): void;   // eat — pitch rises with combo, deepens with WHAT WAS EATEN
   gulp(): void;                    // GULP whoosh
   rocket(): void;                  // ROCKET BITE zip
@@ -3875,6 +3877,10 @@ export function createAudio(): Audio3D {
   }
 
   return {
+    /** SKYLARK FIELD's burner on demand: the ascension (life.ts) fires it in
+     *  sync with a balloon's telegraph pulse. Silent until the world's bus
+     *  exists, which is the moment the music starts. */
+    skBurnerHit() { const c = ctx; if (!c) return; skBurner(c.currentTime + 0.02, 0.24); },
     startMusic() {
       // prefetch the recorded kit so the very first gulp is the real sample.
       // (This used to sit AFTER the pirate early-return, so the resort was the

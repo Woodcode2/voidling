@@ -20,15 +20,22 @@
 //      Needs from the mechanic: `__depart(n)`, and `devouredPct` +
 //      `initialMass` on `__matchState()`.
 //
-//   B. THE SKY FILLS.  Airborne envelopes at fixed match times (SEED=7):
-//      1:30 >= 30, 2:40 >= 70, 3:00 >= 90. An envelope is airborne when its
-//      mesh sits above y = 2. Needs from the mechanic: every envelope mesh
-//      carries `userData.balloon = { id, stage }` so the probe can find them
-//      without guessing from radius.
+//   B. THE SKY FILLS.  Field envelopes airborne at fixed match times (SEED=7):
+//      1:00 >= 4, 1:30 >= 8, 2:28 >= 16, 2:40 >= 18, 3:00 >= 35. An envelope
+//      is airborne when its mesh sits above y = 2; only stages 1-4 count (a
+//      bag never flies; the distant sprites, stage 5, are scenery and never
+//      count). Needs from the mechanic: every envelope mesh carries
+//      `userData.balloon = { id, stage }` so the probe can find them without
+//      guessing from radius.
+//      CORRECTED: the first draft asked 30/70/90, copied from the brief's
+//      table, which its own rule (bar D, one departure every >= 6 s) makes
+//      impossible — 11 by 1:30 is the ceiling. The rule is the game; the
+//      numbers were wrong. brief §3B carries the correction.
 //
-//   C. THE LAST HANDFUL NEVER LEAVE.  At 3:00 at least 8 envelopes are still
-//      on the ground (y < 1), visible and uneaten. There is always something
-//      to eat; the game never moves the child's dinner.
+//   C. THE LAST HANDFUL NEVER LEAVE.  At 3:00 at least 8 envelopes of stage
+//      1-4 (a bag does not count — it could never have left) are still on the
+//      ground (y < 1), visible and uneaten. There is always something to eat;
+//      the game never moves the child's dinner.
 //
 //   D. THE TELEGRAPH PAYS.  Every departure was edible for >= 8 s between its
 //      first burner pulse and leaving the ground, and no two departures were
@@ -36,7 +43,7 @@
 //      `userData.balloon.telegraphAt` and `.departAt` (match seconds), set as
 //      they happen.
 //
-// --quick stops after bar A and one 20-second airborne sample, for iterating
+// --quick stops after bar A and one airborne sample at 0:34, for iterating
 // on the mechanic; the full run is a real 3:00 match, which under swiftshader
 // in this container is about 27 minutes of wall clock.
 import { chromium } from 'playwright';
@@ -90,9 +97,12 @@ const untilT = (t) => p.waitForFunction((tt) => (window.__matchState?.().t ?? 0)
   } else if (!c0.hasDepart) {
     fail('A', 'window.__depart(n) does not exist — there is no third state to test');
   } else {
-    await p.evaluate(() => window.__depart(3));
-    await p.waitForTimeout(300);
+    const marked = await p.evaluate(() => window.__depart(3));
+    // the meter is refreshed by refreshHud() every 0.2 s of MATCH time, which
+    // under swiftshader is ~2 s of wall clock: wait for it to move, not 300 ms
+    await p.waitForFunction((m0) => window.__matchState().initialMass !== m0, c0.initialMass, { timeout: 15000 }).catch(() => { });
     const c1 = await census();
+    if (marked !== 3) fail('A', `__depart(3) marked ${marked} balloons — not enough tagged, visible, uneaten envelopes to test on`);
     const dPct = c1.devouredPct - c0.devouredPct, dMass = c0.initialMass - c1.initialMass;
     if (dPct !== 0) fail('A', `devouredPct moved by ${dPct} on a departure — the sky is being credited to the child`);
     else if (dMass !== 3) fail('A', `initialMass fell by ${dMass}, not 3 — departed balloons are not leaving the denominator`);
@@ -101,9 +111,11 @@ const untilT = (t) => p.waitForFunction((tt) => (window.__matchState?.().t ?? 0)
 }
 
 // ── B, C, D over the match clock ────────────────────────────────────────────
-const airborne = (c) => c.env.filter((e) => e.vis && !e.eaten && e.y > 2).length;
-const grounded = (c) => c.env.filter((e) => e.vis && !e.eaten && e.y < 1).length;
-const BARS = QUICK ? [[20, 1]] : [[90, 30], [160, 70], [180, 90]];
+const field = (e) => e.stage >= 1 && e.stage <= 4;
+const airborne = (c) => c.env.filter((e) => field(e) && e.vis && !e.eaten && e.y > 2).length;
+const grounded = (c) => c.env.filter((e) => field(e) && e.vis && !e.eaten && e.y < 1).length;
+// --quick samples at 0:34: the first telegraph starts at 22 and lifts at 30
+const BARS = QUICK ? [[34, 1]] : [[60, 4], [90, 8], [148, 16], [160, 18], [180, 35]];
 let last = null;
 for (const [t, want] of BARS) {
   await untilT(t);

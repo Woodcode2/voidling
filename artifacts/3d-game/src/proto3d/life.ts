@@ -20,6 +20,7 @@ import * as LN from './lantern';
 import * as PW from './powder';
 import * as AL from './alpine';
 import * as SK from './skylark';
+import * as SKF from './skyfield';
 // MAPLE FALLS speaks for itself: newsroom_maple exports its townsfolk voices in
 // exactly the shape of the VOICE_AMBIENT / VOICE_PANIC pools below, keyed by
 // the same voice ids the cast carries (politician, protester, gossip, farmer,
@@ -2140,6 +2141,9 @@ export function createLife(
   addEdible: AddEdible,
   biomeAt: (x: number, z: number) => Biome | null,
   say: Say,
+  /** a one-shot from the score, by name — the ascension's burner fires it in
+   *  sync with a telegraph pulse (audio3d.ts owns the sound) */
+  sfx?: (name: string) => void,
 ): Life {
   const movers: Mover[] = [];
   // beat-cue listeners — set pieces register here so the match spine can
@@ -4275,6 +4279,219 @@ export function createLife(
     // somewhere reads as an evacuation, not a morning out.
     for (const [wx, wy] of SK.scatterLand(48, Math.random, 40, [260, 900])) {
       skPlace(wx, wy, 'meadow', { tether: 6, leg: 0, kid: Math.random() < 0.4 });
+    }
+    // ══ THE ASCENSION — "get them before they go up" (brief §3B) ═══════════
+    //
+    // Nothing on this field had ever left the ground. The tagline is the
+    // level, so this is the mechanic: a balloon that is going to leave SAYS SO
+    // for eight seconds — burner pulses, the envelope lit from inside, the
+    // basket worth 1.5x — and then lifts, straight up and slowly, edible until
+    // it is six units clear. One at a time, never a wave, until the whale; the
+    // eight lowest-numbered envelopes are tethered for the match so there is
+    // always something to eat. A balloon that has left is the THIRD STATE
+    // (prototype3d.ts: userData.departed): it leaves both sides of the
+    // devoured meter, so the sky is never credited to the child.
+    //
+    // THE CAMERA DECIDES THE ALTITUDES. Measured (sky survey, brief §3B): the
+    // play camera's ceiling over the child is 12 u at spawn, 44 u at r4, 97 u
+    // at r8. So the Lift tier cruises at 14 u — in frame from the first
+    // minute, one balloon-height over the standing field — and climbs at
+    // 0.15 u/s from there, so the sky fills exactly as fast as the camera
+    // rises to see it. Drift is the wind along 030, the runway heading, and it
+    // grows with height the way real wind does.
+    {
+      type Env = {
+        m: THREE.Mesh; id: number; stage: number; cols: [number, number, number] | undefined;
+        geo0: THREE.BufferGeometry; mat0: THREE.Material;
+        phase: 0 | 1 | 2 | 3;      // on the ground, standing up, telegraph, airborne
+        t: number;                  // seconds in this phase
+        alt: number; vy: number; keep: boolean;
+        pulse: number;              // seconds since the burner lit; -1 when dark
+        nextPulse: number; disc: number;   // shadow-disc instance; -1 when none
+      };
+      const envs: Env[] = [];
+      let live = false, mt = 0, nextAt = 22, picks = 0, cascade = false, cascadeAt = 0;
+      const wind = [Math.sin(Math.PI / 6), -Math.cos(Math.PI / 6)];   // 030, in 3D x/z
+      // ONE burner light for the whole field. The telegraph is one at a time
+      // by rule, so one warm pool of light on the grass under the basket is
+      // the read, and it moves to whichever burner is lit.
+      const burner = new THREE.PointLight(0xffa04a, 0, 44, 2);
+      burner.visible = false; scene.add(burner);
+      // THE SHADOW DISCS, DECOUPLED. A departed balloon's baked contact disc is
+      // switched off by the match loop; these follow it on the ground instead,
+      // one draw call for all of them, shrinking as it climbs. The shadow
+      // sliding over a tourist group is the signature of the world.
+      const DISC_CAP = 128;
+      const discProto = contactShadow(1);
+      const discs = new THREE.InstancedMesh(discProto.geometry, discProto.material as THREE.Material, DISC_CAP);
+      discs.frustumCulled = false; discs.renderOrder = -1; discs.count = DISC_CAP;
+      const _zero = new THREE.Matrix4().makeScale(0, 0, 0), _dm = new THREE.Matrix4();
+      const _flat = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+      const _dp = new THREE.Vector3(), _ds = new THREE.Vector3();
+      for (let i = 0; i < DISC_CAP; i++) discs.setMatrixAt(i, _zero);
+      let discN = 0;
+      scene.add(discs);
+      // a cold envelope STANDS before it goes: its mesh swaps to the standing
+      // geometry in its own colours (one geometry per colour triple, cached)
+      // and grows out of the ground over four seconds. The whale has her own.
+      const standGeo = new Map<string, THREE.BufferGeometry>();
+      const standing = (cols?: [number, number, number]) => {
+        const k = cols ? cols.join(',') : 'x';
+        let g = standGeo.get(k);
+        if (!g) { g = (SKF.skBalloonStanding(cols) as THREE.Mesh).geometry; standGeo.set(k, g); }
+        return g;
+      };
+      let whaleGeo: THREE.BufferGeometry | null = null;
+      const collect = () => {
+        envs.length = 0;
+        scene.traverse((o) => {
+          const b = o.userData.balloon as { id: number; stage: number; cols?: [number, number, number] } | undefined;
+          if (!b || !(o as THREE.Mesh).isMesh) return;
+          const m = o as THREE.Mesh;
+          envs.push({ m, id: b.id, stage: b.stage, cols: b.cols, geo0: m.geometry, mat0: m.material as THREE.Material,
+            phase: 0, t: 0, alt: 0, vy: 0, keep: false, pulse: -1, nextPulse: 0, disc: -1 });
+        });
+        envs.sort((a, b) => a.id - b.id);
+        // the tethered eight: the lowest-numbered standing envelopes, then cold
+        let kept = 0;
+        for (const st of [3, 2]) for (const e of envs) if (kept < 8 && e.stage === st) { e.keep = true; kept++; }
+      };
+      const glow = (e: Env, k: number) => {
+        if (e.m.material === e.mat0) {
+          const c = (e.mat0 as THREE.MeshStandardMaterial).clone();
+          c.emissive.setHex(0xff8a3d); c.emissiveIntensity = 0; e.m.material = c;
+        }
+        (e.m.material as THREE.MeshStandardMaterial).emissiveIntensity = k;
+      };
+      const fire = (e: Env) => {
+        e.pulse = 0;
+        const b = e.m.userData.balloon as { telegraphAt?: number };
+        if (b.telegraphAt === undefined) b.telegraphAt = mt;
+        sfx?.('burner');
+      };
+      const begin = (e: Env) => {
+        e.t = 0; e.m.userData.ptsMult = 1.5;   // worth more while it is saying goodbye
+        if (e.stage === 2 || e.stage === 4) {
+          e.m.geometry = e.stage === 4 ? (whaleGeo ??= (SKF.skWhaleStanding() as THREE.Mesh).geometry) : standing(e.cols);
+          e.m.scale.y = 0.12; e.phase = 1;
+        } else { e.phase = 2; fire(e); }
+      };
+      /** Near the child but not under their nose — a chase the child can see
+       *  and can lose. Every third pick is a cold envelope standing up, so the
+       *  field visibly changes over the match; the cascade after the whale
+       *  spreads outward from her, tower to coast. */
+      const candidate = (px: number, pz: number, outward: boolean): Env | null => {
+        let best: Env | null = null, bs = Infinity;
+        for (const e of envs) {
+          if (e.phase !== 0 || e.keep || (e.stage !== 2 && e.stage !== 3) || eaten(e.m) || e.m.userData.departed) continue;
+          const d = Math.hypot(e.m.position.x - px, e.m.position.z - pz);
+          const s = outward ? d : Math.abs(d - 40) + (e.stage === 2 ? (picks % 3 === 2 ? -14 : 14) : 0);
+          if (s < bs) { bs = s; best = e; }
+        }
+        return best;
+      };
+      const reset = () => {
+        for (const e of envs) {
+          if (e.m.material !== e.mat0) { (e.m.material as THREE.Material).dispose(); e.m.material = e.mat0; }
+          e.m.geometry = e.geo0;
+          e.phase = 0; e.t = 0; e.alt = 0; e.vy = 0; e.pulse = -1; e.disc = -1;
+          delete e.m.userData.ptsMult;
+          const b = e.m.userData.balloon as { telegraphAt?: number; departAt?: number };
+          delete b.telegraphAt; delete b.departAt;
+        }
+        for (let i = 0; i < DISC_CAP; i++) discs.setMatrixAt(i, _zero);
+        discs.instanceMatrix.needsUpdate = true; discN = 0;
+        burner.visible = false;
+        mt = 0; nextAt = 22; picks = 0; cascade = false;
+      };
+      cues.push((n) => {
+        if (n === 'match') { if (!envs.length) collect(); reset(); live = true; }
+        else if (n === 'whale' && live) {
+          // THE WHALE STANDS on the beat (4 s), fires at 4, 5.5 and 8.5, and
+          // lifts twelve seconds after the card — the countdown a child can beat
+          const w = envs.find((e) => e.stage === 4);
+          if (w && w.phase === 0 && !eaten(w.m) && !w.m.userData.departed) begin(w);
+        }
+      });
+      movers.push({ mesh: null as unknown as THREE.Object3D, update(dt, _t, vx, vz) {
+        if (!live) return;
+        mt += dt;
+        // ── the schedule: one at a time until the whale goes, then the cascade
+        if (!cascade && mt >= nextAt) {
+          const c = candidate(vx, vz, false);
+          if (c) { begin(c); picks++; }
+          nextAt = mt + (mt < 60 ? 7.5 : 6.5);
+        }
+        if (cascade && mt >= cascadeAt) {
+          const w = envs.find((e) => e.stage === 4);
+          const c = candidate(w ? w.m.position.x : vx, w ? w.m.position.z : vz, true);
+          if (c) begin(c);
+          cascadeAt = mt + 0.4;
+        }
+        let lit: Env | null = null, litK = 0;
+        for (const e of envs) {
+          if (e.phase === 0) continue;
+          const m = e.m;
+          if (eaten(m)) {
+            if (e.disc >= 0) { discs.setMatrixAt(e.disc, _zero); discs.instanceMatrix.needsUpdate = true; e.disc = -1; }
+            if (e.pulse >= 0) { e.pulse = -1; glow(e, 0); }
+            continue;
+          }
+          e.t += dt;
+          if (e.phase === 1) {
+            // standing up: the envelope grows out of the ground over four seconds
+            const k = Math.min(1, e.t / 4);
+            m.scale.y = 0.12 + 0.88 * (1 - (1 - k) * (1 - k));
+            if (k >= 1) { m.scale.y = 1; e.phase = 2; e.t = 0; fire(e); }
+          } else if (e.phase === 2) {
+            // the telegraph: a second pulse 1.5 s after the first (a third for
+            // the whale), and eight seconds from the first pulse to the ground
+            // letting go
+            if (e.t >= 1.5 && e.t - dt < 1.5) fire(e);
+            if (e.stage === 4 && e.t >= 4.5 && e.t - dt < 4.5) fire(e);
+            if (e.t >= 8) {
+              e.phase = 3; e.t = 0; e.vy = 0; e.nextPulse = rand(5, 9); fire(e);
+              (m.userData.balloon as { departAt?: number }).departAt = mt;
+              if (discN < DISC_CAP) e.disc = discN++;
+              if (e.stage === 4 && !cascade) { cascade = true; cascadeAt = mt + 1.0; }
+            }
+          } else {
+            // airborne. Straight up first — 2.2 u/s within three seconds — then
+            // the wind takes it: drift along 030 grows with height to 1.5 u/s
+            // by 16 u, and the climb settles to 0.15 u/s so the balloon stays
+            // inside the camera's rising ceiling. Gone from the meter at 6 u.
+            const cruise = e.stage === 4 ? 26 : 14;
+            if (e.alt < cruise) e.vy = Math.min(e.stage === 4 ? 1.6 : 2.2, e.vy + dt * 0.9);
+            else e.vy = Math.max(0.15, e.vy - dt * 0.6);
+            e.alt += e.vy * dt;
+            const sp = 1.5 * Math.min(1, Math.max(0, (e.alt - 4) / 12));
+            m.position.x += wind[0] * sp * dt; m.position.z += wind[1] * sp * dt;
+            m.position.y = e.alt + (e.alt > 8 ? Math.sin(mt * 0.7 + e.id) * 1.2 : 0);
+            m.rotation.y += dt * 0.04;
+            if (e.alt >= 6 && !m.userData.departed) m.userData.departed = true;
+            // the burner keeps firing every 5-9 s while it is low enough to hear
+            if (e.alt < 15) { e.nextPulse -= dt; if (e.nextPulse <= 0) { fire(e); e.nextPulse = rand(5, 9); } }
+            if (e.disc >= 0) {
+              const r = (e.stage === 4 ? 9.5 : 4.8) * 1.35 * Math.max(0.4, 1 - e.alt / 60);
+              _dp.set(m.position.x, 0.045, m.position.z); _ds.set(r, r, r);
+              discs.setMatrixAt(e.disc, _dm.compose(_dp, _flat, _ds));
+              discs.instanceMatrix.needsUpdate = true;
+            }
+          }
+          // the burner glow: emissive 0 -> 1.4 over 0.15 s, hold 0.4, decay 0.6
+          if (e.pulse >= 0) {
+            e.pulse += dt;
+            const k = e.pulse < 0.15 ? e.pulse / 0.15 : e.pulse < 0.55 ? 1 : e.pulse < 1.15 ? 1 - (e.pulse - 0.55) / 0.6 : -1;
+            if (k < 0) { e.pulse = -1; glow(e, 0); }
+            else { glow(e, 1.4 * k); if (k > litK) { litK = k; lit = e; } }
+          }
+        }
+        if (lit) {
+          const L = lit as Env;
+          burner.visible = true; burner.intensity = 80 * litK;
+          burner.position.set(L.m.position.x, L.m.position.y + 2.4, L.m.position.z);
+        } else burner.visible = false;
+      } });
     }
   }
 

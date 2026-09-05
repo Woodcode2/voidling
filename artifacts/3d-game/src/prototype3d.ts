@@ -2228,7 +2228,7 @@ const OVERLAYS = ['worlds', 'shop', 'daily', 'settings', 'trophies', 'skinPrev',
 }
 const bubbles = createBubbles(camera);
 await bootStage('Letting everyone in…', 42);
-const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
+const life = createLife(scene, addEdible, island.biomeAt, bubbles.say, (n) => { if (n === 'burner') audio.skBurnerHit(); });
 // QA: the crowd gate. `life` is exposed so qa/crowdgate.mjs can time
 // life.update() directly with the gate on and off, isolating the crowd from
 // the renderer and the sim — the only way to get a number out of a software-GL
@@ -2992,7 +2992,7 @@ function setShadowInstance(idx: number, on: boolean, x = 0, z = 0, s = 1): void 
 function bakeContactShadows(): void {
   for (const e of edibles) {
     const ud = e.mesh.userData as Record<string, unknown>;
-    if (ud.mover) continue;
+    if (ud.mover || ud.departed) continue;
     if (ud.shIdx !== undefined) {
       // already harvested — but validateWorld nudges props off roads between
       // sweeps, so refresh the matrix rather than leaving the disc behind
@@ -4699,7 +4699,14 @@ function refreshHud() {
   // bar A holds it.
   let consumed = 0, total = 0, mine = 0, departed = 0;
   for (const e of edibles) {
-    if (e.mesh.userData.departed) { departed++; continue; }
+    if (e.mesh.userData.departed) {
+      departed++;
+      // its baked contact disc would stay on the grass where it stood;
+      // life.ts draws the one that follows it up
+      const ud = e.mesh.userData;
+      if (ud.shIdx !== undefined && !ud.shOff) { setShadowInstance(ud.shIdx as number, false); ud.shOff = true; }
+      continue;
+    }
     total++;
     if (e.eaten || !e.mesh.visible) { consumed++; if (e.mesh.userData.byPlayer) mine++; }
   }
@@ -7031,6 +7038,7 @@ function resetMatch() {
     e.eaten = false; e.t = 0;
     e.mesh.userData.eaten = false;
     e.mesh.userData.byPlayer = false;
+    e.mesh.userData.departed = false; e.mesh.userData.shOff = false;   // the sky comes back down for the rematch
     e.mesh.visible = true;
     if (!e.mesh.parent) scene.add(e.mesh);
     // magnet drift + topple mean EVERYTHING goes back to its surveyed home

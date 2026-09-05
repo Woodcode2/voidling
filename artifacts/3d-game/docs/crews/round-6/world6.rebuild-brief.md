@@ -267,6 +267,11 @@ deleted. A number nobody reads is a lie waiting to be believed.
 > `whale` beat's own timer) — the one shot where the horizon is in frame.
 > `qa/ascension.mjs` bars B/C get these numbers in the next commit.
 >
+> **Powder's finale, measured.** `qa/_avalanche.mjs` on the rebuilt bundle:
+> 0 snowballs at t=1, **22 at t>152, 22 visible — PASS**. The avalanche has
+> fired for the first time since world 5 shipped; the generic dispatch
+> (`c17dc56`) is proven in the browser, not just by `beattruth`.
+>
 > **Survey claim disproven.** The sky survey reported the new arrivals polygon
 > yields 0 rig nodes at `skPlaceable(p, 130)`. Replayed (`qa/_skrig.mjs`,
 > SSR, the code's own centroid and grid): **16 nodes**; interior 91.7%

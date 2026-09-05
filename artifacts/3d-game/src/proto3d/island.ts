@@ -5619,8 +5619,8 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // a departure is attributable. stage: 0 bagged, 1 spilled, 2 cold,
     // 3 standing, 4 the whale.
     let balloonId = 0;
-    const tagBalloon = <T extends THREE.Object3D>(mesh: T, stage: number): T => {
-      mesh.userData.balloon = { id: balloonId++, stage };
+    const tagBalloon = <T extends THREE.Object3D>(mesh: T, stage: number, cols?: [number, number, number]): T => {
+      mesh.userData.balloon = { id: balloonId++, stage, cols };
       return mesh;
     };
     const drop = (mesh: THREE.Object3D, p2: SK.Pt, r: number, rotY?: number, force = false, qk?: string, claim?: number) => {
@@ -5786,7 +5786,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         const cols = env();
         const mesh = tagBalloon(stage === 0 ? SKF.skBalloonBagged(cols)
           : stage === 1 ? SKF.skBalloonSpilled(cols)
-            : stage === 2 ? SKF.skBalloonCold(cols) : SKF.skBalloonStanding(cols), stage);
+            : stage === 2 ? SKF.skBalloonCold(cols) : SKF.skBalloonStanding(cols), stage, cols);
         // ONE EDIBLE, ONE RADIUS — see skyfield.ts's header on fadeOccluders
         const r = stage === 0 ? 1.4 : stage === 1 ? 5.2 : stage === 2 ? 4.6 : 4.8;
         // ── CLAIMS SIZED FOR THE RULE THAT ACTUALLY RUNS ────────────────────
@@ -5868,7 +5868,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       rig.forEach((p2, i) => {
         const cols = env();
         const stage = i % 2;
-        drop(tagBalloon(stage === 0 ? SKF.skBalloonSpilled(cols) : SKF.skBalloonCold(cols), stage + 1),
+        drop(tagBalloon(stage === 0 ? SKF.skBalloonSpilled(cols) : SKF.skBalloonCold(cols), stage + 1, cols),
           p2, stage === 0 ? 5.2 : 4.6, layoutYaw(), false, 'big', stage === 0 ? 11.0 : 10.5);
       });
     }
@@ -5902,7 +5902,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       // ONE draw decides both the mesh and its radius. This drew twice, so a
       // spilled envelope could carry a cold one's eat radius and vice versa.
       const spilled = rnd2() < 0.5;
-      drop(tagBalloon(spilled ? SKF.skBalloonSpilled(cols) : SKF.skBalloonCold(cols), spilled ? 1 : 2),
+      drop(tagBalloon(spilled ? SKF.skBalloonSpilled(cols) : SKF.skBalloonCold(cols), spilled ? 1 : 2, cols),
         p2, spilled ? 5.2 : 4.6, layoutYaw(), false, 'big', 9.0);
     }
     for (const p2 of SK.scatterInRegion(REG('tower'), 110, rnd2, 50, { sep: 1.1 })) {

@@ -45,7 +45,6 @@ const proto = strip(PROTO), life = strip(LIFE);
 // its debt. Same rule as qa/placement.baseline.json and qa/roundlod.mjs.
 const FROZEN = {
   sheep: 'SKYLARK FIELD — the shepherd-and-dog chase; built in the world 6 rebuild (brief §3E)',
-  whale: 'SKYLARK FIELD — the whale stands and lifts; THE mechanic of the rebuild (brief §3B)',
   contest: 'POWDER PASS — the snowman contest has no world-side handler; owed since world 5',
 };
 
