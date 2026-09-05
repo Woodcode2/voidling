@@ -5134,6 +5134,11 @@ export function createLife(
       };
       const envs: Env[] = [];
       let live = false, mt = 0, nextAt = 22, picks = 0, cascade = false, cascadeAt = 0;
+      // the last PLANNED departure: the rule is six seconds between balloons
+      // leaving the ground, and a cold envelope leaves twelve seconds after
+      // it is picked where a standing one leaves after eight — so spacing the
+      // picks spaced nothing (bar D: "6 departures within 6 s, a wave")
+      let lastDep = -99;
       const wind = [Math.sin(Math.PI / 6), -Math.cos(Math.PI / 6)];   // 030, in 3D x/z
       // ONE burner light for the whole field. The telegraph is one at a time
       // by rule, so one warm pool of light on the grass under the basket is
@@ -5235,7 +5240,12 @@ export function createLife(
         for (let i = 0; i < DISC_CAP; i++) discs.setMatrixAt(i, _zero);
         discs.instanceMatrix.needsUpdate = true; discN = 0;
         burner.visible = false;
-        mt = 0; nextAt = 22; picks = 0; cascade = false;
+        mt = 0; nextAt = 22; picks = 0; cascade = false; lastDep = -99;
+      };
+      // QA: the controller's own state, for qa/ascension.mjs and qa/_whale.mjs
+      (window as unknown as { __asc: unknown }).__asc = {
+        envs, state: () => ({ mt, nextAt, picks, cascade, lastDep, live }),
+        phases: () => envs.map((e) => ({ id: e.id, stage: e.stage, phase: e.phase, alt: Math.round(e.alt * 10) / 10, keep: e.keep, vis: e.m.visible, eaten: !!e.m.userData.eaten, departed: !!e.m.userData.departed })),
       };
       cues.push((n) => {
         if (n === 'match') { if (!envs.length) collect(); reset(); live = true; }
@@ -5252,8 +5262,13 @@ export function createLife(
         // ── the schedule: one at a time until the whale goes, then the cascade
         if (!cascade && mt >= nextAt) {
           const c = candidate(vx, vz, false);
-          if (c) { begin(c); picks++; }
-          nextAt = mt + (mt < 60 ? 7.5 : 6.5);
+          if (!c) nextAt = mt + 2;
+          else {
+            const L = c.stage === 3 ? 8 : 12;           // seconds from pick to leaving the ground
+            const earliest = lastDep + 6.5 - L;
+            if (mt < earliest) nextAt = earliest;       // this one would leave too soon after the last
+            else { begin(c); picks++; lastDep = mt + L; nextAt = mt + 1; }
+          }
         }
         if (cascade && mt >= cascadeAt) {
           const w = envs.find((e) => e.stage === 4);
