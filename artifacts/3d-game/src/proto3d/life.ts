@@ -638,7 +638,11 @@ export type Prop = 'juice' | 'clipboard' | 'tray' | 'ball' | 'detector' | 'selfi
   // only thing an adult holds that is visible from directly overhead, which is
   // why the protest and the fair are both told with them.
   | 'leaflets' | 'placard' | 'coffeepot' | 'rod' | 'pompom' | 'horn' | 'bat'
-  | 'pie' | 'tape' | 'board' | 'leash';
+  | 'pie' | 'tape' | 'board' | 'leash'
+  // SKYLARK FIELD props. A dawn crowd is anoraks on wet grass, and from 46°
+  // up an anorak is an anorak — the hand is the only place a job can live.
+  | 'rope' | 'paddle' | 'bubblewand' | 'bucket' | 'broom' | 'camera' | 'crook'
+  | 'balloon';
 // HAIR is the single most important surface at a top-down camera — it is the
 // only thing you see of most people. Nine silhouettes, fourteen colours.
 export type Hair = 'short' | 'buzz' | 'bob' | 'long' | 'bun' | 'pony' | 'curly' | 'braids' | 'bald';
@@ -663,6 +667,10 @@ interface PersonOpts {
   // MAPLE FALLS: a fair prize rosette (crimson / blue / gold) on the chest,
   // and a mail satchel slung across the body.
   rosette?: number; satchel?: number;
+  // SKYLARK FIELD: the tint of a prop that is NOT the outfit accent — a kid's
+  // balloon is picked per kid by the cast, and the accent is already spoken
+  // for by the placard/pompom path (`_propCol`). Only `balloon` reads it.
+  propCol?: number;
 }
 
 // ── part builders. Each pushes GEOMETRY into `out`; the caller welds the list
@@ -791,7 +799,7 @@ function hairParts(out: Geo[], style: Hair, col: number): void {
 // parameter would have meant changing every existing call site for the sake of
 // four props, and this bakes into the geometry at build time either way.
 let _propCol = 0xd8443c;
-function propParts(out: Geo[], kind: Prop, s: number): void {
+function propParts(out: Geo[], kind: Prop, s: number, col?: number): void {
   if (kind === 'juice') {
     // A TALL GLASS WITH A STRAW, NOT A COUPE. This was an inverted cone with a
     // garnish dot, which is the martini silhouette and nothing else — carried
@@ -855,6 +863,70 @@ function propParts(out: Geo[], kind: Prop, s: number): void {
       out.push(pc(B.dot, 0xf0c050, 0.24 * s, (-0.86 + dy * 0.7) * s, 0.02 * s, 0.11 * s));
   } else if (kind === 'leash') {
     out.push(pc(B.box, 0xd8443c, 0.02, -1.30 * s, 0.62 * s, 0.05 * s, 0.05 * s, 0.95 * s, -0.55));
+  // ══ SKYLARK FIELD ════════════════════════════════════════════════════════
+  // Eight jobs for a launch field, each sized as a MARK before an object: a
+  // pale ring, an orange dot, a diagonal to the grass, a dark square, a bright
+  // dot beside the head. Ground is 2.06·s below this pivot on an adult
+  // (shY 2.18 / armL 1.06) and the top of the head is 1.21·s above it; a kid's
+  // head top is 1.50·s. Anything meant to touch grass or clear a head is
+  // placed against those, not against the hand.
+  } else if (kind === 'rope') {
+    // the coil is the armband torus, fattened: two loops on the upper arm and
+    // a dark whipped end hanging off the lower one. Solid boxes cannot make a
+    // ring — three crossed at the centre are an asterisk, three around a
+    // circle are a bracelet of lumps — and the torus is 120 triangles
+    // (5 x 12 segments) already carried on every kid's arm as an armband.
+    for (const [y, sc] of [[-0.40, 0.92], [-0.58, 1.02]] as [number, number][])
+      out.push(pc(B.ring, 0xc9a86b, 0.02 * s, y * s, 0.02 * s, sc * s, sc * s, sc * s, Math.PI / 2 + 0.12));
+    out.push(pc(B.box, 0x4a3a2a, 0.34 * s, -0.86 * s, 0.10 * s, 0.11 * s, 0.34 * s, 0.11 * s, 0, 0, 0.12));
+  } else if (kind === 'paddle') {
+    // marshal's bat. The handle tips forward 0.3 and the disc sits square on
+    // its end, so at rest the orange is a hand's width off the hip and clear of
+    // the anorak — the one place on a hi-vis person that is not yellow.
+    out.push(pc(B.tube, 0x8a8f9c, 0.06 * s, -0.95 * s, 0.26 * s, 0.07 * s, 0.55 * s, 0.07 * s, 0.3));
+    out.push(pc(B.disc, 0xff7a1a, 0.06 * s, -0.40 * s, 0.43 * s, 0.60 * s, 0.06 * s, 0.60 * s, Math.PI / 2 + 0.3));
+  } else if (kind === 'bubblewand') {
+    // held up and OUT — the ring has to clear the shoulder to show from above
+    out.push(pc(B.tube, WHITE, 0.18 * s, -0.55 * s, 0.20 * s, 0.035 * s, 1.00 * s, 0.035 * s, 0, 0, -0.35));
+    out.push(pc(B.ring, 0x35d6f0, 0.41 * s, 0.08 * s, 0.20 * s, 0.40 * s, 0.40 * s, 0.40 * s));
+  } else if (kind === 'bucket') {
+    // hangs straight under the fist. The sides are the arm's taper flipped
+    // (wider at the top); the taper is open, so the yellow cap is what the
+    // camera meets at 46° instead of the inside wall, and the rim is a ring
+    // rather than a lid so that cap stays yellow, not dark.
+    out.push(pc(B.taper, 0xf2c623, 0, -1.42 * s, 0.14 * s, 0.50 * s, 0.50 * s, 0.50 * s, Math.PI));
+    out.push(pc(B.disc, 0xf2c623, 0, -1.20 * s, 0.14 * s, 0.46 * s, 0.04 * s, 0.46 * s));
+    out.push(pc(B.ring, 0x2a2a34, 0, -1.17 * s, 0.14 * s, 0.60 * s, 0.60 * s, 0.60 * s, Math.PI / 2));
+  } else if (kind === 'broom') {
+    // handle through the fist at 0.55 off vertical, bristles on the grass
+    // 0.7·s ahead of the feet: from 46° up that is a diagonal to the ground.
+    // Steeper and it foreshortens to a dot; flatter and the sweep in dancer
+    // mode 8 (arm -0.9 .. -0.3) lifts the head to chest height, since the
+    // whole thing pivots at the shoulder.
+    out.push(pc(B.tube, 0xb9793f, 0.06 * s, -1.18 * s, 0.22 * s, 0.06 * s, 1.60 * s, 0.06 * s, -0.55));
+    out.push(pc(B.box, 0x4a3d2e, 0.06 * s, -1.95 * s, 0.69 * s, 0.56 * s, 0.30 * s, 0.16 * s, -0.55));
+  } else if (kind === 'camera') {
+    // the forearm is welded straight, so the camera floats where a bent one
+    // would hold it — chest-high and 0.55·s ahead — rather than at the fist.
+    // From above that is a dark square just past the shoulder line.
+    out.push(pc(B.box, 0x2a2a34, 0.02, -0.30 * s, 0.55 * s, 0.40 * s, 0.26 * s, 0.16 * s));
+    out.push(pc(B.dot, 0x8a8f9c, 0.02, -0.30 * s, 0.65 * s, 0.17 * s, 0.17 * s, 0.10 * s));
+  } else if (kind === 'crook') {
+    // bottom on the grass, curl 0.24·s clear of an adult head top. The curl is
+    // a torus offset outward so the staff meets it at the bottom of one side
+    // and it reads as a hook rather than a lollipop.
+    out.push(pc(B.tube, 0xd9c9a4, 0.08 * s, -0.225 * s, 0.16 * s, 0.06 * s, 3.55 * s, 0.06 * s));
+    out.push(pc(B.ring, 0xd9c9a4, 0.26 * s, 1.65 * s, 0.16 * s, 0.48 * s, 0.56 * s, 0.48 * s));
+  } else if (kind === 'balloon') {
+    // A dot floating BESIDE the head, not over it. Ball centre 3.0·s up: that
+    // is 1.5·s over a kid's crown and 1.8·s over an adult's, and 0.45·s out so
+    // the 0.42·s ball clears a kid's 0.65 head radius from directly above. The
+    // string leans to match. Colour is the `col` parameter: `_propCol` is the
+    // outfit accent, and a kid's balloon is the cast's pick, not the anorak's.
+    const bc = col ?? 0xff5d7e;
+    out.push(pc(B.tube, 0xd8d2c2, 0.225 * s, 0.785 * s, 0.16 * s, 0.03 * s, 3.62 * s, 0.03 * s, 0, 0, -0.125));
+    out.push(pc(B.sphS, bc, 0.45 * s, 3.00 * s, 0.20 * s, 0.84 * s));
+    out.push(pc(B.cone, bc, 0.45 * s, 2.54 * s, 0.20 * s, 0.14 * s, 0.16 * s, 0.14 * s, Math.PI));   // the knot
   } else {   // selfie stick
     out.push(pc(B.tube, 0xc8cdd8, 0, -1.34 * s, 0.52 * s, 0.07 * s, 1.50 * s, 0.07 * s, 0.85));
     out.push(pc(B.box, INK, 0, -0.86 * s, 1.09 * s, 0.16 * s, 0.22 * s, 0.05 * s, 1.2));
@@ -891,6 +963,15 @@ const LN_MOSS = 0x3f6a48;
 const LN_PLUM = 0x5a2f52;
 const LN_GOLD = 0xd9a24a;
 const LN_PAPER = 0xd8cdb6;
+// SKYLARK FIELD's three crew colours. A crew's overalls take one of these by
+// `side` (see makeCast `crew`), so the two people under an envelope read as
+// THAT balloon's from 46 degrees up. Hi-vis is for the marshals and the slab;
+// the trouser pool is mud-coloured on purpose — the first pass used Maple's
+// blues and the field looked like a school trip, not a workforce at six a.m.
+const SK_BLUE = 0x2f6fd0, SK_RED = 0xd8443a, SK_GREEN = 0x3a9a5a;
+const SK_CREW = [SK_BLUE, SK_RED, SK_GREEN];
+const SK_HIVIS = 0xffd23f, SK_ORANGE = 0xff7a1a, SK_CREAM = 0xf0e6d2;
+const SK_MUD = [0x2a2a34, 0x3a4a6a, 0x4a4034, 0x5a5a64];
 const OUTFIT: Record<string, Fit> = {
   // ── LANTERN NIGHT. Deep, saturated, low-value colours: at night a pale
   // costume blows out under a lantern pool and everything mid-grey vanishes
@@ -969,6 +1050,33 @@ const OUTFIT: Record<string, Fit> = {
     hat: 'cap', hatOdds: 0.8, wear: ['jersey', 'jersey', 'tee'], shoe: ['shoe'] },
   treeline: { shirt: [GD_HOME_A, GD_HOME_A, GD_GOLD, 0x4a7a58, 0xf0e6d2, GD_AWAY], pants: [0x4a4034, 0x3a4a6a, 0x2a2a34],
     hat: 'beanie', hatOdds: 0.5, wear: ['hoodie', 'open', 'tee'], shoe: ['boot', 'shoe'] },
+  // ── SKYLARK FIELD. Keyed by skylark.ts's SkBiome ids. Without these ten,
+  // every adult on the field fell through to OUTFIT.cozy and a six-a.m. balloon
+  // meet came out in Maple's suburban pastels. Dawn, wet grass, early autumn:
+  // anoraks and fleeces over mud-coloured trousers, boots wherever the ground
+  // is grass, crew colours wherever a crew works and hi-vis wherever a vehicle
+  // moves — so a district reads as its job from the play camera before anyone
+  // is close enough to show a prop.
+  launchfield: { shirt: [SK_BLUE, SK_RED, SK_GREEN, SK_CREAM, SK_BLUE, SK_RED, SK_GREEN], pants: SK_MUD,
+    hat: 'cap', hatOdds: 0.6, wear: ['dungarees', 'hoodie', 'open', 'tee'], shoe: ['boot', 'boot', 'shoe'] },
+  arrivals: { shirt: [SK_BLUE, SK_RED, SK_GREEN, SK_CREAM, SK_HIVIS, SK_ORANGE], pants: SK_MUD,
+    hat: 'cap', hatOdds: 0.5, wear: ['hoodie', 'open', 'tee', 'dungarees'], shoe: ['boot', 'shoe'] },
+  breakfast: { shirt: [SK_CREAM, 0xffffff, SK_RED, 0x4a7a8a, 0x8a4a5a, SK_BLUE], pants: SK_MUD,
+    hat: 'beanie', hatOdds: 0.3, wear: ['apron', 'apron', 'hoodie', 'open', 'tee'], shoe: ['shoe', 'boot'] },
+  hangars: { shirt: [0x4a7a8a, 0x5a6a3a, 0x3a4a6a, SK_CREAM, SK_GREEN, 0x8a4a5a], pants: SK_MUD,
+    hat: 'beanie', hatOdds: 0.55, wear: ['hoodie', 'hoodie', 'open', 'dungarees'], shoe: ['boot', 'shoe'] },
+  tower: { shirt: [0xffffff, 0xdfe8ee, 0x2a3a6a, 0x1f2a4a, 0x6b4a33], pants: [0x24242e, 0x2a2a34, 0x3a3f4d],
+    hat: 'cap', hatOdds: 0.4, wear: ['blazer', 'blazer', 'tee', 'uniform'], shoe: ['shoe'] },
+  meadow: { shirt: [0x4a7a8a, 0x8a4a5a, 0x5a6a3a, 0x3a4a6a, SK_CREAM, 0xff8a3a], pants: SK_MUD,
+    hat: 'beanie', hatOdds: 0.5, wear: ['hoodie', 'hoodie', 'open', 'tee'], shoe: ['boot', 'boot', 'shoe'] },
+  perimeter: { shirt: [0x4a7a8a, 0x8a4a5a, 0x5a6a3a, 0x3a4a6a, SK_HIVIS, SK_CREAM], pants: SK_MUD,
+    hat: 'beanie', hatOdds: 0.5, wear: ['hoodie', 'hoodie', 'open', 'tee'], shoe: ['boot', 'boot', 'shoe'] },
+  slab: { shirt: [SK_HIVIS, SK_ORANGE, SK_HIVIS, SK_BLUE, 0xe8702a], pants: [0x2a2a34, SK_BLUE, 0xe8702a, 0x3a3a3a],
+    hat: 'cap', hatOdds: 0.6, wear: ['dungarees', 'dungarees', 'tee', 'hoodie'], shoe: ['boot'] },
+  circle: { shirt: [SK_HIVIS, SK_ORANGE, SK_BLUE, SK_CREAM, 0xe8702a], pants: [0x2a2a34, SK_BLUE, 0x3a3a3a],
+    hat: 'cap', hatOdds: 0.5, wear: ['dungarees', 'tee', 'hoodie', 'open'], shoe: ['boot', 'shoe'] },
+  runway: { shirt: [SK_HIVIS, SK_HIVIS, SK_ORANGE, SK_BLUE, 0xe8702a], pants: [0x2a2a34, SK_BLUE, 0xe8702a],
+    hat: 'cap', hatOdds: 0.65, wear: ['dungarees', 'dungarees', 'tee'], shoe: ['boot'] },
 };
 
 // ══ THE ELECTION ═════════════════════════════════════════════════════════════
@@ -1161,10 +1269,10 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
     // the held prop welds INTO the right arm: a waiter's tray is not an extra
     // draw call, it is extra triangles on a mesh that already exists
     _propCol = accent;                                  // placards/pompoms take the accent
-    if (o?.prop && sx > 0) propParts(p, o.prop, A);
+    if (o?.prop && sx > 0) propParts(p, o.prop, A, o.propCol);
     // …and `propL` in the LEFT, for the two-handed jobs — pompoms, and a
     // placard carried in one hand with leaflets in the other
-    if (o?.propL && sx < 0) propParts(p, o.propL, A);
+    if (o?.propL && sx < 0) propParts(p, o.propL, A, o.propCol);
     const sh = new THREE.Group(); sh.position.set(sx, bd.shY, 0);
     sh.add(weld(p)); g.add(sh); arms.push(sh);
   }
@@ -1242,15 +1350,43 @@ export type Role = 'guest' | 'rich' | 'robe' | 'kid' | 'waiter' | 'bellhop' | 'l
   // populate than a resort does.
   | 'campaigner' | 'protester' | 'farmer' | 'teen' | 'server' | 'cheer' | 'bandkid'
   | 'fisher' | 'camper' | 'dogwalker' | 'mail' | 'ballplayer' | 'coach' | 'baker'
-  | 'gossip' | 'booster';
+  | 'gossip' | 'booster'
+  // ── SKYLARK FIELD. A balloon meet is a WORKPLACE: five hundred people and
+  // every one with a job, and the brief's test for a job is that it reads from
+  // 46 degrees up on a phone — a hat, a hi-vis, a thing in the hand. World 6
+  // cast 358 people with none of this and the crowd was a suburb on a runway.
+  // Fourteen roles, no new mesh parts: each is the existing kit in a uniform,
+  // and the hands they carry are propParts's (rope, paddle, bubblewand,
+  // bucket, broom, camera, crook, balloon).
+  | 'crew' | 'pilot' | 'marshal' | 'cleaner' | 'tealady' | 'vancrew' | 'guide'
+  | 'tourist' | 'photographer' | 'ticket' | 'driver' | 'shepherd' | 'spectator' | 'pym';
 
 const KID_SHIRT = [0xff4f9a, 0x35d6f0, 0xffd23f, 0x7ef05a, 0xff8a3a, 0xb875ff];
 const KID_PANTS = [0x2f6fe0, 0xff5470, 0x2ab8d8, 0x66de93, 0xffb347];
+// SKYLARK FIELD's ten district ids (skylark.ts's SkBiome), kept as a local set
+// rather than an import: makeCast branches on `dress` for the kids, and that
+// branch has to be decided before the first Math.random draw or the resort,
+// the town and the game-day children all change clothes.
+const SK_IDS = new Set(['launchfield', 'arrivals', 'breakfast', 'hangars', 'tower',
+  'meadow', 'perimeter', 'slab', 'circle', 'runway']);
+// a skylark kid's party balloon and bobble hat come in the envelope colours,
+// so a child on the bank matches the thing she is looking at
+const SK_KID_COLS = [SK_RED, SK_BLUE, SK_HIVIS, SK_GREEN, 0xff5d7e];
 
 // `side` is the CAMPAIGN COLOUR this person is wearing — DINKLE or HOLLIS.
 // Callers pass their block's allegiance so a whole street reads as one camp;
-// omitted, the person picks a side at random like anybody else.
+// omitted, the person picks a side at random like anybody else. On SKYLARK
+// FIELD it is the crew index (0/1/2) instead — see `crew`.
 function makeCast(role: Role, dress: string, side?: number): THREE.Group {
+  const p = castFor(role, dress, side);
+  // qa/jobs.mjs counts people per district by this, and the look-up cue
+  // branches on it (a spectator claps, a tourist's camera flashes). Stamped
+  // once, here, rather than in thirty cases: a role that forgot it would be a
+  // person the count cannot see.
+  p.userData.role = role;
+  return p;
+}
+function castFor(role: Role, dress: string, side?: number): THREE.Group {
   // LAZY on purpose: the sixteen Pirate Bay roles below must not draw a single
   // number from Math.random that they did not draw before this parameter
   // existed, or every spawn position on that island shifts.
@@ -1258,6 +1394,25 @@ function makeCast(role: Role, dress: string, side?: number): THREE.Group {
   const camp = (): number => (_camp ??= FAIR_COLS[Math.floor(Math.random() * FAIR_COLS.length)]);
   switch (role) {
     case 'kid': {
+      // SKYLARK FIELD: six in the morning on wet grass in September. Nobody is
+      // swimming, so no swimsuit, no armbands, no rubber ring — an anorak, a
+      // bobble hat and a party balloon on a string in one of the envelope
+      // colours, which is the child-sized version of the crowd's own look-up.
+      // Branched BEFORE the first draw below so the resort, the town and the
+      // game-day kids keep their Math.random sequence byte for byte.
+      if (SK_IDS.has(dress)) {
+        const bal = Math.random() < 0.35;
+        return makePerson(dress, undefined, {
+          kid: true, shirt: pick(KID_SHIRT), pants: pick(KID_PANTS), accent: pick(KID_SHIRT),
+          wear: pick(['hoodie', 'hoodie', 'tee'] as Wear[]),
+          pattern: pick(['stripe', 'twotone', 'plain', 'plain'] as Pattern[]),
+          shoe: pick(['boot', 'boot', 'shoe'] as Shoe[]),
+          hair: pick(['curly', 'bob', 'pony', 'short', 'braids', 'buzz'] as Hair[]),
+          hat: Math.random() < 0.6 ? 'beanie' : null, hatCol: pick(SK_KID_COLS),
+          rucksack: Math.random() < 0.2,
+          prop: bal ? 'balloon' : undefined, propCol: bal ? pick(SK_KID_COLS) : undefined,
+        });
+      }
       // a child is not a shrunk adult: short limbs, round barrel, big head, and
       // an armband or a rubber ring you can read from directly overhead
       const swim = Math.random() < 0.5;
@@ -1495,6 +1650,128 @@ function makeCast(role: Role, dress: string, side?: number): THREE.Group {
         hat: 'cap', hatCol: camp(), rosette: camp(),
         prop: Math.random() < 0.3 ? 'leaflets' : undefined,
       });
+
+    // ══ SKYLARK FIELD ═════════════════════════════════════════════════════
+    // Every case below was checked against one question: standing in a crowd
+    // of its own district at the play camera's 46 degrees, what is the ONE
+    // thing that says the job? Crew: the overalls' colour. Marshal: hi-vis
+    // under a white cap. Cleaner: a yellow bucket. Guide: a placard. Shepherd:
+    // a crook taller than the head. If that thing is a prop it is welded into
+    // the arm mesh — no role here costs a draw call the resort's did not.
+    case 'crew': {
+      // one of three crews, by `side`, so the two people under an envelope
+      // wear its colour; the white tee under the bib is what keeps three dark
+      // overalls from reading as one crew from above
+      const c = SK_CREW[(side ?? Math.floor(Math.random() * 3)) % 3];
+      return makePerson(dress, undefined, {
+        shirt: 0xffffff, pants: c, accent: c, wear: 'dungarees', shoe: 'boot', pattern: 'plain',
+        hat: Math.random() < 0.7 ? 'cap' : null, hatCol: c, prop: 'rope',
+        hair: pick(['short', 'buzz', 'pony', 'bun', 'curly'] as Hair[]),
+      });
+    }
+    case 'pilot':   // brown leather, cream trousers, and the cap is never off
+      return makePerson(dress, undefined, {
+        shirt: 0x6b4a33, pants: SK_CREAM, accent: 0x4a3222, wear: 'blazer', shoe: 'boot', pattern: 'plain',
+        hat: 'cap', hatCol: pick([0x4a3222, 0x24242e, SK_CREAM]), glasses: Math.random() < 0.5,
+        prop: 'clipboard',
+      });
+    case 'marshal':
+      // hi-vis under a WHITE cap. The cap is the marshal from directly above —
+      // a hi-vis tee on its own is a tourist in yellow at the top of the
+      // camera's travel — and the paddle is the marshal from the side. The
+      // stripe pattern in pale grey is the reflective banding.
+      return makePerson(dress, undefined, {
+        shirt: pick([SK_HIVIS, SK_ORANGE]), pants: 0x2a2a34, accent: 0xd8d4cc, wear: 'tee', shoe: 'boot',
+        pattern: 'stripe', hat: 'cap', hatCol: 0xffffff, prop: 'paddle',
+      });
+    case 'cleaner':
+      // blue overalls, yellow at the shoulders and a yellow bucket at the hip.
+      // Half of them sweep instead of blowing bubbles — that is the half the
+      // kids do not follow
+      return makePerson(dress, undefined, {
+        shirt: 0xf2c623, pants: SK_BLUE, accent: 0xf2c623, wear: 'dungarees', shoe: 'boot', pattern: 'plain',
+        hat: null, prop: Math.random() < 0.5 ? 'bubblewand' : 'broom', propL: 'bucket',
+      });
+    case 'tealady':   // a white apron over a floral dress, a headscarf, the urn's pot
+      return makePerson(dress, undefined, {
+        shirt: pick([0x7a5a8a, 0x5a7a6a, 0x8a4a5a, 0x4a6a8a]), pants: pick([0x3a3a44, 0x5a4a3a]),
+        accent: 0xffffff, wear: 'apron', pattern: 'floral', shoe: 'shoe',
+        hat: 'bandana', hatCol: pick([SK_RED, SK_BLUE, 0xf0c050, SK_CREAM]),
+        prop: Math.random() < 0.5 ? 'coffeepot' : 'tray', hair: pick(['bun', 'bun', 'bob', 'curly'] as Hair[]),
+      });
+    case 'vancrew':   // the bacon van: white coat, paper hat, a tray for the tower
+      return makePerson(dress, undefined, {
+        shirt: 0xffffff, pants: pick([0x2a2a34, 0x3a4a6a]), accent: pick([SK_RED, SK_BLUE, 0xe4e0d6]),
+        wear: 'apron', shoe: 'shoe', pattern: 'plain', hat: 'toque', prop: 'tray',
+      });
+    case 'guide':
+      // the placard takes the accent, so the sign over a guide's head is the
+      // one white rectangle in a field of colour; the red jacket is for the
+      // conga behind to follow
+      return makePerson(dress, undefined, {
+        shirt: SK_RED, pants: 0x2a2a34, accent: 0xffffff, wear: 'blazer', shoe: 'shoe', pattern: 'plain',
+        hat: Math.random() < 0.3 ? 'cap' : null, hatCol: SK_RED, prop: 'placard', lanyard: true,
+      });
+    case 'tourist':
+      // bright coats and a sunhat on a cold morning: a tourist is the person
+      // dressed for the postcard rather than the field. Three looks — hooded,
+      // open coat, bare-headed — and half carry the camera the look-up flashes
+      return makePerson(dress, undefined, {
+        shirt: pick([0xff8a3a, 0x35d6f0, 0xffd23f, 0xb875ff, 0x7be8b0]), pants: pick(SK_MUD),
+        accent: pick([0xffffff, INK, 0x2a2a34]), wear: pick(['hoodie', 'hoodie', 'open'] as Wear[]),
+        shoe: pick(['shoe', 'boot'] as Shoe[]), pattern: 'plain',
+        hat: Math.random() < 0.5 ? 'sun' : null, hatCol: pick([0xf6e3b8, SK_CREAM, 0x8a7a5a]),
+        hair: pick(['short', 'bob', 'long', 'bun', 'pony', 'curly', 'bald', 'buzz'] as Hair[]),
+        glasses: Math.random() < 0.3, rucksack: Math.random() < 0.4,
+        prop: Math.random() < 0.5 ? 'camera' : undefined,
+      });
+    case 'photographer':   // khaki vest, cap, and the camera never leaves the face
+      return makePerson(dress, undefined, {
+        shirt: 0x8a8a5a, pants: 0x2a2a34, accent: 0x5a5a3a, wear: 'open', shoe: 'boot', pattern: 'plain',
+        hat: 'cap', hatCol: pick([0x4a4a3a, INK]), prop: 'camera', rucksack: Math.random() < 0.5,
+        hair: pick(['short', 'buzz', 'pony', 'bald'] as Hair[]),
+      });
+    case 'ticket':   // the caravan at the gate: navy top to toe, leaflets out
+      return makePerson(dress, undefined, {
+        shirt: 0x1f2a4a, pants: 0x24242e, accent: 0xf0c050, wear: 'blazer', shoe: 'shoe', pattern: 'plain',
+        hat: 'cap', hatCol: 0x1f2a4a, prop: 'leaflets', lanyard: Math.random() < 0.6,
+      });
+    case 'driver': {
+      // a boiler suit is dungarees with the tee the same colour as the bib —
+      // one colour from collar to boot, which is what stops it being a farmer
+      const bs = pick([0xe8702a, SK_BLUE]);
+      return makePerson(dress, undefined, {
+        shirt: bs, pants: bs, accent: bs, wear: 'dungarees', shoe: 'boot', pattern: 'plain',
+        hat: 'cap', hatCol: pick([INK, bs]), prop: 'tape',
+      });
+    }
+    case 'shepherd':   // tweed, a flat cap, and a crook taller than he is
+      return makePerson(dress, undefined, {
+        shirt: 0x7a6a4a, pants: 0x4a4034, accent: 0x5a4a34, wear: 'blazer', shoe: 'boot', pattern: 'plain',
+        hat: 'cap', hatCol: 0x6a5a3a, prop: 'crook', hair: pick(['short', 'bald', 'buzz'] as Hair[]),
+      });
+    case 'spectator':
+      // the bank: muted anoraks, a bobble hat, a hot drink. Deliberately the
+      // dullest people on the field — they are what the balloons are bright
+      // against, and the clap on the look-up cue is what makes them a crowd
+      return makePerson(dress, undefined, {
+        shirt: pick([0x4a7a8a, 0x8a4a5a, 0x5a6a3a, 0x3a4a6a]), pants: pick(SK_MUD),
+        accent: pick([0x2a2a34, 0xffffff, 0xf0c050]), wear: 'hoodie', shoe: pick(['boot', 'shoe'] as Shoe[]),
+        pattern: 'plain', hat: Math.random() < 0.5 ? 'beanie' : null,
+        hatCol: pick([SK_RED, SK_BLUE, 0xf0c050, SK_GREEN, 0x5a5a64]),
+        glasses: Math.random() < 0.25, prop: Math.random() < 0.3 ? 'juice' : undefined,
+      });
+    case 'pym':
+      // MR PYM, the Balloonmeister. White shirt, no hat, glasses, a megaphone:
+      // the only person on the field dressed for an office and the only one
+      // who never moves. The lanyard is the nearest thing in the kit to a tie.
+      // Grey — he has been deciding whether it is safe to fly since before
+      // the whale.
+      return makePerson(dress, undefined, {
+        shirt: 0xffffff, pants: 0x2a2a34, accent: 0x2a2a34, wear: 'tee', shoe: 'shoe', pattern: 'plain',
+        hat: null, glasses: true, lanyard: true, prop: 'horn',
+        hair: pick(['short', 'bald'] as Hair[]), hairCol: pick([0x9a9aa4, 0xe8e2d8, 0x55555f]),
+      });
     default:         // generic holidaymaker in whatever the district wears
       return makePerson(dress, undefined, {
         glasses: Math.random() < 0.35,
@@ -1517,6 +1794,14 @@ const VOICE_OF: Partial<Record<Role, string>> = {
   server: 'diner', baker: 'gossip', gossip: 'gossip', dogwalker: 'gossip',
   booster: 'booster', coach: 'booster', mail: 'booster', camper: 'booster',
   fisher: 'farmer', ballplayer: 'kid',
+  // SKYLARK FIELD — resolve against newsroom_skylark's SKYLARK_VOICE_* pools,
+  // consulted only on skylark, where the module tables are NOT a fallback: an
+  // unknown key is silence, not "bin day tomorrow!". The photographer speaks
+  // as a tourist and the chase driver as crew — neither has enough of its own
+  // to say to earn a pool.
+  crew: 'crew', pilot: 'pilot', marshal: 'marshal', cleaner: 'cleaner', tealady: 'tea',
+  vancrew: 'van', guide: 'guide', tourist: 'tourist', photographer: 'tourist',
+  ticket: 'ticket', driver: 'crew', shepherd: 'shepherd', spectator: 'spectator', pym: 'pym',
 };
 let animalN = 0;
 function makeBuggy(): THREE.Group {
