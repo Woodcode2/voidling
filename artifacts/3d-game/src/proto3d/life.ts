@@ -4371,7 +4371,7 @@ export function createLife(
       };
       const begin = (e: Env) => {
         e.t = 0; e.m.userData.ptsMult = 1.5;   // worth more while it is saying goodbye
-        if (e.stage === 2 || e.stage === 4) {
+        if (e.stage === 1 || e.stage === 2 || e.stage === 4) {
           e.m.geometry = e.stage === 4 ? (whaleGeo ??= (SKF.skWhaleStanding() as THREE.Mesh).geometry) : standing(e.cols);
           e.m.scale.y = 0.12; e.phase = 1;
         } else { e.phase = 2; fire(e); }
@@ -4383,7 +4383,12 @@ export function createLife(
       const candidate = (px: number, pz: number, outward: boolean): Env | null => {
         let best: Env | null = null, bs = Infinity;
         for (const e of envs) {
-          if (e.phase !== 0 || e.keep || (e.stage !== 2 && e.stage !== 3) || eaten(e.m) || e.m.userData.departed) continue;
+          // one at a time it is cold or standing envelopes; the cascade after
+          // the whale takes the spilled ones too (they inflate like a cold
+          // one) — measured, the cascade ran out of candidates at 23 airborne
+          // against a bar of 35 because 55 spilled envelopes never qualified
+          if (e.phase !== 0 || e.keep || eaten(e.m) || e.m.userData.departed) continue;
+          if (e.stage !== 2 && e.stage !== 3 && !(outward && e.stage === 1)) continue;
           const d = Math.hypot(e.m.position.x - px, e.m.position.z - pz);
           const s = outward ? d : Math.abs(d - 40) + (e.stage === 2 ? (picks % 3 === 2 ? -14 : 14) : 0);
           if (s < bs) { bs = s; best = e; }
@@ -4426,7 +4431,7 @@ export function createLife(
           const w = envs.find((e) => e.stage === 4);
           const c = candidate(w ? w.m.position.x : vx, w ? w.m.position.z : vz, true);
           if (c) begin(c);
-          cascadeAt = mt + 0.4;
+          cascadeAt = mt + 0.3;
         }
         let lit: Env | null = null, litK = 0;
         for (const e of envs) {
@@ -4446,10 +4451,15 @@ export function createLife(
           } else if (e.phase === 2) {
             // the telegraph: a second pulse 1.5 s after the first (a third for
             // the whale), and eight seconds from the first pulse to the ground
-            // letting go
-            if (e.t >= 1.5 && e.t - dt < 1.5) fire(e);
-            if (e.stage === 4 && e.t >= 4.5 && e.t - dt < 4.5) fire(e);
-            if (e.t >= 8) {
+            // letting go. MEASURED ON THE SAME CLOCK AS THE PROMISE: a standing
+            // envelope enters this phase in begin(), after this frame's mt has
+            // already advanced, so its phase clock ran one frame behind the
+            // timestamp and qa/ascension.mjs bar D read 9 of 22 departures at
+            // 7.9x seconds. The lift now reads mt against telegraphAt directly.
+            const since = mt - ((m.userData.balloon as { telegraphAt?: number }).telegraphAt ?? mt);
+            if (since >= 1.5 && since - dt < 1.5) fire(e);
+            if (e.stage === 4 && since >= 4.5 && since - dt < 4.5) fire(e);
+            if (since >= 8) {
               e.phase = 3; e.t = 0; e.vy = 0; e.nextPulse = rand(5, 9); fire(e);
               (m.userData.balloon as { departAt?: number }).departAt = mt;
               if (discN < DISC_CAP) e.disc = discN++;
