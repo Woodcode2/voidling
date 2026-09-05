@@ -5711,7 +5711,13 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const p2: SK.Pt = [SK.LAUNCH.cx + dx, SK.LAUNCH.cy + dy];
       const m = mk === 0 ? SKF.skInflatorFan() : mk === 1 ? SKF.skTrailer()
         : mk === 2 ? SKF.skCylinderPair() : SKF.skCrownLine();
-      drop(m, p2, mk === 1 ? 2.0 : 0.9, layoutYaw(), false, mk === 1 ? 'car' : 'small');
+      // FORCED, like the whale: these four sit inside the launch circle by
+      // design, and the circle is exactly what skPlaceable() forbids. With
+      // force=false every one of them was silently rejected (density survey:
+      // "the whale's ground crew, 0 of 4"), so she lay on bare concrete with no
+      // fan, no trailer, no bottles and no crown line — a hero with no crew.
+      m.userData.kind = 'whalekit';   // QA: qa/_skcensus.mjs counts what actually landed
+      drop(m, p2, mk === 1 ? 2.0 : 0.9, layoutYaw(), true, mk === 1 ? 'car' : 'small');
     }
 
     // 2. THE LAUNCH FIELD — the hero district and the densest lawn in the game.
@@ -5809,7 +5815,8 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       // PASS TWO — the crew's kit, filling in around what is already standing
       const kit = (mk: () => THREE.Object3D, p2: SK.Pt, r: number, yaw: number) => {
         if (!SK.skPlaceable(p2[0], p2[1], 15)) return;
-        drop(mk(), p2, r, yaw, false, 'small', r + 0.9);
+        const m = mk(); m.userData.kind = 'crewkit';   // QA: counted by qa/_skcensus.mjs
+        drop(m, p2, r, yaw, false, 'small', r + 0.9);
       };
       for (const { p: p2, stage } of nodes) {
         if (stage >= 1) kit(() => SKF.skBasket(), [p2[0] - vx * 190, p2[1] - vy * 190], 0.9, layoutYaw());
@@ -5868,7 +5875,9 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       rig.forEach((p2, i) => {
         const cols = env();
         const stage = i % 2;
-        drop(tagBalloon(stage === 0 ? SKF.skBalloonSpilled(cols) : SKF.skBalloonCold(cols), stage + 1, cols),
+        const m = stage === 0 ? SKF.skBalloonSpilled(cols) : SKF.skBalloonCold(cols);
+        m.userData.kind = 'rig';
+        drop(tagBalloon(m, stage + 1, cols),
           p2, stage === 0 ? 5.2 : 4.6, layoutYaw(), false, 'big', stage === 0 ? 11.0 : 10.5);
       });
     }
@@ -5955,11 +5964,21 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     //    because a row of food vans is a row and every errand in this world
     //    ends at one of them.
     {
-      const R = REG('breakfast');
-      const ux = Math.sin((30 * Math.PI) / 180), uy = -Math.cos((30 * Math.PI) / 180);
-      let cx = 0, cy = 0;
-      for (const [px, py] of R.poly) { cx += px; cy += py; }
-      cx /= R.poly.length; cy /= R.poly.length;
+      // ── THE ROW IS WHERE THE GROUND IS, NOT WHERE THE POLYGON'S MIDDLE IS ──
+      // This row was laid along 030 through the district's centroid, and the
+      // centroid is on excluded ground: the breakfast polygon straddles the
+      // perimeter track and leans on 03/21, so 57% of it is unplaceable for a
+      // van (qa/_skbrk.mjs). Three of four vans were silently rejected — the
+      // density survey's "BREAKFAST ROW (1 van of 4)" — and the errand every
+      // person on this world ends at had one destination. Replayed every
+      // heading, pitch and anchor against the real geometry (qa/_skbrk2.mjs):
+      // the only fully legal rows run on 120-130 degrees, and the one with
+      // margin is heading 130, pitch 280, anchored at 7520,5020 — the row can
+      // shift 40 units either way and every seat still clears drop()'s own
+      // 71-unit rule. So that is where the row is.
+      const deg = (130 * Math.PI) / 180;
+      const ux = Math.sin(deg), uy = -Math.cos(deg);
+      const cx = 7520, cy = 5020;
       const vans = [
         () => SKF.skBaconVan(0xe8e2d0, 0xd8443a),
         () => SKF.skCoffeeHorsebox(),
@@ -5967,9 +5986,9 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         () => SKF.skDoughnutTrailer(),
       ];
       vans.forEach((mk, i) => {
-        const p2: SK.Pt = [cx + ux * (i - 1.5) * 320, cy + uy * (i - 1.5) * 320];
-        if (!SK.skPlaceable(p2[0], p2[1], 40)) return;
-        drop(mk(), p2, 2.1, layoutYaw() + Math.PI / 2, false, 'car');
+        const p2: SK.Pt = [cx + ux * (i - 1.5) * 280, cy + uy * (i - 1.5) * 280];
+        const m = mk(); m.userData.kind = 'van';
+        drop(m, p2, 2.1, deg + Math.PI / 2 + (rnd2() - 0.5) * 0.2, false, 'car');
       });
     }
     for (const p2 of SK.scatterInRegion(REG('breakfast'), 16, rnd2, 150, { sep: 9.0 })) {
@@ -6054,13 +6073,24 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
           drop(m, p2, 0.4, rnd2() * Math.PI * 2, false, 'small');
         }
         // the spectator band, just outside the track, facing the field
-        if (true) {
+        // OUTSIDE THE TRACK WHERE THERE IS LAND, INSIDE WHERE THERE IS NOT. The
+        // track runs close to the coast for half its length: replayed against
+        // the geometry (qa/_skmiss.mjs), 260 units outside clears the rules on
+        // 15 of 30 segments and 260 inside on the other 15 — so a car that
+        // cannot park outside parks inside, facing the field either way, and
+        // the band is a band rather than one car (density survey: "1 car of
+        // 30"). drop()'s own clearance is the one that binds (58 world units
+        // for a 1.7 prop), so it is the one asked here.
+        {
           const mx = (x1 + x2) * 0.5, my = (y1 + y2) * 0.5;
           const inx = 6000 - mx, iny = 6000 - my, il = Math.hypot(inx, iny) || 1;
-          const p2: SK.Pt = [mx - (inx / il) * 260, my - (iny / il) * 260];
-          if (SK.onSkylarkLand(p2[0], p2[1]) && SK.skPlaceable(p2[0], p2[1], 20)) {
-            drop(SKF.skSpectatorCar(pick([0x8ea3c4, 0xc4a08e, 0x9ec4a0, 0xd0d0c8])), p2, 1.7,
-              Math.atan2(inx, iny), false, 'car', 2.4);
+          for (const side of [-1, 1]) {
+            const p2: SK.Pt = [mx + (inx / il) * 260 * side, my + (iny / il) * 260 * side];
+            if (!SK.onSkylarkLand(p2[0], p2[1]) || !SK.skPlaceable(p2[0], p2[1], 58)) continue;
+            const car = SKF.skSpectatorCar(pick([0x8ea3c4, 0xc4a08e, 0x9ec4a0, 0xd0d0c8]));
+            car.userData.kind = 'spectator';
+            drop(car, p2, 1.7, Math.atan2(inx, iny) + (side > 0 ? Math.PI : 0), false, 'car', 2.4);
+            break;
           }
         }
       }
