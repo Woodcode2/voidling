@@ -5619,6 +5619,9 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // a departure is attributable. stage: 0 bagged, 1 spilled, 2 cold,
     // 3 standing, 4 the whale.
     let balloonId = 0;
+    /** a destination for the cast (life.ts walks to these by kind) — set on
+     *  userData rather than replacing it, because noFront() lives there too */
+    const kinded = <T extends THREE.Object3D>(m: T, kind: string): T => { m.userData.kind = kind; return m; };
     const tagBalloon = <T extends THREE.Object3D>(mesh: T, stage: number, cols?: [number, number, number]): T => {
       mesh.userData.balloon = { id: balloonId++, stage, cols };
       return mesh;
@@ -5869,11 +5872,15 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       for (let i = -4; i <= 4; i++) {
         const p2: SK.Pt = [cx + vx * i * 300, cy + vy * i * 300];
         if (!SK.pointInPoly(p2[0], p2[1], R.poly) || !SK.skPlaceable(p2[0], p2[1], 40)) continue;
-        drop(SKF.skTrailer(), p2, 2.0, layoutYaw(), false, 'car');
+        const tr = SKF.skTrailer(); tr.userData.kind = 'trailer';   // the chase drivers' A (life.ts)
+        drop(tr, p2, 2.0, layoutYaw(), false, 'car');
         const b: SK.Pt = [p2[0] + ux * 200, p2[1] + uy * 200];
         drop(tagBalloon(SKF.skBalloonBagged(env()), 0), b, 1.4, layoutYaw(), false, 'big');
       }
-      drop(SKF.skTicketCaravan(), [cx + ux * 600, cy + uy * 600], 1.6, layoutYaw() + Math.PI / 2, false, 'house', 4.2);
+      {   // the cast's destinations carry a kind: life.ts's ticket sellers walk caravan <-> gate
+        const cv = SKF.skTicketCaravan(); cv.userData.kind = 'caravan';
+        drop(cv, [cx + ux * 600, cy + uy * 600], 1.6, layoutYaw() + Math.PI / 2, false, 'house', 4.2);
+      }
       // and the crews already rigging: envelopes spilled out on the wet grass,
       // laid on the same 030 as everything else on this field
       // the sweep is wider than the field on purpose — pointInPoly and
@@ -5920,8 +5927,10 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       let cx = 0, cy = 0;
       for (const [px, py] of R.poly) { cx += px; cy += py; }
       cx /= R.poly.length; cy /= R.poly.length;
-      drop(SKF.skControlTower(), [cx, cy], 4.2, SK.skFacingCircle(cx, cy), true, 'big');
-      drop(SKF.skMetHut(), [cx - 420, cy + 300], 0.8, rnd2() * Math.PI * 2, false, 'small');
+      const tower = SKF.skControlTower(); tower.userData.kind = 'tower';   // Mr Pym's balcony (life.ts)
+      drop(tower, [cx, cy], 4.2, SK.skFacingCircle(cx, cy), true, 'big');
+      const hut = SKF.skMetHut(); hut.userData.kind = 'methut';
+      drop(hut, [cx - 420, cy + 300], 0.8, rnd2() * Math.PI * 2, false, 'small');
       drop(SKF.skBriefingCaravan(), [cx + 480, cy + 260], 2.0, layoutYaw(), false, 'house', 4.2);
       drop(SKF.skFlagpole(), [cx - 300, cy - 420], 0.5, 0, false, 'small');
       drop(SKF.skWindsock(), [cx + 520, cy - 380], 0.5, 0, false, 'small');
@@ -6026,7 +6035,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     for (const p2 of SK.scatterInRegion(REG('breakfast'), 180, rnd2, 40, { sep: 1.5 })) {
       const k = rnd2();
       const m = k < 0.34 ? SKF.skPicnicBench() : k < 0.60 ? SKF.skStrawBale()
-        : k < 0.76 ? SKF.skWheelieBin() : k < 0.90 ? SKF.skTussock() : SKF.skSpectatorCar();
+        : k < 0.76 ? kinded(SKF.skWheelieBin(), 'bin') : k < 0.90 ? SKF.skTussock() : SKF.skSpectatorCar();
       drop(m, p2, k < 0.90 ? 0.75 : 1.7, layoutYaw(), false, k < 0.90 ? 'small' : 'car');
     }
 
@@ -6070,7 +6079,8 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
           const off = (half + 180 + rnd2() * 320) * side;
           const p2: SK.Pt = [a[0] + ux * d - uy * off, a[1] + uy * d + ux * off];
           if (!SK.skPlaceable(p2[0], p2[1], 20)) continue;
-          drop(SKF.skSheep(), p2, 0.55, rnd2() * Math.PI * 2, false, 'small');
+          const sheep = SKF.skSheep(); sheep.userData.kind = 'sheep';   // the shepherd walks at these (life.ts)
+          drop(sheep, p2, 0.55, rnd2() * Math.PI * 2, false, 'small');
         }
       }
     }
