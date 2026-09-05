@@ -661,6 +661,14 @@ const ENV_GAIN = 1.0;   // gradient level, tuned to the room box's mean radiance
 }
 const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 1000);
 let camDist = 50;
+// THE LOOK-UP. The play camera's top edge sits 30-50 degrees BELOW the horizon
+// at every radius (sky survey, brief §3B), so a sky full of balloons is never
+// in frame on its own. Once a match, at the moment SKYLARK FIELD's whale
+// leaves the ground, the camera tilts up for four seconds — the look target
+// rises 18 units and the offset flattens to ~30 degrees — and the child sees
+// the horizon and everything that went up before her. Armed by the 'whale'
+// beat twelve seconds ahead, which is when life.ts lifts her.
+let lookUpAt = -1, lookUpT = -1;
 // ── THE CAMERA'S VOICE ─────────────────────────────────────────────────────
 // camera.fov was a literal 32, set once at construction and never written
 // again — no event in a three-minute match reached the lens (AAA-BRIEF §4.2,
@@ -5794,6 +5802,7 @@ function beginMatch(solo = false) {
   // hidden, drum quiet). AFTER the restore loop un-hides everything —
   // resetMatch ends by calling into here, so this covers both entry paths.
   life.cue('match');
+  lookUpAt = -1; lookUpT = -1;
   drumCueT = 0; clearBeatLoot();
   feverMult = 1; feverT = 0; lastR = voidling.radius; matchEaten = 0; signedOn = false;
   // ── THE HERO WAS ASLEEP BEFORE THE MATCH BEGAN ────────────────────────────
@@ -8965,6 +8974,7 @@ function animate() {
           // costs nothing; qa/beattruth.mjs now fails on any cue that reaches
           // nobody.
           if (bt.cue) life.cue(bt.cue, voidState.x, voidState.z);
+          if (bt.cue === 'whale') lookUpAt = matchElapsed() + 12;   // she lifts twelve seconds after the card
           if (bt.cue === 'treasure') spawnBeatTreasure();
           else if (bt.cue === 'drum') {
             drumCueT = bt.dur; drumThump = 0;
@@ -9886,11 +9896,20 @@ function animate() {
       introHZ = (COPY.hero[1] - voidState.z) * e;
     } else { introHX = 0; introHZ = 0; }
     if (outroT > 0) targetDist *= 0.72;   // end-of-match push-in on the winner moment
+    // the look-up: 1 s in, 3 s hold, 1 s out, smoothed at both ends
+    if (lookUpAt >= 0 && started && !ended && matchElapsed() >= lookUpAt) { lookUpT = 0; lookUpAt = -1; }
+    let lk = 0;
+    if (lookUpT >= 0) {
+      lookUpT += dt;
+      const raw = lookUpT < 1 ? lookUpT : lookUpT < 4 ? 1 : lookUpT < 5 ? 5 - lookUpT : -1;
+      if (raw < 0) lookUpT = -1; else lk = raw * raw * (3 - 2 * raw);
+    }
+    targetDist *= 1 + 0.15 * lk;
     camDist += (targetDist - camDist) * (1 - Math.exp(-1.6 * dt));
     // steepen the camera as the void grows (hole.io): big hole ⇒ near-top-down,
     // so towers and trees stop hiding the hero
     const steep = THREE.MathUtils.clamp((R - 2.5) / 5.5, 0, 1);
-    camOffset.set(0.62 + (0.45 - 0.62) * steep, 0.92 + (1.4 - 0.92) * steep, 0.62 + (0.45 - 0.62) * steep).normalize();
+    camOffset.set(0.62 + (0.45 - 0.62) * steep, 0.92 + (1.4 - 0.92) * steep - 0.45 * lk, 0.62 + (0.45 - 0.62) * steep).normalize();
     // LOOKAHEAD: frame the ground AHEAD of travel — a steer-to-eat game gives
     // the pixels to where you're going, the void rides slightly behind center
     // …off SMOOTHED ACTUAL DISPLACEMENT, never off velX/velZ. Those are the
@@ -9935,7 +9954,7 @@ function animate() {
     // stateless: it is added on the way to the GPU and gone next frame.
     camFollow.lerp(tmpV, 1 - Math.exp(-5.0 * dt));
     camera.position.copy(camFollow);
-    camera.lookAt(lookX, R * 0.5, lookZ);
+    camera.lookAt(lookX, R * 0.5 + 18 * lk, lookZ);
     // the lens punch: widen, then spring home on WALL time (a punch that
     // freezes with hit-stop reads as a glitch, not an impact)
     if (kitCd > 0) kitCd -= dtRaw;
