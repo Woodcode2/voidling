@@ -5813,15 +5813,30 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         drop(mesh, p2, r, layoutYaw(), false, 'big', claim);
       }
       // PASS TWO — the crew's kit, filling in around what is already standing
+      // ── THE KIT GOES IN THE GAPS, AND THE GAPS ARE MEASURED ──────────────
+      // These offsets (190 across, 230 along) were authored for the old
+      // 340x420 grid and never revisited when the pitch tightened to 250x238:
+      // 230 along is 20 units short of the NEXT node, so spotOpen refused
+      // nearly every fan and bottle, and the survey counted 36 of 176 kit
+      // items on the field. A standing envelope's dome is 4.6 in radius (184
+      // world across); at this pitch the gap between two domes is 66 world
+      // along and 54 across, and the MIDPOINTS — 125 along, 119 across — sit
+      // 27-33 world (1.35-1.65 units) clear of either dome's edge, which a
+      // basket (0.8 half-width), a fan (0.68) or a bottle pair (0.5) all
+      // fit inside with room. So the kit stands at the midpoints, asks the
+      // runway rule itself, and is forced past spotOpen — whose inflated
+      // balloon claims (12.5 for a 6.8 footprint, to keep tether pins out of
+      // skirts) would otherwise keep a crew's own basket out of its crew.
+      // The claim is still made, so the small-kit scatter below keeps clear.
       const kit = (mk: () => THREE.Object3D, p2: SK.Pt, r: number, yaw: number) => {
-        if (!SK.skPlaceable(p2[0], p2[1], 15)) return;
+        if (!SK.skPlaceable(p2[0], p2[1], 30)) return;
         const m = mk(); m.userData.kind = 'crewkit';   // QA: counted by qa/_skcensus.mjs
-        drop(m, p2, r, yaw, false, 'small', r + 0.9);
+        drop(m, p2, r, yaw, true, 'small', r + 0.9);
       };
       for (const { p: p2, stage } of nodes) {
-        if (stage >= 1) kit(() => SKF.skBasket(), [p2[0] - vx * 190, p2[1] - vy * 190], 0.9, layoutYaw());
-        if (stage >= 2) kit(() => SKF.skInflatorFan(), [p2[0] + ux * 230, p2[1] + uy * 230], 0.8, layoutYaw() + Math.PI);
-        if (stage === 3) kit(() => SKF.skCylinderPair(), [p2[0] - ux * 210, p2[1] - uy * 210], 0.6, rnd2() * Math.PI * 2);
+        if (stage >= 1) kit(() => SKF.skBasket(), [p2[0] + vx * 119, p2[1] + vy * 119], 0.9, layoutYaw());
+        if (stage >= 2) kit(() => SKF.skInflatorFan(), [p2[0] + ux * 125, p2[1] + uy * 125], 0.8, layoutYaw() + Math.PI);
+        if (stage === 3) kit(() => SKF.skCylinderPair(), [p2[0] - vx * 119, p2[1] - vy * 119], 0.6, rnd2() * Math.PI * 2);
       }
     }
     // the launch field's own small stuff, scattered between the rows
@@ -5866,10 +5881,19 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       // corners the old +/-5/+/-4 could not reach. The launch field's grid
       // going legal cost the world a dozen envelopes; this is where they come
       // back, and they come back somewhere a real meet actually rigs.
+      // ── THE GRID'S TWO AXES MUST BE PERPENDICULAR, AND THEY WERE NOT ─────
+      // When the trailer row above was re-aimed at the whale (30730b1), this
+      // grid inherited its `ux,uy` (toward the whale) while keeping `vx,vy`
+      // (east-west): a 138-degree frame, so a node and its staggered
+      // neighbour in the next row sat 204 world units apart — 10.2 3D, for
+      // envelopes 10.6 long. qa/placement.mjs measured five of them
+      // interpenetrating by up to 1.5. The across axis is now the true
+      // perpendicular: 250 along, 280 across, 306 on the diagonal.
+      const rvx = -uy, rvy = ux;
       const rig: SK.Pt[] = [];
       for (let i = -8; i <= 8; i++) for (let j = -7; j <= 7; j++) {
-        const p2: SK.Pt = [cx + ux * (i * 250 + (j % 2 ? 125 : 0)) + vx * j * 280,
-          cy + uy * (i * 250 + (j % 2 ? 125 : 0)) + vy * j * 280];
+        const p2: SK.Pt = [cx + ux * (i * 250 + (j % 2 ? 125 : 0)) + rvx * j * 280,
+          cy + uy * (i * 250 + (j % 2 ? 125 : 0)) + rvy * j * 280];
         if (SK.pointInPoly(p2[0], p2[1], R.poly) && SK.skPlaceable(p2[0], p2[1], 130)) rig.push(p2);
       }
       rig.forEach((p2, i) => {
@@ -5988,7 +6012,11 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       vans.forEach((mk, i) => {
         const p2: SK.Pt = [cx + ux * (i - 1.5) * 280, cy + uy * (i - 1.5) * 280];
         const m = mk(); m.userData.kind = 'van';
-        drop(m, p2, 2.1, deg + Math.PI / 2 + (rnd2() - 0.5) * 0.2, false, 'car');
+        // authored: the runway rule is asked here (every seat clears it by 40),
+        // and spotOpen is not — the arrivals scatter runs first and a tussock
+        // at the district edge cost the row its fourth seat (census: 3 of 4)
+        if (!SK.skPlaceable(p2[0], p2[1], 71)) return;
+        drop(m, p2, 2.1, deg + Math.PI / 2 + (rnd2() - 0.5) * 0.2, true, 'car');
       });
     }
     for (const p2 of SK.scatterInRegion(REG('breakfast'), 16, rnd2, 150, { sep: 9.0 })) {
@@ -6081,16 +6109,19 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         // the band is a band rather than one car (density survey: "1 car of
         // 30"). drop()'s own clearance is the one that binds (58 world units
         // for a 1.7 prop), so it is the one asked here.
-        {
-          const mx = (x1 + x2) * 0.5, my = (y1 + y2) * 0.5;
-          const inx = 6000 - mx, iny = 6000 - my, il = Math.hypot(inx, iny) || 1;
+        // …and a car parks where the segment lets it: five stations along the
+        // segment, outside first, then inside. Replayed (qa/_skspec.mjs): the
+        // midpoint alone hosts 15 of 30; with the stations, 29 of 30.
+        seat: for (const t of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+          const bx = x1 + (x2 - x1) * t, by = y1 + (y2 - y1) * t;
+          const inx = 6000 - bx, iny = 6000 - by, il = Math.hypot(inx, iny) || 1;
           for (const side of [-1, 1]) {
-            const p2: SK.Pt = [mx + (inx / il) * 260 * side, my + (iny / il) * 260 * side];
+            const p2: SK.Pt = [bx + (inx / il) * 260 * side, by + (iny / il) * 260 * side];
             if (!SK.onSkylarkLand(p2[0], p2[1]) || !SK.skPlaceable(p2[0], p2[1], 58)) continue;
             const car = SKF.skSpectatorCar(pick([0x8ea3c4, 0xc4a08e, 0x9ec4a0, 0xd0d0c8]));
             car.userData.kind = 'spectator';
             drop(car, p2, 1.7, Math.atan2(inx, iny) + (side > 0 ? Math.PI : 0), false, 'car', 2.4);
-            break;
+            break seat;
           }
         }
       }
