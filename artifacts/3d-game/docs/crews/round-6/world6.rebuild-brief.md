@@ -241,7 +241,23 @@ deleted. A number nobody reads is a lie waiting to be believed.
 
 ### 3B. THE SKY — the ascension, which is the level
 
-> **IN PROGRESS — resume point.** Commit `570d53b` lands the third state:
+> **RESUME POINT (latest, 73df917).** Built and measured so far: third
+> state (bar A passes), the controller (`442fb47`), the look-up
+> (`7556807`), the clock fix (`d1d045e`), departure spacing by leaving
+> time (`73df917`). Two full `qa/ascension.mjs` runs: A ok; B ok at 1:00 (5),
+> 1:30 (9), 2:28 (18), 2:40 (20); C ok; **B at 3:00 = 23 against 35 in both
+> runs, and the numbers say the whale never lifts, so the cascade never
+> starts** — `qa/_whale.mjs` (fires the cue by hand at t>3, watches her 14 s,
+> reads `window.__asc`) is written and NOT yet run; suspects: the lying mesh
+> is `!visible` (LOD/fade) at the cue so `eaten()` refuses her, or the cue
+> never reaches the listener. D's "wave" is fixed in code, unmeasured. THE
+> CAST is in (`bdb243a`) and **`qa/jobs.mjs` PASSES: 542 people, 100% in a
+> role, 73% of adults carrying a prop**; `qa/purpose.mjs`, the lookbook shot
+> and four skeptics (workflow wf_d12323f9-c51) were in flight. Next in
+> order: run `_whale.mjs`, fix, full ascension run, register `ascension` and
+> `jobs` in `qa/gate.mjs`, then the ground (3C), beats (3E), art (3F).
+>
+> **Earlier resume point.** Commit `570d53b` lands the third state:
 > every envelope tagged `userData.balloon = { id, stage }`, `departed` leaves
 > both sides of `devouredPct`, `capture()` and every target loop refuse a
 > departed balloon, `window.__depart(n)` + `__matchState().devouredPct /
