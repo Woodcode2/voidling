@@ -5431,7 +5431,7 @@ const moments = { firstBuilding: false, firstCar: false, firstRunner: false, hal
 let countTick = 0;
 const floatPos = new THREE.Vector3();
 function capture(e: Edible, giveHunger = true) {
-  if (e.mesh.userData.departed) return;   // the sky is not on the menu — third state (brief §3B)
+  if (e.mesh.userData.departed || e.mesh.userData.tethered) return;   // the sky is not on the menu, and neither is a pegged-down whale (brief §3B)
   const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
   const d = Math.hypot(dx, dz) || 1;
   e.eaten = true; e.t = 0; e.orbit = Math.atan2(dz, dx);
@@ -5713,7 +5713,7 @@ function fireGulp() {
   hunger -= COST.gulp; powerCd = 0.5;
   const R = voidling.radius, reach = R * 8;
   for (const e of edibles) {
-    if (e.eaten || !e.mesh.visible || e.mesh.userData.departed || e.radius > R * EAT_RATIO) continue;
+    if (e.eaten || !e.mesh.visible || e.mesh.userData.departed || e.mesh.userData.tethered || e.radius > R * EAT_RATIO) continue;
     const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     const d = Math.hypot(dx, dz); if (d > reach) continue;
     if ((dx / (d || 1)) * aim.x + (dz / (d || 1)) * aim.z > 0.2) capture(e, false);   // forward cone
@@ -5728,7 +5728,7 @@ function fireCollapse() {
   hunger -= COST.collapse; powerCd = 1.2;
   const R = voidling.radius, reach = R * 16;
   for (const e of edibles) {
-    if (e.eaten || !e.mesh.visible || e.mesh.userData.departed || e.radius > R * 2.5) continue;   // COLLAPSE devours even big things
+    if (e.eaten || !e.mesh.visible || e.mesh.userData.departed || e.mesh.userData.tethered || e.radius > R * 2.5) continue;   // COLLAPSE devours even big things
     const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     if (Math.hypot(dx, dz) < reach) capture(e, false);
   }
@@ -9236,7 +9236,7 @@ function animate() {
         let best: Edible | null = null, bd = Infinity;
         const Rh = voidling.radius;
         for (const e of edibles) {
-          if (e.eaten || !e.mesh.visible || e.mesh.userData.departed || e.radius > Rh * EAT_RATIO) continue;
+          if (e.eaten || !e.mesh.visible || e.mesh.userData.departed || e.mesh.userData.tethered || e.radius > Rh * EAT_RATIO) continue;
           const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
           const d = dx * dx + dz * dz;
           if (d < bd) { bd = d; best = e; }
@@ -9752,7 +9752,7 @@ function animate() {
       }
       continue;
     }
-    if (!e.mesh.visible || e.mesh.userData.eaten || e.mesh.userData.departed) continue;   // a rival owns it — never double-eat; a departed balloon is the sky's
+    if (!e.mesh.visible || e.mesh.userData.eaten || e.mesh.userData.departed || e.mesh.userData.tethered) continue;   // a rival owns it — never double-eat; a departed balloon is the sky's; a tethered one is pegged down
     const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     const d = Math.hypot(dx, dz);
     const reach = R * 2.0 + e.radius * 2.4;

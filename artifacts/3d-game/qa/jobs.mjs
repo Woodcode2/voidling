@@ -54,7 +54,7 @@ const c = await p.evaluate(() => {
     if (role) { out.roled++; out.roles[role] = (out.roles[role] || 0) + 1; }
     else out.unroled[dist] = (out.unroled[dist] || 0) + 1;
     (out.byDistrict[dist] ||= {})[role || '(none)'] = ((out.byDistrict[dist] ||= {})[role || '(none)'] || 0) + 1;
-    if (!u.kid) { out.adults++; if (u.prop || u.propL) out.adultsWithProp++; }
+    if (u.role !== 'kid') { out.adults++; if (u.prop || u.propL) out.adultsWithProp++; }   // nothing stamps userData.kid; the role does
   }
   return out;
 });

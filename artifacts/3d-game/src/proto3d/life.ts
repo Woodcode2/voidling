@@ -974,7 +974,7 @@ const LN_PAPER = 0xd8cdb6;
 // the trouser pool is mud-coloured on purpose — the first pass used Maple's
 // blues and the field looked like a school trip, not a workforce at six a.m.
 const SK_BLUE = 0x2f6fd0, SK_RED = 0xd8443a, SK_GREEN = 0x3a9a5a;
-const SK_CREW = [SK_BLUE, SK_RED, SK_GREEN];
+const SK_CREW = [SK_RED, SK_BLUE, SK_GREEN];
 const SK_HIVIS = 0xffd23f, SK_ORANGE = 0xff7a1a, SK_CREAM = 0xf0e6d2;
 const SK_MUD = [0x2a2a34, 0x3a4a6a, 0x4a4034, 0x5a5a64];
 const OUTFIT: Record<string, Fit> = {
@@ -1344,7 +1344,7 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
   // what the right hand carries, by name. The geometry is welded into the arm
   // by now, so this is the only way the runtime can tell a camera from a
   // clipboard — the look-up (addWanderer) fires a flash on one and not the other.
-  g.userData.prop = o?.prop;
+  if (o?.prop) g.userData.prop = o.prop;   // only when there is one: every other world's userData stays byte-identical
   return g;
 }
 
@@ -1699,7 +1699,7 @@ function castFor(role: Role, dress: string, side?: number): THREE.Group {
       // kids do not follow
       return makePerson(dress, undefined, {
         shirt: 0xf2c623, pants: SK_BLUE, accent: 0xf2c623, wear: 'dungarees', shoe: 'boot', pattern: 'plain',
-        hat: null, prop: Math.random() < 0.5 ? 'bubblewand' : 'broom', propL: 'bucket',
+        hat: null, prop: side === 1 ? 'broom' : 'bubblewand', propL: 'bucket',   // side 1 sweeps (mode 8); the wand half blows bubbles
       });
     case 'tealady':   // a white apron over a floral dress, a headscarf, the urn's pot
       return makePerson(dress, undefined, {
@@ -2438,7 +2438,7 @@ const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
 // disc is swap-removed and the draw range shrinks; nothing is ever "hidden" by
 // parking it under the ground. Built on the first emit, so the five worlds
 // without a cleaner never allocate it.
-const SOAP_MAX = 64;
+const SOAP_MAX = 128;
 let _softDisc: THREE.CanvasTexture | null = null;
 /** a white disc with a bright rim and a soft edge — shared by the bubbles and
  *  the camera flash. A plain fade-out read as fog at 32 px; the rim is what
@@ -3046,14 +3046,14 @@ export function createLife(
   // 90-second match standing in interior water, one of them 6 units from the
   // river centreline for 21 seconds straight.
   const wet = (x: number, z: number, m: number) => WID === 'maple' && inWater3(x, z, m);
-  function addWanderer(mesh: THREE.Object3D, hx: number, hz: number, tether: number, base: number, fear: number, radius: number, biome: string, panicLines?: string[], voice?: string, leg?: number, paceMul = 1, stops?: [number, number][]) {
+  function addWanderer(mesh: THREE.Object3D, hx: number, hz: number, tether: number, base: number, fear: number, radius: number, biome: string, panicLines?: string[], voice?: string, leg?: number, paceMul = 1, stops?: [number, number][], face?: number) {
     if (!biomeAt(hx, hz) || wet(hx, hz, 8)) return;   // don't spawn anyone off the coastline, or in the water
     // …and nobody lives on the void's opening square. The owner's report was
     // "he starts on top of a person": this is the single choke point every
     // walking person in both worlds goes through, so one test covers the lot.
     // They can still WANDER in later — by then the player has moved.
     if (nearSpawn(hx, hz)) return;
-    let ang = rand(0, Math.PI * 2), hop = 0, fled = false, slideT = 0;
+    let ang = face !== undefined ? Math.PI / 2 - face : rand(0, Math.PI * 2), hop = 0, fled = false, slideT = 0;
     // MARGIN TEST, HOISTED. The step must keep the WHOLE body on land, not just
     // the center — a ped standing with its center on the cliff lip reads broken.
     // This lived inside update(), so every walking person in the world built a
@@ -3233,7 +3233,7 @@ export function createLife(
               // void outranks the balloon by branch order, as it does the errand.
               spd = 0;
             } else if (!errand) {
-              ang += rand(-1, 1) * dt * 3;
+              if (base > 0) ang += rand(-1, 1) * dt * 3;   // a rooted person (base 0) keeps the heading they were given
               const hd = Math.hypot(mesh.position.x - hx, mesh.position.z - hz);
               if (hd > tether) ang = Math.atan2(hz - mesh.position.z, hx - mesh.position.x);
             } else if (dwell > 0) {
@@ -3304,6 +3304,12 @@ export function createLife(
         // between stops, and the sweeping / camera / serving pose takes over the
         // moment the errand loop stands the person still
         const dnc = dnc0 && dnc0.atDwell && !(dwell > 0 && spd === 0) ? undefined : dnc0;
+        if (dnc0 && dnc0.atDwell && !dnc && limbs) {
+          // between stops the walk cycle writes only head.y — the pose's pitch
+          // and lean would otherwise ride along (skeptic: a photographer
+          // walking with the head tilted back 0.5 rad)
+          limbs.head.rotation.x = 0; limbs.torso.rotation.x = 0; limbs.torso.rotation.z = 0;
+        }
         // ── SKYLARK: THE LOOK-UP ─────────────────────────────────────────
         // `lookT` is set by the 'lift'/'telegraph' cue on everybody within 40
         // units. While it runs the walker is held (above), the head goes back
@@ -4896,18 +4902,21 @@ export function createLife(
        *  stop; `leg` alone is the ordinary errand loop. */
       const cast = (role: Role, x: number, z: number, o?: {
         leg?: number; mode?: number; dwellMode?: number; side?: number; speed?: number;
-        tether?: number; stops?: [number, number][]; face?: number; kid?: boolean;
+        tether?: number; stops?: [number, number][]; face?: number; kid?: boolean; voice?: string;
       }) => {
         const dress = dressAt(x, z);
         const p = makeCast(role, dress, o?.side);
         if (o?.mode !== undefined) p.userData.dancer = { t: rand(0, 6), spin: 1, mode: o.mode };
         else if (o?.dwellMode !== undefined) p.userData.dancer = { t: rand(0, 6), spin: 1, mode: o.dwellMode, atDwell: true };
         else if (role === 'kid') p.userData.dancer = { t: rand(0, 6), spin: 1, mode: 2 };
-        const leg = o?.stops ? 20 : (o?.leg ?? 0);
-        const rec = addWanderer(p, x, z, o?.tether ?? 10, o?.speed ?? rand(0.8, 1.4), 16,
-          role === 'kid' ? 1.9 : 2.4, dress, undefined, VOICE_OF[role], leg, role === 'kid' ? 1.4 : 1.2, o?.stops);
-        if (rec && o?.face !== undefined) rec.mesh.rotation.y = o.face;
-        return rec;
+        // a route needs two distinct points or it parks the person at one
+        // forever (skeptic: a photographer whose three draws coincided stood
+        // at one vantage all match); fewer than two, and it is an errand
+        let stops = o?.stops?.filter((st, i, arr) => arr.findIndex((q) => Math.hypot(q[0] - st[0], q[1] - st[1]) < 1.1) === i);
+        if (stops && stops.length < 2) stops = undefined;
+        const leg = stops ? 20 : (o?.leg ?? (o?.stops ? 20 : 0));
+        return addWanderer(p, x, z, o?.tether ?? 10, o?.speed ?? rand(0.8, 1.4), 16,
+          role === 'kid' ? 1.9 : 2.4, dress, undefined, o?.voice ?? VOICE_OF[role], leg, role === 'kid' ? 1.4 : 1.2, stops, o?.face);
       };
       const vans = byKind('van'), bins = byKind('bin'), trailers = byKind('trailer'), sheep = byKind('sheep');
       const kit = byKind('crewkit'), caravan = byKind('caravan')[0], tower = byKind('tower')[0];
@@ -4919,19 +4928,32 @@ export function createLife(
       // their own envelope, walking basket -> their kit -> a peg and back
       // with a coil of rope on the arm. A pilot stands at the basket of every
       // standing envelope with a clipboard, working through the checks.
+      // A STANDING ENVELOPE IS A CLOSED SHELL: skBalloonStanding's dome
+      // reaches the ground at r 4.6, so anyone inside 5.6 of its centre is
+      // inside the fabric and invisible (skeptic finding: every pilot was).
+      // The basket stop is at the skirt, the pilot at the dome's edge facing
+      // in. And a crew's morning has a LONG leg in it — a fetch to the
+      // nearest trailer or van — because qa/purpose.mjs read the first
+      // version's basket-kit-peg loop as milling: drift median 0.22.
+      const fetchable = [...trailers, ...vans];
       for (const b of balloons) {
         const [bx, bz] = at(b.m);
         const myKit = nearest(kit, bx, bz, 9).slice(0, 2);
+        const skirt = b.stage === 3 ? 5.8 : 3.0;
         const n = b.stage === 3 ? 2 : 1;
+        const fetch = nearest(fetchable, bx, bz, 160)[0];
         for (let i = 0; i < n; i++) {
           const a = Math.random() * Math.PI * 2;
-          const [sx, sz] = off(bx, bz, 3.2, a);
-          const stops: [number, number][] = [off(bx, bz, 2.6, a + 0.6), ...myKit.map((k) => off(k.position.x, k.position.z, 1.2)), off(bx, bz, 6.5, a + 2.4)];
-          cast('crew', sx, sz, { side: crewSide(b.cols), stops, tether: 16, speed: rand(0.8, 1.2) });
+          const [sx, sz] = off(bx, bz, skirt + 0.6, a);
+          const stops: [number, number][] = [off(bx, bz, skirt, a + 0.6), ...myKit.map((k) => off(k.position.x, k.position.z, 1.2))];
+          if (i === 0 && fetch) stops.push(off(fetch.position.x, fetch.position.z, 3.5));
+          else stops.push(off(bx, bz, skirt + 9, a + 2.4));
+          cast('crew', sx, sz, { side: crewSide(b.cols), stops, tether: 200, speed: rand(0.8, 1.2) });
         }
         if (b.stage === 3) {
-          const [px, pz] = off(bx, bz, 2.0);
-          cast('pilot', px, pz, { mode: 3, tether: 2, speed: 0.2, face: Math.atan2(bx - px, bz - pz) });
+          const a = Math.random() * Math.PI * 2;
+          const [px, pz] = off(bx, bz, 5.6, a);
+          cast('pilot', px, pz, { mode: 3, tether: 2, speed: 0, face: Math.atan2(bx - px, bz - pz) });
         }
       }
 
@@ -4988,13 +5010,13 @@ export function createLife(
         const [vx0, vz0] = at(v);
         for (let i = 0; i < 2; i++) {
           const targets = nearest(balloons.map((b) => b.m), vx0, vz0, 90);
-          const stops: [number, number][] = [off(vx0, vz0, 2.6), ...[0, 1].map(() => { const t = targets.length ? pick2(targets) : v; return off(t.position.x, t.position.z, 3); })];
+          const stops: [number, number][] = [off(vx0, vz0, 2.6), ...[0, 1].map(() => { const t = targets.length ? pick2(targets) : v; return off(t.position.x, t.position.z, 5.8); })];
           const [sx, sz] = off(vx0, vz0, 3);
           cast('tealady', sx, sz, { stops, tether: 60, speed: rand(0.8, 1.0) });
         }
         const [cx2, cz2] = off(vx0, vz0, 2.4);
-        cast('vancrew', cx2, cz2, { mode: 13, tether: 2, speed: 0.2, face: Math.atan2(vx0 - cx2, vz0 - cz2) + Math.PI });
-        if (Math.random() < 0.5) { const [c3, c4] = off(vx0, vz0, 3.2); cast('vancrew', c3, c4, { mode: 13, tether: 2, speed: 0.2 }); }
+        cast('vancrew', cx2, cz2, { mode: 13, tether: 2, speed: 0, face: Math.atan2(vx0 - cx2, vz0 - cz2) + Math.PI });
+        if (Math.random() < 0.5) { const [c3, c4] = off(vx0, vz0, 3.2); cast('vancrew', c3, c4, { mode: 13, tether: 2, speed: 0, face: Math.atan2(vx0 - c3, vz0 - c4) + Math.PI }); }
       }
 
       // ── GUIDES AND THEIR TOURISTS — a guide with a placard leads five people
@@ -5094,13 +5116,13 @@ export function createLife(
       // the megaphone up, turned toward whatever is going next.
       if (tower) {
         const [px, pz] = off(tower.position.x, tower.position.z, 5.5, Math.atan2(lcz - tower.position.z, lcx - tower.position.x));
-        cast('pym', px, pz, { mode: 9, tether: 1, speed: 0.1, face: Math.atan2(lcx - px, lcz - pz) });
+        cast('pym', px, pz, { mode: 9, tether: 1, speed: 0, face: Math.atan2(lcx - px, lcz - pz) });
       }
 
       // ── DOG WALKERS — the long way round, as today.
       for (const [wx, wy] of SK.scatterInRegion(skRegion('meadow'), 6, Math.random, 40)) {
         const [x, z] = g3([wx, wy]);
-        cast('dogwalker', x, z, { leg: 44, tether: 40 });
+        cast('dogwalker', x, z, { leg: 44, tether: 40, voice: 'spectator' });   // VOICE_OF says 'gossip', which on this field is Maple's suburb
       }
     }
     // ══ THE ASCENSION — "get them before they go up" (brief §3B) ═══════════
@@ -5139,6 +5161,7 @@ export function createLife(
       // it is picked where a standing one leaves after eight — so spacing the
       // picks spaced nothing (bar D: "6 departures within 6 s, a wave")
       let lastDep = -99;
+      let whaleT = -1;   // when her card came; the cascade starts 13 s after it whether she flew or was eaten
       const wind = [Math.sin(Math.PI / 6), -Math.cos(Math.PI / 6)];   // 030, in 3D x/z
       // ONE burner light for the whole field. The telegraph is one at a time
       // by rule, so one warm pool of light on the grass under the basket is
@@ -5240,7 +5263,8 @@ export function createLife(
         for (let i = 0; i < DISC_CAP; i++) discs.setMatrixAt(i, _zero);
         discs.instanceMatrix.needsUpdate = true; discN = 0;
         burner.visible = false;
-        mt = 0; nextAt = 22; picks = 0; cascade = false; lastDep = -99;
+        mt = 0; nextAt = 22; picks = 0; cascade = false; lastDep = -99; whaleT = -1;
+        for (const e of envs) if (e.stage === 4) e.m.userData.tethered = true;   // pegged down again for the rematch
       };
       // QA: the controller's own state, for qa/ascension.mjs and qa/_whale.mjs
       (window as unknown as { __asc: unknown }).__asc = {
@@ -5253,7 +5277,11 @@ export function createLife(
           // THE WHALE STANDS on the beat (4 s), fires at 4, 5.5 and 8.5, and
           // lifts twelve seconds after the card — the countdown a child can beat
           const w = envs.find((e) => e.stage === 4);
-          if (w && w.phase === 0 && !eaten(w.m) && !w.m.userData.departed) begin(w);
+          whaleT = mt;
+          if (w && w.phase === 0 && !eaten(w.m) && !w.m.userData.departed) {
+            w.m.userData.tethered = false;   // the pegs come out: for twelve seconds she is the biggest meal in the game
+            begin(w);
+          }
         }
       });
       movers.push({ mesh: null as unknown as THREE.Object3D, update(dt, _t, vx, vz) {
@@ -5270,6 +5298,10 @@ export function createLife(
             else { begin(c); picks++; lastDep = mt + L; nextAt = mt + 1; }
           }
         }
+        // THE CASCADE STARTS ON THE CLOCK, NOT ON HER. If the child takes the
+        // whale in her twelve seconds — the win the world is named for — the
+        // field still goes up with her card, one second after she would have.
+        if (!cascade && whaleT >= 0 && mt >= whaleT + 13) { cascade = true; cascadeAt = mt; }
         if (cascade && mt >= cascadeAt) {
           const w = envs.find((e) => e.stage === 4);
           const c = candidate(w ? w.m.position.x : vx, w ? w.m.position.z : vz, true);

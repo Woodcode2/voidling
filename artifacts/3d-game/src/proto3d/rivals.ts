@@ -457,7 +457,7 @@ export function createRivals(
   const rivals: R[] = [];        // THIS match's cast (api.list points at it)
   // …or DEPARTED: a balloon in the air is not on anybody's menu, and a rival
   // chasing the ground under it is a rival chasing nothing
-  const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible || m.userData.departed;
+  const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible || m.userData.departed || m.userData.tethered;
 
   // the family wears LEGENDARIES ONLY — the 3D-accessory hero skins (unicorn
   // horn, dino spikes, wizard hat, crown…). Aspirational: every family member

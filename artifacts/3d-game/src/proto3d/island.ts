@@ -5698,6 +5698,15 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     //    length before they are big enough to eat any of her.
     {
       const whale = tagBalloon(SKF.skWhaleLying(), 4);
+      // PEGGED DOWN. Two full qa/ascension.mjs runs put 23 balloons in the air
+      // at 3:00 against a bar of 35 and the cascade never started, because by
+      // 2:28 the whale had been eaten — an idle child at r7 can take an r18
+      // meal, and the rivals hunt big. qa/_whale.mjs proved the cue works when
+      // she is there to answer it. So she is tethered (capture() and the
+      // rivals refuse a tethered prop) until life.ts stands her on the beat,
+      // and THEN she is the biggest meal in the game for twelve seconds —
+      // which is the rule the world is named for.
+      whale.userData.tethered = true;
       drop(whale, [SK.LAUNCH.cx, SK.LAUNCH.cy], 18.0, layoutYaw(), true, 'big');
       SK.claimSpot(SK.LAUNCH.cx, SK.LAUNCH.cy, SK.LAUNCH.rx * 0.85);
     }
@@ -6028,7 +6037,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     }
     for (const p2 of SK.scatterInRegion(REG('breakfast'), 16, rnd2, 150, { sep: 9.0 })) {
       const cols = env();
-      drop(tagBalloon(SKF.skBalloonSpilled(cols), 1), p2, 5.2, layoutYaw(), false, 'big', 9.0);
+      drop(tagBalloon(SKF.skBalloonSpilled(cols), 1, cols), p2, 5.2, layoutYaw(), false, 'big', 9.0);
     }
     for (const p2 of SK.scatterInRegion(REG('breakfast'), 180, rnd2, 40, { sep: 1.5 })) {
       const k = rnd2();
