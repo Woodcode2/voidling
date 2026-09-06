@@ -15,6 +15,9 @@ cluster. Numbers are quoted in `../../holeio.polish-plan.md` §0 and stream D.
 | `pirate-spawn-t5.png` | 5 s | void 20.7% of width; 14.7% of the playfield near-neutral (sand is warm, chroma median 0.19) |
 | `pirate-mid-t88.png` | 88 s | void 23.3% of width; 8% near-neutral |
 | `pirate-late-t163.png` | 163 s | void 31.2% of width; 2% near-neutral |
+| `gameday-spawn-t5.png` | 5 s | void 20.7% of width; **70% of the playfield near-neutral** (grey lot, chroma median 0.06), props at p90 chroma 0.51 — the neutral stage, already in our engine |
+| `gameday-mid-t88.png` | 88 s | void 26.8% of width; 55% near-neutral |
+| `gameday-late-t163.png` | 163 s | void 31.5% of width; 64% near-neutral |
 
 Caveats: the rim figure is meaningless for a sphere with no rim (it counts the whole lit body).
 The first version of the finder (lilac-or-dark) picked shadows and the space edge on three
