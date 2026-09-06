@@ -177,7 +177,25 @@ buzzer). **(5) CLEAR** — 100% devoured (solo's `voidBestPct` is the counter). 
 ~2:1; shade hue-shifted; the player object has a lit rim; display type is three layers.
 No texture, no fog *(theirs; we keep ours where measured to help)*.
 
-**Ours today (measured on `recon/self/maple-*.png`, reference viewport, DPR 2–3).**
+**All six worlds, spawn frame (t = 5 s), `recon/self/*-spawn-t5.png`, one script (`self.py`),
+HUD bands excluded; the same script on their two match frames for the last rows.**
+
+| world | playfield below chroma 0.12 (the stage) | above 0.35 (the actors) | value median | void, % of width | reading |
+|---|---|---|---|---|---|
+| Maple | 31% | 53% | 0.71 | 20.2 | the grass is a prop colour |
+| Pirate | 15% | 11% | 0.73 | 20.7 | warm sand competes; few actors |
+| Game Day | **70%** | 16% | **0.33** | 20.7 | right ratio, too dark |
+| Lantern | 62% | **3%** | **0.25** | ~20.6 | neutral but unlit; nothing pops |
+| Powder | 36% | **2%** | 0.68 | 17.8 | pale stage, no actors |
+| Skylark | 17% | **48%** | 0.45 | 19.9 | the field is one saturated green |
+| Hole.io city | 52% | 26% | 0.69 | 22.6 | the target |
+| Hole.io flowers | 61% | 13% | 0.89 | 22.6 | the target, bright variant |
+
+Every world fails in its own way, and none fails the same way as another: two have a
+saturated stage (Maple, Skylark), two have a stage with no actors (Pirate, Powder), two
+are neutral but dark (Game Day, Lantern). So bar 1 is stated per world, not globally.
+
+**Maple in detail (measured on `recon/self/maple-*.png`, reference viewport, DPR 2–3).**
 Spawn playfield: 26.2% of pixels below chroma 0.12 (theirs 56%), 37.7% above 0.35;
 saturated grass 30% of the field at chroma 0.39, pale path 31%. Late (t = 163 s): 9%
 below 0.12. Void: 18.5% of width at spawn, 31.9% at 17 m; no rim, body value 2.0:1
@@ -188,11 +206,15 @@ landmark** with only the joystick ring visible (`maple-mid-t88.png`); their hole
 the ground and can never be occluded. Bar 7 below covers it.
 
 **Bars.**
-1. **The stage.** In a rendered spawn frame, ≥ 50% of the playfield has chroma < 0.15,
-   and the props on it have median chroma ≥ 0.45 (theirs 0.12 / 57–100% sat). Achieved
-   by desaturating ground districts 50–70% toward their own hue's grey, *not* by
-   greying them: maple park stays green, at chroma ~0.15. Prop palettes untouched
-   unless a prop reads below 0.45.
+1. **The stage, per world.** In the spawn frame, measured by `self.py`: **≥ 50% of the
+   playfield below chroma 0.12, ≥ 15% above 0.35, value median 0.55–0.80** (their city:
+   52% / 26% / 0.69). Maple and Skylark: desaturate the ground 50–70% toward its own
+   hue's grey, not to grey (the park stays green at chroma ~0.15). Pirate and Powder:
+   the stage stays; the actors get their chroma (prop palettes lifted to ≥ 0.45, more
+   coloured props on the field). Game Day: lift the key so value reaches ≥ 0.55 without
+   losing the grey lot. Lantern: a night can keep value ~0.35 only if the actors are
+   lit — lanterns and stalls as emissive props at chroma ≥ 0.45 covering ≥ 15%; else the
+   night brightens.
 2. **Two tones.** Every merged prop material gets a shade tone at 1.9–2.6:1 luminance
    below its lit tone, hue-shifted 8–15° toward the fill light's hue, selected per face
    by the face normal against the key (a vertex-colour pass in the prop shader). Measured

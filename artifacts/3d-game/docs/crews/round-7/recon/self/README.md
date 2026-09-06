@@ -24,6 +24,11 @@ cluster. Numbers are quoted in `../../holeio.polish-plan.md` §0 and stream D.
 | `powder-spawn-t5.png` | 5 s | void 17.8% of width; 35.5% near-neutral (snow reads pale, chroma median 0.15) but only 1.8% of pixels above chroma 0.35 — the stage is fine, the actors are missing |
 | `powder-mid-t88.png` | 88 s | void 24.4% of width; 0.8% near-neutral (blue-shaded snow) |
 | `powder-late-t163.png` | 163 s | void 31.1% of width; 6% near-neutral, 3.6% above 0.35 |
+| `skylark-spawn-t5.png` | 5 s | void 19.9% of width; 16.6% near-neutral, **48% above chroma 0.35** — the field is one saturated green |
+| `skylark-mid-t88.png` | 88 s | void 25.2% of width; 78% above 0.35 |
+| `skylark-late-t163.png` | 163 s | void 26.6% of width; 90% above 0.35 (uniform grass, chroma p90 = median) |
+
+The same script on the owner's Hole.io frames, HUD bands excluded the same way: city `02` — 52.3% below 0.12, 25.9% above 0.35, value median 0.69; flowers `10` — 61.4% / 13.4% / 0.89.
 
 Caveats: the rim figure is meaningless for a sphere with no rim (it counts the whole lit body).
 The first version of the finder (lilac-or-dark) picked shadows and the space edge on three
