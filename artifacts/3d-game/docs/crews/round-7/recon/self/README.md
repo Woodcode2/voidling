@@ -18,6 +18,9 @@ cluster. Numbers are quoted in `../../holeio.polish-plan.md` §0 and stream D.
 | `gameday-spawn-t5.png` | 5 s | void 20.7% of width; **70% of the playfield near-neutral** (grey lot, chroma median 0.06), props at p90 chroma 0.51 — the neutral stage, already in our engine |
 | `gameday-mid-t88.png` | 88 s | void 26.8% of width; 55% near-neutral |
 | `gameday-late-t163.png` | 163 s | void 31.5% of width; 64% near-neutral |
+| `lantern-spawn-t5.png` | 5 s | night world: 62% near-neutral but value median 0.25 and only 2.8% of pixels above chroma 0.35 — nothing pops because nothing is lit; a COMBO floater lands on top of a speech bubble (text collision); void ~20.6% of width by eye (the violet mask merged with the lit ground, 29.8% reported, not trusted) |
+| `lantern-mid-t88.png` | 88 s | void 26.3% of width; 14.5% near-neutral |
+| `lantern-late-t163.png` | 163 s | void 32.2% of width; 4.8% near-neutral |
 
 Caveats: the rim figure is meaningless for a sphere with no rim (it counts the whole lit body).
 The first version of the finder (lilac-or-dark) picked shadows and the space edge on three
