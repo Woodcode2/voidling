@@ -648,8 +648,51 @@ there is no ring in this build's loading screen, and the screen is a still.
    (1,200 ms) measured from touch-down; the scale series shows motion from f316. The
    report uses **f316–385 = 1,167 ms** as the descent and f314 as the touch.
 
-*M2 (swallow, floaters, size-up), M3 (growth, camera follow, joystick), M4 (audio) and
-the skeptic's verdict are appended below when they land.*
+### 11.9 · Growth, camera follow and the joystick (M3)
+
+Evidence: `recon/holeio/vid-M3-growth_camera_joystick.md` (every number with its method),
+`vid-M3-findings.md` (the raw return). Full-resolution px (1320×2868) unless stated.
+
+- **The hole does not grow between size-ups.** Interior diameter is **294 px** (22.3% of
+  width; p5–p95 292–295 over 271 clean frames) for the whole of Size 1 and **412 px**
+  (31.2%) for the whole of Size 2. Growth is a step at a threshold, not a slope. Aspect
+  (vertical/horizontal extent) 0.635 → 0.689: the camera tilts toward top-down as the
+  hole grows.
+- **The size-up is one frame, then two curves.** At f785 (t = 13.07 s) the label flips
+  "Size 1" → "Size 2", the size bar empties to zero, and the interior jumps 294 → 336 in
+  the same frame. Screen diameter then rises to a **peak of 538 px at f799–800 (15
+  frames, 250 ms, ease-out, k = 1.47)**, falls back over 16 frames, and settles at 412 by
+  f826 (41 frames, 683 ms after the trigger). The hump is not a spring: it is a fast
+  **world-size step (×2.2 in ~15 frames, ≤ 2–4% overshoot)** multiplied by a slower
+  **camera zoom-out (÷1.54, 42 frames = 700 ms, 50% at f800, 90% at f820)**, both starting
+  on the trigger frame. Net screen ratio 1.40. The joystick ring stays 165 px throughout:
+  UI is unaffected by the zoom. *So the beat is: the world grows now, the camera catches
+  up lazily, and for a quarter-second the player is twice as big as they will be.*
+- **The camera is not pinned; the hole leads it.** Hole centre mean (692, 1417), sd
+  (38, 17), max deviation 136 px x / 90 px y from the mean. Regression against travel
+  velocity: **centre = 4.4 frames × velocity + anchor** (r = 0.83–0.98), lag 0–2 frames.
+  A first-order camera lag with a ~73 ms time constant; at the usual 13 px/frame the hole
+  sits ~57 px ahead of the anchor in its travel direction. Zero-velocity anchor (661,
+  1451): screen-centre x, 17 px below centre y (50.6% of height).
+- **Joystick: floating and dragged.** Default drawn at (659, 2148) = screen-centre x,
+  74.9% of height, **ring radius 165 px** (25% of width as a diameter), knob radius ~84
+  px, knob clamp **≈173 px** (ring + 8). Touch-down re-places the base under the finger
+  (320 px from the default). While the knob is at full deflection the base is **dragged
+  along the knob direction** (moved > 12 px in 28% of 10-frame windows; base-motion
+  angle − knob angle: median 0.4°). Release snaps the joystick back to the default in
+  **one frame**, no tween; the hole then decelerates sharply (13 → 5 px/frame in two
+  frames) with a tail halving every ~12 frames.
+- **Speed is not proportional to deflection.** Ground speed at the hole is 11–14
+  px/frame at every deflection above 60 px (bins 60–120: 12.8; 150–165: 13.6; 172–178:
+  13.2). The joystick is a **direction control at constant speed**; steering follows the
+  knob's screen direction with a **5-frame (83 ms) lag**, no axis rotation.
+- **Screen speed is constant across sizes.** Full-deflection speed 12.7 px/frame at
+  Size 1, 13.6 at Size 2 (+7%). In ground units the Size 2 hole travels ~1.65× faster:
+  the world speed scales with the size so the screen speed does not.
+
+*M2 (swallow, floaters, size-up label and burst), M4 (audio) and the skeptic's verdict are
+appended below when they land. §11.8 (M2) and §11.10 (M4) are reserved; §11.11 is the
+skeptic.*
 
 ---
 

@@ -28,6 +28,8 @@ gate (`qa/gate.mjs --profile=push`) stays green at every commit.
 | Display type | Gradient fill + thick stroke (67% of fill area) + shadow | Fredoka 700, 3 px stroke, no gradient (`index.html:128`) | One layer short |
 | Menu | Violet ground `#4c3cbe` (value 0.75, chroma 0.51) over 45% of the frame; 3D diorama of the level at 49% of height, slow orbit, static UI | Dark violet ground `#1b0f38` (value 0.22, chroma 0.16; frame value median 0.36); painted key art over 82% of height; no 3D, no motion (`qa-out/menu.png`, `index.html:850`) | **A poster where they have a world, and half as bright** |
 | Ladder | Five colour-coded pips, current one 29% wider, one tap to play | Six poster cards on a separate screen; goals hidden until the end card (`index.html:1933`, `:474`) | Progress is a grid, not a picture |
+| Joystick | Floating and dragged; constant speed, direction only; 5-frame steering lag | Floating, base follows past 1.7× the ring (`prototype3d.ts:3145`); heading lerp weighted by deflection² | Close; speed law differs |
+| Camera follow | Void leads the anchor by ~73 ms of velocity; hole steps at size-ups, camera zooms out ÷1.54 over 700 ms | `targetDist` from radius (`:9840`), continuous growth, `camDist *= 1.07` on evolve | Different model |
 | Reward beat | "Size N" pop at the avatar, floater size = bite value, end card over the dimmed world, next reward as a locked jewel | Evolve card on the HUD, one floater size + big, end card over the dimmed world ✓, NEW WORLD card ✓ | Two of four |
 
 What is **not** in the gap and stays ours: named rivals with hunt behaviour, the newsroom,
@@ -66,7 +68,17 @@ gate exists only on the reload path (`:6398`).
 6. Every world keeps its hero-landmark reveal, but inside the 1.2 s, not instead of it.
    (If a world needs longer, the owner decides per world; the default is 1.2 s.)
 7. Rivals: all voids start within one screen of the player at the settled camera.
-   *(Their co-location is the owner's belief; §11.9 will say what the recording shows.)*
+   *(Their co-location is the owner's belief; the recording is a solo run and cannot
+   confirm it.)*
+8. **Joystick** (from §11.9): direction control at constant speed, not speed by
+   deflection; base re-placed under the finger on touch-down and dragged along the knob
+   direction at full deflection; ring diameter 24–26% of screen width; steering lag
+   ≤ 100 ms; release snaps the base back in one frame and the void decelerates sharply
+   then tails off (halving every ~200 ms).
+9. **Camera follow** (from §11.9): the void leads the camera anchor in its travel
+   direction by 60–80 ms of velocity (first-order lag); zero-velocity anchor at
+   screen-centre x and 50–51% of height; screen speed at full deflection constant
+   within 10% across all sizes (world speed scales with size).
 
 **Probe.** `qa/opening.mjs`: records frames from load to settle, reports idle length,
 touch→move latency, descent length and easing fit, time of first floater, goal card
@@ -207,9 +219,13 @@ are being measured in §11.8–11.10 and will replace the placeholders marked �
 NEW WORLD card ✓; growth bar on the HUD (`index.html:168`).
 
 **Bars.**
-1. Size-up: the "SIZE N" read pops **at the void** (projected, not HUD), gold, with one
-   ground ring and the bar reset; total beat ≤ †(their length); the camera punch is
-   real (the no-op is replaced) and ≤ 1.1× of `camDist` for ≤ 300 ms.
+1. Size-up (numbers from §11.9): on the trigger frame the read flips, the bar empties,
+   and the void's **world size steps up over ≤ 250 ms ease-out** (≤ 4% overshoot) while
+   the **camera pulls back over ~700 ms** (50% at 250 ms), so the void reads at roughly
+   twice its eventual screen size for a quarter-second and settles within 700 ms. The
+   "SIZE N" read pops **at the void** (projected, not HUD), gold, with one ground ring.
+   The no-op `camPunch` is replaced by that zoom-out; the UI does not scale with it.
+   Label scale curve and burst radius: †(M2).
 2. Floaters: three sizes keyed to bite value (small / medium / big at 1 : 1.5 : 2.2 of
    height), lifetime †(theirs), rising †(their distance), never more than 6 alive.
 3. Growth bar: leading-edge brightness ≥ 1.3× the fill.
@@ -276,6 +292,10 @@ recorded in the stream's brief, never hidden.
    (recommend retire).
 4. Per-world intro length: 1.2 s default, or a named exception (recommend no exceptions).
 5. Whether stream B (the live menu) is in the launch scope or the first update.
+6. **Stepped growth or continuous growth.** Their hole is exactly one size for the whole
+   of a tier and steps at the threshold (§11.9); ours grows continuously with mass. The
+   step is what makes the size-up a beat. *Recommend: keep mass continuous, quantise the
+   visible radius to the form, and let the growth bar carry the in-between progress.*
 
 *Draft 1, written before M2–M4 and the skeptic returned. Placeholders marked † are
 filled and the file re-issued as draft 2 when §11.8–11.11 land.*
