@@ -115,15 +115,26 @@ async function runOnce(browser, tapMs, shots) {
     localStorage.setItem('voidDailyLast', new Date().toDateString());
   } catch { /* private mode: the defaults are fine */ } });
   await p.addInitScript(SAMPLER);
-  await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
+  // Bare URL, not ?w=<world>. With the world in the query string the game boots
+  // straight into it and runs its intro camera while the probe is still clicking
+  // through the menu, so the first sampled frame already has the camera at rest:
+  // the first game-time run of this probe found a 328 ms "descent" of x1.21 for
+  // an intro that travels from camDist 300 to 38. The world is chosen from the
+  // picker instead, so sampling starts before the intro does.
+  await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
   await p.click('#btnPlay'); await p.waitForTimeout(1400);
   await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
   await p.waitForFunction(() => !!window.__matchState, null, { timeout: 400000 });
-  // Reset the sampler clock to the first gameplay frame, not to page load.
+  // Reset the sampler to the first gameplay frame, not to page load, and assert
+  // the camera really is still high — if it is not, the intro was missed and
+  // every descent number below would be measuring the tail of something.
   await p.evaluate(() => { window.__op.rows = []; window.__op.floaters = []; window.__op.t0 = performance.now(); });
+  await p.waitForTimeout(60);
+  const startHigh = await p.evaluate(() => (window.__op.rows[0]?.camDist ?? 0));
+  if (startHigh < 100) console.log(`  WARNING: first sampled camDist is ${startHigh.toFixed(0)} — the intro was already over when sampling began; descent numbers are not trustworthy.`);
 
   if (shots) { mkdirSync(OUT, { recursive: true }); await p.screenshot({ path: `${OUT}/${WORLD}-01-first.png` }); }
   await p.waitForTimeout(tapMs);
