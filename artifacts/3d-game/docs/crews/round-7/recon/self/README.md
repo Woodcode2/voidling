@@ -12,8 +12,13 @@ cluster. Numbers are quoted in `../../holeio.polish-plan.md` §0 and stream D.
 | `maple-spawn-t5.png` | 5 s | void 159 px = 18.5% of width; 26% of the playfield near-neutral; timer already at 2:55 |
 | `maple-mid-t88.png` | 88 s | the void fully hidden behind a landmark; only the joystick ring shows |
 | `maple-late-t163.png` | 163 s | void at 17 m = 31.9% of width; 9% of the playfield near-neutral |
+| `pirate-spawn-t5.png` | 5 s | void 20.7% of width; 14.7% of the playfield near-neutral (sand is warm, chroma median 0.19) |
+| `pirate-mid-t88.png` | 88 s | void 23.3% of width; 8% near-neutral |
+| `pirate-late-t163.png` | 163 s | void 31.2% of width; 2% near-neutral |
 
-Caveats: the blob finder's rim figure is meaningless for a sphere with no rim (it counts the
-whole lit body) and its default region picked the space edge on the late frame; the late void
-was re-measured with a violet mask restricted to the upper 70% (in the plan). The `gw` mid and
+Caveats: the rim figure is meaningless for a sphere with no rim (it counts the whole lit body).
+The first version of the finder (lilac-or-dark) picked shadows and the space edge on three
+frames; `self.py` now uses the violet body mask only, rows 5–75% of the playfield, and gives
+20.2–20.7% of width at spawn and 31.2–31.9% late on both worlds (the DPR-2 `qa/shot.mjs`
+frame gave 18.5% at spawn). Corrected here, not hidden. The `gw` mid and
 late frames are autopilot runs, so the occlusion is one observation, not a rate.

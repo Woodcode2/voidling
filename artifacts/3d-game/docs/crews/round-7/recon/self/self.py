@@ -14,8 +14,8 @@ print(f"  chroma median {np.median(ch):.3f}  p90 {np.percentile(ch,90):.3f}  <0.
 # hue
 r,g,b=pf[...,0],pf[...,1],pf[...,2]; d=np.where(ch>0,ch,1)
 h=np.where(mx==r,(g-b)/d%6,np.where(mx==g,(b-r)/d+2,(r-g)/d+4))*60
-lil=((h>250)&(h<295)&(ch>0.25)); dark=(mx<0.18)
-sel=(lil|dark).copy(); sel[:int(sel.shape[0]*0.2)]=False  # lower 80% of playfield only
+lil=((h>250)&(h<300)&(ch>0.20)&(mx>0.15)); dark=(mx<0.18)
+sel=lil.copy(); sel[:int(sel.shape[0]*0.05)]=False; sel[int(sel.shape[0]*0.75):]=False  # violet body only, rows 5-75% of the playfield (space edge and HUD excluded)
 from scipy import ndimage
 lab,k=ndimage.label(sel); 
 if k:
