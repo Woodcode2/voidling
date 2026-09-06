@@ -1,0 +1,22 @@
+
+OPENING — maple @ 4177, tap at 2500 ms (and a second run tapping at 200 ms)
+
+FAIL  A1   clock ticks elapsed before the first touch           got        0.536 s      want 0
+PASS  A3   idle available before touch, in game time            got        0.536 s      want >= 0.5
+FAIL  A4   touch-down to first void movement                    got          283 ms     want <= 133
+FAIL  A5   descent duration                                     got         1819 ms     want 1100-1300
+FAIL  A6   descent easing on camera HEIGHT (best fit)           got ease-out-quad        want ease-in-out
+FAIL  A6b  height progress at t=0.5                             got        0.679        want 0.40-0.60
+PASS  A7   ground scale over the descent                        got        5.313 x      want 4.0-5.5
+FAIL  A8   descent frames with controls dead                    got        4.000 frames want 0
+FAIL  A9   first +1 floater, as a fraction of the descent       got       -1.000        want 0.30-0.60
+FAIL  A21  descent length difference, early tap vs late tap     got          669 ms     want <= 100
+
+  descent (game time) 450..2269 ms; camera height 152.8 -> 28.8
+  NOTE: durations are GAME time (the match clock), not wall clock — under swiftshader the wall runs ~10x slower.
+  camera peaked at sample 8 (camDist 213)
+  easing fit ease-out-quad (rms 0.070); early-tap descent 1150 ms
+  clock at the first gameplay frame 180.00 s; first floater none
+
+8 of 10 bars failing
+

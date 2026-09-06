@@ -220,17 +220,45 @@ The probe now measures every duration on **the match clock** (`MATCH_LEN − clo
 advances in the same clamped `dt` the game itself uses, and keeps wall time for one purpose
 only: how long the probe waited before touching, which is a property of the probe.
 
-What survived the correction, and is real:
+It took **three** corrections in all before the probe measured what it claimed to. The
+second: with the world in the query string the game boots straight into it, so the intro
+ran while the probe was still clicking through the menu and the first sampled frame already
+had the camera at rest. The third, and the instructive one: **the camera does not begin
+high and fall.** It sits at its menu position, *jumps* to the intro's start height when the
+match begins, and only then descends. A detector that assumed a monotonic fall from the
+first sample walked past the climb, found the last frames of settling, and reported a
+421 ms descent of ×1.20 for a move that travels from camDist 300 to 38.
 
-| Bar | Measured on the untouched tree | Meaning |
-|---|---|---|
-| **A1** | **0.550 s of match clock burned before the first touch** | The clock is running before the player exists. This is the stream in one number. |
-| A9 | **no `+1` floater at all** during the opening | Nothing is scored while the camera comes down. |
-| A6 | best fit **ease-out-quad** on camera height | Their descent fits ease-in-out. Ours does not; it is a different curve, not a slower one. |
-| A8 | 0 dead frames *while a touch was held* | Passes only because the probe touches after the intro has finished. It will fail once the touch lands during the descent — the bar is right, the run was too gentle. |
+All three wrong numbers looked plausible. That is the argument for writing the probe before
+the build and running it on a tree whose behaviour is already known: the failures are
+diagnosable. Written after the rebuild, all three flaws would have silently certified
+whatever was built.
 
-That last row is a real limitation of the first run and is written into the build order:
-step 4's probe run must tap **during** the descent, or A8 proves nothing.
+**The before-run, once the instrument was honest** (`recon/self/opening-before.log`, Maple,
+tap at 2.5 s; the same run tapping at 200 ms for A21):
+
+| Bar | Ours, measured | Target | Theirs | Reading |
+|---|---|---|---|---|
+| **A1** | **0.536 s of match clock burned before the first touch** | 0 | 0 | The clock runs before the player exists. This is the stream in one number. |
+| A3 | 0.536 s | ≥ 0.5 | 717 ms | Passes, but only because the clock is what is running — there is no *free* idle at all. |
+| A4 | 283 ms | ≤ 133 | 117 ms | Touch to first movement, twice their latency. |
+| A5 | **1,819 ms** (coded 2.2 s; see note) | 1,100–1,300 | 1,167 | Half again as long as theirs. |
+| A6 | **ease-out-quad** (rms 0.070) | ease-in-out | ease-in-out | A different curve, not a slower one. |
+| A6b | 0.679 of the height gone at the halfway point | 0.40–0.60 | 0.45 | Ours dumps most of the descent early and crawls in. |
+| **A7** | **×5.31** | 4.0–5.5 | ×4.755 | **Passes.** The distance the camera travels is already right; only its timing and shape are wrong. |
+| A8 | **4 frames with the controls dead** | 0 | 0 | Confirmed against the void's own position, not a flag. |
+| A9 | **no `+1` floater at all** | 0.30–0.60 of the descent | at 0.45 | Nothing is scored while the camera comes down. |
+| A21 | **669 ms** difference between tapping at 200 ms and at 2.5 s | ≤ 100 | n/a | Our opening is not interruption-neutral: when you tap changes what you get. |
+
+*Note on A5.* The probe starts sampling when the world is chosen, and the camera's peak was
+sample 8 at camDist 213 rather than the coded 300 — so on the current tree it misses the
+first fraction of the climb and **1,819 ms is a lower bound** on an intro the code sets to
+2.2 s. This imprecision disappears after the rebuild, when the descent starts on a touch the
+probe itself synthesises.
+
+The single most encouraging row is A7. The camera already travels the right distance; what
+is wrong is when it starts, how long it takes, what shape it moves in, and whether the
+player may act during it. That is a smaller job than it looked.
 
 Registered in `qa/gate.mjs` under the push profile once green.
 
