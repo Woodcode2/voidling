@@ -1,0 +1,16 @@
+screen,first_frame,last_frame,n_frames,duration_ms_at_60fps,duration_ms_at_59.49fps,t_start_s_at_60fps,notes
+"store tab (idle, no scroll)",1,49,49,816.7,823.7,0.0,first frame of clip; ends with HOLES nav tap
+"store->holes tap transition (HUD pill pop, nav icons resize, store content still visible)",50,54,5,83.3,84.0,0.817,HUD pill scales up from ~25%; nav hole icon grows
+holes tab: empty blue panel (grid not yet drawn),55,55,1,16.7,16.8,0.9,hard cut at 55; 1-frame empty grid
+holes tab: CLASSIC HOLES grid,56,101,46,766.7,773.2,0.917,tab header bounce settles by f72; green + buttons pop f67-80
+special holes: empty panel,102,102,1,16.7,16.8,1.683,tab tap; 1-frame empty grid
+holes tab: SPECIAL HOLES grid,103,127,25,416.7,420.2,1.7,
+holes tab: CLASSIC HOLES grid (2nd),128,153,26,433.3,437.0,2.117,"hard cut, grid drawn immediately"
+"main menu (city, level pills, PLAY)",154,205,52,866.7,874.1,2.55,hard cut at 154; entrance pops settle by ~f177; backdrop dim starts f200
+LEVEL 7 booster card pop-in,206,220,15,250.0,252.1,3.417,"card first visible f206 (w=125 half-px), peak f214 (110%), settled f220"
+"LEVEL 7 booster card (static, PLAY pops f215-230, X pops f224-238)",221,253,33,550.0,554.7,3.667,PLAY press visible f249-253
+Loading... screen,254,270,17,283.3,285.8,4.217,static; source has 6 dropped frames here
+"gameplay: idle high camera, joystick at default spot",271,313,43,716.7,722.8,4.5,Goal scroll timer-driven f301-343
+gameplay: touch-down f314 -> camera descent,314,385,72,1200.0,1210.3,5.217,descent 316-385 by cone scale; timer starts ~f314
+gameplay: settled camera,386,1514,1129,18816.7,18978.0,6.417,timer ticks every 62.33 f
+iOS Control Centre pull-down (recording stop),1515,1547,33,550.0,554.7,25.233,CC slides in 1515-1519; last frame 1547
