@@ -26,7 +26,7 @@ gate (`qa/gate.mjs --profile=push`) stays green at every commit.
 | The stage | Ground chroma < 0.12 over 56% of the playfield; props 57–100% sat | Maple park 0.44, meadow 0.44, quad 0.37, cove 0.32 (palette hexes, pre-light) | **Our ground competes with the props** |
 | Materials | Two tones per material, 2:1; shade hue-shifted | Single-tone vertex colour under a real rig with a cool fill (`island.ts:3973`, `prototype3d.ts:793`) | Half right: the rig shifts hue; the material has one tone |
 | Display type | Gradient fill + thick stroke (67% of fill area) + shadow | Fredoka 700, 3 px stroke, no gradient (`index.html:128`) | One layer short |
-| Menu | Violet ground, 3D diorama of the level at 49% of height, slow orbit, static UI | Violet gradient, static painted key art, no 3D, no motion (`index.html:850`) | **A poster where they have a world** |
+| Menu | Violet ground `#4c3cbe` (value 0.75, chroma 0.51) over 45% of the frame; 3D diorama of the level at 49% of height, slow orbit, static UI | Dark violet ground `#1b0f38` (value 0.22, chroma 0.16; frame value median 0.36); painted key art over 82% of height; no 3D, no motion (`qa-out/menu.png`, `index.html:850`) | **A poster where they have a world, and half as bright** |
 | Ladder | Five colour-coded pips, current one 29% wider, one tap to play | Six poster cards on a separate screen; goals hidden until the end card (`index.html:1933`, `:474`) | Progress is a grid, not a picture |
 | Reward beat | "Size N" pop at the avatar, floater size = bite value, end card over the dimmed world, next reward as a locked jewel | Evolve card on the HUD, one floater size + big, end card over the dimmed world ✓, NEW WORLD card ✓ | Two of four |
 
@@ -80,11 +80,16 @@ PLAY and the HUD sit at ≥ 4.2:1 / 6.5:1 against the ground; the coin pill pops
 overshoot on every tab change; each tab is a colour world (blue store, violet play,
 orange skins); tab changes are hard cuts.
 
-**Ours today.** Opaque `#menu` with a gradient, a starfield and a static
-`splash_hero.webp` at 66 vh; `#menuOrb` hidden (`index.html:850–1013`, `:891`); world
-select is a separate poster grid (`:1933`); PLAY → picker → PLAY is two taps.
+**Ours today (measured on `qa-out/menu.png`, 860×1864).** Opaque `#menu`: dark violet
+ground `#1b0f38`–`#191539` (value 0.22, chroma 0.16) against their `#4c3cbe` (value 0.75,
+chroma 0.51); the painted key art (island, falling houses, the void's face) spans rows
+5.7%–88% of height; 15.8% of pixels have chroma > 0.35; `#menuOrb` hidden
+(`index.html:891`); world select is a separate poster grid (`:1933`); PLAY → picker →
+PLAY is two taps. The art is good; it is a poster, and it is dark.
 
 **Bars.**
+0. The menu ground is lifted toward theirs: value 0.55–0.75, chroma 0.40–0.55, still
+   violet. Measured at the four corners of `qa/menushot.mjs`'s frame.
 1. The menu's hero is the selected world's island, rendered live (the same island build,
    low-cost variant), occupying 45–52% of frame height, on a camera orbit of 0.25–0.4
    px/frame at 1320-wide; the crowd idles; the void sits on it in its current skin and
