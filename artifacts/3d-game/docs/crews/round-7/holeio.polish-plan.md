@@ -259,10 +259,32 @@ NEW WORLD card ✓; growth bar on the HUD (`index.html:168`).
    twice its eventual screen size for a quarter-second and settles within 700 ms. The
    "SIZE N" read pops **at the void** (projected, not HUD), gold, with one ground ring.
    The no-op `camPunch` is replaced by that zoom-out; the UI does not scale with it.
-   Label scale curve and burst radius: †(M2).
-2. Floaters: three sizes keyed to bite value (small / medium / big at 1 : 1.5 : 2.2 of
-   height), lifetime †(theirs), rising †(their distance), never more than 6 alive.
+   The read appears one frame after the trigger, gold with a dark outline, ~22% of screen
+   width, and **rises ~80 px over 500 ms at constant size** (theirs does not scale in).
+   One soft light disk expands from 0.65× to 1.1× the void's diameter over ~380 ms and
+   fades; a short burst of rising arrows inside the void peaks at ~150 ms and is gone by
+   390 ms. Three elements, one beat, everything over in ≤ 500 ms.
+2. Floaters (measured, §11.8): **lifetime 1.0 s** — alpha holds 170 ms then fades
+   linearly to zero; **rise 66 px total** (about 5% of screen height) on an ease-out that
+   is 20% of the way up after one frame and 58% by frame 10; **screen-space** (no
+   horizontal drift while the world moves under it); spawn 0.45 × the void's width above
+   its centre; white fill with a 4–5 px dark outline, glyph ~4% of screen height. Two
+   close together stay independent, 60–90 px apart, never stacked or merged. Ours keys
+   size to bite value where theirs does not, because our bites differ in value; keep
+   three sizes at 1 : 1.5 : 2.2, and keep the measured lifetime and rise.
 3. Growth bar: leading-edge brightness ≥ 1.3× the fill.
+3b. **The eat itself gets no ring, no burst and no rim reaction** (§11.8: their rim is
+   unchanged to a third of a pixel through a swallow). The feedback is the object's own
+   motion, the counter and the sound. Small props sink in ~100 ms after being dragged in;
+   tall props **tip over** (to 60–90° from vertical in 6–14 frames) and sink head-first;
+   a whole eat is 250–300 ms, a tall one up to 440 ms. This closes task #11 from the
+   other side: the answer is not fewer rings, it is none.
+3c. **Audio** (§11.10): one fixed sample per event type, **no pitch randomisation and no
+   combo ramp** — variety comes from having more samples, not from modulating one. The
+   eat sound lands within ±67 ms of the object starting to sink. The size-up sting is the
+   loudest sound in the game and **lands ~200 ms after the visual**, not with it. We keep
+   our music bed (they have none) but adopt the discrete-sample discipline and the sting's
+   deliberate lag.
 4. End card: the *level pip* lights first (stream C), then coins count up (keep 900 ms),
    then the next reward, drawn as its own illustration behind a padlock (island art per
    world exists in the poster set), then PLAY AGAIN.
@@ -328,5 +350,7 @@ recorded in the stream's brief, never hidden.
 | 5 | live menu | first update; the level picker's background is the current level's world, animated in 3D |
 | 6 | stepped or continuous growth | open — governor recommends quantised visible size with continuous mass underneath |
 
-*Draft 2, 2026-09-06. † placeholders in stream E are filled when M2 (swallow, floaters,
-size-up label and burst) and M4 (audio) land and the skeptic has ruled.*
+*Draft 2, 2026-09-06, complete: all four measurers are folded in and no placeholders
+remain. **The skeptic pass is still owed** (§11.11 of the recon: it failed twice on account
+limits, not on the material), so every number here is one measurement plus its author's
+second method, not an adversarial verdict. That pass runs before a crew is briefed.*

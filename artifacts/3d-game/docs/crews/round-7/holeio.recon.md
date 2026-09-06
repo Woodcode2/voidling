@@ -690,9 +690,86 @@ Evidence: `recon/holeio/vid-M3-growth_camera_joystick.md` (every number with its
   Size 1, 13.6 at Size 2 (+7%). In ground units the Size 2 hole travels ~1.65× faster:
   the world speed scales with the size so the screen speed does not.
 
-*M2 (swallow, floaters, size-up label and burst), M4 (audio) and the skeptic's verdict are
-appended below when they land. §11.8 (M2) and §11.10 (M4) are reserved; §11.11 is the
-skeptic.*
+### 11.8 · The swallow, the floaters and the size-up (M2)
+
+Evidence: `recon/holeio/vid-M2-findings.md`. Full-resolution px (1320×2868), 60 fps.
+
+- **Twenty-five eats in the clip**: 19 cones, 4 lamp posts, 2 people, between f357 and
+  f1430.
+- **A cone does not rotate. It is dragged.** The cap width stays 83–88 px and the
+  principal-axis angle stays constant while the object is pulled toward the hole centre
+  and then drops in **6 frames (101 ms)**. Whole event, first pixel over the interior to
+  last pixel visible: **15–17 frames (252–286 ms)**.
+- **A lamp post tips over.** Its angle from vertical goes 5° → 62° in 14 frames on one
+  event, and on another it falls flat in 6 frames (5° → 88°) and then sinks head-first,
+  **26 frames (437 ms)** in total. Tall things fall; small things sink.
+- **A person is swallowed fastest**: inside for 9 and 14 frames (151 ms, 235 ms), landing
+  lying flat.
+- **No burst, no ring, no particle on an ordinary eat, and the rim does not react.** The
+  outer rim ellipse measures 382.9 × 297.7 px during a swallow against 383.0 × 297.9 px
+  before and 382.5 × 297.5 px after: unchanged to a third of a pixel. *This is the single
+  most important line in this section for us.* Their eat has no effect at all; the feedback
+  is the object's own motion, the counter, and the sound.
+- **Every object is worth 1.** The size bar steps by the same amount for a cone, a lamp
+  post or a person (Size 1 steps ≈ 1,850–2,090 px of fill). Value is not encoded in the
+  bite; the "+1" floater is literal.
+- **The floater.** White fill with a 4–5 px dark-grey outline, glyph 49 px tall (57 with
+  the outline). Spawns about **0.45 × the rim's outer width above the rim centre** (Size 1
+  median 168 px above; Size 2 median 240 px). It is **screen-space**: horizontal drift is
+  0.00 px/frame while the ground moves 2–13 px/frame under it. It rises **66 px over its
+  whole life**, fast at first then almost stopping: 13 px by frame 1, 28 by frame 5, 38 by
+  frame 10, 49 by 20, 56 by 30, 64 by 50. Alpha holds at 1.0 for **10 frames** then fades
+  linearly to zero. **Lifetime 60 frames = 1.0 s exactly.**
+- **Two floaters do not stack or merge.** Each is an independent instance at its own spawn
+  point, typically 58–91 px apart.
+- **The size-up beat, frame by frame.** f785: the bar empties and the label flips in one
+  frame. f786: a ring begins. f787: the gold **"Size 2"** appears (gradient `#f9e256` →
+  `#eeb32c` with a dark orange-brown `#832e17` outline, 290 px wide, 88–90 px tall) and
+  rises 80 px over the next 30 frames while it holds a constant width. A **soft white
+  disk** (white at the rim, cream `#fcfceb` at its edge) expands from 249 px to 420 px
+  radius over f787–810 and fades. **Six to eight pale up-arrows** rise inside the hole,
+  peaking f793–800, gone by ~f810 (23 frames, 390 ms). The rim itself goes 383 px → **704
+  px at f799 (+84%)** → 531 px settled at f815 (+39% over where it began).
+- So the whole beat is: **the world doubles for a quarter-second, three elements are added
+  at once (label, disk, arrows), and everything is over in 390–500 ms.**
+
+### 11.10 · Audio (M4)
+
+Evidence: `recon/holeio/vid-M4-findings.md`. Levels are relative to the clip's peak.
+
+- **There is no music.** Onset-envelope autocorrelation peaks at 0.095; 20.7% of all 20 ms
+  windows inside the gameplay are digital silence, with fifteen internal silent runs over
+  20 ms, one of them 1.58 s long. Every sound is a discrete effect over silence.
+- **There are no UI sounds.** The track is exact digital zero until 6.14 s, which is after
+  the match has started. Menu taps, tab changes, the booster card and the loading screen
+  are all silent in this recording. *Caveat from the measurer: iOS may not have captured
+  app audio before the match, so "no UI sound" is not proven, only "not present here".*
+- **Sounds do not vary.** Every instance of the cone eat is the same sample at the same
+  pitch and level (waveform correlation ≥ 0.97 across 13 instances, best resampling ratio
+  1.00, level spread ≤ 0.5 dB). **No pitch randomisation, no combo ramp.** Variety comes
+  from having several samples, not from modulating one.
+- **The kit.** A two-hit low gulp for a standard eat (13 instances); two bright whooshes
+  used at Size 2 (centroid ≈ 5,000 Hz); two metallic clanks for lamp posts, ~935 ms long;
+  two different screams for the two people, with a real pitch glide (339 Hz → 206 Hz over
+  0.7 s) and the second-loudest peak in the clip.
+- **The size-up sting is the loudest sound in the recording** (0.0 dB relative to the
+  clip's peak) and it **lags the visual by about 12 frames**: the visual size-up is at
+  f785 (13.07 s) and the audio lead-in starts at 13.26 s with its loud hit at 13.36 s.
+- **Eat sounds land within ±4 frames (±67 ms) of the object starting to sink.**
+- Loudest half-second is the sting at −17.4 dBFS; a run of ordinary eats sits far below it.
+
+### 11.11 · The skeptic did not run
+
+The independent re-measurement of the headline numbers (descent easing, swallow duration,
+size-up overshoot, floater lifetime, joystick behaviour) was launched twice and failed
+both times on account limits, not on the material. **Nothing in §11 has been adversarially
+re-measured.** Two things reduce the risk and neither removes it: M1 and M3 each verified
+their own two headline numbers by a second method (frame rate at three frames, hole
+diameter by extent and by ellipse fit, zoom by ground features and by optical flow), and
+M2's and M3's independent measurements of the same size-up agree (rim 383 → 531 px, ratio
+1.39, against M3's interior 294 → 412 px, ratio 1.40). The skeptic pass is owed before any
+number here is used as a build bar.
+
 
 ---
 
