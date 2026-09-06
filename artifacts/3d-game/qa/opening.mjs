@@ -17,6 +17,16 @@
 // camDist: on a perspective camera the on-screen size of the ground goes as
 // 1/height, and height is what the descent is easing. camDist is recorded too
 // because the steering's speed cap reads it (see __matchState's comment).
+//
+// TIME IS GAME TIME, NOT WALL CLOCK. The first run of this probe reported a
+// 10,893 ms descent for an intro the code sets to 2.2 s, and a 37 s idle for a
+// 2.5 s wait. Both were the instrument, not the game: under swiftshader the
+// renderer manages a few frames a second, and the loop clamps dt per frame, so
+// the world advances roughly ten times slower than the wall. Every duration
+// below is therefore measured on the match clock (MATCH_LEN - clock), which
+// advances in the same clamped dt the game itself uses. Wall time is still
+// recorded per row, and is used for one thing only: how long the probe waited
+// before touching, which is a property of the probe and not of the game.
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
@@ -30,7 +40,7 @@ const OUT = 'qa-out/opening';
 // builder needs to see move, not to satisfy.
 const BARS = {
   A1: { what: 'clock ticks elapsed before the first touch', want: 0, unit: 's', cmp: (v) => v <= 0.001 },
-  A3: { what: 'idle available before touch (world alive, clock stopped)', want: '>= 0.5', unit: 's', cmp: (v) => v >= 0.5 },
+  A3: { what: 'idle available before touch, in game time', want: '>= 0.5', unit: 's', cmp: (v) => v >= 0.5 },
   A4: { what: 'touch-down to first void movement', want: '<= 133', unit: 'ms', cmp: (v) => v <= 133 },
   A5: { what: 'descent duration', want: '1100-1300', unit: 'ms', cmp: (v) => v >= 1100 && v <= 1300 },
   A6: { what: 'descent easing on camera HEIGHT (best fit)', want: 'ease-in-out', unit: '', cmp: (v) => /in-out|smooth/.test(String(v)) },
@@ -78,7 +88,8 @@ const SAMPLER = () => {
       const cam = w.__cam;
       if (ms && vs && cam) {
         w.__op.rows.push({
-          t: performance.now() - w.__op.t0,
+          t: performance.now() - w.__op.t0,          // wall ms, for the probe's own bookkeeping
+          g: ms.clock,                               // the match clock: the game's own time axis
           clock: ms.clock, mt: ms.t, camDist: ms.camDist, r: ms.r, score: ms.score,
           cy: cam.position.y, cx: cam.position.x, cz: cam.position.z,
           vx: vs.x, vz: vs.z, vr: vs.r,
@@ -136,9 +147,16 @@ async function runOnce(browser, tapMs, shots) {
 
 function analyse(d) {
   const rows = d.rows, touchAt = d.touchAt ?? 0;
+  // Game time, in ms, measured down from whatever the clock read on the first
+  // sampled frame. On the untouched tree the clock is already running there, so
+  // this axis starts at zero and moves; once stream A lands it will not move at
+  // all until the touch, which is bar A1.
+  const g0 = rows[0]?.g ?? 0;
+  const gm = (r) => (g0 - r.g) * 1000;
   const pre = rows.filter((r) => r.t < touchAt);
   const clock0 = pre.length ? pre[0].clock : null;
   const clockPre = pre.length ? clock0 - pre[pre.length - 1].clock : null;   // seconds burned before the touch
+  const idleG = pre.length ? (clock0 - pre[pre.length - 1].clock) || (pre[pre.length - 1].t - pre[0].t) / 1000 : 0;
 
   // The descent, found from the camera height series rather than from a flag:
   // the first frame where height starts falling to the frame where it stops.
@@ -151,9 +169,10 @@ function analyse(d) {
     while (iA < h.length && (yStart - h[iA].y) < 0.005 * span) iA++;
     while (iB > iA && (yStart - h[iB].y) > 0.995 * span) iB--;
   }
-  const descentMs = h[iB].t - h[iA].t;
+  const descentMs = gm(rows[iB]) - gm(rows[iA]);
   const seg = h.slice(iA, iB + 1);
-  const series = seg.map((p) => ({ x: (p.t - seg[0].t) / (descentMs || 1), y: (yStart - p.y) / (span || 1) }));
+  const segG = rows.slice(iA, iB + 1).map(gm);
+  const series = seg.map((p, i) => ({ x: (segG[i] - segG[0]) / (descentMs || 1), y: (yStart - p.y) / (span || 1) }));
   const fit = series.length > 5 ? fitEasing(series) : { name: 'n/a', rms: NaN };
   const mid = series.reduce((a, b) => (Math.abs(b.x - 0.5) < Math.abs(a.x - 0.5) ? b : a), series[0] || { x: 0, y: 0 });
   // Ground scale: on-screen size goes as 1/height, so the scale gained over the
@@ -169,14 +188,19 @@ function analyse(d) {
     if (Math.hypot(b.vx - a.vx, b.vz - a.vz) < 1e-4) dead++;
   }
   let firstMove = null;
+  const touchRow = rows.find((r) => r.t >= touchAt);
+  const touchG = touchRow ? gm(touchRow) : 0;
   for (let i = 1; i < rows.length; i++) {
     if (rows[i].t < touchAt) continue;
-    if (Math.hypot(rows[i].vx - rows[i - 1].vx, rows[i].vz - rows[i - 1].vz) > 1e-3) { firstMove = rows[i].t - touchAt; break; }
+    if (Math.hypot(rows[i].vx - rows[i - 1].vx, rows[i].vz - rows[i - 1].vz) > 1e-3) { firstMove = gm(rows[i]) - touchG; break; }
   }
-  const f0 = d.floaters[0]?.t ?? null;
-  const floaterFrac = f0 == null ? null : (f0 - h[iA].t) / (descentMs || 1);
+  // Floaters carry wall timestamps (they are DOM sightings), so convert by
+  // finding the sampled frame nearest in wall time and reading its game clock.
+  const f0w = d.floaters[0]?.t ?? null;
+  const f0 = f0w == null ? null : gm(rows.reduce((a, b) => (Math.abs(b.t - f0w) < Math.abs(a.t - f0w) ? b : a), rows[0]));
+  const floaterFrac = f0 == null ? null : (f0 - gm(rows[iA])) / (descentMs || 1);
 
-  return { rows: rows.length, touchAt, clockPre, clock0, descentMs, descentFrom: h[iA].t, fit, mid: mid.y,
+  return { rows: rows.length, touchAt, clockPre, clock0, idleG, descentMs, descentFrom: gm(rows[iA]), fit, mid: mid.y,
     groundScale, dead, firstMove, floater: f0, floaterFrac, yStart, yEnd };
 }
 
@@ -187,7 +211,7 @@ const early = analyse(await runOnce(b, 200, false));
 await b.close();
 
 const got = {
-  A1: late.clockPre ?? 0, A3: (late.touchAt || 0) / 1000, A4: late.firstMove ?? 1e9,
+  A1: late.clockPre ?? 0, A3: late.idleG ?? 0, A4: late.firstMove ?? 1e9,
   A5: late.descentMs, A6: late.fit.name, A6b: late.mid, A7: late.groundScale,
   A8: late.dead, A9: late.floaterFrac ?? -1,
   A21: Math.abs(late.descentMs - early.descentMs),
@@ -205,7 +229,8 @@ mkdirSync(OUT, { recursive: true });
 writeFileSync(`${OUT}/${WORLD}-series.json`, JSON.stringify({ late, early, got }, null, 1));
 console.log(`\nOPENING — ${WORLD} @ ${PORT}, tap at ${TAP_MS} ms (and a second run tapping at 200 ms)\n`);
 console.log(lines.join('\n'));
-console.log(`\n  descent found at t=${late.descentFrom.toFixed(0)}..${(late.descentFrom + late.descentMs).toFixed(0)} ms; camera height ${late.yStart.toFixed(1)} -> ${late.yEnd.toFixed(1)}`);
+console.log(`\n  descent (game time) ${late.descentFrom.toFixed(0)}..${(late.descentFrom + late.descentMs).toFixed(0)} ms; camera height ${late.yStart.toFixed(1)} -> ${late.yEnd.toFixed(1)}`);
+console.log(`  NOTE: durations are GAME time (the match clock), not wall clock — under swiftshader the wall runs ~10x slower.`);
 console.log(`  easing fit ${late.fit.name} (rms ${late.fit.rms.toFixed(3)}); early-tap descent ${early.descentMs.toFixed(0)} ms`);
 console.log(`  clock at the first gameplay frame ${late.clock0?.toFixed(2)} s; first floater ${late.floater == null ? 'none' : late.floater.toFixed(0) + ' ms'}`);
 console.log(`\n${fails} of ${Object.keys(BARS).length} bars failing\n`);

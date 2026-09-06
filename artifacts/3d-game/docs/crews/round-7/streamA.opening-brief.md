@@ -206,6 +206,32 @@ What it does:
 It must also emit `qa-out/opening/<world>-<frame>.png` for the first, the touch, the
 midpoint and the settle, so a human can see what the numbers describe.
 
+### 6.1 · The first run, and the instrument's own correction
+
+`qa/opening.mjs` was written and run against the untouched tree before any of the opening
+was changed. It failed 8 of 10 bars, which is what it was for. **Two of those numbers were
+the instrument's fault and are recorded here rather than quietly fixed**: it reported a
+**10,893 ms descent** for an intro the code sets to 2.2 s, and a **37 s idle** for a 2.5 s
+wait. Under swiftshader the renderer manages a few frames a second and the loop clamps `dt`
+per frame, so the world advances roughly ten times slower than the wall clock. Wall time is
+not a measure of anything the game does.
+
+The probe now measures every duration on **the match clock** (`MATCH_LEN − clock`), which
+advances in the same clamped `dt` the game itself uses, and keeps wall time for one purpose
+only: how long the probe waited before touching, which is a property of the probe.
+
+What survived the correction, and is real:
+
+| Bar | Measured on the untouched tree | Meaning |
+|---|---|---|
+| **A1** | **0.550 s of match clock burned before the first touch** | The clock is running before the player exists. This is the stream in one number. |
+| A9 | **no `+1` floater at all** during the opening | Nothing is scored while the camera comes down. |
+| A6 | best fit **ease-out-quad** on camera height | Their descent fits ease-in-out. Ours does not; it is a different curve, not a slower one. |
+| A8 | 0 dead frames *while a touch was held* | Passes only because the probe touches after the intro has finished. It will fail once the touch lands during the descent — the bar is right, the run was too gentle. |
+
+That last row is a real limitation of the first run and is written into the build order:
+step 4's probe run must tap **during** the descent, or A8 proves nothing.
+
 Registered in `qa/gate.mjs` under the push profile once green.
 
 ---
