@@ -295,6 +295,8 @@ tuning, not the world.
 
 ### L10 · Feel
 
+*Superseded in part by §11 (motion, timing and the match start, from the owner's recording).*
+
 **Not observed.** Frame rate, input latency, camera follow behaviour, sound and haptics
 all require running the game. The only feel-adjacent measurements available from stills
 are the camera pitch (≈47°) and the hole's constant screen share (22.6%→48.3% across
@@ -419,6 +421,8 @@ Honest, from the same frames — this is where our identity lives.
 
 ## 8 · Open questions and what could not be observed
 
+*Bullets 1, 3 and 4 are answered in §11 from the owner's recording; the rest stand.*
+
 - Everything in motion: idle animations, swallow duration, growth easing, camera follow,
   transitions, the ad flow, count-up timing.
 - All sound and haptics.
@@ -482,6 +486,170 @@ and 18 verified crops: `10`–`15` match detail, `20`–`22` splash, `30`–`32`
 **Tooling** (scratchpad, not committed): `probe.py` (dims/px/region/top/sat/scan),
 `find.py` (colour-cluster feature location), `chroma.py` (corrected colourfulness),
 `crop.py`, `tryweb.mjs` (the browser reachability test).
+
+## 11 · Motion, from the recording (governor's addendum)
+
+Written by the governor from the owner's 25.8 s screen recording
+(`recon/holeio/vid-owner-recording-25s.mp4`, iPhone 16 Pro Max, 1320×2868), measured
+frame by frame by the M1 timeline measurer. **This section supersedes every "not
+observed" line above that concerns motion, timing and the match start** (L1 loading,
+L2 idle animation, L3 sequence, L4 match start, L10 feel, §8 bullets 1, 3 and 4). Sound,
+swallow timing, floater lifetime, the size-up curve, growth over the match, camera follow
+and joystick behaviour are being measured by M2–M4 and are appended below as they land.
+Evidence: `recon/holeio/vid-M1-findings.md` (every number with its method),
+`vid-M1-timeline.csv`, `vid-M1-descent_scale.csv`, and four montages `vid-M1-mont_*.png`.
+
+**Frame convention.** The recording decodes to 1,547 frames at a constant 60 fps; frame N
+is at t = (N−1)/60 s. Durations are in ms at 60 fps. Frame numbers are the half-scale
+`f60` set. The recorder dropped frames at 4.30 s, 4.42 s, 7.73 s and 17.74 s (50–83 ms
+each); those gaps are filled with duplicated frames and are excluded from every timing.
+
+### 11.1 · Timeline of the clip
+
+| t (s) | frames | ms | screen / event |
+|---|---|---|---|
+| 0.00 | 1–49 | 817 | Store tab, idle |
+| 0.82 | 50–54 | 83 | Store→Holes tap: coin pill pops 25%→100%, nav hole icon grows |
+| 0.90 | 55 | 17 | Holes tab, **empty blue panel** (grid not yet drawn) |
+| 0.92 | 56–101 | 767 | CLASSIC HOLES grid; tab header bounces 300 ms |
+| 1.68 | 102 | 17 | Special-holes tab, empty panel |
+| 1.70 | 103–127 | 417 | SPECIAL HOLES grid |
+| 2.12 | 128–153 | 433 | CLASSIC HOLES grid again (drawn immediately, no empty frame) |
+| 2.55 | 154–205 | 867 | Main menu: city diorama, level pills 5–9, SOLO RUN card, PLAY |
+| 3.42 | 206–220 | 250 | LEVEL 7 booster card pops in |
+| 3.67 | 221–253 | 550 | Card static; PLAY pressed f249–253 |
+| 4.22 | 254–270 | 283 | Loading… (static) |
+| 4.50 | 271–313 | 717 | Gameplay, high idle camera, no input |
+| 5.22 | 314 | — | **Touch-down**: joystick jumps to the finger, timer starts |
+| 5.25 | 316–385 | 1,167 | Camera descent to the play height |
+| 6.42 | 386–1514 | 18,817 | Settled camera, play |
+| 25.23 | 1515–1547 | 550 | iOS Control Centre, recording stopped |
+
+The clip starts on the Store tab; the main menu is on screen for 52 frames only. Every
+tab change is a hard cut (whole-frame difference 75–87 out of 255), with the content
+drawn one frame after the panel.
+
+### 11.2 · Menu and store at rest
+
+- **Store (f1–49): one idle animation.** The four-point white sparkle on the ADS banner
+  twinkles with a scale pulse whose half-period is ≥ 25 frames (full period not
+  measurable in 49 frames). Nothing else moves: the sunburst rays do not rotate
+  (< 0.25° over 49 frames), the nav icon is static to the pixel, no shine sweeps cross
+  the coin packs, and the FREE button does not pulse.
+- **Holes tab entrance (f55–72):** the active tab header bounces (top edge 194→203→199
+  half-px, settled in 18 frames = 300 ms); the nav hole icon grows 90→177 half-px with
+  an ease-out over 25 frames (417 ms); the green "+" on the coin and ticket pills pops
+  f67–80 with a 2× overshoot (11→33→17 px). After it settles, nothing on the tab is
+  periodic.
+- **Main menu entrance (f154–177):** the nav hole icon shrinks 177→90 in 6 frames
+  (100 ms); the coin pill pops **with overshoot** (yellow area 61→674→~510 px, 15 frames
+  = 250 ms); the PLAY button's colour settles over 23 frames (383 ms) at constant size,
+  so a sheen fade, not a scale.
+- **Main menu at rest (f162–199): the city drifts.** Sub-pixel template tracking shows
+  the tallest tower's helipad moving +6.0 px x / −1.0 px y over 37 frames (0.16 px/frame
+  half-res, 0.32 full-res) while the island base, the SOLO RUN card, PLAY and the HUD do
+  not move at all. The fit is not a 2D rotation, translation or scale of the frame; it is
+  consistent with a **slow 3D camera orbit of the diorama**, accelerating across the
+  window (period and reversal not measurable in 46 frames). The helicopter's rotor shows
+  no resolvable rotation beyond the drift. **The UI is static; only the world moves.**
+- **PLAY tap → card (f200–218):** the backdrop dims linearly, luminance 43.7→20.6
+  (−53%) over 19 frames (317 ms), ~1.6 lum/frame; the HUD dims with it.
+
+### 11.3 · The LEVEL 7 booster card
+
+- **Pop-in:** scale from the screen centre with **~10% overshoot**: interior width
+  125→…→641 (peak, f214) →583 (final, f220). 9 frames to peak, 6 to settle, **15 frames
+  = 250 ms**. The card's PLAY pill then pops separately (f215–230, 16 frames, ~16% area
+  overshoot) and the orange X after it (f224–238, 15 frames, large overshoot). Three
+  staggered pops, ~150 ms apart.
+- **Geometry (full-res f240):** outer card 1,230×1,698 px = 93.2% of width, **59.2% of
+  height** (top at 24.5%, bottom at 83.7%). Cream header, orange body with two white
+  slot tiles (345×447 each), cream lower panel with a torn-paper edge at the join, blue
+  footer with a darker lip. PLAY pill 670×223 px = 50.8% of screen width. X close ~105 px
+  = 8% of width. Colours: frame `#6c7ff2`, cream (250,241,224), orange (252,170,95),
+  PLAY green (95,208,18)→(130,226,42), lip (74,91,227).
+- **Strings, verbatim:** "LEVEL 7" · "Lv. 9" · "Lv. 13" · "Select Boosters to start with
+  an advantage!" (two centred lines) · "PLAY". Two slots, both locked, unlock labels
+  Lv. 9 and Lv. 13. No booster names, no third slot, no price. The badge behind reads
+  LEVEL 8 while the card and the selected pill say 7.
+- **Press state:** PLAY darkens (green area 19,583→16,383) over f249–253, then a hard
+  cut to Loading.
+
+### 11.4 · The loading screen is static
+
+283 ms (17 frames). Royal-blue ground (19,87,205), a stack of objects falling into a hole
+with vertical light streaks (tree, hydrant, taxi), small stars, "Loading…" text. No
+progress bar. Object centroids move < 0.03 px/frame, region luminance 109.00→109.02:
+**nothing moves, fades or loops.** The recorder dropped six frames here, consistent with
+the app stalling while it loads. This corrects the L1 assumption that the ring animates:
+there is no ring in this build's loading screen, and the screen is a still.
+
+### 11.5 · The match opening
+
+- **Idle phase (f271–313, 717 ms).** The camera starts high and does not move (cone
+  scale 1.0000 ± 0.0002 over 43 frames); the hole is 22×14 half-px, static; a joystick
+  ring (77×77 half-px, ~154 px full-res) is already drawn, knob concentric. **The match
+  does not start until the player touches.**
+- **The goal scroll is timer-driven, not input-driven.** Rolled scroll visible by f301
+  (0.5 s after gameplay begins), **unrolls f308–314 (7 frames, 117 ms)**, open
+  f315–337 (383 ms), rolls up f338–343 (100 ms), gone f344. It unrolls before any input
+  and rolls up during the descent.
+- **Touch-down f314.** The joystick jumps from its default spot (326.6,1072.0) to the
+  finger (476.2,1013.8): **floating joystick** that re-anchors on touch. Knob deflection
+  begins f319; **the hole first moves f321** (7 frames after touch-down, ~117 ms).
+- **The descent (f316–385, 70 frames = 1,167 ms).** Ground scale ×4.755 (cone-pair
+  tracking; hole interior width 22→108 half-px agrees within 3%). Camera-height progress
+  fits **ease-in-out** (RMS 0.063 vs linear 0.113, ease-out 0.155); 50% at t = 0.45,
+  10%/90% at f330/f366. Thresholds on the same series: 1–99% = 1,050 ms, 5–95% = 800 ms.
+  Ground-scale progress fits ease-in-quad. The camera also tilts toward top-down: hole
+  aspect 0.64→0.80, view angle from vertical ≈50°→≈37° (rough). The camera ends at
+  ~21% of its starting distance.
+- **The first reward lands during the descent.** The hole eats its first cone f340–356
+  and the first "+1" floater pops **f356**, while the camera is still at 45% of the way
+  down. The "Size 1" bar pops in one frame at f369; the timer ring scales in f372–383
+  (12 frames, 200 ms). The HUD is off screen f271–371.
+- **The timer starts on the touch, not on the load.** Digit changes every 62.33 frames
+  (linear fit, residuals ≤ 0.6 frame): **1.039 s per displayed second** at 60 fps
+  (1.048 s if the recorder was 59.49). Extrapolated back, 4:00→3:59 lands at f376 and
+  the 4:00 start at f313.7 = the touch-down frame. So the idle phase is free, the descent
+  is on the clock.
+- **Joystick:** first drawn on the first gameplay frame at a default position; on touch it
+  re-anchors to the touch point; deflection follows the finger. Whether a finger was
+  already down at f271 cannot be distinguished.
+
+### 11.6 · What this changes in the build plan
+
+1. **Match start is gated on input; the clock starts with the finger.** We currently
+   start the match on load. Hole.io gives 0.7 s of free high-camera idle, then a 1.17 s
+   ease-in-out descent that is *on the clock* and already paying out (+1 at 45%).
+2. **Every UI entrance is a scale pop with 10–16% overshoot in 250 ms**, staggered
+   ~150 ms per element (card → PLAY → X). Coin pills pop with overshoot on every tab
+   change. Tab changes are hard cuts, content one frame late.
+3. **The menu world moves; the menu UI does not.** A slow diorama orbit of ~0.3 px/frame
+   at full-res is the only motion, and it is enough.
+4. **The loading screen is a still** and lasts 283 ms. We do not need a loading
+   animation; we need a loading illustration and a fast load.
+5. **The goal scroll is a timer:** 117 ms unroll, 383 ms open, 100 ms roll-up, before
+   any input. It never waits for the player.
+6. **Floating joystick** that re-anchors on touch-down; ~117 ms from touch to first
+   movement.
+
+### 11.7 · Corrections to this addendum
+
+1. **Frame rate.** My first pass assumed the container's 59.49 fps. M1 decoded the source
+   at both rates and matched the extracted frames: mean absolute difference 2.3–4.5 at
+   60 fps against 7.2–22.4 at 59.49 fps. The set is 60 fps; frame N is at (N−1)/60 s. All
+   timings in this section use 60 fps.
+2. **Match start.** §8 said no frame shows a match start. The recording does: the match
+   starts on touch, not on load, and the timer starts with the touch.
+3. **Loading animation.** L1 assumed a loading ring that might animate. The build's
+   loading screen has no ring and nothing animates.
+4. **The descent length.** M1's summary table lists the descent window as f314–385
+   (1,200 ms) measured from touch-down; the scale series shows motion from f316. The
+   report uses **f316–385 = 1,167 ms** as the descent and f314 as the touch.
+
+*M2 (swallow, floaters, size-up), M3 (growth, camera follow, joystick), M4 (audio) and
+the skeptic's verdict are appended below when they land.*
 
 ---
 
