@@ -18,7 +18,7 @@
 // Chroma is (max-min)/255, not HSL saturation: near-black reports S=100% and
 // that error once made a dimmed end card read as the most colourful frame in the
 // reference set. See docs/crews/round-7/holeio.recon.md §9.
-import { chromium } from 'playwright';
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
 
@@ -139,41 +139,32 @@ function rimOf(img, v) {
   return { width: 100 * lit / row.length, contrast };
 }
 
-async function shoot(browser, world) {
-  const p = await browser.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 3 });
-  p.setDefaultTimeout(400000);
-  await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
-  await p.addInitScript(() => { try {
-    localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
-    localStorage.setItem('voidDailyLast', new Date().toDateString());
-  } catch { /* private mode is fine */ } });
-  await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 300000 });
-  await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
-  await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
-    if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${world}"]`);
-  await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 5, null, { timeout: 400000 });
-  mkdirSync(OUT, { recursive: true });
-  const path = `${OUT}/${world}-spawn.png`;
-  await p.screenshot({ path });
-  await p.close();
-  return path;
+// Frames come from qa/_worldshots.mjs, not from a second copy of the same
+// browser dance. The first version of this probe drove Chromium itself and hung
+// for 400 s waiting on the match clock, because the bare-URL boot takes a
+// different path through the world picker than the one _worldshots already
+// solved. Reusing it also guarantees these frames are the SAME frames as the
+// committed baseline in docs/crews/round-7/recon/self/, so a before/after
+// comparison is like for like.
+function frameFor(world) {
+  const p = `qa-out/gw/${world}-spawn.png`;
+  if (!existsSync(p)) {
+    execFileSync('node', ['qa/_worldshots.mjs', world, String(PORT)], { stdio: 'inherit' });
+  }
+  if (!existsSync(p)) throw new Error(`no spawn frame for ${world} at ${p}`);
+  return p;
 }
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
-  args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 const rows = [];
+mkdirSync(OUT, { recursive: true });
 for (const world of WORLDS) {
-  const path = await shoot(b, world);
+  const path = frameFor(world);
   const img = readPNG(path);
   const st = stats(img);
   const v = findVoid(img);
   const rim = v ? rimOf(img, v) : { width: 0, contrast: 0 };
   rows.push({ world, ...st, share: v ? v.share : 0, rim: rim.width, contrast: rim.contrast });
 }
-await b.close();
 
 // Their two frames, measured by the identical function, so the table is one artefact.
 for (const [f, label] of [['02-match-city.png', 'HOLE.IO city'], ['10-match-flowers-size1.png', 'HOLE.IO flowers']]) {
