@@ -1,7 +1,9 @@
-# The polish plan — THE CUTE WORLD ENDER against HOLE.IO (round 7, draft 1)
+# The polish plan — THE CUTE WORLD ENDER against HOLE.IO (round 7, draft 2)
 
-*Governor's draft for the owner. Nothing here is built. Every bar is a number a probe
-can fail. The owner approves streams and order before a crew is briefed.*
+*Governor's plan, with the owner's decisions of 2026-09-06 folded in (§4). Nothing here is
+built. Every bar is a number a probe can fail. Operating model from here: the governor
+writes each stream's brief and gives the skeptic verdict; Opus at max effort builds and
+runs the probes.*
 
 **Sources.** `holeio.recon.md` (Opus's ten-lens report, §6 twenty mechanisms, §11 motion
 from the owner's recording) and a code map of our build taken today (file:line cited
@@ -56,8 +58,10 @@ never waits.
 gate exists only on the reload path (`:6398`).
 
 **Bars.**
-1. High-camera idle after load, clock stopped, until the first touch. Idle ≥ 0.5 s is
-   free; there is no upper limit.
+1. High-camera idle after load, clock stopped, until the first input. The clock starts
+   on the first touch-down (in the recording the hole first moves 7 frames later, so
+   "starts when you move" and "starts when you touch" differ by ~120 ms; we start on the
+   touch). Idle ≥ 0.5 s is free; there is no upper limit.
 2. Touch-down → hole moves within 8 frames at 60 fps (theirs: 7).
 3. Descent 1.10–1.30 s, ease-in-out on camera height (50% at t = 0.40–0.50), ground
    scale ×4–5, controls live from the first frame of the descent.
@@ -84,7 +88,7 @@ gate exists only on the reload path (`:6398`).
 touch→move latency, descent length and easing fit, time of first floater, goal card
 timings. Fails on any bar.
 
-### B · The menu is a world (L)
+### B · The menu is a world (L) — first update, not launch
 
 **Mechanism.** Same violet as ours. The hero is a live 3D diorama of the selected level
 at ~49% of frame height, on a slow orbit (~0.3 px/frame at full-res); the UI never moves;
@@ -102,10 +106,12 @@ PLAY is two taps. The art is good; it is a poster, and it is dark.
 **Bars.**
 0. The menu ground is lifted toward theirs: value 0.55–0.75, chroma 0.40–0.55, still
    violet. Measured at the four corners of `qa/menushot.mjs`'s frame.
-1. The menu's hero is the selected world's island, rendered live (the same island build,
-   low-cost variant), occupying 45–52% of frame height, on a camera orbit of 0.25–0.4
-   px/frame at 1320-wide; the crowd idles; the void sits on it in its current skin and
-   hat.
+1. The menu's hero is the **current level's world**, rendered live in 3D behind the
+   level picker (the same island build, low-cost variant), occupying 45–52% of frame
+   height, on a camera orbit of 0.25–0.4 px/frame at 1320-wide; the crowd idles; the void
+   sits on it in its current skin and hat; the scene changes when the current level
+   changes world. Owner's words: "when you're at this level the background of the level
+   picker is animated in 3D, super high quality."
 2. Menu UI: zero motion at rest except the coin pill's entrance pop (250 ms, 10–20%
    overshoot) and the PLAY sheen (≤ 400 ms).
 3. The ladder row (stream C) sits under the hero; PLAY under it. One tap to play.
@@ -133,17 +139,23 @@ in-match goal is "eat everything"; a day-seeded quest board exists (`QUEST_POOL`
 `prototype3d.ts:3648`) but is hidden in play (`index.html:474`) and shown only on the end
 card; solo mode has `% DEVOURED`.
 
-**Owner's decision needed.** ×3 or ×5 per world. The three that exist as mechanics
-already: **(1) EAT** — reach N points on the bar; **(2) SET** — eat N of each of three
-kinds, counting down per kind (our `cars`/`houses`/`big`/`gold` pools are the kinds);
-**(3) CLEAR** — 100% devoured (solo's `voidBestPct` is the counter). Two more that need
-new logic: **(4) RIVALS** — finish first against the named rivals; **(5) RUSH** — N points
-in a shortened clock. Recommend ×3 now, ×5 after launch, so 18 levels ship first.
+**Decided (owner, 2026-09-06, clarified): five levels per world — four timed goals, then
+the clear.** On a goal level, reaching the goal inside the clock **wins the level on the
+spot**, as in Hole.io; the clock running out fails it. The fifth level is 100% devoured.
+The four goals, in order: **(1) EAT** — reach N points on the bar; **(2) SET** — eat N of
+each of three kinds, counting down per kind (our `cars`/`houses`/`big`/`gold` pools are
+the kinds); **(3) LANDMARK** — eat the world's hero landmark before the clock (the
+`heroCue` prop, which every world already has); **(4) RIVALS** — be the biggest void
+when the clock ends, against the named rivals (rank is already computed for the crown
+banner; this is the one goal that cannot end early, because it is decided at the
+buzzer). **(5) CLEAR** — 100% devoured (solo's `voidBestPct` is the counter). That is
+**30 levels at launch**. RUSH (N points on a short clock) is held for the first update.
 
 **Bars.**
-1. Level = (world, goal). 18 levels at ×3; the pip row shows five at a time with the
-   current one centred; unlock is strictly sequential; state persists (new key
-   `voidLevels`, versioned).
+1. Level = (world, goal). 30 levels; the pip row shows five at a time with the current
+   one centred; unlock is strictly sequential; state persists (new key `voidLevels`,
+   versioned). A goal level ends the moment the goal is met: the end card opens on that
+   frame with the win, and the clear level runs the full clock.
 2. Pip states with four distinct colours at ≥ 3:1 from each other and from the ground;
    the current pip 25–35% wider than the others.
 3. Each level's goal is on the goal card (stream A bar 5) as one line of ≤ 6 words, and
@@ -153,10 +165,10 @@ in a shortened clock. Recommend ×3 now, ×5 after launch, so 18 levels ship fir
    after the card is up); 100% clear turns it magenta with a distinct sound.
 5. Difficulty: goal N per world tuned so the median tester clears level 1 of a world
    in one run and level 3 in ≤ 3 runs (measured in the playtest, not asserted).
-6. The daily quest board is retired into this system, or kept only as the end card's
-   bonus row. Owner's call; recommend retire.
+6. The daily quest board is **retired** (owner's decision); its pools become the SET
+   level's kinds and its code path is removed, not hidden.
 
-**Probe.** `qa/ladder.mjs`: state machine test over all 18 levels (unlock order, persist,
+**Probe.** `qa/ladder.mjs`: state machine test over all 30 levels (unlock order, persist,
 100%-clear flag), pip contrast, HUD counter presence at t = 5/88/163 s.
 
 ### D · Colour and pop (M)
@@ -232,9 +244,8 @@ NEW WORLD card ✓; growth bar on the HUD (`index.html:168`).
 4. End card: the *level pip* lights first (stream C), then coins count up (keep 900 ms),
    then the next reward, drawn as its own illustration behind a padlock (island art per
    world exists in the poster set), then PLAY AGAIN.
-5. Whether the size read moves from the HUD to under the void is the **owner's call**;
-   it was moved to the HUD once for legibility. Recommend: the momentary pop at the void
-   plus the persistent bar on the HUD, not one or the other.
+5. Size read: **both** (owner: "do what you believe is AAA") — the momentary "SIZE N"
+   pop at the void on each size-up, and the persistent bar on the HUD.
 
 **Probe.** `qa/_juiceshots.mjs` extended with frame timing of the size-up beat and floater
 lifetimes; the end-card order asserted by DOM timestamps.
@@ -268,8 +279,8 @@ build now; revisit after C ships.
 3. **D · colour and pop** — bars 1, 3, 4 first (stage, rim, screen share), then 2, 5, 6.
 4. **C · the ladder (×3)** with **E · the beat** — they share the goal card and the end
    card, so one crew.
-5. **B · the menu** — last, because it renders the island from C's level state and D's
-   materials; building it first would build it twice.
+5. **B · the menu** — first update (owner's decision), because it renders the island from
+   C's level state and D's materials; building it first would build it twice.
 6. **F** rides with A.
 
 Each stream: brief → build → probe → skeptic verdict → gate → commit. Corrections are
@@ -284,18 +295,16 @@ recorded in the stream's brief, never hidden.
 - Copy their strings, their island illustration, their sounds or their skins.
 - Ship any stream without its probe passing on the reference viewport (430×932, DPR 2).
 
-## 4 · Decisions the owner owns
+## 4 · Decisions, taken by the owner on 2026-09-06
 
-1. ×3 or ×5 goals per world at launch (recommend ×3, 18 levels).
-2. Size read under the void, on the HUD, or both (recommend both, as in E bar 5).
-3. Retire the daily quest board into the ladder, or keep it as the end card's bonus row
-   (recommend retire).
-4. Per-world intro length: 1.2 s default, or a named exception (recommend no exceptions).
-5. Whether stream B (the live menu) is in the launch scope or the first update.
-6. **Stepped growth or continuous growth.** Their hole is exactly one size for the whole
-   of a tier and steps at the threshold (§11.9); ours grows continuously with mass. The
-   step is what makes the size-up a beat. *Recommend: keep mass continuous, quantise the
-   visible radius to the form, and let the growth bar carry the in-between progress.*
+| # | question | decision |
+|---|---|---|
+| 1 | goals per world | four timed goals + the 100% clear = five levels per world, 30 at launch; reaching a goal inside the clock wins the level on the spot (RIVALS is decided at the buzzer) |
+| 2 | size read | governor's call → both: pop at the void, bar on the HUD |
+| 3 | daily quest board | retire |
+| 4 | when the clock starts | on the first input (owner: "once you move"; measured: on the touch, movement 7 frames later) |
+| 5 | live menu | first update; the level picker's background is the current level's world, animated in 3D |
+| 6 | stepped or continuous growth | open — governor recommends quantised visible size with continuous mass underneath |
 
-*Draft 1, written before M2–M4 and the skeptic returned. Placeholders marked † are
-filled and the file re-issued as draft 2 when §11.8–11.11 land.*
+*Draft 2, 2026-09-06. † placeholders in stream E are filled when M2 (swallow, floaters,
+size-up label and burst) and M4 (audio) land and the skeptic has ruled.*
