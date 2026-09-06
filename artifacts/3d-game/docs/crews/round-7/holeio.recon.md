@@ -597,8 +597,9 @@ there is no ring in this build's loading screen, and the screen is a still.
 - **Touch-down f314.** The joystick jumps from its default spot (326.6,1072.0) to the
   finger (476.2,1013.8): **floating joystick** that re-anchors on touch. Knob deflection
   begins f319; **the hole first moves f321** (7 frames after touch-down, ~117 ms).
-- **The descent (f316–385, 70 frames = 1,167 ms).** Ground scale ×4.755 (cone-pair
-  tracking; hole interior width 22→108 half-px agrees within 3%). Camera-height progress
+- **The descent (f313–385, 72 frames = 1,200 ms; first moved frame f314).** Ground scale
+  **×6.0 at the screen centre** — see §11.11, where the ×4.755 cone-chain figure is
+  corrected and the magnification is shown to vary 1.9×–8.2× across a single frame. Camera-height progress
   fits **ease-in-out** (RMS 0.063 vs linear 0.113, ease-out 0.155); 50% at t = 0.45,
   10%/90% at f330/f366. Thresholds on the same series: 1–99% = 1,050 ms, 5–95% = 800 ms.
   Ground-scale progress fits ease-in-quad. The camera also tilts toward top-down: hole
@@ -658,7 +659,7 @@ Evidence: `recon/holeio/vid-M3-growth_camera_joystick.md` (every number with its
   (31.2%) for the whole of Size 2. Growth is a step at a threshold, not a slope. Aspect
   (vertical/horizontal extent) 0.635 → 0.689: the camera tilts toward top-down as the
   hole grows.
-- **The size-up is one frame, then two curves.** At f785 (t = 13.07 s) the label flips
+- **The size-up is one frame, then two curves.** At f785 (t = 13.07 s; the world's own size overshoots +9% here — a spring, see §11.11) the label flips
   "Size 1" → "Size 2", the size bar empties to zero, and the interior jumps 294 → 336 in
   the same frame. Screen diameter then rises to a **peak of 538 px at f799–800 (15
   frames, 250 ms, ease-out, k = 1.47)**, falls back over 16 frames, and settles at 412 by
@@ -676,16 +677,17 @@ Evidence: `recon/holeio/vid-M3-growth_camera_joystick.md` (every number with its
   1451): screen-centre x, 17 px below centre y (50.6% of height).
 - **Joystick: floating and dragged.** Default drawn at (659, 2148) = screen-centre x,
   74.9% of height, **ring radius 165 px** (25% of width as a diameter), knob radius ~84
-  px, knob clamp **≈173 px** (ring + 8). Touch-down re-places the base under the finger
+  px, knob clamp **174.6 ± 0.1 px** = 1.058 × the ring (§11.11). Touch-down re-places the base under the finger
   (320 px from the default). While the knob is at full deflection the base is **dragged
   along the knob direction** (moved > 12 px in 28% of 10-frame windows; base-motion
   angle − knob angle: median 0.4°). Release snaps the joystick back to the default in
   **one frame**, no tween; the hole then decelerates sharply (13 → 5 px/frame in two
   frames) with a tail halving every ~12 frames.
-- **Speed is not proportional to deflection.** Ground speed at the hole is 11–14
-  px/frame at every deflection above 60 px (bins 60–120: 12.8; 150–165: 13.6; 172–178:
-  13.2). The joystick is a **direction control at constant speed**; steering follows the
-  knob's screen direction with a **5-frame (83 ms) lag**, no axis rotation.
+- **Speed against deflection: not measurable from this clip** (§11.11). Ground speed runs
+  7.3–16.5 px/frame, median 11.4, and the deflection sits within 15 px of the clamp for 97%
+  of the only touch in the recording, so no bin below the clamp carries more than a handful
+  of frames. Steering does follow the knob's screen direction with a **5-frame (83 ms)
+  lag**, no axis rotation — that part is independently confirmed.
 - **Screen speed is constant across sizes.** Full-deflection speed 12.7 px/frame at
   Size 1, 13.6 at Size 2 (+7%). In ground units the Size 2 hole travels ~1.65× faster:
   the world speed scales with the size so the screen speed does not.
@@ -696,8 +698,8 @@ Evidence: `recon/holeio/vid-M2-findings.md`. Full-resolution px (1320×2868), 60
 
 - **Twenty-five eats in the clip**: 19 cones, 4 lamp posts, 2 people, between f357 and
   f1430.
-- **A cone does not rotate. It is dragged.** The cap width stays 83–88 px and the
-  principal-axis angle stays constant while the object is pulled toward the hole centre
+- **A cone does not rotate. It is dragged.** The principal-axis angle stays constant
+  (≤ 1.5° of wander, which is perspective; the cap width *falls* 10–12% as it sinks — §11.11) while the object is pulled toward the hole centre
   and then drops in **6 frames (101 ms)**. Whole event, first pixel over the interior to
   last pixel visible: **15–17 frames (252–286 ms)**.
 - **A lamp post tips over.** Its angle from vertical goes 5° → 62° in 14 frames on one
@@ -758,18 +760,75 @@ Evidence: `recon/holeio/vid-M4-findings.md`. Levels are relative to the clip's p
 - **Eat sounds land within ±4 frames (±67 ms) of the object starting to sink.**
 - Loudest half-second is the sting at −17.4 dBFS; a run of ordinary eats sits far below it.
 
-### 11.11 · The skeptic did not run
+### 11.11 · The skeptic's verdicts
 
-The independent re-measurement of the headline numbers (descent easing, swallow duration,
-size-up overshoot, floater lifetime, joystick behaviour) was launched twice and failed
-both times on account limits, not on the material. **Nothing in §11 has been adversarially
-re-measured.** Two things reduce the risk and neither removes it: M1 and M3 each verified
-their own two headline numbers by a second method (frame rate at three frames, hole
-diameter by extent and by ellipse fit, zoom by ground features and by optical flow), and
-M2's and M3's independent measurements of the same size-up agree (rim 383 → 531 px, ratio
-1.39, against M3's interior 294 → 412 px, ratio 1.40). The skeptic pass is owed before any
-number here is used as a build bar.
+Five independent skeptics were given one headline number each, told to **refute** it, told
+to default to refuted when they could not reproduce it, and forbidden to read the original
+measurer's code before producing their own number. Four claims survived with corrections;
+**one was refuted outright.** Their working is under `scratchpad/recon/vid/verify/`.
 
+| # | Claim | Verdict | What changed |
+|---|---|---|---|
+| 1 | Descent f316–385 = 1,167 ms, ground scale ×4.755, ease-in-out on height | **corrected** | **f313→f385 = 72 frames = 1,200 ms exactly**; **ground scale ×6.0 at the screen centre**, not ×4.755. Easing untouched. |
+| 2 | A cone does not rotate; the rim does not react | **corrected** | Rotation and the rim both confirmed, harder than claimed. **The cap width is not constant** — it falls 10–12% across the eat. |
+| 3 | The size-up hump is a fast world step × a slow camera zoom, world overshoot ≤ 4% | **REFUTED** | **The world size itself overshoots +9% — a real spring.** Camera zoom ÷1.47, world step ×2.08. |
+| 4 | The "+1" floater lives exactly 60 frames | **corrected** | **Confirmed and strengthened**: the suspicion was backwards. Rise 67 px, fade 0.0181/frame. |
+| 5 | Floating and dragged joystick; constant speed, direction only | **corrected** | Mechanics confirmed to a pixel. **The constant-speed claim is refuted as stated and is not measurable from this clip.** |
+
+**1 · The descent is 1,200 ms and the ground magnifies ×6.0.** The skeptic refused the red
+cones and used the hole's own ground footprint, measured two ways, cross-checked against a
+dense optical-flow homography and validated on 80 frames where the camera is provably
+static (constant to ±0.06%). Frames 300–313 are dead still to 0.0000 px; **f314 is the
+first frame that moves**; f316 is merely the first frame whose motion exceeds 0.1 px — three
+frames into an ease-in whose whole point is a near-zero opening. So the move is **72 frames
+= 1.2000 s exactly**, a clean authored duration the 70-frame reading hid.
+
+The scale error has a structural cause worth keeping: **ground magnification is not uniform
+across the frame.** Over one window the skeptic measured local magnification running from
+1.9× at the top of the frame to 8.2× at the bottom — a 4.3× spread within a single frame,
+because the camera is perspective and tilted. A median over a cloud of cone blobs samples
+that whole field and drifts toward the low end. *"The ground scale grows ×4.755" is not a
+well-defined number without saying where on the screen it was measured; at the point the
+camera converges on, it is 6.0.* The easing survives untouched: 50% of camera height at
+t = 0.445 against the claimed 0.45, ease-in-out beating linear by 3× in fit error.
+
+**2 · The swallow, harder.** No rotation: the cone's screen axis wanders ≤ 1.5° across a
+250 px traverse, which is perspective, not spin. The rim: across four eats the outer ellipse
+moves ≤ 0.5 px on both axes against a ±0.03 px noise floor, with no pulse — **their rim
+genuinely does nothing.** But the cap width is *not* constant at 83–88 px; it is 105–108 px
+at rim contact falling to 94–95 px as the cone goes down, −10 to −12%. The object shrinks in
+perspective as it sinks, which is the honest reading of "it is dragged in and sinks".
+
+**3 · The size-up is a spring, and this is the refutation that changes our build.** The
+claim was that the visible hump is entirely a fast world step multiplied by a lazy camera.
+The skeptic measured the camera zoom three independent ways over the decisive window and got
+×1.138 where the original chain gave ×1.208 — and falsified the original directly against a
+bollard whose real size cannot change (the inflated zoom predicts a 42.3 px base at f845; the
+correct one predicts 48.3; measured 47.9). With the corrected camera, **the world size
+overshoots by +9%** and its peak *lags* the screen peak by 2–3 frames, which a pure
+step-times-camera product cannot produce. Roughly half the hump is camera, half is a genuine
+spring in the world.
+
+**4 · The floater survived the strongest attack.** The skeptic set out to break the
+suspiciously round 60 frames and found the suspicion was backwards: thresholding
+*under*-counts. A blob detector sees a median of 27 frames; the missing 33 are real,
+sub-threshold and measurable, with two independent estimators agreeing to ±0.005 alpha. The
+glyph is drawn on frames 0–59, every time. Rise 67.0 ± 0.6 px; fade 0.0181/frame.
+
+**5 · The joystick, and a lesson about our own bar.** Every mechanic was reproduced almost
+exactly — base jump 321 px against 320, dragged in 28.8% of windows against 28%, one-frame
+snap-back, 5-frame steering lag. The clamp is tighter than reported: **174.6 ± 0.1 px =
+1.058 × the 165 px ring**, and the original's ±3.7 was its own detector's noise. But the
+claim that matters for us fails twice: speed is **not** constant (median 11.4 px/frame,
+range 7.3–16.5, only 45% of frames inside the claimed 11–14), and **the test was never
+possible** — the deflection sits within 15 px of the clamp for 97% of the touch, so the
+original's "bins" carried six and seven frames each. *We cannot conclude anything about how
+their speed responds to deflection from this recording.* Our own bar A17 must be written as
+a design decision we own, not as a copy of a measurement that does not exist.
+
+**What this pass cost and what it bought.** Eight agents, 1.6M tokens, and it moved four
+numbers, killed one mechanism, and told us one of our bars was built on sand. Every number in
+§11 now carries either a second method by its own author or an independent adversary.
 
 ---
 

@@ -159,19 +159,19 @@ beaten.
 | A2 | Any scoring, rival, beat or newsroom event before the first touch | **none** | none observable | §11.5 |
 | A3 | Idle length available before touch | **≥ 0.5 s, unbounded** | 717 ms then the player touched | §11.5 |
 | A4 | Touch-down → void first moves | **≤ 8 frames (133 ms)** | 7 frames (117 ms) | §11.5 |
-| A5 | Descent duration | **1.10–1.30 s** | 1,167 ms | §11.5 |
+| A5 | Descent duration | **1.10–1.30 s** | **1,200 ms** (72 frames exactly, §11.11) | §11.5 |
 | A6 | Descent easing, camera **height** progress | **ease-in-out**, 50% at t = 0.40–0.50 | ease-in-out, 50% at t = 0.45 | §11.5 |
-| A7 | Ground scale over the descent | **×4.0–5.5** | ×4.755 | §11.5 |
+| A7 | Ground scale over the descent, **measured at the screen centre** | **×5.5–6.5** | **×6.0** (§11.11 — the ×4.755 figure was a cone-chain artefact; magnification varies 1.9×–8.2× across one frame, so the measuring point must be stated) | §11.5 |
 | A8 | Frames of the descent with controls dead | **0** | 0 | §11.5 |
 | A9 | First "+1" floater | **within the descent, at 30–60% of it** | at 45% (f356 of f316–385) | §11.5 |
 | A10 | Edible prop within reach at spawn | **≥ 1, in every world, every level** | not guaranteed | §11.5, ours by design |
 | A11 | Goal card: unroll / open / roll-up | **≤ 150 ms / 350–600 ms / ≤ 150 ms** | 117 / 383 / 100 ms | §11.5 |
 | A12 | Goal card starts | **~0.5 s after the first gameplay frame, on a timer, regardless of input** | f301 ≈ 0.5 s, timer-driven | §11.5 |
 | A13 | Frames in which the goal card blocks or swallows input | **0** | 0 | §11.5 |
-| A14 | Joystick base on touch-down | **anchors under the finger** | jumps 320 px from its default | §11.9 |
+| A14 | Joystick base on touch-down | **anchors under the finger** | jumps 321 px from its default (§11.11) | §11.9 |
 | A15 | Joystick ring diameter | **24–26% of screen width** | 330 px of 1320 = 25.0% | §11.9 |
 | A16 | Steering lag, knob direction → travel direction | **≤ 100 ms** | 5 frames = 83 ms | §11.9 |
-| A17 | Speed at full deflection, across sizes | **constant within 10%** | 12.7 → 13.6 px/frame (+7%) | §11.9 |
+| A17 | Speed at full deflection, across sizes | **constant within 10%** — *our design decision, not a copy* | **not measurable from their recording** (§11.11: their speed runs 7.3–16.5 px/frame and the deflection never leaves the clamp) | ours |
 | A18 | Void screen share at spawn | **22–26% of width** | 22.6% | §2 L4, `recon/self/` |
 | A19 | Hero landmark in frame at the settled camera | **yes, every world** | n/a — they have none | ours |
 | A20 | Sound in the opening | **arrival, goal card, descent bed, first bite all audible** | silent until 6.14 s | §11.10 |
@@ -264,7 +264,66 @@ Registered in `qa/gate.mjs` under the push profile once green.
 
 ---
 
-## 7. THE RISKS, NAMED
+## 7. THE CODE, SITE BY SITE
+
+Located by three read-only scouts against this tree. Line numbers are `src/prototype3d.ts`
+unless the path says otherwise.
+
+### 7.1 · The four discoveries that would have broken this build silently
+
+1. **`:9955` — the camera never renders the authored `camDist`.** It renders a first-order
+   lag of it: `camFollow.lerp(tmpV, 1 - Math.exp(-5.0 * dt))`, a 0.2 s time constant. Over a
+   2.2–3.6 s intro that is invisible. **Over a 1.2 s descent it is a sixth of the whole
+   move** — an authored ease-in-out would arrive as something else entirely. The spring must
+   be bypassed or seeded for the descent.
+2. **`:9230` — attract mode drives the void by itself.** `else if ((!started ||
+   DEBUG_HARNESS) && tClock - lastInput > 4)` — after four seconds without input on an
+   unstarted match, the void starts moving on its own. An idle with *no upper bound* is bar
+   A3; today the idle auto-plays. This must be re-gated before the arrival exists.
+3. **`:3306` — keyboard steering is gated on `started`.** `if (started && MOVE_KEYS…)`. If
+   the match only starts on touch, a desktop player or a probe pressing W can never start
+   it. The match must be startable from any input, not only a pointer.
+4. **`:9034` — one line is the entire control lockout.** `if (introT > 0) { const dk =
+   Math.pow(0.9, dt * 60); velX *= dk; velZ *= dk; }`. Nothing else in the movement path is
+   gated on the intro. **Deleting this line is bar A8.** `controlsLive` (`:9855`) turns out
+   to be a *display* flag for the teaching hand (`:9678` is its only input-facing use), not a
+   lockout at all.
+
+### 7.2 · The sites
+
+| Site | What it is | Change |
+|---|---|---|
+| `:5793` `beginMatch()` | the single tail of every entry path; arms and starts the match in one synchronous call | **Split into `armMatch()` and `startMatch()`.** Arm does clearRun, placeStickers, validateWorld, gildTreasure, the HOUR deal and the camera park. Start does the clock, the music, the descent. |
+| `:5751` `let started = false, startT = 0` | the *only* "match is live" flag in the file | The fork in the road. Either `started` moves to touch-down and every consumer moves with it, or a second flag is introduced. Scout's recommendation: move it, and audit the consumers below. |
+| `:5865` `started = true; startT = tClock;` | fires inside `beginMatch`, at world-ready, with no input | Move to the touch-down handler. |
+| `:5843` `matchLen = solo ? 120 : MATCH_LEN; matchClock = matchLen;` | the only place the clock is initialised | Keep in the **arm** half so the HUD can show a full clock during the idle. |
+| `:3585` `matchElapsed = () => matchLen - matchClock` | the single named expression for match time | **No change.** It already reads 0 for as long as the clock is held, which is bar A1. |
+| `:5911` `audio.startMusic()` | fires inside `beginMatch` | Move to the touch handler — and note this **removes the entire reason the tap gate exists**: the first touch *is* the user gesture the audio context needs. Bar A1 and stream F collapse into one change. |
+| `:5912` `introT = COPY.introLen` | arms the camera move; per-world 2.2 / 2.2 / 3.4 / 3.6 / 3.5 / 3.4 s | Becomes a single 1.2 s descent clock, armed at touch. |
+| `:9841–9877` | the intro tick inside `animate()` | The descent phase. Starts on touch, runs 1.2 s, does not gate controls. |
+| `:9874` `k2 = introT / COPY.introLen; camDist = 38 + 262·k2²` | the descent curve | Squares *remaining* time, so in elapsed time it is **ease-out** — which is exactly what the probe measured. Replace with elapsed-progress smoothstep. |
+| `:9912` `camOffset` renormalised from `steep` and `lk` | the camera's direction vector | **No change, and load-bearing**: because the offset is a fixed unit direction, easing `camDist` gives ease-in-out on *height* for free. |
+| `:9224` `const cd = introT > 0 ? Math.min(camDist, …settled…) : camDist` | the steering speed cap during the intro | **Keep.** It already makes the player's speed identical during and after the descent — the one place in the file that already assumes a playable descent. |
+| `:9851` shadows off for the intro | perf guard | Re-check: at a shorter, lower descent the toggle may no longer pay for itself, and shadows popping on at the settle is now visible. |
+| `:9885` the hero-landmark hold | quarter / half / quarter windows of `introLen` | At 1.2 s these become 0.3 / 0.6 / 0.3 s. Bar A19 says the landmark must be in frame at the settle — the *hold* may go, the framing may not. |
+| `:9942` `introHX` folded into camera **position**, not just the look target | the hero's lateral travel | Must be removed from the descent or the descent must not carry it. |
+| `:9856` first-run guide banners fired at intro-end | teaching | Once `:9034` is gone the instruction is true from frame one; move them earlier. |
+| `:9618` `crowdGate = introT > 0 ? Infinity : …` | crowd updates unbounded during the intro | Re-check: a 1.2 s window of unbounded crowd updates now overlaps the player's first movement. |
+| `:3233` pointerdown on the canvas | the joystick anchor | **The hook for the whole stream**: first pointerdown of an unstarted match calls `startMatch()`. |
+| `:9164` the per-frame input read | deadzone `mag > 0.156`, `joyEdgeTick()` | **No change** — this block already sits *outside* the `started` gate, so the joystick already produces motion independently of a match. That is the contract we want. |
+| `:9213` deflection→speed ramp | linear from mag 0.156 to 0.58 | Leave unless bar A17 retunes feel. This is the one line that decides "how far do I push for full speed". |
+| `:9272` velocity smoothing, ~91 ms | acceleration filter | No change. At a 1.2 s descent the void reaches full commanded speed within the first 5% of it. |
+
+### 7.3 · The consumers of `started`, and where each belongs
+
+The scout's enumeration is the input to step 2 of §9 and must be completed into a committed
+list before the flag is touched. What is already known: the clock (`:8909`), scoring, rival
+hunting, the beat scheduler, the newsroom, audio, telemetry stamps (`:3610` `elapsed()`),
+keyboard steering (`:3306`), attract mode (`:9230`), and the teaching hand (`:9678`). Two of
+those — keyboard steering and attract mode — are **hazards rather than consumers** and are
+listed in §7.1.
+
+## 8. THE RISKS, NAMED
 
 The dangerous part of this stream is not the camera. It is that **`started` and
 `matchClock` currently mean "the world is running"**, and this brief splits that into two
@@ -281,12 +340,12 @@ other, deliberately, one at a time.
 | **The clock starting late shortens nothing but feels longer** | 180 s is unchanged; the player simply gets the descent for free | Confirm `MATCH_LEN` is untouched; the change is when counting starts, not how long it runs. |
 | **Solo mode and the tutorial** have their own start paths | Easy to fix the main path and leave two broken ones | The probe runs solo and first-run as separate cases. |
 
-## 8. THE ORDER OF WORK
+## 9. THE ORDER OF WORK
 
 1. **Write `qa/opening.mjs` first** and run it on the untouched tree. It must fail A1,
    A5, A6, A8, A9, A10, A19, A20, A21. Commit the probe and its failing output. *A probe
    that has never failed has never been tested.*
-2. **Enumerate the readers** of `started` and `matchClock` (§7 row 1) and commit the list
+2. **Enumerate the readers** of `started` and `matchClock` (§7.3) and commit the list
    as a document before changing either.
 3. **Split the flag**: `worldReady` (from load) and `matchLive` (from the first touch).
    Assign every consumer. Gate the clock on `matchLive`. Probe: A1, A2 go green.
@@ -307,7 +366,7 @@ Steps 3 through 9 are each one commit with its probe result in the message. If a
 cannot go green, it stops and reports rather than proceeding — a half-applied flag split
 is worse than none.
 
-## 9. DONE MEANS
+## 10. DONE MEANS
 
 - `node qa/opening.mjs` green on all 22 bars, on all six worlds, on both start paths, in
   solo and first-run.
