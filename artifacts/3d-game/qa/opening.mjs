@@ -133,8 +133,10 @@ async function runOnce(browser, tapMs, shots) {
   // every descent number below would be measuring the tail of something.
   await p.evaluate(() => { window.__op.rows = []; window.__op.floaters = []; window.__op.t0 = performance.now(); });
   await p.waitForTimeout(60);
-  const startHigh = await p.evaluate(() => (window.__op.rows[0]?.camDist ?? 0));
-  if (startHigh < 100) console.log(`  WARNING: first sampled camDist is ${startHigh.toFixed(0)} — the intro was already over when sampling began; descent numbers are not trustworthy.`);
+  // Sampling must begin before the camera reaches its intro peak. Checking
+  // rows[0] is the wrong test — the camera is still at its menu position there.
+  // The honest test is done in analyse(): if the peak is the very first sampled
+  // frame, the climb was missed and the descent may be a tail.
 
   if (shots) { mkdirSync(OUT, { recursive: true }); await p.screenshot({ path: `${OUT}/${WORLD}-01-first.png` }); }
   await p.waitForTimeout(tapMs);
@@ -171,13 +173,22 @@ function analyse(d) {
 
   // The descent, found from the camera height series rather than from a flag:
   // the first frame where height starts falling to the frame where it stops.
+  // The camera does not begin high: it sits at its menu position, JUMPS to the
+  // intro's start height when the match begins, and only then descends. A
+  // detector that assumed a fall from row 0 reported a 421 ms descent of x1.20
+  // for a move from camDist 300 to 38 — it had measured the settle and called it
+  // the descent. So find the peak first, and measure from there.
   const h = rows.map((r) => ({ t: r.t, y: r.cy - 0, d: r.camDist }));
-  const yStart = h[0]?.y ?? 0;
-  const yEnd = h[h.length - 1]?.y ?? 0;
+  let iPeak = 0;
+  for (let i = 1; i < h.length; i++) if (h[i].y > h[iPeak].y) iPeak = i;
+  let iMin = iPeak;
+  for (let i = iPeak; i < h.length; i++) if (h[i].y < h[iMin].y) iMin = i;
+  const yStart = h[iPeak]?.y ?? 0;
+  const yEnd = h[iMin]?.y ?? 0;
   const span = yStart - yEnd;
-  let iA = 0, iB = h.length - 1;
+  let iA = iPeak, iB = iMin;
   if (Math.abs(span) > 0.5) {
-    while (iA < h.length && (yStart - h[iA].y) < 0.005 * span) iA++;
+    while (iA < iMin && (yStart - h[iA].y) < 0.005 * span) iA++;
     while (iB > iA && (yStart - h[iB].y) > 0.995 * span) iB--;
   }
   const descentMs = gm(rows[iB]) - gm(rows[iA]);
@@ -211,7 +222,8 @@ function analyse(d) {
   const f0 = f0w == null ? null : gm(rows.reduce((a, b) => (Math.abs(b.t - f0w) < Math.abs(a.t - f0w) ? b : a), rows[0]));
   const floaterFrac = f0 == null ? null : (f0 - gm(rows[iA])) / (descentMs || 1);
 
-  return { rows: rows.length, touchAt, clockPre, clock0, idleG, descentMs, descentFrom: gm(rows[iA]), fit, mid: mid.y,
+  const missedClimb = iPeak === 0;
+  return { rows: rows.length, touchAt, clockPre, clock0, idleG, descentMs, descentFrom: gm(rows[iA]), fit, mid: mid.y, missedClimb, iPeak, peakDist: rows[iPeak]?.camDist ?? 0,
     groundScale, dead, firstMove, floater: f0, floaterFrac, yStart, yEnd };
 }
 
@@ -240,8 +252,10 @@ mkdirSync(OUT, { recursive: true });
 writeFileSync(`${OUT}/${WORLD}-series.json`, JSON.stringify({ late, early, got }, null, 1));
 console.log(`\nOPENING — ${WORLD} @ ${PORT}, tap at ${TAP_MS} ms (and a second run tapping at 200 ms)\n`);
 console.log(lines.join('\n'));
+if (late.missedClimb) console.log(`\n  WARNING: the camera's peak was the first sampled frame — the climb was missed and the descent below may be a tail, not the move.`);
 console.log(`\n  descent (game time) ${late.descentFrom.toFixed(0)}..${(late.descentFrom + late.descentMs).toFixed(0)} ms; camera height ${late.yStart.toFixed(1)} -> ${late.yEnd.toFixed(1)}`);
 console.log(`  NOTE: durations are GAME time (the match clock), not wall clock — under swiftshader the wall runs ~10x slower.`);
+console.log(`  camera peaked at sample ${late.iPeak} (camDist ${late.peakDist.toFixed(0)})`);
 console.log(`  easing fit ${late.fit.name} (rms ${late.fit.rms.toFixed(3)}); early-tap descent ${early.descentMs.toFixed(0)} ms`);
 console.log(`  clock at the first gameplay frame ${late.clock0?.toFixed(2)} s; first floater ${late.floater == null ? 'none' : late.floater.toFixed(0) + ' ms'}`);
 console.log(`\n${fails} of ${Object.keys(BARS).length} bars failing\n`);
