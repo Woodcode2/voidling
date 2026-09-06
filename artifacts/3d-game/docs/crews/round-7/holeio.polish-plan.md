@@ -19,11 +19,11 @@ gate (`qa/gate.mjs --profile=push`) stays green at every commit.
 
 | | HOLE.IO (measured) | Ours (today) | Gap |
 |---|---|---|---|
-| Match start | On the first touch; 0.7 s free idle at a high camera | On load or on a tap gate; clock runs during the intro | **Their opening is the player's; ours is a cutscene** |
+| Match start | On the first touch; 0.7 s free idle at a high camera | On load or on a tap gate; clock runs during the intro (the t = 5 s frame already reads 2:55) | **Their opening is the player's; ours is a cutscene** |
 | Intro camera | 1.17 s ease-in-out, ×4.75 ground scale, first bite at 45% of the way down | 2.2–3.6 s quadratic ease-in, controls dead throughout (`prototype3d.ts:9841`, `:9034`) | **2–3× longer, and the player cannot move** |
-| Player on screen | 22.6% → 48.3% of screen width, Size 1 → 14 | ≈18% → ≈40% of width, derived from `targetDist` (`:9840`) and fov 32 | ~20% smaller at every size |
-| Player's rim | Lit torus, 13.4% of diameter, 3 tones, 9.1:1 vs interior | Shader lip held at ~2.5 px (`void3d.ts:246`) ≈ 3–6% of diameter | **A line where they have a lit object** |
-| The stage | Ground chroma < 0.12 over 56% of the playfield; props 57–100% sat | Maple park 0.44, meadow 0.44, quad 0.37, cove 0.32 (palette hexes, pre-light) | **Our ground competes with the props** |
+| Player on screen | 22.6% → 48.3% of screen width, Size 1 → 14 | **18.5%** at spawn (t = 5 s), **31.9%** at 17 m (t = 163 s), measured on `recon/self/maple-*.png`; ≈40% at the 18 m cap by formula (`:9840`) | 18% smaller at spawn, a third smaller late |
+| Player's rim | Lit torus, 13.4% of diameter, 3 tones, 9.1:1 vs interior | No rim: a glossy sphere, one hue, lit/shade value 0.85/0.42 = 2.0:1 across the body (`recon/self/maple-spawn-t5.png`); the shader lip is ~2.5 px (`void3d.ts:246`) | **A ball where they have a lit ring; the body's two tones are right** |
+| The stage | Ground chroma < 0.12 over 56% of the playfield; props 57–100% sat | Maple spawn frame: **26% of the playfield below 0.12**; saturated green grass covers 30% at chroma 0.39, the pale path 31% (`recon/self/maple-spawn-t5.png`, `self.py`) | **Half the neutral stage they have; the grass is a prop colour** |
 | Materials | Two tones per material, 2:1; shade hue-shifted | Single-tone vertex colour under a real rig with a cool fill (`island.ts:3973`, `prototype3d.ts:793`) | Half right: the rig shifts hue; the material has one tone |
 | Display type | Gradient fill + thick stroke (67% of fill area) + shadow | Fredoka 700, 3 px stroke, no gradient (`index.html:128`) | One layer short |
 | Menu | Violet ground `#4c3cbe` (value 0.75, chroma 0.51) over 45% of the frame; 3D diorama of the level at 49% of height, slow orbit, static UI | Dark violet ground `#1b0f38` (value 0.22, chroma 0.16; frame value median 0.36); painted key art over 82% of height; no 3D, no motion (`qa-out/menu.png`, `index.html:850`) | **A poster where they have a world, and half as bright** |
@@ -153,10 +153,15 @@ in a shortened clock. Recommend ×3 now, ×5 after launch, so 18 levels ship fir
 ~2:1; shade hue-shifted; the player object has a lit rim; display type is three layers.
 No texture, no fog *(theirs; we keep ours where measured to help)*.
 
-**Ours today.** Ground districts painted from hexes with chroma 0.29–0.44 in the green
-worlds (`island.ts:2106`); props single-tone under the rig (`island.ts:3973`); void lip
-~2.5 px (`void3d.ts:246`); type 3 px stroke, no gradient (`index.html:128`); fog per world
-(`island.ts:656`).
+**Ours today (measured on `recon/self/maple-*.png`, reference viewport, DPR 2–3).**
+Spawn playfield: 26.2% of pixels below chroma 0.12 (theirs 56%), 37.7% above 0.35;
+saturated grass 30% of the field at chroma 0.39, pale path 31%. Late (t = 163 s): 9%
+below 0.12. Void: 18.5% of width at spawn, 31.9% at 17 m; no rim, body value 2.0:1
+lit/shade. Props single-tone under the rig (`island.ts:3973`); type 3 px stroke, no
+gradient (`index.html:128`); fog per world (`island.ts:656`). One more observation: in
+the mid-match frame (t = 88 s, autopilot) the void is **fully hidden behind a
+landmark** with only the joystick ring visible (`maple-mid-t88.png`); their hole is on
+the ground and can never be occluded. Bar 7 below covers it.
 
 **Bars.**
 1. **The stage.** In a rendered spawn frame, ≥ 50% of the playfield has chroma < 0.15,
@@ -180,6 +185,9 @@ worlds (`island.ts:2106`); props single-tone under the rig (`island.ts:3973`); v
    ≥ 3:1 from the fill, and a shadow. Measured by the cluster method in `measure.md`.
 6. **Fog** stays, but its near plane is pushed so that nothing within the settled
    camera's playfield is fogged more than 5%.
+7. **Never hidden.** When a prop occludes the void from the camera, the prop fades to
+   ≤ 40% opacity within 150 ms (or the void's silhouette draws through it); measured
+   by an occlusion probe at 5 s / 88 s / 163 s on every world.
 
 **Probe.** `qa/pop.mjs`: chroma histogram of the playfield vs props (the recon's
 `chroma.py` method), two-tone ratio on three named props, rim ratio and contrast at Size
@@ -237,9 +245,9 @@ build now; revisit after C ships.
 
 ## 2 · Order
 
-1. **Measure ourselves first (S).** Run `qa/menushot.mjs`, `qa/shot.mjs` and
-   `qa/_worldshots.mjs` on the current build and compute every "ours today" number above
-   from frames with the recon's methods. Replace every derived number. Skeptic verifies.
+1. **Measure ourselves first (S).** Done for the menu and Maple (`recon/self/`, method
+   in `self.py`); the other five worlds and the evolve/end-card frames remain, and a
+   skeptic re-measures the Maple numbers before any crew is briefed.
 2. **A · the opening** — the largest feel gap for the smallest change. Ships alone.
 3. **D · colour and pop** — bars 1, 3, 4 first (stage, rim, screen share), then 2, 5, 6.
 4. **C · the ladder (×3)** with **E · the beat** — they share the goal card and the end
