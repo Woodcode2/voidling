@@ -5936,7 +5936,15 @@ function beginMatch(solo = false) {
   // playing height and the camera JUMPS up to DESCENT_START the instant the
   // player touches — the probe caught exactly that: a camera peaking at 227 that
   // should have been descending from it.
-  camDist = DESCENT_START; camFollow.set(0, 0, 0);
+  camDist = DESCENT_START;
+  // camFollow is the smoothed position the camera actually renders from. Zeroing
+  // it here put the camera at the world origin for the first armed frame and let
+  // the spring slide it into place over ~0.2 s — a camera move during what is
+  // meant to be a still establishing shot. Worse, a player who touched inside
+  // that window got that slide folded into their descent: the probe measured the
+  // early-tap and late-tap descents differing by 250-291 ms, on a bar that asks
+  // for 100. The idle camera is parked, so it is snapped, not sprung — see the
+  // lerp below, which now takes the authored position exactly while armed.
   arriveT = 0; arriveLanded = false;
   voidling.arriveY(ARRIVE_HIGH);
   resetFps();
@@ -10157,7 +10165,7 @@ function animate() {
     // was measurably eating the top of the arc (the probe found the camera peaking
     // at camDist 220 of an authored 300). During the descent the authored value is
     // taken exactly; the spring resumes the moment the match settles.
-    camFollow.lerp(tmpV, introT > 0 ? 1 : 1 - Math.exp(-5.0 * dt));
+    camFollow.lerp(tmpV, (introT > 0 || (armed && !started)) ? 1 : 1 - Math.exp(-5.0 * dt));
     camera.position.copy(camFollow);
     camera.lookAt(lookX, R * 0.5 + 18 * lk, lookZ);
     // the lens punch: widen, then spring home on WALL time (a punch that
