@@ -5780,6 +5780,24 @@ let introT = 0, outroT = 0;
 let introHX = 0, introHZ = 0;
 // what the shadow map was set to before the opening move borrowed it
 let introShadow: boolean | null = null;
+// THE DESCENT — round 7, stream A step 4. Measured from HOLE.IO's own opening:
+// 72 frames = 1.2000 s exactly, ease-in-out on camera HEIGHT with 50% of the
+// height travelled at t=0.45, and the ground magnifying x6.0 at the point the
+// camera converges on. Their span was first read as 70 frames / x4.755; an
+// adversarial re-measure using the hole's own ground footprint, cross-checked
+// against a dense optical-flow homography, corrected both — and showed the
+// magnification varying 1.9x-8.2x ACROSS ONE FRAME, so a scale figure means
+// nothing without naming where it was measured. holeio.recon.md 11.11.
+//
+// The descent replaced a per-world 2.2-3.6 s move on `camDist = 38 + 262*k2*k2`,
+// which squares REMAINING time and is therefore ease-OUT in elapsed time — the
+// probe measured exactly that. Height is what eases now, and because camOffset
+// is a fixed unit direction (see its renormalisation below) easing camDist eases
+// height with it.
+const DESCENT_LEN = 1.2;               // seconds
+const DESCENT_SCALE = 6.0;             // ground magnification, screen centre
+const DESCENT_END = 38;                // camDist the match plays at
+const DESCENT_START = DESCENT_END * DESCENT_SCALE;
 // THE HAND-AUTHORED FIRST SIXTY SECONDS. All of these are per-match, and all of
 // them exist because the opening was measured and found to teach the wrong
 // things in the wrong order.
@@ -5974,14 +5992,14 @@ function startMatch(): void {
   // THE CARD LEAVES WITH THE SHOT — see the note in beginMatch's history: the
   // duration is driven from the camera move so the name lands 0.45 s after the
   // hands rather than sitting over the void at full opacity.
-  tcEl.style.animationDuration = (COPY.introLen + 0.45).toFixed(2) + 's';
+  tcEl.style.animationDuration = (DESCENT_LEN + 0.45).toFixed(2) + 's';
   tcEl.classList.remove('show'); void tcEl.offsetWidth; tcEl.classList.add('show');
-  titleUntil = tClock + COPY.introLen + 0.45;
+  titleUntil = tClock + DESCENT_LEN + 0.45;
   // The first touch IS the user gesture the audio context needs. This is why the
   // reload path's TAP TO PLAY gate existed at all, and why it can go.
   audio.startMusic(); audio.setMusicStage(0);
   document.body.classList.add('intro');   // the HUD arrives with the hands
-  introT = COPY.introLen;   // orbital reveal: the world's landmark, then dive to the tiny void
+  introT = DESCENT_LEN;   // the landmark is revealed INSIDE the descent, not instead of it
 }
 // ── asset preloader: menu time is download time; PLAY holds on a branded
 // loading bar until every pack mesh is resident, so a match never starts
@@ -9939,8 +9957,13 @@ function animate() {
         showGuide('<b>DRAG</b> to move — eat & <b>GROW</b>!', 6);
         dragNagT = 3;   // the repeat waits its gap too, not just the ones after it
       }
-      const k2 = Math.max(0, introT / COPY.introLen);
-      camDist = 38 + 262 * k2 * k2;   // ease-in dive from orbit
+      // ELAPSED progress, not remaining, and smoothstep rather than a square:
+      // p goes 0 -> 1 across the move and smoothstep is symmetric, so half the
+      // height is gone at half the time. The old form put 68% of the height in
+      // the first half and crawled the rest.
+      const p = Math.max(0, Math.min(1, 1 - introT / DESCENT_LEN));
+      const eased = p * p * (3 - 2 * p);
+      camDist = DESCENT_START + (DESCENT_END - DESCENT_START) * eased;
       targetDist = camDist;
     }
     // THE ESTABLISHING SHOT. While the intro runs, the camera's subject slides
@@ -9951,7 +9974,7 @@ function animate() {
     // bowl for the first half-second, not already halfway home.
     // Worlds with no hero pass null and behave exactly as before.
     if (introT > 0 && COPY.hero) {
-      const u = Math.max(0, Math.min(1, introT / COPY.introLen));
+      const u = Math.max(0, Math.min(1, introT / DESCENT_LEN));
       // HOLD, THEN TRAVEL. A straight smoothstep across the whole intro left
       // the camera off the stadium within half a second — there was never a
       // frame you could call an establishing shot. This holds the subject ON
@@ -10020,7 +10043,14 @@ function animate() {
     // over the following half-second. A bite was not a kick, it was a kick
     // plus a lingering wander. Smoothing camFollow instead makes shake
     // stateless: it is added on the way to the GPU and gone next frame.
-    camFollow.lerp(tmpV, 1 - Math.exp(-5.0 * dt));
+    // THE FOLLOW SPRING IS BYPASSED FOR THE DESCENT. It is a first-order lag with
+    // a 0.2 s time constant, so the camera never renders the distance the code
+    // authors — it renders a smoothed trail of it. Over the old 2.2-3.6 s intro
+    // that was imperceptible; over 1.2 s it is a sixth of the whole move, and it
+    // was measurably eating the top of the arc (the probe found the camera peaking
+    // at camDist 220 of an authored 300). During the descent the authored value is
+    // taken exactly; the spring resumes the moment the match settles.
+    camFollow.lerp(tmpV, introT > 0 ? 1 : 1 - Math.exp(-5.0 * dt));
     camera.position.copy(camFollow);
     camera.lookAt(lookX, R * 0.5 + 18 * lk, lookZ);
     // the lens punch: widen, then spring home on WALL time (a punch that
