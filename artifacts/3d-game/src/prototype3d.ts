@@ -5834,6 +5834,12 @@ const DESCENT_START = DESCENT_END * DESCENT_SCALE;
 // leave 1.55 and cannot.
 const FIRST_BITE_RING = 5;
 const FIRST_BITE_N = 10;
+// THE GOAL CARD is on its own timer and answers to nothing else. Theirs unrolls
+// about half a second after the first gameplay frame, holds, and rolls away —
+// before any input, and it never waits for one. holeio.recon.md 11.5.
+const GOAL_CARD_AT = 0.5;    // seconds after the world arms
+const GOAL_CARD_LEN = 0.6;   // 117 ms unroll + 383 ms open + 100 ms away
+let goalCardT = -1;          // counts up while armed; -1 once fired
 const ARRIVE_FALL = 0.55;   // seconds of fall
 const ARRIVE_HIGH = 26;     // world units above his resting height
 let arriveT = 0;            // counts UP from 0 while the world is armed and untouched
@@ -5946,6 +5952,7 @@ function beginMatch(solo = false) {
   // for 100. The idle camera is parked, so it is snapped, not sprung — see the
   // lerp below, which now takes the authored position exactly while armed.
   arriveT = 0; arriveLanded = false;
+  goalCardT = 0;
   voidling.arriveY(ARRIVE_HIGH);
   resetFps();
   // the quality adapter starts its window HERE. Frames before this line are
@@ -6090,13 +6097,6 @@ function startMatch(): void {
   // unlocks the menu and the daily reward). It moves from world-ready to here
   // only so that loading a world and never touching it is not "having played".
   localStorage.setItem('voidPlayed', '1');
-  const tcEl = el('titlecard');
-  // THE CARD LEAVES WITH THE SHOT — see the note in beginMatch's history: the
-  // duration is driven from the camera move so the name lands 0.45 s after the
-  // hands rather than sitting over the void at full opacity.
-  tcEl.style.animationDuration = (DESCENT_LEN + 0.45).toFixed(2) + 's';
-  tcEl.classList.remove('show'); void tcEl.offsetWidth; tcEl.classList.add('show');
-  titleUntil = tClock + DESCENT_LEN + 0.45;
   // The first touch IS the user gesture the audio context needs. This is why the
   // reload path's TAP TO PLAY gate existed at all, and why it can go.
   audio.startMusic(); audio.setMusicStage(0);
@@ -7251,6 +7251,11 @@ function resetMatch() {
   // impression you can tune beats one you can only sample. The variety budget
   // is spent on the rival cast, their join times and the gilded treasure
   // instead, all of which re-roll per match without touching the opening.
+  // resetMatch has never had to clear the title card: it used to be fired from
+  // beginMatch and to fade itself out over the intro. Now it is a ribbon on its
+  // own clock, so a PLAY AGAIN that re-arms mid-animation would leave the old
+  // one open over the new world.
+  { const tc = el('titlecard'); tc.classList.remove('show'); goalCardT = -1; }
   voidState.x = island.spawn.x; voidState.z = island.spawn.z;
   gildTreasure();
   velX = 0; velZ = 0; camDist = 50;
@@ -9095,6 +9100,19 @@ function animate() {
       const k = Math.min(1, arriveT / ARRIVE_FALL);
       voidling.arriveY(ARRIVE_HIGH * (1 - k * k));
       if (k >= 1) { arriveLanded = true; voidling.arriveY(0); voidling.bump(); }   // sound: stream A step 9, with the rest of the opening's audio
+    }
+    // The goal card is timer-driven: it does not wait for the touch, and the touch
+    // does not wait for it. A player who taps at 100 ms sees it unroll over their
+    // descent exactly as a player who never taps sees it unroll over the idle.
+    if (goalCardT >= 0) {
+      goalCardT += dt;
+      if (goalCardT >= GOAL_CARD_AT) {
+        goalCardT = -1;
+        const tc = el('titlecard');
+        tc.style.animationDuration = GOAL_CARD_LEN.toFixed(2) + 's';
+        tc.classList.remove('show'); void tc.offsetWidth; tc.classList.add('show');
+        titleUntil = tClock + GOAL_CARD_LEN;
+      }
     }
     if (handHold > 0) handHold -= dt;
     if (guideT > 0) { guideT -= dt; if (guideT <= 0) guideEl().classList.remove('show'); }

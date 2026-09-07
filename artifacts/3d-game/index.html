@@ -558,23 +558,46 @@
          cinematographer in docs/crews/round-5/firstframe/ filed it, and the
          skeptics kept it). 21vh clears the clock above and the void, the hand,
          the bubbles and the growth bar below at every phone in the pack. */
-      #titlecard { position: fixed; inset: 0; z-index: 8; display: flex; flex-direction: column;
-        align-items: center; justify-content: flex-start; padding-top: 21vh; box-sizing: border-box;
+      /* THE GOAL CARD — round 7, stream A. It was a full-screen scrim that faded
+         over 4.2 s; it is now a RIBBON that unrolls, holds and rolls up on its own
+         timer. Measured from HOLE.IO's goal scroll: 117 ms to unroll, 383 ms open,
+         100 ms to roll away, and it starts about half a second after the first
+         gameplay frame whether or not the player has touched anything
+         (holeio.recon.md 11.5). A full-bleed inset:0 element cannot unroll — the
+         animation reads as a screen wipe — so the card is sized to its content and
+         the scrim travels with it. */
+      #titlecard { position: fixed; left: 50%; top: 17vh; transform: translateX(-50%);
+        z-index: 8; display: flex; flex-direction: column; align-items: center;
+        padding: 14px 26px; box-sizing: border-box; max-width: min(86vw, 460px);
         pointer-events: none; text-align: center; color: #fff;
-        opacity: 0;
-        background: radial-gradient(ellipse 78% 30% at 50% 28%, rgba(9,5,20,0.72) 0%,
-                                    rgba(9,5,20,0.55) 45%, rgba(9,5,20,0) 78%); }
-      #titlecard.show { animation: cardFade 4.2s ease forwards; }
+        opacity: 0; border-radius: 18px;
+        background: linear-gradient(180deg, rgba(14,8,30,0.90) 0%, rgba(14,8,30,0.78) 100%);
+        box-shadow: 0 10px 28px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.10); }
+      #titlecard.show { animation: goalRoll 0.60s cubic-bezier(0.22,0.9,0.3,1) forwards; }
       #titlecard .lvl { font-size: 15px; font-weight: 700; letter-spacing: 6px; opacity: 0.95; color: #d9c2ff;
         text-shadow: 0 2px 8px rgba(0,0,0,0.85); }
-      #titlecard .name { font-size: clamp(34px, 12vw, 62px); text-wrap: balance; margin-top: 6px;
+      #titlecard .name { font-size: clamp(22px, 7vw, 34px); text-wrap: balance; margin-top: 2px;
         font-weight: 700; letter-spacing: 1px;
         text-shadow: 0 4px 24px rgba(123,79,224,0.7), 0 2px 6px rgba(0,0,0,0.85); }
       /* the goal line carries its own stroke, the same trick #timer already
          uses to stay legible over arbitrary terrain */
       #titlecard .sub { font-size: 16px; font-weight: 700; opacity: 1; margin-top: 10px; letter-spacing: 1px;
         color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,0.95); }
-      @keyframes cardFade { 0%{opacity:0; transform:translateY(10px) scale(0.98)} 14%{opacity:1; transform:translateY(0) scale(1)} 72%{opacity:1} 100%{opacity:0; transform:translateY(-6px) scale(1.02)} }
+      /* Unroll / hold / roll-up, scaled from the top edge like a paper scroll.
+         600 ms total: 0-19.5% unrolls (117 ms), held to 83.3% (383 ms open), then
+         100 ms away. The percentages are the measured ones, not eyeballed. */
+      @keyframes goalRoll {
+        0%   { opacity: 0; transform: translateX(-50%) scaleY(0.04); }
+        19.5%{ opacity: 1; transform: translateX(-50%) scaleY(1); }
+        83.3%{ opacity: 1; transform: translateX(-50%) scaleY(1); }
+        100% { opacity: 0; transform: translateX(-50%) scaleY(0.04); }
+      }
+      #titlecard { transform-origin: 50% 0%; }
+      /* the three lines fade slightly after the ribbon opens, so the paper reads
+         as the thing that moved rather than the text stretching with it */
+      #titlecard.show .lvl, #titlecard.show .name, #titlecard.show .sub {
+        animation: goalInk 0.60s ease forwards; }
+      @keyframes goalInk { 0%,10%{opacity:0} 26%{opacity:1} 83.3%{opacity:1} 100%{opacity:0} }
       /* ── THE SCRAPBOOK ──────────────────────────────────────────────────
          A found sticker is a CARD, not a list row: it has to feel like an
          object a child owns. Not-yet-found ones keep the same footprint and

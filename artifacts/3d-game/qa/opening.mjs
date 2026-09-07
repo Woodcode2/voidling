@@ -62,6 +62,9 @@ const BARS = {
   A7: { what: 'ground scale over the descent', want: '5.5-6.5', unit: 'x', cmp: (v) => v >= 5.5 && v <= 6.5 },
   A8: { what: 'descent frames with controls dead', want: 0, unit: 'frames', cmp: (v) => v === 0 },
   A9: { what: 'first +1 floater, as a fraction of the descent', want: '0.30-0.60', unit: '', cmp: (v) => v >= 0.3 && v <= 0.6 },
+  A11:{ what: 'goal card visible for (unroll + hold + roll-up)', want: '450-750', unit: 'ms', cmp: (v) => v >= 450 && v <= 750 },
+  A12:{ what: 'goal card appears after the world is up, on a timer', want: '0.3-0.9', unit: 's', cmp: (v) => v >= 0.3 && v <= 0.9 },
+  A13:{ what: 'goal card frames that could swallow input (pointer-events)', want: 0, unit: 'frames', cmp: (v) => v === 0 },
   A21:{ what: 'descent length difference, early tap vs late tap', want: '<= 100', unit: 'ms', cmp: (v) => v <= 100 },
   // A9 stays failing until the guaranteed first bite lands (brief 3.2): their
   // first point arrives at 45% of the descent by luck of the map, ours by rule.
@@ -115,7 +118,7 @@ function fitEasing(series) {          // series: [{x, y}] both normalised 0..1
 // wrong camera maths must not be able to pass itself.
 const SAMPLER = () => {
   const w = window;
-  w.__op = { rows: [], floaters: [], t0: performance.now(), touchAt: null };
+  w.__op = { rows: [], floaters: [], card: [], t0: performance.now(), touchAt: null };
   const live0 = new WeakMap();   // element -> was it live on the previous frame
   const tick = () => {
     try {
@@ -138,6 +141,16 @@ const SAMPLER = () => {
       // runs while the void was demonstrably eating. A floater is LIVE when it
       // carries text and the `go` class, so the transition into that state is the
       // spawn, and the same element spawning again must count again.
+      // The goal card: when it is on, and whether it could ever eat a tap. It is
+      // pointer-events:none by design, so this measures the design rather than
+      // trusting it — a later stylesheet edit that made it clickable would show up
+      // here as a non-zero A13 rather than as a child whose first tap did nothing.
+      const tc = document.getElementById('titlecard');
+      if (tc) {
+        const cs = getComputedStyle(tc);
+        const on = cs.opacity !== '0' && cs.visibility !== 'hidden' && cs.display !== 'none';
+        w.__op.card.push({ t: performance.now() - w.__op.t0, on, blocks: cs.pointerEvents !== 'none' });
+      }
       for (const el of document.querySelectorAll('.vf')) {
         const live = el.classList.contains('go') && !!(el.textContent || '').trim();
         const was = live0.get(el) || false;
@@ -176,7 +189,7 @@ async function runOnce(browser, tapMs, shots) {
   // Reset the sampler to the first gameplay frame, not to page load, and assert
   // the camera really is still high — if it is not, the intro was missed and
   // every descent number below would be measuring the tail of something.
-  await p.evaluate(() => { window.__op.rows = []; window.__op.floaters = []; window.__op.t0 = performance.now(); });
+  await p.evaluate(() => { window.__op.rows = []; window.__op.floaters = []; window.__op.card = []; window.__op.t0 = performance.now(); });
   await p.waitForTimeout(60);
   // Sampling must begin before the camera reaches its intro peak. Checking
   // rows[0] is the wrong test — the camera is still at its menu position there.
@@ -304,6 +317,12 @@ function analyse(d) {
   }
   // Floaters carry wall timestamps (they are DOM sightings), so convert by
   // finding the sampled frame nearest in wall time and reading its game clock.
+  // Card window, in game time, from the samples where it was on screen.
+  const cardOn = (d.card || []).filter((c) => c.on);
+  const toG = (w) => gm(rows.reduce((a, b) => (Math.abs(b.t - w) < Math.abs(a.t - w) ? b : a), rows[0]));
+  const cardMs = cardOn.length > 1 ? toG(cardOn[cardOn.length - 1].t) - toG(cardOn[0].t) : 0;
+  const cardAt = cardOn.length ? toG(cardOn[0].t) / 1000 : -1;
+  const cardBlocks = (d.card || []).filter((c) => c.on && c.blocks).length;
   const f0w = d.floaters[0]?.t ?? null;
   const f0 = f0w == null ? null : gm(rows.reduce((a, b) => (Math.abs(b.t - f0w) < Math.abs(a.t - f0w) ? b : a), rows[0]));
   const floaterFrac = f0 == null ? null : (f0 - gm(rows[iA])) / (descentMs || 1);
@@ -326,7 +345,7 @@ function analyse(d) {
     if (rows[i].t < touchAt) continue;
     travelled += Math.hypot(rows[i].vx - rows[i - 1].vx, rows[i].vz - rows[i - 1].vz);
   }
-  return { rows: rows.length, touchAt, clockPre, clock0, idleG, descentMs, authoredMs, cap, sampleMs, q1: q1.y, q3: q3.y, travelled, samples: seg.length, descentFrom: gm(rows[iA]), fit, mid: mid.y, missedClimb, iPeak, peakDist: rows[iPeak]?.camDist ?? 0,
+  return { rows: rows.length, touchAt, clockPre, clock0, idleG, descentMs, authoredMs, cap, sampleMs, q1: q1.y, q3: q3.y, travelled, samples: seg.length, cardMs, cardAt, cardBlocks, descentFrom: gm(rows[iA]), fit, mid: mid.y, missedClimb, iPeak, peakDist: rows[iPeak]?.camDist ?? 0,
     groundScale, dead, firstMove, floater: f0, floaterFrac, yStart, yEnd };
 }
 
@@ -340,6 +359,7 @@ const got = {
   A1: late.clockPre ?? 0, A3: late.idleG ?? 0, A4: late.firstMove ?? 1e9,
   A5: late.authoredMs, A6: late.q1, A6c: late.q3, A6b: late.mid, A7: late.groundScale,
   A8: late.dead, A9: late.floaterFrac ?? -1,
+  A11: late.cardMs, A12: late.cardAt, A13: late.cardBlocks,
   A21: Math.abs(late.descentMs - early.descentMs),
 };
 let fails = 0;
