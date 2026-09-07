@@ -725,12 +725,34 @@ function coastSolid(R0: number): (x: number, z: number) => boolean {
     && insideIsland3(x + d45, z + d45) && insideIsland3(x - d45, z - d45)
     && insideIsland3(x + d45, z - d45) && insideIsland3(x - d45, z + d45);
 }
+// THE PLAY DISTANCE, and it decides how big the hero is. On a perspective camera
+// on-screen size goes as 1/distance, so this one number sets the void's share of
+// the screen — measured at 19.6% of width against HOLE.IO's 22.6%, their hero
+// being consistently larger than ours at every size (holeio.recon.md §2 L4).
+// 38 -> 33 puts him at about 24%, mid-band. Used by the descent's end, the
+// settled follow distance and the steering cap's stand-in during the descent;
+// declared HERE, above every one of them, so none of the three can read it in
+// its temporal dead zone.
+const PLAY_DIST = 33;
+
 /** THE STEERING CAP, in one place. `Math.min(96, 16 * (camDist / 50))` was
  *  written out at three call sites — the input block, the shore recovery and
  *  the hero's gaze — and the shore recovery exists BECAUSE two of those three
  *  had drifted out of agreement with each other. A number that three pieces of
- *  physics have to share is not a literal, it is a function. */
-function steerCap(camDist: number): number { return Math.min(96, 16 * (camDist / 50)); }
+ *  physics have to share is not a literal, it is a function.
+ *
+ *  ── AND IT IS A FUNCTION OF SIZE, NOT OF THE LENS ────────────────────────
+ *  Written against camDist it silently made the framing decision a BALANCE
+ *  decision: camDist settles at PLAY_DIST * (R/0.9)^0.82, so pulling the camera
+ *  in from 38 to 33 to make the hero read larger also slowed him 12.16 -> 10.56
+ *  units/second, at every radius, in every world — with six per-world score
+ *  targets (WIN_SCORE) tuned against the old pace and no probe watching. Since
+ *  camDist/PLAY_DIST is exactly (R/0.9)^0.82, normalising by PLAY_DIST gives
+ *  back the identical shipped law and makes the pace immune to reframing.
+ *  SPAWN_SPEED is the shipped 16 * 38/50, and the 96 ceiling still binds at the
+ *  same RADIUS it always did (R = 11.6), because that ratio is unchanged. */
+const SPAWN_SPEED = 12.16;             // world units/second at R = 0.9
+function steerCap(camDist: number): number { return Math.min(96, SPAWN_SPEED * (camDist / PLAY_DIST)); }
 const TOPDOWN = location.search.includes('top');
 const SHOW_WALLS = location.search.includes('walls');   // ?walls=1 — see the containment boundary
 const ASSETVIEW = location.search.includes('assets');   // ?debug gallery of the GLB pack
@@ -1113,8 +1135,8 @@ scene.add(sun); scene.add(sun.target);
 // Costs one pass over the edibles, which the frame already walks several
 // times, and skips almost everything on a cheap squared-distance test first.
 const _foCam = new THREE.Vector3(), _foDir = new THREE.Vector3(), _foTo = new THREE.Vector3();
-const _foFading = new Set<THREE.Object3D>();
-const _foPrev = new Set<THREE.Object3D>();
+const _foFading = new Set<Edible>();
+const _foPrev = new Set<Edible>();
 /** how fast a prop dissolves and comes back, in fade units per second */
 const FO_RATE = 5.5;
 function fadeOccluders(dt: number): void {
@@ -1134,7 +1156,7 @@ function fadeOccluders(dt: number): void {
   for (const e of edibles) {
     if (e.eaten) continue;
     const m = e.mesh;
-    if (!m.visible || m.userData.fade === undefined) continue;
+    if (!m.visible || !e.fadeTo) continue;
     const px = m.position.x - _foCam.x, py = m.position.y - _foCam.y, pz = m.position.z - _foCam.z;
     // distance ALONG the camera->hero axis
     const t = px * _foDir.x + py * _foDir.y + pz * _foDir.z;
@@ -1144,34 +1166,38 @@ function fadeOccluders(dt: number): void {
     const perp2 = cx * cx + cy * cy + cz * cz;
     const reach = shield + (e.radius || 1);
     if (perp2 > reach * reach) continue;
-    _foFading.add(m);
+    _foFading.add(e);
   }
   // EASE, DO NOT SNAP. A prop that pops to 30% and back as the void slides
   // past reads as a rendering fault; half a second of dissolve reads as the
   // camera being polite. Everything that stopped occluding this frame is
   // walked back up by the same rate.
   const step = FO_RATE * Math.min(dt, 0.05);
-  for (const m of _foFading) {
-    const cur = (m.userData.fade as number) ?? 1;
-    // 0.62, not 0.28. At 0.28 the Bayer keep-mask is 5/16 pixels — on white
-    // snow that is a black-and-red halftone print, the only visible pixel
-    // pattern in five worlds (art direction round 3, verified at the pixel).
-    // At 0.62 it keeps 10/16: a 62%-solid ghost, while the hero still shows
-    // through 6/16 of an occluder's pixels, so the fade's contract holds.
-    // 0.62 sits strictly between Bayer steps .5625 and .625 — no equality
-    // edge. The crews skeptic KILLED the companion change here (a cone-taper
-    // on the shield reach): its motivating scenario was geometrically
-    // impossible, and the constant cylinder is the accidental compensation
-    // that keeps 11.5-unit lift pylons fading when they truly cross the
-    // sight line. The reach stays as it is, deliberately.
-    setMeshFade(m, Math.max(0.62, cur - step));
+  // 0.62, not 0.28. At 0.28 the Bayer keep-mask is 5/16 pixels — on white
+  // snow that is a black-and-red halftone print, the only visible pixel
+  // pattern in five worlds (art direction round 3, verified at the pixel).
+  // At 0.62 it keeps 10/16: a 62%-solid ghost, while the hero still shows
+  // through 6/16 of an occluder's pixels, so the fade's contract holds.
+  // 0.62 sits strictly between Bayer steps .5625 and .625 — no equality
+  // edge. The crews skeptic KILLED the companion change here (a cone-taper
+  // on the shield reach): its motivating scenario was geometrically
+  // impossible, and the constant cylinder is the accidental compensation
+  // that keeps 11.5-unit lift pylons fading when they truly cross the
+  // sight line. The reach stays as it is, deliberately.
+  for (const e of _foFading) {
+    for (const m of e.fadeTo!) {
+      setMeshFade(m, Math.max(0.62, ((m.userData.fade as number) ?? 1) - step));
+    }
   }
-  for (const m of _foPrev) {
-    if (_foFading.has(m)) continue;
-    const cur = (m.userData.fade as number) ?? 1;
-    const next = Math.min(1, cur + step);
-    setMeshFade(m, next);
-    if (next < 1) _foFading.add(m);   // keep easing it back next frame
+  for (const e of _foPrev) {
+    if (_foFading.has(e)) continue;
+    let below = false;
+    for (const m of e.fadeTo!) {
+      const next = Math.min(1, ((m.userData.fade as number) ?? 1) + step);
+      setMeshFade(m, next);
+      if (next < 1) below = true;
+    }
+    if (below) _foFading.add(e);   // keep easing it back next frame
   }
 }
 
@@ -1303,16 +1329,32 @@ function applyQuality() {
 }
 
 // ── edibles + island ─────────────────────────────────────────────────────────
-interface Edible { mesh: THREE.Object3D; radius: number; eaten: boolean; t: number; orbit: number; orbitR: number; spin: THREE.Vector3; home: THREE.Vector3; homeScale: THREE.Vector3; homeRotY: number; }
+interface Edible { mesh: THREE.Object3D; radius: number; eaten: boolean; t: number; orbit: number; orbitR: number; spin: THREE.Vector3; home: THREE.Vector3; homeScale: THREE.Vector3; homeRotY: number;
+  /** the objects that actually carry a fade uniform — see addEdible */
+  fadeTo?: THREE.Object3D[]; }
 const edibles: Edible[] = [];
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 function addEdible(mesh: THREE.Object3D, radius: number) {
   // remember where everything LIVES — instant rematch restores the island
   // in-place instead of a full page reload (hole.io's <2s "one more go" loop)
   mesh.userData.eRadius = radius;   // gameplay size, readable by rivals/validators
+  // ── WHAT THE OCCLUSION FADE IS ALLOWED TO TOUCH ──────────────────────────
+  // armFade() arms the MERGED MESH, inside mergedProp(). Most prop factories
+  // then wrap that mesh in a Group and hand the GROUP to addEdible — so
+  // fadeOccluders, which read userData.fade off the object it was given, saw
+  // undefined and skipped the prop entirely. Measured on Maple: of 5614
+  // edibles only 2742 were reachable, 1741 were armed on a child underneath
+  // the object the loop could see, and the remaining 1131 were not armed at
+  // all. The hero was blocked in 832 of 2001 sampled frames and the mechanism
+  // built to prevent exactly that could act on barely half the island.
+  // Resolved once, here, because a per-frame traverse over 5,600 props to find
+  // out is the kind of cost this feature was explicitly designed to avoid.
+  const fadeTo: THREE.Object3D[] = [];
+  mesh.traverse((o) => { if (o.userData.fade !== undefined) fadeTo.push(o); });
   if (radius >= 2.5 && !mesh.userData.mover) mesh.userData.building = true;   // building-class: may NEVER be translated by FX
   edibles.push({ mesh, radius, eaten: false, t: 0, orbit: 0, orbitR: 0, spin: new THREE.Vector3(),
-    home: mesh.position.clone(), homeScale: mesh.scale.clone(), homeRotY: mesh.rotation.y });
+    home: mesh.position.clone(), homeScale: mesh.scale.clone(), homeRotY: mesh.rotation.y,
+    fadeTo: fadeTo.length ? fadeTo : undefined });
 }
 
 // ── WORLD SELECT ────────────────────────────────────────────────────────────
@@ -5842,7 +5884,10 @@ let introShadow: boolean | null = null;
 // height with it.
 const DESCENT_LEN = 1.2;               // seconds
 const DESCENT_SCALE = 6.0;             // ground magnification, screen centre
-const DESCENT_END = 38;                // camDist the match plays at
+// PLAY_DIST is declared beside steerCap, which is the other thing that reads it
+// and the one that must not be reached before it exists. The ground scale is
+// DESCENT_START/DESCENT_END, a ratio, so reframing leaves it alone.
+const DESCENT_END = PLAY_DIST;         // camDist the match plays at
 const DESCENT_START = DESCENT_END * DESCENT_SCALE;
 
 // THE ARRIVAL — stream A step 5. HOLE.IO's pre-touch idle is 717 ms of a static
@@ -9570,7 +9615,7 @@ function animate() {
       // targetDist is computed later in the frame, so derive the settled camera
       // distance from the radius directly rather than reading the diving one
       const cd = introT > 0
-        ? Math.min(camDist, Math.min(340, Math.max(26, 38 * Math.pow(voidling.radius / 0.9, 0.82))))
+        ? Math.min(camDist, Math.min(340, Math.max(26, PLAY_DIST * Math.pow(voidling.radius / 0.9, 0.82))))
         : camDist;
       const speed = steerCap(cd) * jm;
       tvx = (rightTmp.x * inX - fwdTmp.x * inY) * speed;
@@ -10189,7 +10234,7 @@ function animate() {
     // CONTINUOUS zoom (hole.io): distance ∝ R^0.78 — the void visibly gains
     // ~20% screen size across a form before the camera catches up, so growth
     // reads every few seconds instead of only at evolutions
-    let targetDist = Math.min(340, Math.max(26, 38 * Math.pow(R / 0.9, 0.82)));
+    let targetDist = Math.min(340, Math.max(26, PLAY_DIST * Math.pow(R / 0.9, 0.82)));
     if (introT > 0) {
       introT -= dt;
       // ── THE ESTABLISHING SHOT IS EXPENSIVE, so it does not pay for shadows.
