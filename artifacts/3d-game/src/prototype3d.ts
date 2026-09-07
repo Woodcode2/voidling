@@ -2186,6 +2186,14 @@ _dbg.__matchState = () => ({
   // these, and a goal card that never appeared cost a full diagnostic run to
   // localise. armed vs started is the whole shape of the opening.
   armed, goalCardT, arriveLanded, introT,
+  // tClock is the game's own monotonic clock and it runs during the armed idle,
+  // where matchClock deliberately does not. Anything measuring the opening needs
+  // it: dt is clamped to 0.05/frame, so under a software renderer managing about
+  // a frame a second the whole idle plays ~20x slower than the wall — a 0.5 s
+  // card timer takes 12 s of wall clock. A harness that waits in wall time
+  // touches the screen before the opening has begun and then reports the opening
+  // missing. Measured: 0.043 game-seconds per wall-second.
+  tClock,
   // QA: the camera distance the STEERING actually reads. The player's top speed
   // is min(96, 16 * camDist / 50), and camDist is not recoverable from the
   // radius — it lags, it eases, and it is still falling from 300 during the

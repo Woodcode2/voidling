@@ -129,6 +129,7 @@ const SAMPLER = () => {
         w.__op.rows.push({
           t: performance.now() - w.__op.t0,          // wall ms, for the probe's own bookkeeping
           g: ms.clock,                               // the match clock: the game's own time axis
+          tc: ms.tClock,                             // the game's monotonic clock — runs during the idle too
           clock: ms.clock, mt: ms.t, camDist: ms.camDist, r: ms.r, score: ms.score,
           cy: cam.position.y, cx: cam.position.x, cz: cam.position.z,
           vx: vs.x, vz: vs.z, vr: vs.r,
@@ -197,7 +198,17 @@ async function runOnce(browser, tapMs, shots) {
   // frame, the climb was missed and the descent may be a tail.
 
   if (shots) { mkdirSync(OUT, { recursive: true }); await p.screenshot({ path: `${OUT}/${WORLD}-01-first.png` }); }
-  await p.waitForTimeout(tapMs);
+  // WAIT IN GAME TIME, NOT WALL TIME. dt is clamped to 0.05 per frame, so under
+  // swiftshader the opening runs about twenty times slower than the wall: the
+  // 0.5 s goal-card timer takes ~12 s of wall clock. Waiting `tapMs` of wall
+  // clock touched the screen before the card had fired and before the void had
+  // landed, and then reported both missing — five runs of A11/A12 reading zero on
+  // a build that was working. The wait is now expressed in the game's own clock.
+  const wantG = tapMs / 1000;
+  await p.waitForFunction((g) => {
+    const s0 = window.__opG0 ?? (window.__opG0 = window.__matchState().tClock);
+    return window.__matchState().tClock - s0 >= g;
+  }, wantG, { timeout: 400000 }).catch(() => {});
   if (shots) await p.screenshot({ path: `${OUT}/${WORLD}-02-pretouch.png` });
 
   // The touch. Held and dragged, because a tap that does not move the stick
@@ -319,9 +330,11 @@ function analyse(d) {
   // finding the sampled frame nearest in wall time and reading its game clock.
   // Card window, in game time, from the samples where it was on screen.
   const cardOn = (d.card || []).filter((c) => c.on);
-  const toG = (w) => gm(rows.reduce((a, b) => (Math.abs(b.t - w) < Math.abs(a.t - w) ? b : a), rows[0]));
+  // Card timings ride tClock, which runs during the idle; matchClock does not.
+  const tcAt = (w) => (rows.reduce((a, b) => (Math.abs(b.t - w) < Math.abs(a.t - w) ? b : a), rows[0])?.tc ?? 0) * 1000;
+  const toG = tcAt;
   const cardMs = cardOn.length > 1 ? toG(cardOn[cardOn.length - 1].t) - toG(cardOn[0].t) : 0;
-  const cardAt = cardOn.length ? toG(cardOn[0].t) / 1000 : -1;
+  const cardAt = cardOn.length ? (toG(cardOn[0].t) - (rows[0]?.tc ?? 0) * 1000) / 1000 : -1;
   const cardBlocks = (d.card || []).filter((c) => c.on && c.blocks).length;
   const f0w = d.floaters[0]?.t ?? null;
   const f0 = f0w == null ? null : gm(rows.reduce((a, b) => (Math.abs(b.t - f0w) < Math.abs(a.t - f0w) ? b : a), rows[0]));
