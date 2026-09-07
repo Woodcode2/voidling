@@ -1888,6 +1888,7 @@ const _dbg = new Proxy(_dbgStore, {
 }) as unknown as {
   __scene: THREE.Scene; __cam: THREE.Camera; __THREE: typeof THREE; __renderer: THREE.WebGLRenderer;
   __firstBite: unknown;
+  __openAudio: { k: string; t: number }[];
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void; __settle: () => { inside: number; through: number; doorstep: number; feet: number; ms: number };
   __life: Life; __moverStats: (gate: number) => { near: number; total: number }; __crowdGate: number;
   __hatSheet: (ids: string[]) => Promise<unknown>;
@@ -5892,6 +5893,21 @@ const FIRST_BITE_MAX = 5.5;
 const GOAL_CARD_AT = 0.5;    // seconds after the world arms
 const GOAL_CARD_LEN = 0.6;   // 117 ms unroll + 383 ms open + 100 ms away
 let goalCardT = -1;          // counts up while armed; -1 once fired
+// THE OPENING'S SOUND, and a log of it. HOLE.IO's track is digital zero until
+// 6.14 s — their menu, their loading screen and the first second of their match
+// are silent (holeio.recon.md 11.10). Ours is not: the void announces himself when
+// he lands, the music starts on the touch that starts the match, and the first
+// bite is heard. This records what the game ASKED to play, with a game-time stamp.
+// It cannot know what was audible: a browser will not start an audio context
+// before a gesture, so on the world-switch path everything before the first touch
+// is requested and dropped. That is a browser rule, not a bug, and the bar says
+// which of the two it is measuring.
+const openAudio: { k: string; t: number }[] = [];
+function sfx(k: string, play: () => void): void {
+  if (openAudio.length < 32) openAudio.push({ k, t: tClock });
+  play();
+}
+_dbg.__openAudio = openAudio;   // QA: declared here, so the hook is wired here too
 const ARRIVE_FALL = 0.55;   // seconds of fall
 const ARRIVE_HIGH = 26;     // world units above his resting height
 let arriveT = 0;            // counts UP from 0 while the world is armed and untouched
@@ -6175,7 +6191,7 @@ function startMatch(): void {
   localStorage.setItem('voidPlayed', '1');
   // The first touch IS the user gesture the audio context needs. This is why the
   // reload path's TAP TO PLAY gate existed at all, and why it can go.
-  audio.startMusic(); audio.setMusicStage(0);
+  sfx('music', () => { audio.startMusic(); audio.setMusicStage(0); });
   document.body.classList.add('intro');   // the HUD arrives with the hands
   introT = DESCENT_LEN;   // the landmark is revealed INSIDE the descent, not instead of it
 }
@@ -9193,7 +9209,11 @@ function animate() {
       arriveT += dt;
       const k = Math.min(1, arriveT / ARRIVE_FALL);
       voidling.arriveY(ARRIVE_HIGH * (1 - k * k));
-      if (k >= 1) { arriveLanded = true; voidling.arriveY(0); voidling.bump(); }   // sound: stream A step 9, with the rest of the opening's audio
+      if (k >= 1) {
+        arriveLanded = true; voidling.arriveY(0); voidling.bump();
+        // He is pleased to be here. A hole cannot do this.
+        sfx('land', () => audio.voice('happy'));
+      }
     }
     // The goal card is timer-driven: it does not wait for the touch, and the touch
     // does not wait for it. A player who taps at 100 ms sees it unroll over their

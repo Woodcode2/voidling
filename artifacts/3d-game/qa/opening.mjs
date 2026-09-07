@@ -75,6 +75,12 @@ const BARS = {
   A14:{ what: 'joystick base offset from the touch point', want: '<= 12', unit: 'px', cmp: (v) => v <= 12 },
   A15:{ what: 'joystick ring diameter as a share of screen width', want: '24-26', unit: '%', cmp: (v) => v >= 24 && v <= 26 },
   A15b:{ what: 'joystick frames drawn BEFORE the first touch (theirs draws a default that then jumps 321 px)', want: 0, unit: 'frames', cmp: (v) => v === 0 },
+  // A20 measures what the game ASKED to play, not what was audible: a browser will
+  // not open an audio context before a gesture, so on the world-switch path
+  // everything before the first touch is requested and dropped. Their opening is
+  // digital zero until 6.14 s; ours asks for a landing coo, the music on the touch,
+  // and the eat. Verified by declaration, like A11.
+  A20:{ what: 'distinct opening sounds requested (land / music / eat)', want: '>= 3', unit: '', cmp: (v) => v >= 3 },
   A21:{ what: 'descent length difference, early tap vs late tap', want: '<= 100', unit: 'ms', cmp: (v) => v <= 100 },
   // A9 stays failing until the guaranteed first bite lands (brief 3.2): their
   // first point arrives at 45% of the descent by luck of the map, ours by rule.
@@ -285,7 +291,9 @@ async function runOnce(browser, tapMs, shots) {
   if (shots) await p.screenshot({ path: `${OUT}/${WORLD}-03-settle.png` });
   await p.mouse.up();
 
-  const data = await p.evaluate(() => window.__op);
+  const data = await p.evaluate(() => ({ ...window.__op,
+    audio: (window.__openAudio || []).map((a) => a.k),
+    eats: (window.__matchState?.().score ?? 0) }));
   await p.close();
   return data;
 }
@@ -403,6 +411,11 @@ function analyse(d) {
   const cardMs = cStart?.dur || cShow?.dur || 0;
   const cardAt = cShow ? cShow.g - (rows[0]?.tc ?? cShow.g) : -1;
   const cardBlocks = cEv.filter((c) => c.blocks).length;
+  // distinct kinds, plus the eat itself if a floater was seen (the eat sound and the
+  // floater are fired from the same event, so one witnesses the other)
+  const kinds = new Set(d.audio || []);
+  if ((d.floaters || []).length) kinds.add('eat');
+  const sounds = kinds.size;
   // Joystick. The anchor test uses the probe's own touch point, which it knows.
   const jOn = (d.joy || []).filter((j) => j.vis);
   const jPre = (d.joy || []).filter((j) => j.vis && j.t < touchAt).length;
@@ -431,7 +444,7 @@ function analyse(d) {
     if (rows[i].t < touchAt) continue;
     travelled += Math.hypot(rows[i].vx - rows[i - 1].vx, rows[i].vz - rows[i - 1].vz);
   }
-  return { rows: rows.length, touchAt, clockPre, clock0, idleG, descentMs, authoredMs, cap, sampleMs, q1: q1.y, q3: q3.y, travelled, samples: seg.length, cardMs, cardAt, cardBlocks, jOffset, jShare, jPre, descentFrom: gm(rows[iA]), fit, mid: mid.y, missedClimb, iPeak, peakDist: rows[iPeak]?.camDist ?? 0,
+  return { rows: rows.length, touchAt, clockPre, clock0, idleG, descentMs, authoredMs, cap, sampleMs, q1: q1.y, q3: q3.y, travelled, samples: seg.length, cardMs, cardAt, cardBlocks, sounds, jOffset, jShare, jPre, descentFrom: gm(rows[iA]), fit, mid: mid.y, missedClimb, iPeak, peakDist: rows[iPeak]?.camDist ?? 0,
     groundScale, dead, firstMove, floater: f0, floaterFrac, yStart, yEnd };
 }
 
@@ -445,7 +458,7 @@ const got = {
   A1: late.clockPre ?? 0, A3: late.idleG ?? 0, A4: late.firstMove ?? 1e9,
   A5: late.authoredMs, A6: late.q1, A6c: late.q3, A6b: late.mid, A7: late.groundScale,
   A8: late.dead, A9: late.floaterFrac ?? -1,
-  A11: late.cardMs, A12: late.cardAt, A13: late.cardBlocks,
+  A11: late.cardMs, A12: late.cardAt, A13: late.cardBlocks, A20: late.sounds,
   A14: late.jOffset, A15: late.jShare, A15b: late.jPre,
   A21: Math.abs(late.descentMs - early.descentMs),
 };
