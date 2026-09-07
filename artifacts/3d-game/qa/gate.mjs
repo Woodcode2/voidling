@@ -61,6 +61,15 @@ const WORLDS = ALL_WORLDS;
 // pf     the house convention: a line of "  PASS — ..." and no "  FAIL — ..."
 // exit   the probe already sets its own exit code; trust it
 // re     an explicit pass/fail pair, for the probes that speak their own dialect
+// ── PICKING A VERDICT IS PART OF REGISTERING A STEP ────────────────────────
+// pf matches /^\s*(PASS|FAIL)\s*[—-]/ and nothing else, and a probe that prints
+// neither is reported as silence — correctly, because a probe that says nothing
+// did not run. Three steps were registered pf whose probes speak exit codes and
+// print a table of their own: `opening`, `joyedge` and `joyrelease`. All three
+// were therefore incapable of passing, and `opening` sat FAIL in the push gate
+// with 18 of 18 bars green underneath it. Audited across all 41 pf steps; these
+// were the only three. If you add a step, grep the probe for "PASS —" before
+// choosing pf.
 const pf = { kind: 'pf' };
 const exitCode = { kind: 'exit' };
 const re = (pass, fail) => ({ kind: 're', pass, fail });
@@ -155,11 +164,20 @@ const SUITE = [
   // tested: it hid a TAP TO PLAY gate that ate the first touch on the other five,
   // and a first-bite ring whose geometry only worked where the props happened to be
   // large. One world is not evidence about six.
+  // EXIT CODE, NOT pf, AND THIS STEP HAS NEVER BEEN ABLE TO PASS. pf wants a
+  // line matching /^\s*PASS\s*[—-]/ — "PASS — something". qa/opening.mjs prints
+  // a table, one "PASS  A5   descent duration..." row per bar, and then sets its
+  // own exit code from the failure count. So the regex never matched, neither
+  // verdict was found, and the gate correctly called it silence: "no verdict
+  // printed". Registered that way in b0a2f75 and never caught, because the full
+  // push gate was not run again until now — 18 of 18 bars green underneath a
+  // step reported as FAIL. A probe that sets its own exit code is exactly what
+  // `exitCode` is for.
   { id: 'opening', tier: 'feel', profiles: ['push', 'live'], timeout: 900,
-    cmd: ['node', 'qa/opening.mjs', 'maple'], verdict: pf,
+    cmd: ['node', 'qa/opening.mjs', 'maple'], verdict: exitCode,
     why: 'the match starts on the first touch, and the player is playing through the camera move' },
   ...WORLDS.map(w => ({ id: `opening:${w}`, tier: 'feel', profiles: ['live'], timeout: 900,
-    cmd: ['node', 'qa/opening.mjs', w], verdict: pf,
+    cmd: ['node', 'qa/opening.mjs', w], verdict: exitCode,
     why: `the opening holds up on ${w}, not just on the world that never reloads` })),
 
   // unlocks.ts calls the locked art "the advertisement for the next one", and
@@ -375,11 +393,11 @@ const SUITE = [
     why: 'the crowd never repeats itself, and never buys freshness by developing favourites' },
 
   { id: 'joyedge', tier: 'feel', profiles: ['live'], timeout: 420,
-    cmd: ['node', 'qa/joyedge.mjs', PORT], verdict: pf,
+    cmd: ['node', 'qa/joyedge.mjs', PORT], verdict: exitCode,
     why: 'a thumb near the bezel drives the void as far as a thumb in the middle' },
 
   { id: 'joyrelease', tier: 'feel', profiles: ['live'], timeout: 420,
-    cmd: ['node', 'qa/joyrelease.mjs', PORT], verdict: pf,
+    cmd: ['node', 'qa/joyrelease.mjs', PORT], verdict: exitCode,
     why: 'every way a drive can end actually stops the void — lift, backgrounded, hidden, paused' },
 
   ...WORLDS.map(w => ({ id: `hero:${w}`, tier: 'art', profiles: ['live', 'art'], timeout: 300,
