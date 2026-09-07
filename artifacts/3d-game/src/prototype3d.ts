@@ -2182,6 +2182,10 @@ _dbg.__matchState = () => ({
   band: rivals.bandStat(),   // QA: is the lane multiplier pinned at its clamp?
   fever: feverMult,          // QA: is a beat window live right now?
   t: started ? matchElapsed() : 0, clock: matchClock, score: playerScore, r: voidling.radius, ev: rivalEv,
+  // QA, round 7 stream A: the arm/start split is invisible from outside without
+  // these, and a goal card that never appeared cost a full diagnostic run to
+  // localise. armed vs started is the whole shape of the opening.
+  armed, goalCardT, arriveLanded, introT,
   // QA: the camera distance the STEERING actually reads. The player's top speed
   // is min(96, 16 * camDist / 50), and camDist is not recoverable from the
   // radius — it lags, it eases, and it is still falling from 300 during the
