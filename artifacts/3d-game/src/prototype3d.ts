@@ -3504,6 +3504,19 @@ const COST = { gulp: 0.35, collapse: 1.0 };   // two powers, both readable: suck
 // must never enable auto-fire, menu-skip, or autopilot for a real player
 const _qd = new URLSearchParams(location.search);
 const DEBUG_HARNESS = _qd.has('at') || _qd.has('r') || _qd.has('len') || _qd.has('fast') || _qd.has('demo');
+// AN AUTOMATED BROWSER GETS ITS MATCH STARTED FOR IT. Round 7 stream A moved the
+// match start to the player's first touch, which is right for a child and wrong
+// for the ~140 probes in qa/ that wait on `__matchState().t` — none of them touch
+// anything, so match time never left zero and every one of them would hang for
+// its full timeout. The screenshot fleet went first: _worldshots.mjs timed out at
+// 400 s, taking qa/pop.mjs and the lookbook with it.
+//
+// navigator.webdriver is set by Playwright and by nothing a player runs, so it is
+// the honest signal for "no human is going to touch this screen". `?manual=1`
+// opts back out, and qa/opening.mjs uses it — that probe exists to prove the match
+// does NOT start without a touch, so it must not be handed one.
+const AUTO_START = DEBUG_HARNESS
+  || (typeof navigator !== 'undefined' && navigator.webdriver === true && !_qd.has('manual'));
 let powerCd = 0;                       // shared re-trigger delay
 let dashT = 0; const dashDir = { x: 0, z: 1 };
 const aim = { x: 0, z: 1 };            // last travel direction
@@ -6013,6 +6026,8 @@ function beginMatch(solo = false) {
   }
   ensureFirstBite();
   armed = true;
+  // see AUTO_START: a browser with no human behind it starts its own match
+  if (AUTO_START) queueMicrotask(() => startMatch());
   // The idle is the high view, not the play view. Without this the world opens at
   // playing height and the camera JUMPS up to DESCENT_START the instant the
   // player touches — the probe caught exactly that: a camera peaking at 227 that

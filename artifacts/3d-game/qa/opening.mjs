@@ -248,7 +248,10 @@ async function runOnce(browser, tapMs, shots) {
   // the first game-time run of this probe found a 328 ms "descent" of x1.21 for
   // an intro that travels from camDist 300 to 38. The world is chosen from the
   // picker instead, so sampling starts before the intro does.
-  await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 300000 });
+  // ?manual=1 opts out of the automated-browser auto-start: this probe exists to
+  // prove the match does NOT begin until the player touches, so it must not be
+  // handed a started match. Every other probe in qa/ wants the opposite.
+  await p.goto(`http://127.0.0.1:${PORT}/?manual=1`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
