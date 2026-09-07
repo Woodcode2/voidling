@@ -131,8 +131,17 @@ const SAMPLER = () => {
   // its animation is a CSS animation, which runs on the WALL clock: 600 ms. Under
   // swiftshader the sampler gets about one frame a second, so it can and did miss
   // the whole thing — A11/A12 read zero while the card was firing correctly.
-  const tcEl = document.getElementById('titlecard');
-  if (tcEl) {
+  // ATTACHED LAZILY, BECAUSE THIS WHOLE FUNCTION RUNS BEFORE THE DOCUMENT EXISTS.
+  // addInitScript executes at document-creation time, so getElementById returns
+  // null here and every listener silently attaches to nothing. The floater check
+  // survived only because it re-queries the DOM inside the frame loop. This cost
+  // another full run of A11/A12 reading zero on a card that was firing.
+  let cardWired = false;
+  const wireCard = () => {
+    if (cardWired) return;
+    const tcEl = document.getElementById('titlecard');
+    if (!tcEl) return;
+    cardWired = true;
     const stamp = (k) => ({ k, t: performance.now() - w.__op.t0,
       g: w.__matchState ? w.__matchState().tClock : 0,
       blocks: getComputedStyle(tcEl).pointerEvents !== 'none' });
@@ -141,9 +150,10 @@ const SAMPLER = () => {
     new MutationObserver(() => {
       if (tcEl.classList.contains('show')) w.__op.card.push(stamp('show'));
     }).observe(tcEl, { attributes: true, attributeFilter: ['class'] });
-  }
+  };
   const tick = () => {
     try {
+      wireCard();
       const ms = w.__matchState ? w.__matchState() : null;
       const vs = w.__voidState ? w.__voidState() : null;
       const cam = w.__cam;
@@ -256,7 +266,10 @@ function analyse(d) {
   const pre = rows.filter((r) => r.t < touchAt);
   const clock0 = pre.length ? pre[0].clock : null;
   const clockPre = pre.length ? clock0 - pre[pre.length - 1].clock : null;   // seconds burned before the touch
-  const idleG = pre.length ? (clock0 - pre[pre.length - 1].clock) || (pre[pre.length - 1].t - pre[0].t) / 1000 : 0;
+  // In the game's own clock, which runs during the idle. The old fallback used
+  // wall seconds and so reported a 122 s idle for 2.5 s of game time — a number
+  // that was true of the harness and false of the game.
+  const idleG = pre.length ? ((pre[pre.length - 1].tc ?? 0) - (pre[0].tc ?? 0)) : 0;
 
   // The descent, found from the camera height series rather than from a flag:
   // the first frame where height starts falling to the frame where it stops.
