@@ -42,7 +42,7 @@ const BARS = {
   A1: { what: 'clock ticks elapsed before the first touch', want: 0, unit: 's', cmp: (v) => v <= 0.001 },
   A3: { what: 'idle available before touch, in game time', want: '>= 0.5', unit: 's', cmp: (v) => v >= 0.5 },
   A4: { what: 'touch-down to first void movement', want: '<= 133', unit: 'ms', cmp: (v) => v <= 133 },
-  A5: { what: 'descent duration (authored, threshold-corrected)', want: '1100-1300', unit: 'ms', cmp: (v) => v >= 1100 && v <= 1300 },
+  A5: { what: 'descent duration, peak to settle', want: '1100-1300', unit: 'ms', cmp: (v) => v >= 1100 && v <= 1300 },
   // A6 IS A QUARTER-POINT TEST, NOT A CURVE FIT. The fit was measured flipping
   // between "smoothstep" and "linear" on identical descent code — RMS 0.034 vs
   // 0.032 — because under swiftshader a 1.2 s move is only ~20 samples with a
@@ -227,9 +227,16 @@ function analyse(d) {
     while (iA < iMin && (yStart - h[iA].y) < 0.005 * span) iA++;
     while (iB > iA && (yStart - h[iB].y) > 0.995 * span) iB--;
   }
-  const descentMs = gm(rows[iB]) - gm(rows[iA]);
-  const seg = h.slice(iA, iB + 1);
-  const segG = rows.slice(iA, iB + 1).map(gm);
+  // THE WINDOW IS PEAK -> MINIMUM, NOT THE TRIMMED SPAN. Normalising time over a
+  // window trimmed at 0.5%/99.5% shifts the curve's own landmarks: probe-t 0.25
+  // then lands at true p 0.271, where a smoothstep reads 0.180 rather than 0.156,
+  // and the quarter-point test measures the trim instead of the easing. It cost a
+  // false A6 failure at 0.202/0.796 on a descent that was correct. The peak and
+  // the minimum are the move's real endpoints, so they are the window; iA/iB stay
+  // only as a diagnostic of where the flat tails begin.
+  const descentMs = gm(rows[iMin]) - gm(rows[iPeak]);
+  const seg = h.slice(iPeak, iMin + 1);
+  const segG = rows.slice(iPeak, iMin + 1).map(gm);
   const series = seg.map((p, i) => ({ x: (segG[i] - segG[0]) / (descentMs || 1), y: (yStart - p.y) / (span || 1) }));
   const fit = series.length > 5 ? fitEasing(series) : { name: 'n/a', rms: NaN };
   const at = (t) => series.reduce((a, b) => (Math.abs(b.x - t) < Math.abs(a.x - t) ? b : a), series[0] || { x: 0, y: 0 });
@@ -264,8 +271,10 @@ function analyse(d) {
   // known clipping. Sampling granularity is reported too: under swiftshader the
   // descent is only ever a handful of frames, so the residual uncertainty is
   // roughly one sample interval.
-  const cap = CAPTURE[fit.name] ?? 1;
-  const authoredMs = descentMs / cap;
+  // No capture correction any more: the window is the whole move, so the measured
+  // span IS the authored span (to within one sample).
+  const cap = 1;
+  const authoredMs = descentMs;
   const sampleMs = seg.length > 1 ? descentMs / (seg.length - 1) : NaN;
   // How far the void actually travelled after the touch. Without this a missing
   // "+1" is ambiguous: it could be a world with no food in reach, or a probe whose
@@ -309,7 +318,7 @@ console.log(`\n  descent (game time) ${late.descentFrom.toFixed(0)}..${(late.des
 console.log(`  NOTE: durations are GAME time (the match clock), not wall clock — under swiftshader the wall runs ~10x slower.`);
 console.log(`  camera peaked at sample ${late.iPeak} (camDist ${late.peakDist.toFixed(0)}); ${late.samples} samples across the descent`);
 console.log(`  void travelled ${late.travelled.toFixed(1)} world units after the touch (the first-bite ring sits at 5)`);
-console.log(`  span measured ${late.descentMs.toFixed(0)} ms; the fitted family's thresholds see ${(100 * late.cap).toFixed(1)}% of a move, so authored = ${late.authoredMs.toFixed(0)} ms (+-${(late.sampleMs || 0).toFixed(0)} ms, one sample)`);
+console.log(`  span ${late.descentMs.toFixed(0)} ms across the whole move (+-${(late.sampleMs || 0).toFixed(0)} ms, one sample); quarter points ${late.q1.toFixed(3)} / ${late.q3.toFixed(3)} against 0.156 / 0.844 for an ease-in-out`);
 console.log(`  easing fit ${late.fit.name} (rms ${late.fit.rms.toFixed(3)}); early-tap descent ${early.descentMs.toFixed(0)} ms`);
 console.log(`  clock at the first gameplay frame ${late.clock0?.toFixed(2)} s; first floater ${late.floater == null ? 'none' : late.floater.toFixed(0) + ' ms'}`);
 console.log(`\n${fails} of ${Object.keys(BARS).length} bars failing\n`);

@@ -1887,6 +1887,7 @@ const _dbg = new Proxy(_dbgStore, {
   },
 }) as unknown as {
   __scene: THREE.Scene; __cam: THREE.Camera; __THREE: typeof THREE; __renderer: THREE.WebGLRenderer;
+  __firstBite: unknown;
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void; __settle: () => { inside: number; through: number; doorstep: number; feet: number; ms: number };
   __life: Life; __moverStats: (gate: number) => { near: number; total: number }; __crowdGate: number;
   __hatSheet: (ids: string[]) => Promise<unknown>;
@@ -5992,6 +5993,7 @@ function beginMatch(solo = false) {
 // magnet return a prop to, so moving one without the other would have the prop
 // spring back to where it used to live the first time it was nudged.
 function ensureFirstBite(): void {
+  const placed: { slot: number; x: number; z: number; r: number }[] = [];
   const maxR = 0.9 * EAT_RATIO;   // the void's radius at the fixed spawn
   const sx = island.spawn.x, sz = island.spawn.z;
   const near = edibles
@@ -6015,7 +6017,12 @@ function ensureFirstBite(): void {
     if (!insideIsland3(x, z)) { taken.delete(slot); continue; }   // never push a prop off the island
     e.mesh.position.x = x; e.mesh.position.z = z;
     e.home.x = x; e.home.z = z;
+    placed.push({ slot, x, z, r: e.radius });
   }
+  // QA: the ring is a rule, so it has to be inspectable rather than argued about.
+  // qa/opening.mjs reads this when the first "+1" does not arrive.
+  _dbg.__firstBite = { spawn: { x: sx, z: sz }, ring: FIRST_BITE_RING, maxR,
+    candidates: near.length, placed };
 }
 
 // THE MATCH BEGINS WHEN THE PLAYER DOES. Called from the first input of an armed
