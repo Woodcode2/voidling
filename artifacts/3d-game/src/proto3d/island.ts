@@ -4220,7 +4220,11 @@ const _fadeHook = function (this: THREE.Object3D) {
 const FADE_POOL_N = 16;
 interface FadeSlot { mat: THREE.Material; owner: THREE.Mesh | null }
 const _fadePools = new Map<THREE.Material, FadeSlot[]>();
-export let _fadeStarved = 0;
+/** Why setMeshFade did or did not hand a prop a material of its own. Every
+ *  branch is counted, because the probe can see that the swap did not happen
+ *  and cannot see which guard refused it — and identity checks against
+ *  PROP_SHARED_MAT only mean anything from inside this module. */
+export const fadeStats = { swapped: 0, released: 0, starved: 0, notMesh: 0, multiMat: 0, notBase: 0, held: 0, private: 0 };
 function fadePool(base: THREE.Material): FadeSlot[] {
   let pool = _fadePools.get(base);
   if (pool) return pool;
@@ -4245,7 +4249,8 @@ export function setMeshFade(o: THREE.Object3D, fade: number): void {
   o.userData.fade = fade;
   if (o.onBeforeRender !== _fadeHook) o.onBeforeRender = _fadeHook;
   const mesh = o as THREE.Mesh;
-  if (!mesh.isMesh || Array.isArray(mesh.material)) return;
+  if (!mesh.isMesh) { fadeStats.notMesh++; return; }
+  if (Array.isArray(mesh.material)) { fadeStats.multiMat++; return; }
   const base = (mesh.userData.fadeBase as THREE.Material | undefined) ?? mesh.material;
   const pool = _fadePools.get(base);
   if (fade >= 0.999) {                                // solid again: give the slot back
@@ -4254,17 +4259,26 @@ export function setMeshFade(o: THREE.Object3D, fade: number): void {
       if (slot) slot.owner = null;
       mesh.material = mesh.userData.fadeBase as THREE.Material;
       mesh.userData.fadeBase = undefined;
+      fadeStats.released++;
     }
     return;
   }
-  if (mesh.userData.fadeBase) return;                 // already holds one
+  if (mesh.userData.fadeBase) { fadeStats.held++; return; }   // already holds one
+  // A GATED PROP ALREADY OWNS ITS MATERIAL. The too-big-to-eat tint clones one
+  // per mesh so a single prop can grey without taking the island with it, which
+  // is exactly what a slot would have bought: a private uniform and an ID that
+  // differs from its neighbours'. Taking a slot here would also throw the grey
+  // away. Not a failure — the common case, since anything big enough to hide
+  // the hero is big enough to be gated.
+  if (mesh.material === mesh.userData.gateMat) { fadeStats.private++; return; }
   // only the two materials that carry the fade shader can dissolve at all
-  if (base !== PROP_SHARED_MAT && base !== PROP_SMOOTH_MAT) return;
+  if (base !== PROP_SHARED_MAT && base !== PROP_SMOOTH_MAT) { fadeStats.notBase++; return; }
   const slot = fadePool(base).find((q) => q.owner === null);
-  if (!slot) { _fadeStarved++; return; }
+  if (!slot) { fadeStats.starved++; return; }
   slot.owner = mesh;
   mesh.userData.fadeBase = base;
   mesh.material = slot.mat;
+  fadeStats.swapped++;
 }
 // Built at module init, not on first use. Material.clone() puts userData through
 // JSON.parse(JSON.stringify(...)), and once a prop material has been drawn its

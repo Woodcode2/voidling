@@ -318,12 +318,17 @@ const shot = await p.evaluate(() => {
       while (anc && !e) { e = window.__edibles.find((x) => x.mesh === anc) || null; anc = anc.parent; }
       const mat = o.material;
       const sh = mat && mat.userData && mat.userData.shader;
-      let fade = o.userData.fade;
-      if (fade === undefined && e) fade = e.mesh.userData.fade;
+      // STRICTLY this object's own fade. An earlier version fell back to the
+      // edible's, which reported 0.62 for a mesh setMeshFade had never touched.
+      const own = o.userData.fade;
       why.push({ name: o.name || '(unnamed)', dist: +hit.distance.toFixed(1),
         mat: mat ? (mat.name || mat.type) + '#' + mat.id : 'none', hooked: !!sh,
         uFade: sh && sh.uniforms.uFade ? +sh.uniforms.uFade.value.toFixed(2) : null,
-        fade: fade === undefined ? null : +fade.toFixed(2),
+        fade: own === undefined ? null : +own.toFixed(2),
+        eFade: e && e.mesh.userData.fade !== undefined ? +e.mesh.userData.fade.toFixed(2) : null,
+        inFadeTo: !!(e && e.fadeTo && e.fadeTo.indexOf(o) >= 0),
+        nFadeTo: e && e.fadeTo ? e.fadeTo.length : 0,
+        hookLen: o.onBeforeRender ? String(o.onBeforeRender).length : 0,
         edible: !!e, r: e ? e.radius : null, reachable: !!(e && e.fadeTo), obj: o });
     }
   }
@@ -378,6 +383,7 @@ const shot = await p.evaluate(() => {
   }
   for (const q of why) delete q.obj;
   return { blocked, fadingNow, mask, seen, ifGone, ifZero, didExperiment: !!E, w, h, why,
+    fadeStats: window.__fadeStats ? { ...window.__fadeStats() } : null,
     px: { x: (na.x * 0.5 + 0.5) * w, y: (-na.y * 0.5 + 0.5) * h,
           r: Math.abs(nb.x - na.x) * 0.5 * w } };
 });
@@ -401,8 +407,9 @@ console.log(`  walked to the chosen occluder: ${walk.ok ? 'arrived' : 'did NOT a
   + ` (${JSON.stringify(walk)})`);
 for (const q of shot.why) console.log(`    in the way at ${q.dist}: ${q.name} ${q.mat}`
   + ` | ${q.edible ? 'edible r=' + q.r : 'NOT an edible'}, `
-  + `${q.reachable ? 'reachable' : 'not reachable'}, hooked ${q.hooked}, `
-  + `fade ${q.fade}, uFade ${q.uFade}`);
+  + `${q.reachable ? 'reachable(' + q.nFadeTo + ')' : 'not reachable'}, `
+  + `in fadeTo ${q.inFadeTo}, hooked ${q.hooked}, onBeforeRender len ${q.hookLen}, `
+  + `own fade ${q.fade}, edible's fade ${q.eFade}, uFade ${q.uFade}`);
 if (shot.didExperiment) {
   console.log(`  EXPERIMENT: with the nearest occluder switched off, `
     + `${shot.ifGone} of ${shot.mask} silhouette px changed `
@@ -412,6 +419,7 @@ if (shot.didExperiment) {
     + `(${(100 * shot.ifZero / Math.max(1, shot.mask)).toFixed(1)}%) `
     + `— near 0 means the value never reaches the GPU`);
 }
+if (shot.fadeStats) console.log(`  setMeshFade: ${JSON.stringify(shot.fadeStats)}`);
 console.log(`  that frame: ${OUT}/${WORLD}-worst.png\n`);
 let pass = 0;
 for (const [id, bar] of Object.entries(BARS)) {

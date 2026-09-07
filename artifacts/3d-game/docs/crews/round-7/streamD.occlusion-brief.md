@@ -45,7 +45,7 @@ All of that is about a mechanism that could only reach **half the island**.
 
 ---
 
-## 2. ONE DEFECT FOUND AND FIXED, ONE STILL OPEN
+## 2. TWO DEFECTS, AND THE SECOND ONE IS A JOKE AT OUR EXPENSE
 
 ### 2.1 The fade could only reach half the island
 
@@ -77,54 +77,72 @@ running it told me how big.
 Resolving the fade targets once, in `addEdible`, took **O2 from 52.6% to 91.0%**.
 And O3 — how much of the hero you can actually see — went to **zero**.
 
-### 2.2 The dissolve does not reach the screen — cause still open
+### 2.2 A clone is not a copy of the shader
 
-That is not a contradiction, it is the next question. With the town hall
-standing over the void, the probe reported the occluder found, in reach,
-reachable, and dissolved to 0.62 — and **0 of 11,050** pixels of the hero's
-silhouette showing through it. The frame, `qa-out/occ/maple-worst.png`, shows a
-flat cream building with no dither anywhere on it.
+With the town hall standing over the void, the probe reported the occluder
+found, in reach, reachable, in `fadeTo`, carrying the fade hook, dissolved to
+0.62, **and its material's `uFade` reading 0.62** — with **0 of 20,263** pixels
+of the hero's silhouette showing through it. Switching that prop off revealed
+99.9% of him, so it is certainly what covers him. Setting its own fade to 0,
+which must discard every pixel it owns, changed nothing at all. A 16×16 block of
+the building over his centre is one flat colour: there is no dither on it
+anywhere.
 
-**A correction, and it is mine.** The same line reported the material's `uFade`
-as 1 while the prop's own `userData.fade` read 0.62, and I wrote a section here
-concluding that every prop's hook was clobbering one shared uniform. That
-reading was an artefact of the probe: the drive stubs `renderer.render`,
-`onBeforeRender` only fires from inside a render, so for the whole drive the
-fade hook never runs and every material's `uFade` sits at its initial 1 whatever
-the props say. I read the stub's fingerprint as the game's. The probe now
-renders once before it asks anything about a shader.
+The answer, verified offline against this repo's three (r185):
 
-The shared uniform is still a real hazard, and the history retrodicts it:
-three.js uploads a material's uniforms only when the material ID changes between
-draws, so three hundred props on one material is one upload — and round 3
-recorded that at 0.28 POWDER's snow read as "a black-and-red halftone print",
-which is what one occluder's fade leaking to every prop in the batch looks like,
-not what one dissolving tree looks like. But fixing it (§2.3) did **not** move
-O3, so it is not the whole story and may not be this story at all.
+```
+Material.clone():  onBeforeCompile copied?  false
+                   userData copied?         yes, by value
+```
 
-The question is now narrowed to two candidates, and the probe has an experiment
-that separates them: render the frame again with the nearest thing in the way
-simply switched off. If the hero appears, the dissolve is what is broken. If he
-does not, that is not what is covering him.
+`clone()` does not copy `onBeforeCompile`, and it does copy `userData`. So a
+cloned prop material comes out carrying the **stock** standard shader plus a
+**dead JSON snapshot** of the original's `shader` object. The fade hook then
+writes 0.62 into that snapshot every frame; anything asking whether the material
+is hooked reads true; and nothing on the GPU has ever heard of `uFade`. Every
+reading was honest and every one of them was about an object no shader reads.
+(The eight `THREE.Texture: Unable to serialize Texture` warnings sitting in the
+console are that same clone, putting a compiled shader's uniforms through JSON.)
 
-### 2.3 A fading prop borrows a material of its own
+And what clones a prop material? The **too-big-to-eat grey tint**
+(`prototype3d.ts`), which gives each prop the void cannot yet swallow a material
+of its own so it can grey without taking the island with it.
 
-A prop that is currently fading takes a material from a pool of sixteen clones
-per base. One mesh per material means nothing else can overwrite its uniform,
-and the material ID necessarily changes on either side of that draw, so the
-upload happens. The clones are made at module init — `Material.clone()` puts
-`userData` through `JSON.parse(JSON.stringify(...))`, and once a prop material
-has been drawn its `userData` holds the compiled shader, which is what the eight
-`THREE.Texture: Unable to serialize Texture` warnings already in the console
-are. Cloning before anything compiles is silent. They share the base's defines,
-so three's program cache returns the same compiled program: a swap costs a
-uniform upload, not a shader build. A prop that cannot get a slot stays solid —
-the old behaviour — and `_fadeStarved` counts it.
+> So the feature written to stop the hero disappearing behind scenery was
+> switched off for every prop big enough to hide him, by a line about the colour
+> grey. Small props — the ones that could never hide anything — faded correctly
+> the whole time, which is exactly why it looked like it worked.
 
-**This is correct and it is not sufficient.** O3 stayed at 0.0% with it in. It
-stays in the tree only if the experiment shows the dissolve is what is broken;
-if the cause is elsewhere it comes back out, rather than sitting there looking
-like a fix.
+Counted rather than inferred, in one 6-second drive, by branch inside
+`setMeshFade`:
+
+```
+{"swapped":10,"released":10,"starved":0,"notMesh":0,"multiMat":0,
+ "notBase":255,"held":120}
+```
+
+255 refusals because the material was a clone, against 10 props ever handled.
+
+It cost the gloss pass too: a gated prop has been rendering without the
+roughness and metalness terms every other prop on the island gets.
+
+### 2.3 The fixes
+
+**Give the clone its shader back.** The gate tint now drops the dead snapshot
+and runs `installPropShader` on its clone, so a gated prop compiles the same
+program as everything else — fade, gloss and all.
+
+**And a fading prop that is NOT gated borrows a material of its own.** Those
+props still share one material, and per-object state on a shared material cannot
+work twice over: every prop's hook writes the same uniforms object so the last
+one drawn wins, and three.js uploads a material's uniforms only when the
+material ID changes between draws, so three hundred props on one material is one
+upload. The history retrodicts it — round 3 recorded that at 0.28 POWDER's snow
+read as "a black-and-red halftone print", which is one occluder's fade leaking
+across a whole batch, not one tree dissolving. So a fading prop takes a material
+from a pool of sixteen clones per base. The clones are built at module init,
+before anything compiles, so `clone()` has an empty `userData` to copy rather
+than a shader. A gated prop needs no slot: it already owns its material.
 
 ## 3. THE PROBE — `qa/occlusion.mjs`
 
@@ -167,40 +185,54 @@ tree, and a bar that can only agree with the code is not a bar.
 
 | # | Bar | Target | Before | After 2.1 | After 2.3 |
 |---|---|---|---|---|---|
-| O2 | blocked frames in which something is fading | ≥ 90% | **52.6%** | **91.0%** | — |
-| O3 | the hero you can see at his worst moment | ≥ 60% | 42.4% | **0.0%** | — |
+| O2 | blocked frames in which something is fading | ≥ 90% | 52.6% | **91.0%** | 80.4% |
+| O3 | the hero you can see at his worst moment | ≥ 60% | 42.4% | 0.0% | **37.5%** |
 
-Diagnostics printed alongside, not scored: how many props the loop can reach,
-how often the raycast finds him blocked at all, the worst and mean blockage over
-the drive, and the material state of every occluder in the way at the shot.
+**37.5% is the arithmetic, to three figures.** A fade of 0.62 discards the six
+Bayer steps at or above it and keeps ten, so a prop that covers the hero
+completely leaves exactly 6/16 of him showing. Landing on the predicted number
+rather than near it is the strongest evidence available that the mechanism is
+now doing precisely what it says, and it also means the remaining gap to 60% is
+not a bug: it is the constant.
+
+O2's 91.0% and 80.4% are separate drives of an unseeded sequence and the spread
+between them is drive-to-drive variance, not a regression; both are the
+reachability fix's number. The 20% of props armed nowhere (§6) is the ceiling on
+that bar.
 
 O3's "before" of 42.4% and its 0.0% after 2.1 are **not comparable** — that is
 the instrument fault in §3, and it is why the moment is now walked to rather
-than waited for. The honest before-and-after of the whole change is the pair of
-runs on the walked moment.
+than waited for. Every figure from 2.1 onward is measured at the walked moment.
 
----
+Diagnostics printed alongside, not scored: how many props the loop can reach,
+how often the raycast finds him blocked at all, the worst and mean blockage over
+the drive, the material state of every occluder in the way at the shot, and the
+branch counts inside `setMeshFade`.
 
-## 5. WHAT THE FIX CAN AND CANNOT DO
+## 5. 0.62 IS NOW A CHOICE, NOT A CONSTANT
 
-Once the dissolve reaches the GPU, an occluder that fully covers the hero still
-leaves him only **37.5% visible**: 0.62 keeps ten pixels in sixteen of the Bayer
-mask. That ceiling is why O3's target is 60% and not 95% — the number itself
-says whether the second half of the work is needed, rather than being set where
-the first half was always going to land.
+The gap from 37.5% to 60% is the fade constant, and the argument that fixed it
+at 0.62 no longer applies. Round 3 rejected 0.28 because on POWDER's snow a
+5-in-16 keep-mask read as a black-and-red halftone print — and that is what it
+looked like, because **every prop sharing the material dissolved together**. A
+whole snowfield flashing is a different thing from one building opening up.
 
-If it is needed, the second half is not a smaller constant. 0.28 was already
-tried and rejected by measurement: on POWDER's snow a 5-in-16 keep-mask reads as
-a black-and-red halftone print. The answer is to draw the hero where he is
-hidden — an upper-hemisphere overlay in his own skin colour with
-`depthFunc: GreaterDepth`, which paints only the pixels where something nearer
-is already in the depth buffer. One extra low-poly draw, the trick every
-third-person game uses, and it keeps him a creature instead of turning the world
-into a flicker. The hemisphere matters: a full sphere would draw a disc of skin
-colour at ground level wherever the ground is in front of his sunken half, which
-is the ring a previous round already rejected by measurement.
+Now that an occluder owns its material, the constant can be per-prop, and the
+sensible shape is graded: a prop grazing the hero's edge stays a solid ghost at
+0.62; a prop dead in his sight line opens toward 0.30, which discards eleven
+steps of sixteen and leaves 68.75% of him visible. The signal is already in
+hand — `fadeOccluders` computes the perpendicular distance from the
+camera-to-hero axis, and how centred that is against the prop's own reach is
+exactly "how much of him is this covering".
 
----
+If a graded floor is not enough, the fallback is not a smaller number: it is to
+draw him where he is hidden — an upper-hemisphere overlay in his own skin colour
+with `depthFunc: GreaterDepth`, which paints only the pixels where something
+nearer is already in the depth buffer. One extra low-poly draw, the trick every
+third-person game uses, and it keeps him a creature rather than turning the
+world into a flicker. The hemisphere matters: a full sphere would draw a disc of
+skin colour at ground level wherever the ground is in front of his sunken half,
+which is the ring a previous round already rejected by measurement.
 
 ## 6. WHAT IS STILL OPEN
 

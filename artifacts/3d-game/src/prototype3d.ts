@@ -27,7 +27,7 @@ import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid, makeVoidBody, applySkinToBody, type Mood } from './proto3d/void3d';
-import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, onIce3, setWorld, setMeshFade, part, mergedProp, type WorldId } from './proto3d/island';
+import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, onIce3, setWorld, setMeshFade, fadeStats, installPropShader, part, mergedProp, type WorldId } from './proto3d/island';
 import { createLife, pickFresh, type Life } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { HATS, HAT_BY_ID, hatLine, HAT_MAX_W, applyHatLod, type Hat } from './proto3d/hats';
@@ -1931,6 +1931,7 @@ const _dbg = new Proxy(_dbgStore, {
   __scene: THREE.Scene; __cam: THREE.Camera; __THREE: typeof THREE; __renderer: THREE.WebGLRenderer;
   __firstBite: unknown;
   __openAudio: { k: string; t: number }[];
+  __fadeStats: () => Record<string, number>;
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void; __settle: () => { inside: number; through: number; doorstep: number; feet: number; ms: number };
   __life: Life; __moverStats: (gate: number) => { near: number; total: number }; __crowdGate: number;
   __hatSheet: (ids: string[]) => Promise<unknown>;
@@ -2043,6 +2044,7 @@ _dbg.__eatNearest = (rel: number) => {
   if (best) capture(best);
   return best ? { r: best.radius, R } : null;
 };
+_dbg.__fadeStats = () => fadeStats;   // QA: why a prop did or did not get its own material
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
 _dbg.__settle = () => ({ ...settleStat });   // QA: what the footprint settle retired at the boot sweep, and its cost (qa/placement.mjs)
 
@@ -9909,7 +9911,32 @@ function animate() {
           if (!o.userData.baseCol) o.userData.baseCol = mm.color.clone();
           // clone the material once per gated mesh, or every prop sharing the
           // merged-prop material would grey out together
-          if (!o.userData.gateMat) { o.userData.gateMat = mm.clone(); (o as THREE.Mesh).material = o.userData.gateMat; }
+          // ── AND A CLONE IS NOT A COPY OF THE SHADER ──────────────────────
+          // three's Material.clone() (r185, verified) does NOT copy
+          // onBeforeCompile, and it DOES copy userData by value. So a cloned
+          // prop material comes out carrying the STOCK standard shader plus a
+          // dead JSON snapshot of the original's `shader` object. The occlusion
+          // fade hook then writes 0.62 into that snapshot every frame, a probe
+          // asking whether the material is hooked reads true, and nothing on
+          // the GPU has ever heard of uFade. Measured with the town hall over
+          // the void: fade 0.62, uFade 0.62, and 0 of 20,121 pixels of the
+          // hero's silhouette showing through it.
+          // Gating fires on exactly the props too big to eat, which is exactly
+          // the set big enough to hide the hero — so the feature written to
+          // stop the hero disappearing was switched off for every prop that
+          // could ever hide him, by a line about the colour grey.
+          // The gloss pass went the same way: a gated prop was rendering
+          // without the roughness and metalness terms every other prop on the
+          // island gets. The eight "THREE.Texture: Unable to serialize Texture"
+          // warnings in the console are this clone, JSON-ing a compiled
+          // shader's uniforms.
+          if (!o.userData.gateMat) {
+            const gm = mm.clone();
+            gm.userData = {};             // drop the dead snapshot; let it compile its own
+            installPropShader(gm);
+            o.userData.gateMat = gm;
+            (o as THREE.Mesh).material = gm;
+          }
           ((o as THREE.Mesh).material as THREE.MeshStandardMaterial).color
             .copy(o.userData.baseCol).lerp(GATE_GREY, 0.42);
         } else if (o.userData.baseCol && o.userData.gateMat) {
