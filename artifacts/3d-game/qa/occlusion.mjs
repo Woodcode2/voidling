@@ -56,9 +56,16 @@ const BARS = {
 const pageLog = [];
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
-const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 3 });
+// DPR 1, DELIBERATELY. O3 is a ratio of the hero's own pixels, so resolution
+// buys it nothing and costs it everything: at DPR 3 every readPixels is 3.6 MP
+// and 14.4 MB, this probe held six of them at once, and the renderer underneath
+// is swiftshader sitting at quality rung 0 — bloom on, pixel ratio 2. Three runs
+// died there: two on a 900-second timeout and one with the browser simply gone.
+// qa/hero.mjs has always shot at DPR 1 for exactly this reason.
+const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });
 p.setDefaultTimeout(400000);
 p.on('console', (m) => { if (m.type() === 'warning' || m.type() === 'error') pageLog.push(m.text()); });
+p.on('crash', () => console.log('  !! the page crashed — the probe outgrew the renderer, not the game'));
 p.on('pageerror', (e) => pageLog.push('pageerror: ' + e.message));
 await p.route('**/functions/v1/ingest-events', r => r.fulfill({ status: 200, body: '{}' }));
 await p.addInitScript(() => { try {
@@ -134,9 +141,16 @@ await p.evaluate((seconds) => {
       const dx = m.position.x - vs.x, dz = m.position.z - vs.z;
       if (dx * dx + dz * dz > 3600) continue;                     // within 60 units of the hero
       if (m.position.distanceTo(from) - (e.radius + 8) >= camToHero) continue;
-      near.push(m);
+      near.push({ m, d: dx * dx + dz * dz });
     }
     if (!near.length) return 0;
+    // NEAREST 24. Thirteen rays a frame against every prop within 60 units is
+    // hundreds of thousands of ray-triangle tests per frame on merged
+    // geometry, and it is what made this drive too slow to finish. Anything
+    // that can cover the hero is one of the closest few; the tail was paying
+    // for props that could never be in the way.
+    near.sort((a, c) => a.d - c.d);
+    const list = near.slice(0, 24).map((q) => q.m);
     let blocked = 0;
     for (const [a, c] of RING) {
       target.copy(hero).addScaledVector(right, a * vs.r).addScaledVector(up, c * vs.r);
@@ -144,7 +158,7 @@ await p.evaluate((seconds) => {
       const len = aim.length();
       ray.set(from, aim.multiplyScalar(1 / len));
       ray.far = len - 0.05;
-      if (ray.intersectObjects(near, true).length) blocked++;
+      if (ray.intersectObjects(list, true).length) blocked++;
     }
     return 100 * blocked / RING.length;
   };
@@ -399,19 +413,11 @@ const shot = await p.evaluate(() => {
   vg.visible = false;
   const C = grab();
   vg.visible = true;
-  let E = null, F = null;
+  let E = null;
+  const F = null;
   if (why.length) {
     const o = why[0].obj;
     o.visible = false; E = grab(); o.visible = true;
-    // F: the same prop asked to disappear ENTIRELY through the fade path.
-    // uFade 0 discards every pixel (voidBayer is never negative), so if F still
-    // shows a solid prop the value is not reaching the GPU, and if it vanishes
-    // the path works and 0.62 is doing exactly what 0.62 asks for.
-    const was = o.userData.fade;
-    o.userData.fade = 0;
-    window.__RR(scene, cam);           // let the hook write it
-    F = grab();
-    o.userData.fade = was;
   }
   window.__RR(scene, cam);
 
