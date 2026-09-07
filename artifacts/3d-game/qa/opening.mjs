@@ -43,8 +43,17 @@ const BARS = {
   A3: { what: 'idle available before touch, in game time', want: '>= 0.5', unit: 's', cmp: (v) => v >= 0.5 },
   A4: { what: 'touch-down to first void movement', want: '<= 133', unit: 'ms', cmp: (v) => v <= 133 },
   A5: { what: 'descent duration (authored, threshold-corrected)', want: '1100-1300', unit: 'ms', cmp: (v) => v >= 1100 && v <= 1300 },
-  A6: { what: 'descent easing on camera HEIGHT (best fit)', want: 'ease-in-out', unit: '', cmp: (v) => /in-out|smooth/.test(String(v)) },
-  A6b:{ what: 'height progress at t=0.5', want: '0.40-0.60', unit: '', cmp: (v) => v >= 0.4 && v <= 0.6 },
+  // A6 IS A QUARTER-POINT TEST, NOT A CURVE FIT. The fit was measured flipping
+  // between "smoothstep" and "linear" on identical descent code — RMS 0.034 vs
+  // 0.032 — because under swiftshader a 1.2 s move is only ~20 samples with a
+  // jittering dt, and at that density the families are not separable. Worse, the
+  // MIDPOINT cannot separate them even in principle: smoothstep(0.5) = 0.5
+  // exactly, the same as linear. The quarter points can: an ease-in-out has
+  // travelled 0.156 of its height at t=0.25 where a linear ramp has travelled
+  // 0.25 — a 0.094 gap, three times the fit noise. Two samples, decisive.
+  A6: { what: 'height travelled at t=0.25 (ease-in-out <= 0.20, linear = 0.25)', want: '<= 0.20', unit: '', cmp: (v) => v <= 0.20 },
+  A6c:{ what: 'height travelled at t=0.75 (ease-in-out >= 0.80, linear = 0.75)', want: '>= 0.80', unit: '', cmp: (v) => v >= 0.80 },
+  A6b:{ what: 'height progress at t=0.5 (both families give 0.5 — a sanity check, not a discriminator)', want: '0.40-0.60', unit: '', cmp: (v) => v >= 0.4 && v <= 0.6 },
   // Their x4.755 was refuted: an adversarial re-measure using the hole's own
   // ground footprint, cross-checked against a dense optical-flow homography, put
   // it at x6.0 at the SCREEN CENTRE — and showed magnification varying 1.9x-8.2x
@@ -223,7 +232,8 @@ function analyse(d) {
   const segG = rows.slice(iA, iB + 1).map(gm);
   const series = seg.map((p, i) => ({ x: (segG[i] - segG[0]) / (descentMs || 1), y: (yStart - p.y) / (span || 1) }));
   const fit = series.length > 5 ? fitEasing(series) : { name: 'n/a', rms: NaN };
-  const mid = series.reduce((a, b) => (Math.abs(b.x - 0.5) < Math.abs(a.x - 0.5) ? b : a), series[0] || { x: 0, y: 0 });
+  const at = (t) => series.reduce((a, b) => (Math.abs(b.x - t) < Math.abs(a.x - t) ? b : a), series[0] || { x: 0, y: 0 });
+  const mid = at(0.5), q1 = at(0.25), q3 = at(0.75);
   // Ground scale: on-screen size goes as 1/height, so the scale gained over the
   // descent is the ratio of the heights, measured above the void's own plane.
   const groundScale = (yStart - 0) / (yEnd || 1);
@@ -257,7 +267,15 @@ function analyse(d) {
   const cap = CAPTURE[fit.name] ?? 1;
   const authoredMs = descentMs / cap;
   const sampleMs = seg.length > 1 ? descentMs / (seg.length - 1) : NaN;
-  return { rows: rows.length, touchAt, clockPre, clock0, idleG, descentMs, authoredMs, cap, sampleMs, descentFrom: gm(rows[iA]), fit, mid: mid.y, missedClimb, iPeak, peakDist: rows[iPeak]?.camDist ?? 0,
+  // How far the void actually travelled after the touch. Without this a missing
+  // "+1" is ambiguous: it could be a world with no food in reach, or a probe whose
+  // synthetic drag simply did not cover any ground before the window closed.
+  let travelled = 0;
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i].t < touchAt) continue;
+    travelled += Math.hypot(rows[i].vx - rows[i - 1].vx, rows[i].vz - rows[i - 1].vz);
+  }
+  return { rows: rows.length, touchAt, clockPre, clock0, idleG, descentMs, authoredMs, cap, sampleMs, q1: q1.y, q3: q3.y, travelled, samples: seg.length, descentFrom: gm(rows[iA]), fit, mid: mid.y, missedClimb, iPeak, peakDist: rows[iPeak]?.camDist ?? 0,
     groundScale, dead, firstMove, floater: f0, floaterFrac, yStart, yEnd };
 }
 
@@ -269,7 +287,7 @@ await b.close();
 
 const got = {
   A1: late.clockPre ?? 0, A3: late.idleG ?? 0, A4: late.firstMove ?? 1e9,
-  A5: late.authoredMs, A6: late.fit.name, A6b: late.mid, A7: late.groundScale,
+  A5: late.authoredMs, A6: late.q1, A6c: late.q3, A6b: late.mid, A7: late.groundScale,
   A8: late.dead, A9: late.floaterFrac ?? -1,
   A21: Math.abs(late.descentMs - early.descentMs),
 };
@@ -289,7 +307,8 @@ console.log(lines.join('\n'));
 if (late.missedClimb) console.log(`\n  WARNING: the camera's peak was the first sampled frame — the climb was missed and the descent below may be a tail, not the move.`);
 console.log(`\n  descent (game time) ${late.descentFrom.toFixed(0)}..${(late.descentFrom + late.descentMs).toFixed(0)} ms; camera height ${late.yStart.toFixed(1)} -> ${late.yEnd.toFixed(1)}`);
 console.log(`  NOTE: durations are GAME time (the match clock), not wall clock — under swiftshader the wall runs ~10x slower.`);
-console.log(`  camera peaked at sample ${late.iPeak} (camDist ${late.peakDist.toFixed(0)})`);
+console.log(`  camera peaked at sample ${late.iPeak} (camDist ${late.peakDist.toFixed(0)}); ${late.samples} samples across the descent`);
+console.log(`  void travelled ${late.travelled.toFixed(1)} world units after the touch (the first-bite ring sits at 5)`);
 console.log(`  span measured ${late.descentMs.toFixed(0)} ms; the fitted family's thresholds see ${(100 * late.cap).toFixed(1)}% of a move, so authored = ${late.authoredMs.toFixed(0)} ms (+-${(late.sampleMs || 0).toFixed(0)} ms, one sample)`);
 console.log(`  easing fit ${late.fit.name} (rms ${late.fit.rms.toFixed(3)}); early-tap descent ${early.descentMs.toFixed(0)} ms`);
 console.log(`  clock at the first gameplay frame ${late.clock0?.toFixed(2)} s; first floater ${late.floater == null ? 'none' : late.floater.toFixed(0) + ' ms'}`);
