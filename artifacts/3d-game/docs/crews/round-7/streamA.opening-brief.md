@@ -256,6 +256,37 @@ first fraction of the climb and **1,819 ms is a lower bound** on an intro the co
 2.2 s. This imprecision disappears after the rebuild, when the descent starts on a touch the
 probe itself synthesises.
 
+### 6.2 · After step 3 — the flag split
+
+`qa/opening.mjs`, Maple, same conditions. The four bars step 3 targeted are green.
+
+| Bar | Before | After | Target |
+|---|---|---|---|
+| **A1** clock burned before the touch | 0.536 s | **0.000 s** | 0 |
+| **A3** idle available | 0.536 s (and it was the clock) | **16.45 s**, unbounded | ≥ 0.5 |
+| **A4** touch to first movement | 283 ms | **0 ms** | ≤ 133 |
+| **A8** frames with controls dead | 4 | **0** | 0 |
+| A6b height progress at halfway | 0.679 | **0.574** | 0.40–0.60 |
+| A21 early tap vs late tap | 669 ms | 300 ms | ≤ 100 |
+| A5 descent duration | 1,819 ms | 1,437 ms | 1,100–1,300 |
+| A6 easing | ease-out-quad | linear | ease-in-out |
+| A7 ground scale | ×5.31 | ×4.23 | **×5.5–6.5** (retargeted, §11.11) |
+| A9 first floater | none | none | 0.30–0.60 of the descent |
+
+Six of ten pass. Two notes, both against my own work:
+
+**A7 moved because the bar moved, not because the build regressed.** The skeptic's
+re-measurement put their ground scale at ×6.0 rather than ×4.755, so the probe's target was
+corrected to 5.5–6.5 — and our ×4.23 now fails a bar it was passing before. That is the
+correct direction: the old pass was against a wrong number.
+
+**A21 improved from 669 ms to 300 ms and still fails.** Tapping early still gets a different
+opening than tapping late. The remaining difference is the descent itself, which step 4
+rebuilds; if it does not close there, the arrival in step 5 cannot be called
+interruption-neutral and the bar stands as a blocker.
+
+### 6.3 · The most encouraging row
+
 The single most encouraging row is A7. The camera already travels the right distance; what
 is wrong is when it starts, how long it takes, what shape it moves in, and whether the
 player may act during it. That is a smaller job than it looked.

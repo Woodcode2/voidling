@@ -45,7 +45,12 @@ const BARS = {
   A5: { what: 'descent duration', want: '1100-1300', unit: 'ms', cmp: (v) => v >= 1100 && v <= 1300 },
   A6: { what: 'descent easing on camera HEIGHT (best fit)', want: 'ease-in-out', unit: '', cmp: (v) => /in-out|smooth/.test(String(v)) },
   A6b:{ what: 'height progress at t=0.5', want: '0.40-0.60', unit: '', cmp: (v) => v >= 0.4 && v <= 0.6 },
-  A7: { what: 'ground scale over the descent', want: '4.0-5.5', unit: 'x', cmp: (v) => v >= 4.0 && v <= 5.5 },
+  // Their x4.755 was refuted: an adversarial re-measure using the hole's own
+  // ground footprint, cross-checked against a dense optical-flow homography, put
+  // it at x6.0 at the SCREEN CENTRE — and showed magnification varying 1.9x-8.2x
+  // across a single frame, so the measuring point has to be stated or the number
+  // means nothing. See holeio.recon.md 11.11.
+  A7: { what: 'ground scale over the descent', want: '5.5-6.5', unit: 'x', cmp: (v) => v >= 5.5 && v <= 6.5 },
   A8: { what: 'descent frames with controls dead', want: 0, unit: 'frames', cmp: (v) => v === 0 },
   A9: { what: 'first +1 floater, as a fraction of the descent', want: '0.30-0.60', unit: '', cmp: (v) => v >= 0.3 && v <= 0.6 },
   A21:{ what: 'descent length difference, early tap vs late tap', want: '<= 100', unit: 'ms', cmp: (v) => v <= 100 },
