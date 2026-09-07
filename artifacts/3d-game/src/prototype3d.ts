@@ -5886,7 +5886,14 @@ const DESCENT_START = DESCENT_END * DESCENT_SCALE;
 const FIRST_BITE_N = 14;
 const FIRST_BITE_MARGIN = 0.85;
 const FIRST_BITE_MIN = 3.5;
-const FIRST_BITE_MAX = 5.5;
+// 4.2, not 5.5. The derived radius grows with the prop size — a world whose
+// smallest qualifying prop is 0.7 wants 5.31 — and at that distance the first
+// point arrives at 0.62-0.63 of the descent on pirate, gameday and lantern,
+// against HOLE.IO's 0.45. Capping at 4.2 brings every world to about 0.50 and
+// only ever INCREASES the coverage margin, since a tighter ring shrinks the
+// worst-case miss while the bite threshold is unchanged: pirate's margin goes
+// from +0.17 to +0.35, skylark's from +0.01 to +0.19.
+const FIRST_BITE_MAX = 4.2;
 // THE GOAL CARD is on its own timer and answers to nothing else. Theirs unrolls
 // about half a second after the first gameplay frame, holds, and rolls away —
 // before any input, and it never waits for one. holeio.recon.md 11.5.
