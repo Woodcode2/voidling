@@ -42,7 +42,7 @@ const BARS = {
   A1: { what: 'clock ticks elapsed before the first touch', want: 0, unit: 's', cmp: (v) => v <= 0.001 },
   A3: { what: 'idle available before touch, in game time', want: '>= 0.5', unit: 's', cmp: (v) => v >= 0.5 },
   A4: { what: 'touch-down to first void movement', want: '<= 133', unit: 'ms', cmp: (v) => v <= 133 },
-  A5: { what: 'descent duration', want: '1100-1300', unit: 'ms', cmp: (v) => v >= 1100 && v <= 1300 },
+  A5: { what: 'descent duration (authored, threshold-corrected)', want: '1100-1300', unit: 'ms', cmp: (v) => v >= 1100 && v <= 1300 },
   A6: { what: 'descent easing on camera HEIGHT (best fit)', want: 'ease-in-out', unit: '', cmp: (v) => /in-out|smooth/.test(String(v)) },
   A6b:{ what: 'height progress at t=0.5', want: '0.40-0.60', unit: '', cmp: (v) => v >= 0.4 && v <= 0.6 },
   // Their x4.755 was refuted: an adversarial re-measure using the hole's own
@@ -54,6 +54,8 @@ const BARS = {
   A8: { what: 'descent frames with controls dead', want: 0, unit: 'frames', cmp: (v) => v === 0 },
   A9: { what: 'first +1 floater, as a fraction of the descent', want: '0.30-0.60', unit: '', cmp: (v) => v >= 0.3 && v <= 0.6 },
   A21:{ what: 'descent length difference, early tap vs late tap', want: '<= 100', unit: 'ms', cmp: (v) => v <= 100 },
+  // A9 stays failing until the guaranteed first bite lands (brief 3.2): their
+  // first point arrives at 45% of the descent by luck of the map, ours by rule.
 };
 
 // Curve families fitted to the height-progress series. Same set that was fitted
@@ -67,6 +69,26 @@ const EASINGS = {
   'smootherstep': (x) => x * x * x * (x * (x * 6 - 15) + 10),
   'sine-in-out': (x) => 0.5 - 0.5 * Math.cos(Math.PI * x),
 };
+
+// HOW MUCH OF AN AUTHORED MOVE DO THE THRESHOLDS ACTUALLY SEE? The descent is
+// found between 0.5% and 99.5% of the total height travelled, and for anything
+// but a linear ramp those cuts land INSIDE the move: a smoothstep reaches 0.5%
+// of its height only 4.1% of the way through, and 99.5% at 95.9%, so the probe
+// sees 91.7% of it and an authored 1,200 ms reads as 1,101. That is a property
+// of the instrument, not of the build — and it is not constant across families,
+// so a builder could otherwise satisfy A5 by picking an easing whose tails the
+// thresholds happen to clip less. Each family's capture fraction is computed
+// here and the measured span is divided by the fitted family's, so A5 is a bar
+// on the AUTHORED duration whatever curve is chosen. The raw span is printed
+// beside it.
+function captureFraction(f) {
+  const N = 20001;
+  let lo = 0, hi = 1;
+  for (let i = 0; i <= N; i++) { const x = i / N; if (f(x) >= 0.005) { lo = x; break; } }
+  for (let i = 0; i <= N; i++) { const x = i / N; if (f(x) >= 0.995) { hi = x; break; } }
+  return Math.max(0.2, hi - lo);
+}
+const CAPTURE = Object.fromEntries(Object.entries(EASINGS).map(([k, f]) => [k, captureFraction(f)]));
 
 function fitEasing(series) {          // series: [{x, y}] both normalised 0..1
   let best = null;
@@ -228,7 +250,14 @@ function analyse(d) {
   const floaterFrac = f0 == null ? null : (f0 - gm(rows[iA])) / (descentMs || 1);
 
   const missedClimb = iPeak === 0;
-  return { rows: rows.length, touchAt, clockPre, clock0, idleG, descentMs, descentFrom: gm(rows[iA]), fit, mid: mid.y, missedClimb, iPeak, peakDist: rows[iPeak]?.camDist ?? 0,
+  // The authored length, recovered from the measured span and the fitted family's
+  // known clipping. Sampling granularity is reported too: under swiftshader the
+  // descent is only ever a handful of frames, so the residual uncertainty is
+  // roughly one sample interval.
+  const cap = CAPTURE[fit.name] ?? 1;
+  const authoredMs = descentMs / cap;
+  const sampleMs = seg.length > 1 ? descentMs / (seg.length - 1) : NaN;
+  return { rows: rows.length, touchAt, clockPre, clock0, idleG, descentMs, authoredMs, cap, sampleMs, descentFrom: gm(rows[iA]), fit, mid: mid.y, missedClimb, iPeak, peakDist: rows[iPeak]?.camDist ?? 0,
     groundScale, dead, firstMove, floater: f0, floaterFrac, yStart, yEnd };
 }
 
@@ -240,7 +269,7 @@ await b.close();
 
 const got = {
   A1: late.clockPre ?? 0, A3: late.idleG ?? 0, A4: late.firstMove ?? 1e9,
-  A5: late.descentMs, A6: late.fit.name, A6b: late.mid, A7: late.groundScale,
+  A5: late.authoredMs, A6: late.fit.name, A6b: late.mid, A7: late.groundScale,
   A8: late.dead, A9: late.floaterFrac ?? -1,
   A21: Math.abs(late.descentMs - early.descentMs),
 };
@@ -261,6 +290,7 @@ if (late.missedClimb) console.log(`\n  WARNING: the camera's peak was the first 
 console.log(`\n  descent (game time) ${late.descentFrom.toFixed(0)}..${(late.descentFrom + late.descentMs).toFixed(0)} ms; camera height ${late.yStart.toFixed(1)} -> ${late.yEnd.toFixed(1)}`);
 console.log(`  NOTE: durations are GAME time (the match clock), not wall clock — under swiftshader the wall runs ~10x slower.`);
 console.log(`  camera peaked at sample ${late.iPeak} (camDist ${late.peakDist.toFixed(0)})`);
+console.log(`  span measured ${late.descentMs.toFixed(0)} ms; the fitted family's thresholds see ${(100 * late.cap).toFixed(1)}% of a move, so authored = ${late.authoredMs.toFixed(0)} ms (+-${(late.sampleMs || 0).toFixed(0)} ms, one sample)`);
 console.log(`  easing fit ${late.fit.name} (rms ${late.fit.rms.toFixed(3)}); early-tap descent ${early.descentMs.toFixed(0)} ms`);
 console.log(`  clock at the first gameplay frame ${late.clock0?.toFixed(2)} s; first floater ${late.floater == null ? 'none' : late.floater.toFixed(0) + ' ms'}`);
 console.log(`\n${fails} of ${Object.keys(BARS).length} bars failing\n`);
