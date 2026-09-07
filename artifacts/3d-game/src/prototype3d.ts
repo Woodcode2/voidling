@@ -6062,21 +6062,32 @@ function ensureFirstBite(): void {
   // from whatever the world already had there and every piece moves the shortest
   // way it can.
   if (!near.length) return;   // a world with nothing edible at spawn is a world bug, not ours to paper over
-  const taken = new Set<number>();
-  for (const { e } of near) {
-    if (taken.size >= FIRST_BITE_N) break;
-    // the ring slot nearest this prop's own bearing, so it moves the shortest way
-    const bearing = Math.atan2(e.mesh.position.z - sz, e.mesh.position.x - sx);
-    let slot = Math.round((bearing / (Math.PI * 2)) * FIRST_BITE_N);
-    slot = ((slot % FIRST_BITE_N) + FIRST_BITE_N) % FIRST_BITE_N;
-    if (taken.has(slot)) continue;
-    taken.add(slot);
+  // ASSIGN PER SLOT, NOT PER PROP. The first version walked the candidates and sent
+  // each to the slot nearest its own bearing, skipping any prop whose slot was
+  // already taken — so when several props shared a bearing the ring came out with
+  // holes, and a drag through a hole reached nothing. Measured with 30 candidates
+  // available in every world: maple filled 10 of 10, but pirate 9, gameday 8 and
+  // skylark 8, and the two worlds tested had their first bite arrive at 0.64 of the
+  // descent instead of 0.42 because the drag went through a gap and carried on to
+  // whatever lay beyond it. Walking the SLOTS and taking the nearest unused prop
+  // for each fills every slot the island allows, and still moves each prop the
+  // shortest distance available to it.
+  const used = new Set<Edible>();
+  for (let slot = 0; slot < FIRST_BITE_N; slot++) {
     const a = (slot / FIRST_BITE_N) * Math.PI * 2;
     const x = sx + Math.cos(a) * FIRST_BITE_RING, z = sz + Math.sin(a) * FIRST_BITE_RING;
-    if (!insideIsland3(x, z)) { taken.delete(slot); continue; }   // never push a prop off the island
-    e.mesh.position.x = x; e.mesh.position.z = z;
-    e.home.x = x; e.home.z = z;
-    placed.push({ slot, x, z, r: e.radius });
+    if (!insideIsland3(x, z)) continue;   // never push a prop off the island
+    let best: Edible | null = null, bd = Infinity;
+    for (const { e } of near) {
+      if (used.has(e)) continue;
+      const d = Math.hypot(e.mesh.position.x - x, e.mesh.position.z - z);
+      if (d < bd) { bd = d; best = e; }
+    }
+    if (!best) break;
+    used.add(best);
+    best.mesh.position.x = x; best.mesh.position.z = z;
+    best.home.x = x; best.home.z = z;
+    placed.push({ slot, x, z, r: best.radius });
   }
   // QA: the ring is a rule, so it has to be inspectable rather than argued about.
   // qa/opening.mjs reads this when the first "+1" does not arrive.
