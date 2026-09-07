@@ -5807,6 +5807,22 @@ const DESCENT_START = DESCENT_END * DESCENT_SCALE;
 // touch cuts it on any frame and the descent that follows is identical either
 // way (bar A21, measured at 44 ms of difference between tapping at 0.2 s and at
 // 2.5 s).
+// THE FIRST BITE IS A RULE, NOT LUCK — stream A step 6. HOLE.IO's first "+1"
+// lands 45% of the way down its descent (holeio.recon.md 11.5) because a cone
+// happened to be near the spawn; nothing in their design guarantees it. Ours is
+// guaranteed, and it has to be a RING rather than a single prop: the player
+// drags whichever way they like, so food in one direction is still luck. Four
+// small props are drawn in to a ring around the hand-authored spawn — each to the
+// ring point nearest its OWN bearing, so every prop moves as little as possible
+// and the world keeps its arrangement.
+//
+// The radius is derived, not guessed: at spawn the steering cap is
+// steerCap(38) = 12.2 world units/second, and their first point arrives at 45% of
+// a 1.2 s descent = 0.54 s of travel. 5 units is reached in ~0.41 s = 34% of the
+// descent, inside the 30-60% the probe asks for with room for a child who drags
+// late or diagonally.
+const FIRST_BITE_RING = 5;
+const FIRST_BITE_N = 4;
 const ARRIVE_FALL = 0.55;   // seconds of fall
 const ARRIVE_HIGH = 26;     // world units above his resting height
 let arriveT = 0;            // counts UP from 0 while the world is armed and untouched
@@ -5903,6 +5919,7 @@ function beginMatch(solo = false) {
     dealMids(hand);
     applyHour(HOURS[pickedWorld][hand.hour]);
   }
+  ensureFirstBite();
   armed = true;
   // The idle is the high view, not the play view. Without this the world opens at
   // playing height and the camera JUMPS up to DESCENT_START the instant the
@@ -5966,6 +5983,39 @@ function beginMatch(solo = false) {
   dragTaught = false;
   dragNagT = 0; dragNags = 0;   // the drag lesson gets its repeats back each match
   nomArmed = !firstEver;   // see onEat: the FIRST NOM party waits for a real drag
+}
+
+// Draw four small props into a ring around the spawn so the first drag, in any
+// direction, reaches something edible. Only props the void can already eat at his
+// starting radius are eligible, and landmarks, tethered and departed props are
+// never touched. `home` moves with the mesh: it is what the drift and the
+// magnet return a prop to, so moving one without the other would have the prop
+// spring back to where it used to live the first time it was nudged.
+function ensureFirstBite(): void {
+  const maxR = 0.9 * EAT_RATIO;   // the void's radius at the fixed spawn
+  const sx = island.spawn.x, sz = island.spawn.z;
+  const near = edibles
+    .filter((e) => !e.eaten && e.mesh.visible && e.radius <= maxR
+      && !e.mesh.userData.departed && !e.mesh.userData.tethered)
+    .map((e) => ({ e, d: Math.hypot(e.mesh.position.x - sx, e.mesh.position.z - sz) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, FIRST_BITE_N * 3);
+  if (!near.length) return;   // a world with nothing edible at spawn is a world bug, not ours to paper over
+  const taken = new Set<number>();
+  for (const { e } of near) {
+    if (taken.size >= FIRST_BITE_N) break;
+    // the ring slot nearest this prop's own bearing, so it moves the shortest way
+    const bearing = Math.atan2(e.mesh.position.z - sz, e.mesh.position.x - sx);
+    let slot = Math.round((bearing / (Math.PI * 2)) * FIRST_BITE_N);
+    slot = ((slot % FIRST_BITE_N) + FIRST_BITE_N) % FIRST_BITE_N;
+    if (taken.has(slot)) continue;
+    taken.add(slot);
+    const a = (slot / FIRST_BITE_N) * Math.PI * 2;
+    const x = sx + Math.cos(a) * FIRST_BITE_RING, z = sz + Math.sin(a) * FIRST_BITE_RING;
+    if (!insideIsland3(x, z)) { taken.delete(slot); continue; }   // never push a prop off the island
+    e.mesh.position.x = x; e.mesh.position.z = z;
+    e.home.x = x; e.home.z = z;
+  }
 }
 
 // THE MATCH BEGINS WHEN THE PLAYER DOES. Called from the first input of an armed
