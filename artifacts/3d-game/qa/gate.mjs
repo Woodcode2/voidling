@@ -143,6 +143,25 @@ const SUITE = [
     cmd: ['node', 'qa/evolvepop.mjs'], verdict: pf,
     why: 'evolving reads as getting BIGGER — the pop dominates the wind-up and lands with the sound' },
 
+  // THE OPENING BELONGS TO THE PLAYER. Eighteen bars measured against HOLE.IO's own
+  // recording: the clock must not move before the first touch, the descent runs
+  // ~1.2 s on an ease-in-out with the controls live throughout, the first point
+  // lands inside it, the goal card runs on its own timer without blocking input,
+  // and the joystick anchors under the thumb rather than jumping to it. Round 7
+  // stream A; docs/crews/round-7/streamA.verdict.md carries the numbers.
+  //
+  // MAPLE ON PUSH, EVERY WORLD ON LIVE — deliberately. Maple is the one world that
+  // does not reload on selection, and for most of this stream it was the only world
+  // tested: it hid a TAP TO PLAY gate that ate the first touch on the other five,
+  // and a first-bite ring whose geometry only worked where the props happened to be
+  // large. One world is not evidence about six.
+  { id: 'opening', tier: 'feel', profiles: ['push', 'live'], timeout: 900,
+    cmd: ['node', 'qa/opening.mjs', 'maple'], verdict: pf,
+    why: 'the match starts on the first touch, and the player is playing through the camera move' },
+  ...WORLDS.map(w => ({ id: `opening:${w}`, tier: 'feel', profiles: ['live'], timeout: 900,
+    cmd: ['node', 'qa/opening.mjs', w], verdict: pf,
+    why: `the opening holds up on ${w}, not just on the world that never reloads` })),
+
   // unlocks.ts calls the locked art "the advertisement for the next one", and
   // the filter was running that advertisement at a fifth of its colour. Opens
   // the picker in the state a real new player is in — two unlocked, three
