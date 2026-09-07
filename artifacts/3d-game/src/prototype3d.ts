@@ -6662,7 +6662,25 @@ if (localStorage.getItem('voidAutoPlay') === '1') {
   Promise.race([preloadP, new Promise((r) => setTimeout(r, 12000))]).then(() => {
     packReady = true;
     track('gate_ready', { ms: Math.round(performance.now() - gateT0) });
-    armGate('TAP TO PLAY', () => requestAnimationFrame(() => {
+    // NO SECOND TAP ON THE RELOAD PATH EITHER — round 7, stream A/F. The fresh-load
+    // gate went when the owner caught it as a regression ("it's showing two to
+    // begin then you have a begin right after"); this one survived because the
+    // audio context needed a gesture in the NEW document after a world switch.
+    // It does not any more: the match — and with it audio.startMusic() — now
+    // begins on the player's first touch of the canvas, which is that gesture.
+    // The gate was buying a tap that the game already collects.
+    //
+    // Measured before removing it: the opening probe passed 17 of 17 bars on
+    // MAPLE, which does not reload, and 8 of 17 on all five worlds that do —
+    // identically, because the probe's first touch was spent dismissing this
+    // overlay instead of steering. No joystick, no movement, no first bite.
+    // A child's first touch was being spent the same way.
+    //
+    // GETTING READY… stays: it is the loading state, and stream F wants a
+    // loading screen. It simply no longer asks for anything.
+    tapGateEl.classList.remove('show');
+    document.body.classList.remove('gated');
+    requestAnimationFrame(() => {
       // THE DAILY CARD GOES FIRST. It is built further down this same module
       // evaluation, so by the time this frame runs it is already on screen —
       // and launching under it starts a three-minute timed match behind a
@@ -6676,7 +6694,7 @@ if (localStorage.getItem('voidAutoPlay') === '1') {
         return;
       }
       launchWorld();
-    }));
+    });
   });
 }
 // FRESH LOAD HAS NO GATE ANY MORE — the owner caught it as a regression the
