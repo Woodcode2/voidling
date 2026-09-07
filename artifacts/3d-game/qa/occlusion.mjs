@@ -98,7 +98,7 @@ await p.evaluate((seconds) => {
   const T = window.__THREE, cam = window.__cam;
   const ray = new T.Raycaster();
   const audit = { frames: 0, worst: 0, sum: 0, blocked: 0, blockedFading: 0,
-    everFaded: 0, done: false, t0: null, hold: false, misses: [] };
+    everFaded: 0, done: false, t0: null, hold: false, misses: [], missTries: 0 };
   window.__occ = audit;
 
   // 13 rays: the centre, four at 45% of his radius, eight at 85%. The disc is
@@ -162,14 +162,17 @@ await p.evaluate((seconds) => {
     const len = cam.position.distanceTo(c);
     const d = new T.Vector3().subVectors(c, cam.position).multiplyScalar(1 / len);
     const rc = new T.Raycaster(cam.position.clone(), d, 0.1, len - 0.05);
-    const all = [];
-    scene.traverse((q) => {
-      if (!q.isMesh || !q.visible || !q.geometry || !q.material) return;
-      let a = q, shown = true;
-      while (a) { if (!a.visible) { shown = false; break; } a = a.parent; }
-      if (shown && !vg.getObjectById(q.id)) all.push(q);
-    });
-    const h = rc.intersectObjects(all, false)[0];
+    if (!window.__allMeshes) {
+      const all = [];
+      scene.traverse((q) => {
+        if (!q.isMesh || !q.geometry || !q.material) return;
+        if (!vg.getObjectById(q.id)) all.push(q);
+      });
+      window.__allMeshes = all;
+    }
+    const h = rc.intersectObjects(window.__allMeshes.filter((q) => {
+      let a = q; while (a) { if (!a.visible) return false; a = a.parent; } return true;
+    }), false)[0];
     if (!h) return null;
     let e = null, anc = h.object;
     while (anc && !e) { e = window.__edibles.find((x) => x.mesh === anc) || null; anc = anc.parent; }
@@ -217,7 +220,12 @@ await p.evaluate((seconds) => {
     if (share > 0) {
       audit.blocked++;
       if (fading) audit.blockedFading++;
-      else if (audit.misses.length < 4) {
+      else if (audit.missTries < 4) {
+        // ATTEMPTS, not results. Gating on misses.length meant a __whoBlocks
+        // that returned null never advanced the guard, so this ran a raycast
+        // against every mesh in the scene on every blocked frame and the drive
+        // never finished. The probe is a program too.
+        audit.missTries++;
         const who = window.__whoBlocks();
         if (who) audit.misses.push(who);
       }
