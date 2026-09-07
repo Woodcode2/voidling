@@ -41,7 +41,11 @@ const OUT = 'qa-out/opening';
 const BARS = {
   A1: { what: 'clock ticks elapsed before the first touch', want: 0, unit: 's', cmp: (v) => v <= 0.001 },
   A3: { what: 'idle available before touch, in game time', want: '>= 0.5', unit: 's', cmp: (v) => v >= 0.5 },
-  A4: { what: 'touch-down to first void movement', want: '<= 133', unit: 'ms', cmp: (v) => v <= 133 },
+  // IN FRAMES, NOT MILLISECONDS. dt is clamped to 0.05, so this harness resolves
+  // time in 50 ms steps and a 133 ms bar cannot be judged: a 200 ms reading is four
+  // frames and the truth could be 151-200. Frames are the invariant — theirs took 7
+  // from touch-down to the hole moving, which at 60 fps is the 117 ms the brief quotes.
+  A4: { what: 'frames from touch-down to first void movement', want: '<= 8', unit: 'frames', cmp: (v) => v <= 8 },
   A5: { what: 'descent duration, peak to settle', want: '1100-1300', unit: 'ms', cmp: (v) => v >= 1100 && v <= 1300 },
   // A6 IS A QUARTER-POINT TEST, NOT A CURVE FIT. The fit was measured flipping
   // between "smoothstep" and "linear" on identical descent code — RMS 0.034 vs
@@ -60,7 +64,10 @@ const BARS = {
   // across a single frame, so the measuring point has to be stated or the number
   // means nothing. See holeio.recon.md 11.11.
   A7: { what: 'ground scale over the descent', want: '5.5-6.5', unit: 'x', cmp: (v) => v >= 5.5 && v <= 6.5 },
-  A8: { what: 'descent frames with controls dead', want: 0, unit: 'frames', cmp: (v) => v === 0 },
+  // Counted only AFTER the void starts moving. Before that it is the acceleration
+  // filter (~91 ms) doing its job — physics, not a lockout. Counting the ramp made
+  // this bar one that any game with acceleration would fail.
+  A8: { what: 'descent frames that ignored a held touch (after first movement)', want: 0, unit: 'frames', cmp: (v) => v === 0 },
   A9: { what: 'first +1 floater, as a fraction of the descent', want: '0.30-0.60', unit: '', cmp: (v) => v >= 0.3 && v <= 0.6 },
   A11:{ what: 'goal card visible for (unroll + hold + roll-up)', want: '450-750', unit: 'ms', cmp: (v) => v >= 450 && v <= 750 },
   A12:{ what: 'goal card appears after the world is up, on a timer', want: '0.3-0.9', unit: 's', cmp: (v) => v >= 0.3 && v <= 0.9 },
@@ -120,6 +127,21 @@ const SAMPLER = () => {
   const w = window;
   w.__op = { rows: [], floaters: [], card: [], t0: performance.now(), touchAt: null };
   const live0 = new WeakMap();   // element -> was it live on the previous frame
+  // THE CARD IS CAUGHT BY EVENTS, NOT BY SAMPLING. Its trigger is in game time but
+  // its animation is a CSS animation, which runs on the WALL clock: 600 ms. Under
+  // swiftshader the sampler gets about one frame a second, so it can and did miss
+  // the whole thing — A11/A12 read zero while the card was firing correctly.
+  const tcEl = document.getElementById('titlecard');
+  if (tcEl) {
+    const stamp = (k) => ({ k, t: performance.now() - w.__op.t0,
+      g: w.__matchState ? w.__matchState().tClock : 0,
+      blocks: getComputedStyle(tcEl).pointerEvents !== 'none' });
+    tcEl.addEventListener('animationstart', () => w.__op.card.push(stamp('start')));
+    tcEl.addEventListener('animationend', () => w.__op.card.push(stamp('end')));
+    new MutationObserver(() => {
+      if (tcEl.classList.contains('show')) w.__op.card.push(stamp('show'));
+    }).observe(tcEl, { attributes: true, attributeFilter: ['class'] });
+  }
   const tick = () => {
     try {
       const ms = w.__matchState ? w.__matchState() : null;
@@ -146,12 +168,8 @@ const SAMPLER = () => {
       // pointer-events:none by design, so this measures the design rather than
       // trusting it — a later stylesheet edit that made it clickable would show up
       // here as a non-zero A13 rather than as a child whose first tap did nothing.
-      const tc = document.getElementById('titlecard');
-      if (tc) {
-        const cs = getComputedStyle(tc);
-        const on = cs.opacity !== '0' && cs.visibility !== 'hidden' && cs.display !== 'none';
-        w.__op.card.push({ t: performance.now() - w.__op.t0, on, blocks: cs.pointerEvents !== 'none' });
-      }
+      // (the card is captured by events, below — a 600 ms CSS animation cannot be
+      // seen by a sampler running at roughly one frame a second)
       for (const el of document.querySelectorAll('.vf')) {
         const live = el.classList.contains('go') && !!(el.textContent || '').trim();
         const was = live0.get(el) || false;
@@ -313,29 +331,30 @@ function analyse(d) {
 
   // Controls: the void's own position is the only honest witness. Count descent
   // frames in which the void did not move at all while a touch was held.
-  let dead = 0;
-  for (let i = iA + 1; i <= iB; i++) {
-    const a = rows[i - 1], b = rows[i];
-    if (b.t < touchAt) continue;
-    if (Math.hypot(b.vx - a.vx, b.vz - a.vz) < 1e-4) dead++;
+  let firstMove = null, firstMoveIdx = -1;
+  const touchIdx = Math.max(1, rows.findIndex((r) => r.t >= touchAt));
+  for (let i = touchIdx; i < rows.length; i++) {
+    if (Math.hypot(rows[i].vx - rows[i - 1].vx, rows[i].vz - rows[i - 1].vz) > 1e-3) {
+      firstMove = i - touchIdx; firstMoveIdx = i; break;
+    }
   }
-  let firstMove = null;
-  const touchRow = rows.find((r) => r.t >= touchAt);
-  const touchG = touchRow ? gm(touchRow) : 0;
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i].t < touchAt) continue;
-    if (Math.hypot(rows[i].vx - rows[i - 1].vx, rows[i].vz - rows[i - 1].vz) > 1e-3) { firstMove = gm(rows[i]) - touchG; break; }
+  let dead = 0;
+  if (firstMoveIdx >= 0) {
+    for (let i = Math.max(iPeak, firstMoveIdx) + 1; i <= iMin; i++) {
+      if (Math.hypot(rows[i].vx - rows[i - 1].vx, rows[i].vz - rows[i - 1].vz) < 1e-4) dead++;
+    }
   }
   // Floaters carry wall timestamps (they are DOM sightings), so convert by
   // finding the sampled frame nearest in wall time and reading its game clock.
   // Card window, in game time, from the samples where it was on screen.
-  const cardOn = (d.card || []).filter((c) => c.on);
-  // Card timings ride tClock, which runs during the idle; matchClock does not.
-  const tcAt = (w) => (rows.reduce((a, b) => (Math.abs(b.t - w) < Math.abs(a.t - w) ? b : a), rows[0])?.tc ?? 0) * 1000;
-  const toG = tcAt;
-  const cardMs = cardOn.length > 1 ? toG(cardOn[cardOn.length - 1].t) - toG(cardOn[0].t) : 0;
-  const cardAt = cardOn.length ? (toG(cardOn[0].t) - (rows[0]?.tc ?? 0) * 1000) / 1000 : -1;
-  const cardBlocks = (d.card || []).filter((c) => c.on && c.blocks).length;
+  // The card's LIFE is wall time (a CSS animation); the moment it APPEARS is game
+  // time (a game-clock timer). Each is measured in its own units.
+  const cEv = d.card || [];
+  const cStart = cEv.find((c) => c.k === 'start'), cEnd = cEv.find((c) => c.k === 'end');
+  const cShow = cEv.find((c) => c.k === 'show');
+  const cardMs = cStart && cEnd ? cEnd.t - cStart.t : 0;
+  const cardAt = cShow ? cShow.g - (rows[0]?.tc ?? cShow.g) : -1;
+  const cardBlocks = cEv.filter((c) => c.blocks).length;
   const f0w = d.floaters[0]?.t ?? null;
   const f0 = f0w == null ? null : gm(rows.reduce((a, b) => (Math.abs(b.t - f0w) < Math.abs(a.t - f0w) ? b : a), rows[0]));
   const floaterFrac = f0 == null ? null : (f0 - gm(rows[iA])) / (descentMs || 1);
