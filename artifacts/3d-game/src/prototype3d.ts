@@ -3248,6 +3248,7 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   joyEl.style.display = joyNubEl.style.display = 'block';
   joyEl.style.left = `${e.clientX}px`; joyEl.style.top = `${e.clientY}px`;
   joySet(e.clientX, e.clientY);
+  startMatch();   // armed -> live: the match begins on the player's first touch
 });
 window.addEventListener('pointermove', (e) => { if (joy.active && e.pointerId === joy.id) joySet(e.clientX, e.clientY); });
 /** Is the thumb jammed against a bezel with nowhere left to push? */
@@ -3303,7 +3304,10 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) joyRe
 
 const keys = new Set<string>();
 const MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-window.addEventListener('keydown', (e) => { if (started && MOVE_KEYS.includes(e.code)) { keys.add(e.code); lastInput = tClock; dragDone = true; } });
+// armed: gated on `armed`, not `started`, and it STARTS the match. Gated on
+// `started` a keyboard could never produce the first input, so desktop play and
+// every headless probe would deadlock on a match that cannot begin.
+window.addEventListener('keydown', (e) => { if (armed && MOVE_KEYS.includes(e.code)) { startMatch(); keys.add(e.code); lastInput = tClock; dragDone = true; } });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
 window.addEventListener('blur', () => keys.clear());   // Cmd-Tab mid-hold must not leave the void driving itself
 window.addEventListener('resize', () => {
@@ -5748,6 +5752,22 @@ pwBtns[0].addEventListener('click', fireGulp);
 pwBtns[1].addEventListener('click', fireCollapse);
 
 // ── game shell: start menu → (tutorial) → match → end → play again ──────────
+// ARMED vs STARTED — round 7, stream A. `started` is not "the match is live":
+// endMatch() never clears it, so it is a since-page-load latch and every gate in
+// this file reads `started && !ended` for the live test. The census of all 300
+// consumers is docs/crews/round-7/streamA.started-census.md.
+//
+//   armed    — the world is up: it renders, the crowd idles, the player may move
+//              and, crucially, may be TAUGHT how to move
+//   started  — the match is live: the clock runs, scoring accrues, rivals hunt,
+//              beats fire, telemetry counts a match
+//
+// The 153 sites that must wait for the player need no edit at all: they already
+// read `started`, and `started` now waits. Only the handful that must stay ON so
+// the player can produce the first touch were re-gated to `armed`, each marked
+// `// armed:` below. Measured before this change: 0.536 s of match clock burned
+// before the player could move (docs/crews/round-7/recon/self/opening-before.log).
+let armed = false;
 let started = false, startT = 0, soloMode = false, titleUntil = 0;
 // the ghost hand's own beat: the lesson lands AFTER the card has gone, not in
 // the same frame the controls go live (the MK8D order — card, settle, teach)
@@ -5852,17 +5872,7 @@ function beginMatch(solo = false) {
     dealMids(hand);
     applyHour(HOURS[pickedWorld][hand.hour]);
   }
-  // NO TWO MATCHES ON THE SAME SCHEDULE. Each beat keeps its authored slot as a
-  // base and moves +-6s around it, so the arc is recognisable but never
-  // recited. Clamped so the finale never lands late enough to be a cutscene.
-  // This has to sit AFTER matchLen is assigned — one line earlier it clamps
-  // against the PREVIOUS match's length, and against 0 on the very first match.
-  for (const bt of BEATS) {
-    if (!bt.base) bt.base = bt.at;
-    bt.at = Math.max(8, Math.min(matchLen - bt.dur - 2, bt.base + (Math.random() * 12 - 6)));
-    bt.fired = false;
-  }
-  started = true; startT = tClock;
+  armed = true;
   resetFps();
   // the quality adapter starts its window HERE. Frames before this line are
   // boot, menu and the world build — none of them say anything about how this
@@ -5875,11 +5885,7 @@ function beginMatch(solo = false) {
   // read it BEFORE it is banked below — everything downstream that means
   // "this child has never played" has to key off this, not off the flag
   const firstEver = !localStorage.getItem('voidPlayed');
-  track('match_start', {
-    solo, lvl: rankInfo(xp).lvl, coins, played: stats.matches,
-    skins: (JSON.parse(localStorage.getItem('voidSkinsOwned') || '[]') as string[]).length,
-    first: firstEver,
-  });
+  pendingFirstEver = firstEver;
   // BANK IT NOW, NOT AT THE WHISTLE. This flag was written in exactly one
   // place — endMatch() — so a child who put the iPad down before the three
   // minutes were up never earned it. Every later launch then took the
@@ -5889,7 +5895,6 @@ function beginMatch(solo = false) {
   // REWARD, EVER. At this age most first sessions end early. It also cost
   // every player day 1 of the calendar, because the first launch always
   // auto-plays. The flag means "has seen a match", so it belongs here.
-  localStorage.setItem('voidPlayed', '1');
   document.body.classList.remove('menu');
   menuEl.style.display = 'none';
   // RESTART the card animation. classList.add on an element that already has
@@ -5905,26 +5910,78 @@ function beginMatch(solo = false) {
   // (in at 14%, hold to 72%, out by 100%) and lands the fade 0.45 s after the
   // hands — card, then camera settle, then lesson, which is the order every
   // shipped opening uses (docs/crews/round-5/firstframe/review-choreo.md).
-  tcEl.style.animationDuration = (COPY.introLen + 0.45).toFixed(2) + 's';
-  tcEl.classList.remove('show'); void tcEl.offsetWidth; tcEl.classList.add('show');
-  titleUntil = tClock + COPY.introLen + 0.45;
-  audio.startMusic(); audio.setMusicStage(0);
-  introT = COPY.introLen;   // orbital reveal: the world's landmark, then dive to the tiny void
+  void tcEl;   // the card is raised by startMatch(), with the descent it is timed against
   // THE FIRST INSTRUCTION USED TO ARRIVE WHILE THE CONTROLS WERE OFF. This
   // fired here, in the same block that sets introT = 2.2 — and the intro damps
   // velocity by 0.9^(dt*60) for those 2.2 seconds, roughly 0.0018x per second.
   // A six-year-old obeys the first thing they are told, drags, and learns that
   // the screen does not respond. It is now queued and fires the moment the
   // controls are actually live.
-  document.body.classList.add('intro');   // the HUD arrives with the hands
   firstRun = firstEver;
   // Maple teaches every time; every other world teaches only a brand-new child.
   teachDrag = firstEver || pickedWorld === 'maple';
   dragDone = false;
-  controlsLive = false;
+  // armed: the ghost hand is the whole reason the world is up before the match.
+  // It was false here because the controls were dead through the intro; they are
+  // not dead any more, and the hand must teach the gesture that starts the match.
+  controlsLive = true;
   dragTaught = false;
   dragNagT = 0; dragNags = 0;   // the drag lesson gets its repeats back each match
   nomArmed = !firstEver;   // see onEat: the FIRST NOM party waits for a real drag
+}
+
+// THE MATCH BEGINS WHEN THE PLAYER DOES. Called from the first input of an armed
+// match — a pointer on the canvas, or a movement key. Everything here was inside
+// beginMatch until round 7 stream A; it is the work that must not happen to a
+// player who has not touched the screen yet: the clock, the beat schedule, the
+// funnel event, the fps and quality windows, the music, the descent, and the
+// "this child has seen a match" flag.
+//
+// Measured against HOLE.IO's own opening: their clock's 4:00 extrapolates back to
+// the exact frame of the touch-down, and their first point lands 45% of the way
+// through the camera descent. docs/crews/round-7/holeio.recon.md §11.5.
+let pendingFirstEver = false;
+function startMatch(): void {
+  if (started || !armed || ended) return;
+  started = true; startT = tClock;
+  // NO TWO MATCHES ON THE SAME SCHEDULE. Each beat keeps its authored slot as a
+  // base and moves +-6s around it, so the arc is recognisable but never recited.
+  // Clamped so the finale never lands late enough to be a cutscene. This has to
+  // sit AFTER matchLen is assigned (beginMatch does that) and AFTER the clock
+  // actually starts — armed earlier, it clamps against the previous match.
+  for (const bt of BEATS) {
+    if (!bt.base) bt.base = bt.at;
+    bt.at = Math.max(8, Math.min(matchLen - bt.dur - 2, bt.base + (Math.random() * 12 - 6)));
+    bt.fired = false;
+  }
+  // The fps and quality windows start HERE, not at world-ready: the idle before
+  // the touch is the cheapest part of the frame budget — no rivals, no beats, no
+  // drain spirals — and letting it into the sample promotes a rung that then
+  // thrashes down on the first real second of play.
+  resetFps();
+  qAccT = 0; qAccN = 0; qCd = 6;
+  track('match_start', {
+    solo: soloMode, lvl: rankInfo(xp).lvl, coins, played: stats.matches,
+    skins: (JSON.parse(localStorage.getItem('voidSkinsOwned') || '[]') as string[]).length,
+    first: pendingFirstEver,
+  });
+  // BANK IT NOW, NOT AT THE WHISTLE — the original reason stands (a child who
+  // puts the iPad down mid-match still counts as having played, which is what
+  // unlocks the menu and the daily reward). It moves from world-ready to here
+  // only so that loading a world and never touching it is not "having played".
+  localStorage.setItem('voidPlayed', '1');
+  const tcEl = el('titlecard');
+  // THE CARD LEAVES WITH THE SHOT — see the note in beginMatch's history: the
+  // duration is driven from the camera move so the name lands 0.45 s after the
+  // hands rather than sitting over the void at full opacity.
+  tcEl.style.animationDuration = (COPY.introLen + 0.45).toFixed(2) + 's';
+  tcEl.classList.remove('show'); void tcEl.offsetWidth; tcEl.classList.add('show');
+  titleUntil = tClock + COPY.introLen + 0.45;
+  // The first touch IS the user gesture the audio context needs. This is why the
+  // reload path's TAP TO PLAY gate existed at all, and why it can go.
+  audio.startMusic(); audio.setMusicStage(0);
+  document.body.classList.add('intro');   // the HUD arrives with the hands
+  introT = COPY.introLen;   // orbital reveal: the world's landmark, then dive to the tiny void
 }
 // ── asset preloader: menu time is download time; PLAY holds on a branded
 // loading bar until every pack mesh is resident, so a match never starts
@@ -7174,7 +7231,7 @@ el('btnHome').addEventListener('click', () => {
     // the stick itself — this listener only owns the sheet)
   });
   qBtn.addEventListener('click', () => {
-    if (!started || ended) return;
+    if (!armed || ended) return;   // armed: a child must be able to leave a world they never started
     void armT;
     paused = true; paintPause(); pauseEl.classList.add('show');
     joyRelease();   // the thumb that was steering is now over a modal that cannot hear it
@@ -7190,7 +7247,7 @@ el('btnHome').addEventListener('click', () => {
       score: Math.round(playerScore), eaten: matchEaten, pct: devouredPct,
       form: curStage, bites: rivalEv.bites, ...fpsSummary(),
     });
-    started = false; ended = true;
+    started = false; armed = false; ended = true;
     audio.stopMusic();
     document.body.classList.add('menu');
     menuEl.style.display = '';
@@ -8905,6 +8962,13 @@ function animate() {
   // the curios turn and catch the light — the glint is what the eye finds
   for (const c of curios) if (c.mesh.visible) animateCurio(c.mesh, tClock, c.seed);
 
+  // armed: the drag lesson's own two timers run before the match does, because
+  // the lesson is what produces the touch. Everything else in the block below
+  // waits for `started`.
+  if (armed && !started && !ended && !paused) {
+    if (handHold > 0) handHold -= dt;
+    if (guideT > 0) { guideT -= dt; if (guideT <= 0) guideEl().classList.remove('show'); }
+  }
   if (started && !ended && !paused) {
     matchClock -= dtw * clockSpeed;
     if (handHold > 0) handHold -= dt;
@@ -9227,7 +9291,11 @@ function animate() {
       const speed = steerCap(cd) * jm;
       tvx = (rightTmp.x * inX - fwdTmp.x * inY) * speed;
       tvz = (rightTmp.z * inX - fwdTmp.z * inY) * speed;
-    } else if ((!started || DEBUG_HARNESS) && tClock - lastInput > 4) {
+    // armed: `!started` was true throughout the pre-touch idle, so the void
+    // drove itself away four seconds after the world appeared. Attract mode is
+    // for the menu backdrop and the demo harness; an armed, untouched world sits
+    // still and waits.
+    } else if ((!armed || DEBUG_HARNESS) && tClock - lastInput > 4) {
       // attract mode: menu backdrop + demo harness ONLY — a real match never
       // self-drives; an idle player's void just sits there being cute
       wanderT -= dt;
@@ -9495,7 +9563,7 @@ function animate() {
   // is most of why Maple feels better to play.) Anything too big is now
   // desaturated toward slate, so the line is glanceable from across the street.
   gateT -= dt;
-  if (started && gateT <= 0) {
+  if (armed && gateT <= 0) {   // armed: what is edible must read before the first touch, not after
     gateT = 0.4;
     const Rg = voidling.radius, reach = Rg * 26 + 40;
     for (const e of edibles) {
@@ -9657,7 +9725,7 @@ function animate() {
   // hid, so the repeat fired in the same frame — measured as one unbroken
   // 20.78s label, which reads as a stuck HUD element rather than as the game
   // saying it again. The gap is the whole message.
-  if (firstRun && started && !ended && guideStep === 1 && !nomArmed && dragNags < 3 && guideT <= 0) {
+  if (firstRun && armed && !ended && guideStep === 1 && !nomArmed && dragNags < 3 && guideT <= 0) {   // armed: the lesson that produces the first touch
     dragNagT -= dt;
     if (dragNagT <= 0) { showGuide('<b>DRAG</b> to move — eat & <b>GROW</b>!', 5); dragNagT = 3; dragNags++; }
   }
@@ -9675,7 +9743,7 @@ function animate() {
   // danger beats stay on firstRun — those are once-in-a-lifetime moments, and
   // replaying them every Maple match would turn the intro level into a
   // permanent tutorial. The owner asked for the hand, not the lecture.
-  handEl.classList.toggle('show', teachDrag && started && !ended && controlsLive && handHold <= 0 && !dragDone);
+  handEl.classList.toggle('show', teachDrag && armed && !ended && controlsLive && handHold <= 0 && !dragDone);   // armed: the hand teaches the gesture that starts the match
   // …and NOT UNTIL THEY CAN MOVE. This fires on any frame the guide is idle,
   // which includes the gaps between the drag lesson's repeats — so a child who
   // had not yet worked out the control was being told "that one is BIGGER than
