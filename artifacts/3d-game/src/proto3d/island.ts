@@ -4188,6 +4188,53 @@ const _fadeHook = function (this: THREE.Object3D) {
   const sh = m?.userData?.shader;
   if (sh) sh.uniforms.uFade.value = (this.userData.fade as number | undefined) ?? 1;
 };
+
+// ── AND A FADING PROP NEEDS A MATERIAL OF ITS OWN ──────────────────────────
+// The hook above is not enough, and the comment above it names the reason
+// without following it through: one uniform, shared. Two separate things go
+// wrong with it, and either alone is fatal.
+//
+//   1. Every prop's hook writes the SAME uniforms object, so the last prop
+//      drawn wins. Measured live, with the town hall standing over the void:
+//      its own userData.fade read 0.62 and the material's uFade read 1.
+//   2. three.js uploads a material's uniforms only when the material ID
+//      changes between draws (WebGLRenderer.setProgram). A run of three hundred
+//      props on one material is one upload — so even the winner of (1) only
+//      reaches the GPU if it happened to be first in the batch.
+//
+// So the feature has never dissolved a prop reliably, in any world, since it
+// was written: qa/occlusion.mjs measured 0 of 19,291 silhouette pixels of the
+// hero showing through an occluder the game believed it had dissolved. The
+// fade rate, the 0.62 constant, the cylinder reach and the killed cone-taper
+// were all tuned against a mechanism that was not running.
+//
+// A prop that is CURRENTLY fading borrows a material from a small pool. One
+// mesh per material means nothing else can overwrite its uniform, and the
+// material ID necessarily changes on either side of that draw, so the upload
+// happens. Clones are made before anything compiles (userData empty, so no
+// JSON round-trip of a shader), and they share the base material's defines, so
+// three's program cache hands back the same compiled program: a swap costs a
+// uniform upload, not a shader build. Sixteen is far above the most that have
+// ever been in flight at once; a prop that cannot get a slot stays solid, which
+// is the old behaviour, and _fadeStarved counts it so a probe can say so.
+const FADE_POOL_N = 16;
+interface FadeSlot { mat: THREE.Material; owner: THREE.Mesh | null }
+const _fadePools = new Map<THREE.Material, FadeSlot[]>();
+export let _fadeStarved = 0;
+function fadePool(base: THREE.Material): FadeSlot[] {
+  let pool = _fadePools.get(base);
+  if (pool) return pool;
+  pool = [];
+  for (let i = 0; i < FADE_POOL_N; i++) {
+    const m = base.clone();
+    m.userData = {};                                  // its own shader, not a copy of one
+    m.name = 'fadeSlot';                              // so a probe can see it took
+    installPropShader(m as THREE.MeshStandardMaterial);
+    pool.push({ mat: m, owner: null });
+  }
+  _fadePools.set(base, pool);
+  return pool;
+}
 /** Attach the fade hook. Called once per prop, at build time. */
 export function armFade(o: THREE.Object3D): void {
   o.userData.fade = 1;
@@ -4197,7 +4244,35 @@ export function armFade(o: THREE.Object3D): void {
 export function setMeshFade(o: THREE.Object3D, fade: number): void {
   o.userData.fade = fade;
   if (o.onBeforeRender !== _fadeHook) o.onBeforeRender = _fadeHook;
+  const mesh = o as THREE.Mesh;
+  if (!mesh.isMesh || Array.isArray(mesh.material)) return;
+  const base = (mesh.userData.fadeBase as THREE.Material | undefined) ?? mesh.material;
+  const pool = _fadePools.get(base);
+  if (fade >= 0.999) {                                // solid again: give the slot back
+    if (mesh.userData.fadeBase) {
+      const slot = pool?.find((q) => q.owner === mesh);
+      if (slot) slot.owner = null;
+      mesh.material = mesh.userData.fadeBase as THREE.Material;
+      mesh.userData.fadeBase = undefined;
+    }
+    return;
+  }
+  if (mesh.userData.fadeBase) return;                 // already holds one
+  // only the two materials that carry the fade shader can dissolve at all
+  if (base !== PROP_SHARED_MAT && base !== PROP_SMOOTH_MAT) return;
+  const slot = fadePool(base).find((q) => q.owner === null);
+  if (!slot) { _fadeStarved++; return; }
+  slot.owner = mesh;
+  mesh.userData.fadeBase = base;
+  mesh.material = slot.mat;
 }
+// Built at module init, not on first use. Material.clone() puts userData through
+// JSON.parse(JSON.stringify(...)), and once a prop material has been drawn its
+// userData holds the compiled shader — uniforms, textures and all. Cloning then
+// is what the eight "THREE.Texture: Unable to serialize Texture" warnings in the
+// console are; cloning now, before anything has compiled, is silent.
+fadePool(PROP_SHARED_MAT);
+fadePool(PROP_SMOOTH_MAT);
 const _pc = new THREE.Color();
 // ── IS THIS PART ROUND? ────────────────────────────────────────────────────
 // Asked here because here is the only place that still knows. part() calls

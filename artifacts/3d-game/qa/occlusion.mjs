@@ -321,7 +321,7 @@ const shot = await p.evaluate(() => {
       let fade = o.userData.fade;
       if (fade === undefined && e) fade = e.mesh.userData.fade;
       why.push({ name: o.name || '(unnamed)', dist: +hit.distance.toFixed(1),
-        mat: mat ? mat.type : 'none', hooked: !!sh,
+        mat: mat ? (mat.name || mat.type) + '#' + mat.id : 'none', hooked: !!sh,
         uFade: sh && sh.uniforms.uFade ? +sh.uniforms.uFade.value.toFixed(2) : null,
         fade: fade === undefined ? null : +fade.toFixed(2),
         edible: !!e, r: e ? e.radius : null, reachable: !!(e && e.fadeTo), obj: o });
@@ -349,22 +349,35 @@ const shot = await p.evaluate(() => {
   vg.visible = false;
   const C = grab();
   vg.visible = true;
-  let E = null;
-  if (why.length) { const o = why[0].obj; o.visible = false; E = grab(); o.visible = true; }
+  let E = null, F = null;
+  if (why.length) {
+    const o = why[0].obj;
+    o.visible = false; E = grab(); o.visible = true;
+    // F: the same prop asked to disappear ENTIRELY through the fade path.
+    // uFade 0 discards every pixel (voidBayer is never negative), so if F still
+    // shows a solid prop the value is not reaching the GPU, and if it vanishes
+    // the path works and 0.62 is doing exactly what 0.62 asks for.
+    const was = o.userData.fade;
+    o.userData.fade = 0;
+    window.__RR(scene, cam);           // let the hook write it
+    F = grab();
+    o.userData.fade = was;
+  }
   window.__RR(scene, cam);
 
   const DIFF = 14;
   const dif = (X, Y, i) => Math.abs(X[i] - Y[i]) > DIFF
     || Math.abs(X[i + 1] - Y[i + 1]) > DIFF || Math.abs(X[i + 2] - Y[i + 2]) > DIFF;
-  let mask = 0, seen = 0, ifGone = 0;
+  let mask = 0, seen = 0, ifGone = 0, ifZero = 0;
   for (let i = 0; i < A.length; i += 4) {
     if (!dif(B, D, i)) continue;          // not the hero
     mask++;
     if (dif(A, C, i)) seen++;             // and he reached the screen here
     if (E && dif(E, A, i)) ifGone++;      // and here, only once the occluder was off
+    if (F && dif(F, A, i)) ifZero++;      // and here, only once it was faded to nothing
   }
   for (const q of why) delete q.obj;
-  return { blocked, fadingNow, mask, seen, ifGone, didExperiment: !!E, w, h, why,
+  return { blocked, fadingNow, mask, seen, ifGone, ifZero, didExperiment: !!E, w, h, why,
     px: { x: (na.x * 0.5 + 0.5) * w, y: (-na.y * 0.5 + 0.5) * h,
           r: Math.abs(nb.x - na.x) * 0.5 * w } };
 });
@@ -390,9 +403,15 @@ for (const q of shot.why) console.log(`    in the way at ${q.dist}: ${q.name} ${
   + ` | ${q.edible ? 'edible r=' + q.r : 'NOT an edible'}, `
   + `${q.reachable ? 'reachable' : 'not reachable'}, hooked ${q.hooked}, `
   + `fade ${q.fade}, uFade ${q.uFade}`);
-if (shot.didExperiment) console.log(`  EXPERIMENT: with the nearest occluder switched off, `
-  + `${shot.ifGone} of ${shot.mask} silhouette px changed `
-  + `(${(100 * shot.ifGone / Math.max(1, shot.mask)).toFixed(1)}%)`);
+if (shot.didExperiment) {
+  console.log(`  EXPERIMENT: with the nearest occluder switched off, `
+    + `${shot.ifGone} of ${shot.mask} silhouette px changed `
+    + `(${(100 * shot.ifGone / Math.max(1, shot.mask)).toFixed(1)}%)`);
+  console.log(`  EXPERIMENT: with that occluder's own fade set to 0, `
+    + `${shot.ifZero} of ${shot.mask} changed `
+    + `(${(100 * shot.ifZero / Math.max(1, shot.mask)).toFixed(1)}%) `
+    + `— near 0 means the value never reaches the GPU`);
+}
 console.log(`  that frame: ${OUT}/${WORLD}-worst.png\n`);
 let pass = 0;
 for (const [id, bar] of Object.entries(BARS)) {
