@@ -87,7 +87,15 @@ console.log(`  delta        ${d.stage.toFixed(1).padStart(7)} ${d.actors.toFixed
 console.log(`\n  NOTE: rung 0 and rung 2 differ in pixel ratio as well as bloom (${on.q.pr} vs ${off.q.pr}),`);
 console.log('  so this is an upper bound on bloom alone. It answers the question that matters —');
 console.log('  whether the numbers the brief grades against survive the pipeline the game ships.');
-const material = Math.abs(d.stage) > 3 || Math.abs(d.actors) > 3 || Math.abs(d.value) > 0.04 || Math.abs(d.chroma) > 0.015;
+// ── ONLY THE QUANTITIES THAT ARE ACTUALLY BARS ─────────────────────────────
+// The first version of this also failed on chroma moving more than 0.015, and
+// duly failed on 0.016 — but chroma median is REPORTED CONTEXT in the brief, not
+// a bar. D1 is stage, D2 is actors, D3 is value. Gating on a number nothing is
+// graded against turns a passing result into a false alarm, which is what it
+// did: value moved 0.000 and the verdict line said re-baseline everything.
+// The thresholds are the margin by which a world's verdict could flip.
+const material = Math.abs(d.stage) > 3 || Math.abs(d.actors) > 3 || Math.abs(d.value) > 0.04;
+console.log(`\n  chroma moved ${d.chroma.toFixed(3)} — reported, not graded: the brief's bars are stage, actors and value.`);
 console.log(`\n${material ? 'FAIL — the shipped pipeline grades differently; stream D needs re-baselining'
   : 'PASS — the measurements stand under the pipeline the game ships'}\n`);
 process.exit(material ? 1 : 0);

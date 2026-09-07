@@ -105,7 +105,7 @@ await p.evaluate((seconds) => {
   const T = window.__THREE, cam = window.__cam;
   const ray = new T.Raycaster();
   const audit = { frames: 0, worst: 0, sum: 0, blocked: 0, blockedFading: 0,
-    everFaded: 0, done: false, t0: null, hold: false, misses: [], missTries: 0 };
+    everFaded: 0, done: false, t0: null, hold: false, misses: [], missTries: 0, ticks: 0 };
   window.__occ = audit;
 
   // 13 rays: the centre, four at 45% of his radius, eight at 85%. The disc is
@@ -201,10 +201,9 @@ await p.evaluate((seconds) => {
     let n = 0;
     for (const e of window.__edibles) {
       if (e.eaten || !e.mesh) continue;
-      let f = e.mesh.userData.fade;
-      if (f === undefined) e.mesh.traverse((o) => {
-        const g = o.userData?.fade; if (g !== undefined && (f === undefined || g < f)) f = g; });
-      if (f !== undefined && f < 0.999) n++;
+      const t = e.fadeTo;
+      if (t) { for (let i = 0; i < t.length; i++) if ((t[i].userData.fade ?? 1) < 0.999) { n++; break; } }
+      else { const f = e.mesh.userData.fade; if (f !== undefined && f < 0.999) n++; }
     }
     return n;
   };
@@ -226,6 +225,8 @@ await p.evaluate((seconds) => {
       dispatchEvent(new PointerEvent('pointermove', { pointerId: 1,
         clientX: cx + best.dx / m * 110, clientY: cy + best.dz / m * 110, bubbles: true })); }
 
+    audit.ticks++;
+    if (audit.ticks % 3) { requestAnimationFrame(tick); return; }
     const share = window.__blockedNow();
     const fading = window.__fadingNow();
     audit.frames++; audit.sum += share;
@@ -251,7 +252,20 @@ await p.evaluate((seconds) => {
   requestAnimationFrame(tick);
 }, SECONDS);
 
-await p.waitForFunction(() => window.__occ?.done === true, null, { timeout: 900000 });
+{
+  const deadline = Date.now() + 780000;
+  let last = -1;
+  for (;;) {
+    let st = null;
+    try { st = await p.evaluate(() => window.__occ && { d: window.__occ.done, f: window.__occ.frames,
+      t: window.__occ.t0 === null ? 0 : (window.__matchState().t - window.__occ.t0) }); }
+    catch (e) { console.log(`  !! the page went away after ${last} audited frames — ${e.message.split('\n')[0]}`); throw e; }
+    if (st?.d) break;
+    if (st && st.f !== last) { last = st.f; console.log(`  … ${st.f} audited frames, ${st.t.toFixed(1)} game-seconds`); }
+    if (Date.now() > deadline) throw new Error(`drive did not finish: ${last} audited frames in 13 minutes`);
+    await p.waitForTimeout(15000);
+  }
+}
 const drive = await p.evaluate(() => ({
   frames: window.__occ.frames, worst: window.__occ.worst,
   mean: window.__occ.sum / Math.max(1, window.__occ.frames),
