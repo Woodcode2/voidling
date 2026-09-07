@@ -248,7 +248,21 @@ function analyse(d) {
   const segG = rows.slice(iPeak, iMin + 1).map(gm);
   const series = seg.map((p, i) => ({ x: (segG[i] - segG[0]) / (descentMs || 1), y: (yStart - p.y) / (span || 1) }));
   const fit = series.length > 5 ? fitEasing(series) : { name: 'n/a', rms: NaN };
-  const at = (t) => series.reduce((a, b) => (Math.abs(b.x - t) < Math.abs(a.x - t) ? b : a), series[0] || { x: 0, y: 0 });
+  // INTERPOLATE THE QUARTER POINTS, DO NOT SNAP TO THE NEAREST SAMPLE. Twenty-five
+  // samples across 1.2 s is a 48 ms grid, so the nearest sample to t=0.25 can sit
+  // anywhere in +-0.02 of it — and on a curve climbing steeply there, that is
+  // worth up to 0.05 of height. Snapping put a correct smoothstep at 0.202
+  // against a 0.20 bar: the reading was quantisation, not easing. Linear
+  // interpolation between the two bracketing samples removes it.
+  const at = (t) => {
+    if (!series.length) return { x: t, y: 0 };
+    let i = 0;
+    while (i < series.length - 1 && series[i + 1].x < t) i++;
+    const a = series[i], b = series[Math.min(i + 1, series.length - 1)];
+    if (b.x === a.x) return a;
+    const k = Math.max(0, Math.min(1, (t - a.x) / (b.x - a.x)));
+    return { x: t, y: a.y + (b.y - a.y) * k };
+  };
   const mid = at(0.5), q1 = at(0.25), q3 = at(0.75);
   // Ground scale: on-screen size goes as 1/height, so the scale gained over the
   // descent is the ratio of the heights, measured above the void's own plane.
