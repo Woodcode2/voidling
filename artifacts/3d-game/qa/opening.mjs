@@ -226,8 +226,27 @@ function analyse(d) {
   const h = rows.map((r) => ({ t: r.t, y: r.cy - 0, d: r.camDist }));
   let iPeak = 0;
   for (let i = 1; i < h.length; i++) if (h[i].y > h[iPeak].y) iPeak = i;
-  let iMin = iPeak;
-  for (let i = iPeak; i < h.length; i++) if (h[i].y < h[iMin].y) iMin = i;
+  // THE END OF THE MOVE IS WHERE IT STOPS MOVING, NOT ITS LOWEST POINT. Taking the
+  // global minimum let slow post-settle drift — the camera easing as the void
+  // grows, the look-up, the spring resuming — keep extending the window: one run
+  // read 1300 ms with a midpoint of 0.624 on the same descent another read as
+  // 1196 ms and 0.560. A rate test is immune to that and to the choice of easing:
+  // find the fastest sample, then take the first and last samples still moving at
+  // 5% of it.
+  let iMin = h.length - 1;
+  {
+    const rate = [];
+    for (let i = 1; i < h.length; i++) {
+      const d = gm(rows[i]) - gm(rows[i - 1]);
+      rate.push(d > 0 ? Math.abs(h[i].y - h[i - 1].y) / d : 0);
+    }
+    const peakRate = Math.max(...rate, 1e-9);
+    let a = iPeak, b = iPeak;
+    for (let i = 0; i < rate.length; i++) {
+      if (rate[i] >= 0.05 * peakRate) { if (a === iPeak && i + 1 > iPeak) a = i; b = i + 1; }
+    }
+    if (b > a) { iPeak = Math.max(0, Math.min(iPeak, a)); iMin = b; }
+  }
   const yStart = h[iPeak]?.y ?? 0;
   const yEnd = h[iMin]?.y ?? 0;
   const span = yStart - yEnd;
