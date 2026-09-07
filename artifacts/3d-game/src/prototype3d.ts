@@ -1155,11 +1155,18 @@ const FO_RATE = 5.5;
 // field. So the number that objection killed is back on the table, tested by
 // O3 and by looking at POWDER, which is the check round 3 actually made.
 //
-// 0.28 discards eleven steps of sixteen: 68.75% of the hero shows through a
-// prop standing completely in front of him. The hero is the child; a building
-// is scenery, and for the second and a half it is between them it can be a
-// ghost.
-const FO_FLOOR = 0.28;
+// 0.28 discards eleven steps of sixteen and it went back to 0.62, because
+// LOOKING at POWDER said what no bar here said: a regular 4x4 mask at low
+// density on a large pale surface is a screen door however few props wear it.
+// Round 3 was right about the dither and I was wrong about why. At 0.62 it is a
+// clean ghost, which is what it always was once the leak stopped painting the
+// whole field with it.
+//
+// So this number no longer has to carry the hero's visibility on its own. He is
+// drawn over whatever hides him (void3d's occluded silhouette), and the fade is
+// the courtesy that makes the camera feel deliberate rather than the mechanism
+// that makes him findable.
+const FO_FLOOR = 0.62;
 function fadeOccluders(dt: number): void {
   const heroX = voidState.x, heroZ = voidState.z, heroY = voidling.group.position.y;
   _foCam.copy(camera.position);

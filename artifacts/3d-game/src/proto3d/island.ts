@@ -4183,16 +4183,10 @@ installPropShader(PROP_SMOOTH_MAT);
 // hook would inherit the previous occluder's 0.3 and disappear — the bug this
 // whole feature exists to prevent, applied to the entire island. One shared
 // function object, no per-frame allocation, and userData.fade defaults to 1.
-// …and it now writes a CONSTANT 1. The dissolve moved to alpha (see
-// setDissolve): if this still drove uFade from userData.fade the prop would be
-// dithered AND blended, which is the halftone back with a ghost behind it. The
-// hook stays rather than going, for the reason it was written — uFade lives on
-// a shared program and keeps whatever the last draw wrote, so something has to
-// keep saying 1 out loud.
 const _fadeHook = function (this: THREE.Object3D) {
   const m = (this as THREE.Mesh).material as { userData?: { shader?: { uniforms: Record<string, { value: number }> } } } | undefined;
   const sh = m?.userData?.shader;
-  if (sh) sh.uniforms.uFade.value = 1;
+  if (sh) sh.uniforms.uFade.value = (this.userData.fade as number | undefined) ?? 1;
 };
 
 // ── AND A FADING PROP NEEDS A MATERIAL OF ITS OWN ──────────────────────────
@@ -4288,37 +4282,30 @@ export function setMeshFade(o: THREE.Object3D, fade: number): void {
   setDissolve(mesh, fade);
 }
 
-// ── AND IT DISSOLVES BY ALPHA, NOT BY DITHER ───────────────────────────────
-// The Bayer discard is still in the prop shader and is no longer driven: uFade
-// stays at 1 and nothing is thrown away. It went because round 3 was RIGHT
-// about it, and I had argued it was only right by accident.
+// ── AND IT DISSOLVES BY DITHER, WHICH IS THE SECOND ANSWER TO THIS ─────────
+// Alpha was tried, measured and reverted, and the frame is the reason. On a
+// merged building the camera-to-hero ray crosses four front faces (measured at
+// 28.3, 29.3, 30.5 and 41.8 units through MAPLE's town hall), and four blends
+// at 0.28 leave 0.72^4 = 27% of the hero coming through — O3 read 33% where the
+// opacity implied 72%. The dither never had that problem, because every layer
+// discards the SAME screen pixels, so overlaps do not compound.
 //
-// Round 3 measured 0.28 reading as "a black-and-red halftone print" on POWDER's
-// snow, and I put that down to the shared-uniform leak dissolving the whole
-// field at once. Fixing the leak, opening the floor to 0.28 and looking at
-// POWDER again: the hero reads beautifully — 70.8% of him through a building
-// standing right in front of him — and the building is a coarse grey
-// crosshatch on white snow. A regular 4x4 mask at low density on a large pale
-// surface is a screen door however few props are wearing it. The leak made it
-// worse; it did not make it.
+// Worse than the number: with several props in the cylinder at once the whole
+// upper half of the frame went to milky haze. The world stopped being solid.
+// A dither at 0.62 is a clean per-prop ghost and always was — the halftone
+// round 3 saw was 0.28 on a shared uniform, which is two problems this stream
+// has now fixed separately.
 //
-// Dithering was the right call when it was made, for two reasons that have both
-// since gone: it needs no per-object material, and it needs no sorting. Props
-// now own their materials (see the pool and the gate tint above), and an
-// occluder is drawn between the opaques and nothing else, so ordinary alpha is
-// available — which is what every third-person game actually uses to get a
-// camera occluder out of the way. depthWrite goes off with it, or the ghost
-// keeps writing the depth that hides the hero behind it.
-//
-// ONLY EVER CALLED ON A MATERIAL THE MESH OWNS. Setting opacity on
-// PROP_SHARED_MAT would ghost the entire island in one frame.
+// So the occluder fade is a HINT, and the guarantee moved to the hero: he is
+// drawn over whatever hides him (void3d, GreaterDepth). That is the division
+// third-person games actually use, and it is why this can stay gentle.
 function setDissolve(mesh: THREE.Mesh, fade: number): void {
   const m = mesh.material as THREE.Material;
   if (!m || Array.isArray(m)) return;
-  const want = fade < 0.999;
-  if (m.transparent !== want) { m.transparent = want; m.needsUpdate = true; }
-  m.opacity = want ? fade : 1;
-  m.depthWrite = !want;
+  // never leave a prop parked in the transparent pass — the alpha experiment
+  // put it there and only the revert takes it back out
+  if (m.transparent) { m.transparent = false; m.opacity = 1; m.depthWrite = true; m.needsUpdate = true; }
+  void fade;
 }
 // Built at module init, not on first use. Material.clone() puts userData through
 // JSON.parse(JSON.stringify(...)), and once a prop material has been drawn its

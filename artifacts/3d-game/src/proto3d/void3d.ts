@@ -612,6 +612,44 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   body.castShadow = false;   // grounded by the contact disc, never by the shadow map
   bob.add(body);
 
+  // ── HE IS DRAWN OVER WHATEVER HIDES HIM ────────────────────────────────────
+  // The island's occlusion fade dissolves a prop standing between the lens and
+  // the void, and it cannot be the whole answer. Measured: with the fade
+  // working correctly at 0.62 a building covering him completely still left
+  // only 6 pixels in 16 of him showing, and opening it far enough to fix that
+  // turned a merged building into a screen door and several of them into fog.
+  // A prop can only be dissolved so far before it stops being a building.
+  //
+  // So the guarantee lives here instead, on him: a second pass of his own
+  // silhouette with depthFunc GreaterDepth, which draws ONLY where something
+  // nearer has already written the depth buffer — precisely the pixels where he
+  // is hidden, and nowhere else. It costs one low-poly draw, it needs no state
+  // from the island, and it cannot be defeated by whatever happens to be in the
+  // way. It is the trick every third-person game uses to keep the character
+  // findable, and it keeps ours a creature rather than turning the world into a
+  // flicker.
+  //
+  // THE CAP MATTERS. He rests sunk, with RADIUS_SINK of his radius above the
+  // ground, so a full sphere would find the GROUND in front of his buried half
+  // and paint a disc of skin colour at ground level all round him. That is the
+  // ring a previous round already rejected at the pixel. The cap stops at
+  // y = -0.809R, just short of the ground line at -0.9R.
+  //
+  // transparent, so it draws after the opaques and reads the finished depth
+  // buffer; depthWrite off, so it never occludes anything itself; toneMapped
+  // off and fog off, so a distant hero behind a building is as legible as a
+  // near one — the point of the pass is that he is never lost.
+  const ghostMat = new THREE.MeshBasicMaterial({
+    color: VOID_COL.bodyMid.clone(), transparent: true, opacity: 0.9,
+    depthFunc: THREE.GreaterDepth, depthWrite: false, toneMapped: false, fog: false,
+  });
+  const ghost = new THREE.Mesh(
+    new THREE.SphereGeometry(0.985, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.80), ghostMat);
+  ghost.castShadow = false; ghost.receiveShadow = false;
+  ghost.renderOrder = 8;
+  ghost.name = 'occludedSilhouette';   // QA: qa/occlusion.mjs finds it by this
+  bob.add(ghost);
+
   // the interior starfield (Higgsfield seamless texture) — engages on load,
   // shader keeps the gradient look until then (offline dev stays clean)
   {
@@ -1745,6 +1783,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       bodyMat.uniforms.uRim.value.set(s.rim);
       bodyMat.uniforms.uSwirl.value.set(s.glow);
       glowMat.uniforms.uColor.value.set(s.glow);
+      ghostMat.color.set(s.mid);   // the silhouette is HIM, so it wears his skin
       ringMats.forEach((m) => m.color.set(s.glow));
       orbStars.forEach((sp) => (sp.material as THREE.SpriteMaterial).color.set(s.glow));
       for (const k in acc) acc[k].visible = false;
