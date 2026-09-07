@@ -5822,8 +5822,18 @@ const DESCENT_START = DESCENT_END * DESCENT_SCALE;
 // a 1.2 s descent = 0.54 s of travel. 5 units is reached in ~0.41 s = 34% of the
 // descent, inside the 30-60% the probe asks for with room for a child who drags
 // late or diagonally.
+//
+// HOW MANY SLOTS IS GEOMETRY, NOT TASTE. A drag that runs between two slots
+// misses both by ring*sin(pi/N), and a bite needs the void's radius plus the
+// prop's — about 1.6 units at spawn. Four slots leave a 3.54-unit gap, and the
+// isometric camera makes the diagonals the NATURAL drag directions: with the
+// camera at +x,+z, dragging toward the top of the screen is the -x,-z diagonal,
+// which is exactly the middle of a four-slot gap. The first build of this ring
+// placed all four correctly and the void still threaded between them for 17.4
+// units without eating anything. Eight slots leave 1.91 and still thread; ten
+// leave 1.55 and cannot.
 const FIRST_BITE_RING = 5;
-const FIRST_BITE_N = 4;
+const FIRST_BITE_N = 10;
 const ARRIVE_FALL = 0.55;   // seconds of fall
 const ARRIVE_HIGH = 26;     // world units above his resting height
 let arriveT = 0;            // counts UP from 0 while the world is armed and untouched
@@ -6002,6 +6012,9 @@ function ensureFirstBite(): void {
     .map((e) => ({ e, d: Math.hypot(e.mesh.position.x - sx, e.mesh.position.z - sz) }))
     .sort((a, b) => a.d - b.d)
     .slice(0, FIRST_BITE_N * 3);
+  // Each prop goes to the slot nearest its own bearing, so the ring is assembled
+  // from whatever the world already had there and every piece moves the shortest
+  // way it can.
   if (!near.length) return;   // a world with nothing edible at spawn is a world bug, not ours to paper over
   const taken = new Set<number>();
   for (const { e } of near) {
