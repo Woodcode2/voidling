@@ -40,6 +40,12 @@ export interface Void3D {
    *  the eat-wobble's own amplitude and decay so it can never invent a new
    *  motion; it is the body acknowledging contact, not a celebration. */
   bump(): void;
+  /** Round 7, stream A: THE ARRIVAL. A temporary height ADDED to the body's
+   *  own rest lift, so the void can fall into the world before the match
+   *  begins without any other system needing to know. The caller owns the
+   *  curve and sets 0 when he has landed; nothing here decays it, because a
+   *  decay of its own would fight whatever the caller is doing. */
+  arriveY(y: number): void;
   setSkin(s: Skin): void;    // recolour body/glow/halo/rings to a skin
   /** Wear a hat, or null for none. Independent of the skin — see hats.ts. */
   setHat(id: string | null): void;
@@ -74,6 +80,7 @@ export interface Void3D {
 }
 
 const RADIUS_SINK = 0.9;   // how much of the orb sits above ground (rest sinks)
+
 
 /** A real N-point star. CircleGeometry(r, 5) is a regular PENTAGON, which is
  *  exactly what Uni-Void's signature "star eyes" and the Archmage's hat star
@@ -1558,6 +1565,10 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   let inhaleT = 0;                 // collapse inhale->burst envelope
   let evolveT = 0;                 // evolution celebration pop
   let ringBurst = 0;               // ring + star flare on evolve
+  // stream A, the arrival: an additive height the caller drives, so the void can
+  // fall into the world before the match begins. Nothing here decays it — a
+  // decay of its own would fight whatever curve the caller is running.
+  let arriveLift = 0;
   let skinHasTex = false;
   const stretchDir = new THREE.Vector3(0, 0, 1);   // travel direction, body space
   let fangGrow = 0;                                // teeth ease in with the form
@@ -1583,6 +1594,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     },
     setMood(m) { if (m !== mood) { mood = m; moodT = 0; } },
     celebrate() { evolveT = 0.7; wobble = 1; ringBurst = 1; },
+    arriveY(y: number) { arriveLift = Math.max(0, y); },
     bump() { wobble = Math.min(1, wobble + 0.42); },
     calm() { evolveT = 0; wobble = 0; ringBurst = 0; },
     faceState() { return { mood, maw: mp.maw, smile: mouth.visible, biting: mouthT > 0 }; },
@@ -1902,7 +1914,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // lift so the orb rests partly sunk into the ground; roll-bob while
       // moving — frenzy/victory add a real happy bounce
       const lift = dispR * (RADIUS_SINK + Math.abs(Math.sin(s.t * (6 + mp.bounce * 3) * slow)) * moveAmt * (0.05 + mp.bounce * 0.055));
-      group.position.set(s.x, lift, s.z);
+      group.position.set(s.x, lift + arriveLift, s.z);
 
       // squash/stretch + lean on the bob (body+glow only) — gentle, so the orb
       // stays a cute round orb, never pinched

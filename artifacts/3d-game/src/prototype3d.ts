@@ -5798,6 +5798,19 @@ const DESCENT_LEN = 1.2;               // seconds
 const DESCENT_SCALE = 6.0;             // ground magnification, screen centre
 const DESCENT_END = 38;                // camDist the match plays at
 const DESCENT_START = DESCENT_END * DESCENT_SCALE;
+
+// THE ARRIVAL — stream A step 5. HOLE.IO's pre-touch idle is 717 ms of a static
+// camera over a static world: measured, the ground scale holds to +-0.016% and
+// the hole does not move a pixel (holeio.recon.md 11.5). It is a buffer. Ours is
+// a character arriving in a world he is about to eat, which is the one thing a
+// hole cannot do — and it costs the impatient player nothing, because the first
+// touch cuts it on any frame and the descent that follows is identical either
+// way (bar A21, measured at 44 ms of difference between tapping at 0.2 s and at
+// 2.5 s).
+const ARRIVE_FALL = 0.55;   // seconds of fall
+const ARRIVE_HIGH = 26;     // world units above his resting height
+let arriveT = 0;            // counts UP from 0 while the world is armed and untouched
+let arriveLanded = false;
 // THE HAND-AUTHORED FIRST SIXTY SECONDS. All of these are per-match, and all of
 // them exist because the opening was measured and found to teach the wrong
 // things in the wrong order.
@@ -5891,6 +5904,13 @@ function beginMatch(solo = false) {
     applyHour(HOURS[pickedWorld][hand.hour]);
   }
   armed = true;
+  // The idle is the high view, not the play view. Without this the world opens at
+  // playing height and the camera JUMPS up to DESCENT_START the instant the
+  // player touches — the probe caught exactly that: a camera peaking at 227 that
+  // should have been descending from it.
+  camDist = DESCENT_START; camFollow.set(0, 0, 0);
+  arriveT = 0; arriveLanded = false;
+  voidling.arriveY(ARRIVE_HIGH);
   resetFps();
   // the quality adapter starts its window HERE. Frames before this line are
   // boot, menu and the world build — none of them say anything about how this
@@ -5961,6 +5981,10 @@ function beginMatch(solo = false) {
 let pendingFirstEver = false;
 function startMatch(): void {
   if (started || !armed || ended) return;
+  // The arrival is cut on whatever frame the touch lands — mid-fall included.
+  // A player who taps at 200 ms gets the same descent as one who watched the
+  // whole thing; that is bar A21 and it is measured, not asserted.
+  arriveLanded = true; voidling.arriveY(0);
   started = true; startT = tClock;
   // NO TWO MATCHES ON THE SAME SCHEDULE. Each beat keeps its authored slot as a
   // base and moves +-6s around it, so the arc is recognisable but never recited.
@@ -8984,6 +9008,16 @@ function animate() {
   // the lesson is what produces the touch. Everything else in the block below
   // waits for `started`.
   if (armed && !started && !ended && !paused) {
+    // THE FALL. A quadratic drop — gravity, not an ease — and a single bump() on
+    // landing, which is the body's existing knock-acknowledgement rather than a
+    // new motion invented for this moment. After he lands the void simply sits
+    // there being himself: the blink is his own idle, already running.
+    if (!arriveLanded) {
+      arriveT += dt;
+      const k = Math.min(1, arriveT / ARRIVE_FALL);
+      voidling.arriveY(ARRIVE_HIGH * (1 - k * k));
+      if (k >= 1) { arriveLanded = true; voidling.arriveY(0); voidling.bump(); }   // sound: stream A step 9, with the rest of the opening's audio
+    }
     if (handHold > 0) handHold -= dt;
     if (guideT > 0) { guideT -= dt; if (guideT <= 0) guideEl().classList.remove('show'); }
   }
@@ -9996,6 +10030,9 @@ function animate() {
       if (raw < 0) lookUpT = -1; else lk = raw * raw * (3 - 2 * raw);
     }
     targetDist *= 1 + 0.15 * lk;
+    // armed: the world waits at the establishing height. Nothing eases toward the
+    // playing distance until the player has asked for a match.
+    if (armed && !started && !ended) targetDist = DESCENT_START;
     camDist += (targetDist - camDist) * (1 - Math.exp(-1.6 * dt));
     // steepen the camera as the void grows (hole.io): big hole ⇒ near-top-down,
     // so towers and trees stop hiding the hero
