@@ -19,7 +19,7 @@
 // that error once made a dimmed end card read as the most colourful frame in the
 // reference set. See docs/crews/round-7/holeio.recon.md §9.
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
 
 const PORT = Number(process.argv[2] || 4177);
@@ -146,9 +146,21 @@ function rimOf(img, v) {
 // solved. Reusing it also guarantees these frames are the SAME frames as the
 // committed baseline in docs/crews/round-7/recon/self/, so a before/after
 // comparison is like for like.
+// ── IT RE-SHOOTS. IT USED TO REUSE WHATEVER WAS ON DISK ────────────────────
+// This shot only when the PNG was MISSING, which makes the probe silently
+// answer about the last build every time it is run twice — change a colour, run
+// pop.mjs, read the number you had before the change and believe it. Every
+// colour figure this stream has quoted came from a script that deleted
+// qa-out/gw/*-spawn.png first, so they stand; but a probe whose correctness
+// depends on the caller remembering to delete its inputs is a trap, and this is
+// the fifth instrument fault in this stream.
+// `--stale` opts back into the old behaviour for the one legitimate case:
+// re-reading frames you already shot, without a preview server running.
+const STALE = process.argv.includes('--stale');
 function frameFor(world) {
   const p = `qa-out/gw/${world}-spawn.png`;
-  if (!existsSync(p)) {
+  if (!STALE || !existsSync(p)) {
+    if (existsSync(p)) rmSync(p);
     execFileSync('node', ['qa/_worldshots.mjs', world, String(PORT)], { stdio: 'inherit' });
   }
   if (!existsSync(p)) throw new Error(`no spawn frame for ${world} at ${p}`);
