@@ -428,10 +428,17 @@
          under a thumb without becoming part of the character. */
       /* 108px = 2 x JOY_R, and JOY_R is where full deflection sits — the ring must
          be exactly the control's radius or it lies about where full speed is.
-         25.1% of a 430 viewport, matching HOLE.IO's measured 25.0%. The border is
+         box-sizing is border-box on purpose: without it `width` excludes the 2px
+         stroke, so a 108px ring drew 112px outside and measured 26.0% of the width
+         — the border was quietly making the control look bigger than it is. At
+         border-box 110 the OUTER edge is 110 (25.6% of a 430 viewport, against
+         HOLE.IO's measured 25.0%) and the stroke's CENTRELINE sits at 54, exactly
+         JOY_R, so the drawn circle traces the control's radius instead of sitting
+         outside it. The border is
          quieter than it was (0.22 from 0.30) because we have the ghost hand to do
          the teaching; their stick has to carry that job as well as feedback. */
-      #joy { position: fixed; width: 108px; height: 108px; border-radius: 50%; z-index: 6;
+      #joy { position: fixed; width: 110px; height: 110px; border-radius: 50%; z-index: 6;
+        box-sizing: border-box;
         background: transparent; border: 2px solid rgba(255,255,255,0.22);
         transform: translate(-50%, -50%); pointer-events: none; display: none; }
       #joyNub { position: fixed; width: 52px; height: 52px; border-radius: 50%; z-index: 6;
