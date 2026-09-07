@@ -1139,6 +1139,27 @@ const _foFading = new Set<Edible>();
 const _foPrev = new Set<Edible>();
 /** how fast a prop dissolves and comes back, in fade units per second */
 const FO_RATE = 5.5;
+// ── HOW FAR AN OCCLUDER OPENS, AND WHY IT IS NO LONGER 0.62 ────────────────
+// The dither keeps every Bayer step BELOW the fade and discards the rest, so
+// the floor is not a brightness, it is a fraction: at 0.62 the six steps at or
+// above it go and ten stay, which leaves exactly 6/16 = 37.5% of a fully
+// covered hero showing. Measured at precisely that, once the dissolve started
+// reaching the GPU at all.
+//
+// 0.62 was not chosen for 37.5%. It was chosen because round 3 measured 0.28
+// reading as "a black-and-red halftone print" across POWDER's snow — and it
+// did, because every prop sharing the material dissolved together, which is
+// the shared-uniform leak, not the dither. One building opening up is a
+// different thing from a snowfield flashing, and only the props actually
+// crossing the sight line dissolve now: measured 1 to 3 at a time, never the
+// field. So the number that objection killed is back on the table, tested by
+// O3 and by looking at POWDER, which is the check round 3 actually made.
+//
+// 0.28 discards eleven steps of sixteen: 68.75% of the hero shows through a
+// prop standing completely in front of him. The hero is the child; a building
+// is scenery, and for the second and a half it is between them it can be a
+// ghost.
+const FO_FLOOR = 0.28;
 function fadeOccluders(dt: number): void {
   const heroX = voidState.x, heroZ = voidState.z, heroY = voidling.group.position.y;
   _foCam.copy(camera.position);
@@ -1173,20 +1194,15 @@ function fadeOccluders(dt: number): void {
   // camera being polite. Everything that stopped occluding this frame is
   // walked back up by the same rate.
   const step = FO_RATE * Math.min(dt, 0.05);
-  // 0.62, not 0.28. At 0.28 the Bayer keep-mask is 5/16 pixels — on white
-  // snow that is a black-and-red halftone print, the only visible pixel
-  // pattern in five worlds (art direction round 3, verified at the pixel).
-  // At 0.62 it keeps 10/16: a 62%-solid ghost, while the hero still shows
-  // through 6/16 of an occluder's pixels, so the fade's contract holds.
-  // 0.62 sits strictly between Bayer steps .5625 and .625 — no equality
-  // edge. The crews skeptic KILLED the companion change here (a cone-taper
-  // on the shield reach): its motivating scenario was geometrically
-  // impossible, and the constant cylinder is the accidental compensation
-  // that keeps 11.5-unit lift pylons fading when they truly cross the
-  // sight line. The reach stays as it is, deliberately.
+  // The floor and its history live at FO_FLOOR. Unchanged here: the crews
+  // skeptic KILLED the companion change (a cone-taper on the shield reach)
+  // because its motivating scenario was geometrically impossible, and the
+  // constant cylinder is the accidental compensation that keeps 11.5-unit lift
+  // pylons fading when they truly cross the sight line. The reach stays as it
+  // is, deliberately.
   for (const e of _foFading) {
     for (const m of e.fadeTo!) {
-      setMeshFade(m, Math.max(0.62, ((m.userData.fade as number) ?? 1) - step));
+      setMeshFade(m, Math.max(FO_FLOOR, ((m.userData.fade as number) ?? 1) - step));
     }
   }
   for (const e of _foPrev) {
