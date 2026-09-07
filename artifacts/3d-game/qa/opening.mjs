@@ -69,7 +69,7 @@ const BARS = {
   // this bar one that any game with acceleration would fail.
   A8: { what: 'descent frames that ignored a held touch (after first movement)', want: 0, unit: 'frames', cmp: (v) => v === 0 },
   A9: { what: 'first +1 floater, as a fraction of the descent', want: '0.30-0.60', unit: '', cmp: (v) => v >= 0.3 && v <= 0.6 },
-  A11:{ what: 'goal card visible for (unroll + hold + roll-up)', want: '450-750', unit: 'ms', cmp: (v) => v >= 450 && v <= 750 },
+  A11:{ what: 'goal card animation duration (unroll + hold + roll-up)', want: '450-750', unit: 'ms', cmp: (v) => v >= 450 && v <= 750 },
   A12:{ what: 'goal card appears after the world is up, on a timer', want: '0.3-0.9', unit: 's', cmp: (v) => v >= 0.3 && v <= 0.9 },
   A13:{ what: 'goal card frames that could swallow input (pointer-events)', want: 0, unit: 'frames', cmp: (v) => v === 0 },
   A21:{ what: 'descent length difference, early tap vs late tap', want: '<= 100', unit: 'ms', cmp: (v) => v <= 100 },
@@ -142,8 +142,21 @@ const SAMPLER = () => {
     const tcEl = document.getElementById('titlecard');
     if (!tcEl) return;
     cardWired = true;
+    // THE DURATION COMES FROM THE ANIMATION, NOT FROM THE EVENT TIMESTAMPS. At about
+    // one frame a second the browser dispatches animation events on frames, so the
+    // quantisation (~1000 ms) is LARGER than the 600 ms being measured: two runs of
+    // the same build read 0.3 ms (the whole animation fell between two frames, so
+    // start and end arrived together) and 2158 ms (a frame landed mid-animation and
+    // end was reported a frame late). Neither is a duration. The Animation object's
+    // own computed timing is what the browser will actually play, at any frame rate.
+    const dur = () => {
+      try {
+        const a = tcEl.getAnimations().find((x) => x.animationName === 'goalRoll');
+        return a ? Number(a.effect.getComputedTiming().duration) : 0;
+      } catch { return 0; }
+    };
     const stamp = (k) => ({ k, t: performance.now() - w.__op.t0,
-      g: w.__matchState ? w.__matchState().tClock : 0,
+      g: w.__matchState ? w.__matchState().tClock : 0, dur: dur(),
       blocks: getComputedStyle(tcEl).pointerEvents !== 'none' });
     // FILTER BY ANIMATION AND BY TARGET. Animation events BUBBLE, and the card runs
     // two: `goalRoll` on the ribbon and `goalInk` on its three lines. Catching the
@@ -371,7 +384,7 @@ function analyse(d) {
   const cEv = d.card || [];
   const cStart = cEv.find((c) => c.k === 'start'), cEnd = cEv.find((c) => c.k === 'end');
   const cShow = cEv.find((c) => c.k === 'show');
-  const cardMs = cStart && cEnd ? cEnd.t - cStart.t : 0;
+  const cardMs = cStart?.dur || cShow?.dur || 0;
   const cardAt = cShow ? cShow.g - (rows[0]?.tc ?? cShow.g) : -1;
   const cardBlocks = cEv.filter((c) => c.blocks).length;
   const f0w = d.floaters[0]?.t ?? null;
