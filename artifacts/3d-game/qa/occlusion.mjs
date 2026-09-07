@@ -44,7 +44,20 @@ import { mkdirSync } from 'node:fs';
 
 const WORLD = process.argv[2] || 'maple';
 const PORT = process.argv[3] || '4177';
-const SECONDS = Number(process.argv[4] || 40);
+// ── THE DRIVE IS OPT-IN NOW, AND IT DEFAULTS OFF ───────────────────────────
+// O2 samples ordinary play to ask whether the game fades anything when the hero
+// is genuinely blocked. It did its job: it found the reachability defect, took
+// 52.6% -> 91.0%, and that fix is committed. What it costs is the problem —
+// thirteen raycasts and a walk over 5,600 edibles per sampled frame, under a
+// software renderer, measured at ELEVEN WALL-SECONDS PER FRAME: 23 audited
+// frames in thirteen minutes. Three runs died on that before the probe could
+// say so, because the wait reported only that the page had gone.
+//
+// O3 needs one moment, not four seconds of play, and the walk that puts the
+// hero behind a chosen occluder already arrives in about two game-seconds. So
+// the default run is walk-then-measure, and the drive comes back with an
+// explicit seconds argument when someone wants O2 again.
+const SECONDS = Number(process.argv[4] || 0);
 const OUT = 'qa-out/occ';
 mkdirSync(OUT, { recursive: true });
 
@@ -213,6 +226,7 @@ await p.evaluate((seconds) => {
     const ms = window.__matchState(), vs = window.__voidState();
     if (audit.t0 === null) audit.t0 = ms.t;
     if (ms.t - audit.t0 > seconds) { audit.done = true; return; }
+    if (seconds <= 0) { audit.done = true; return; }
 
     // drive at the nearest edible, exactly as qa/_worldshots.mjs does
     let best = null, bd = 1e9;
@@ -227,6 +241,7 @@ await p.evaluate((seconds) => {
 
     audit.ticks++;
     if (audit.ticks % 3) { requestAnimationFrame(tick); return; }
+    if (seconds <= 0) { audit.done = true; return; }   // O3-only run: no audit at all
     const share = window.__blockedNow();
     const fading = window.__fadingNow();
     audit.frames++; audit.sum += share;
@@ -472,6 +487,7 @@ await b.close();
 const visible = shot.mask ? 100 * shot.seen / shot.mask : 100;
 
 const got = { O2: drive.blocked ? 100 * drive.blockedFading / drive.blocked : 100, O3: visible };
+if (SECONDS <= 0) delete BARS.O2;   // not sampled, so not scored — silence is not a pass
 console.log(`\nOCCLUSION — ${WORLD} @ ${PORT}, ${SECONDS} game-seconds, ${drive.frames} frames`);
 console.log(`  edibles ${armed.n}`);
 console.log(`    armed on the object fadeOccluders reads: ${armed.onTop}`
