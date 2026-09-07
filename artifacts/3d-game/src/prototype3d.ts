@@ -5870,8 +5870,22 @@ const DESCENT_START = DESCENT_END * DESCENT_SCALE;
 //
 // Fourteen it is. The four-slot original and the ten-slot revision failed the
 // same way for the same reason; only the arithmetic behind them was wrong.
-const FIRST_BITE_RING = 5;
+// THE RADIUS IS DERIVED PER WORLD, because the props are not the same size
+// everywhere. A ring of N slots is only a guarantee if a drag between two of them
+// still passes within `R + r*0.7` of one, and r is whatever that world has lying
+// near its spawn: maple's smallest is 0.55 (threshold 1.285), skylark's is 0.32
+// (1.124). At a fixed radius of 5 the worst-case miss is 1.113 — which clears
+// maple by 0.172 and skylark by 0.011. Arithmetically true, practically a coin
+// flip, and skylark was the one world still failing.
+//
+// So the ring is sized from the smallest prop actually available, with 15% of
+// margin, and clamped so the bite still lands inside the descent: closer than 3.5
+// and the first point arrives before the player has really begun, further than
+// 5.5 and it misses the window entirely.
 const FIRST_BITE_N = 14;
+const FIRST_BITE_MARGIN = 0.85;
+const FIRST_BITE_MIN = 3.5;
+const FIRST_BITE_MAX = 5.5;
 // THE GOAL CARD is on its own timer and answers to nothing else. Theirs unrolls
 // about half a second after the first gameplay frame, holds, and rolls away —
 // before any input, and it never waits for one. holeio.recon.md 11.5.
@@ -6075,6 +6089,12 @@ function ensureFirstBite(): void {
   // from whatever the world already had there and every piece moves the shortest
   // way it can.
   if (!near.length) return;   // a world with nothing edible at spawn is a world bug, not ours to paper over
+  // Size the ring to the smallest prop in the pool: that is the one a drag is most
+  // likely to slip past, so it sets the geometry for all of them.
+  const rMin = near.reduce((m, { e }) => Math.min(m, e.radius), Infinity);
+  const reach = voidling.radius + rMin * 0.7;
+  const ring = Math.max(FIRST_BITE_MIN, Math.min(FIRST_BITE_MAX,
+    reach * FIRST_BITE_MARGIN / Math.sin(Math.PI / FIRST_BITE_N)));
   // ASSIGN PER SLOT, NOT PER PROP. The first version walked the candidates and sent
   // each to the slot nearest its own bearing, skipping any prop whose slot was
   // already taken — so when several props shared a bearing the ring came out with
@@ -6088,7 +6108,7 @@ function ensureFirstBite(): void {
   const used = new Set<Edible>();
   for (let slot = 0; slot < FIRST_BITE_N; slot++) {
     const a = (slot / FIRST_BITE_N) * Math.PI * 2;
-    const x = sx + Math.cos(a) * FIRST_BITE_RING, z = sz + Math.sin(a) * FIRST_BITE_RING;
+    const x = sx + Math.cos(a) * ring, z = sz + Math.sin(a) * ring;
     if (!insideIsland3(x, z)) continue;   // never push a prop off the island
     let best: Edible | null = null, bd = Infinity;
     for (const { e } of near) {
@@ -6106,7 +6126,7 @@ function ensureFirstBite(): void {
   // qa/opening.mjs reads this when the first "+1" does not arrive.
   _dbg.__firstBite = { spawn: { x: sx, z: sz }, authored: { x: island.spawn.x, z: island.spawn.z },
     drift: Math.hypot(sx - island.spawn.x, sz - island.spawn.z),
-    ring: FIRST_BITE_RING, maxR, candidates: near.length, placed };
+    ring, rMin, reach, maxR, candidates: near.length, placed };
 }
 
 // THE MATCH BEGINS WHEN THE PLAYER DOES. Called from the first input of an armed
