@@ -6050,8 +6050,14 @@ function beginMatch(solo = false) {
 // spring back to where it used to live the first time it was nudged.
 function ensureFirstBite(): void {
   const placed: { slot: number; x: number; z: number; r: number }[] = [];
-  const maxR = 0.9 * EAT_RATIO;   // the void's radius at the fixed spawn
-  const sx = island.spawn.x, sz = island.spawn.z;
+  const maxR = voidling.radius * EAT_RATIO;
+  // CENTRE ON THE VOID, NOT ON island.spawn. resetMatch() is what puts the void on
+  // the authored spawn, and it only runs when a match was already live — so on the
+  // world-switch RELOAD path it never runs and the void sits wherever boot left it,
+  // while the ring was being built somewhere else entirely. Maple, which does not
+  // reload, had its first bite at 0.42 of the descent; the reload worlds at
+  // 0.60-0.71, because the void had to cross to a ring that was not around it.
+  const sx = voidState.x, sz = voidState.z;
   const near = edibles
     .filter((e) => !e.eaten && e.mesh.visible && e.radius <= maxR
       && !e.mesh.userData.departed && !e.mesh.userData.tethered)
@@ -6091,8 +6097,9 @@ function ensureFirstBite(): void {
   }
   // QA: the ring is a rule, so it has to be inspectable rather than argued about.
   // qa/opening.mjs reads this when the first "+1" does not arrive.
-  _dbg.__firstBite = { spawn: { x: sx, z: sz }, ring: FIRST_BITE_RING, maxR,
-    candidates: near.length, placed };
+  _dbg.__firstBite = { spawn: { x: sx, z: sz }, authored: { x: island.spawn.x, z: island.spawn.z },
+    drift: Math.hypot(sx - island.spawn.x, sz - island.spawn.z),
+    ring: FIRST_BITE_RING, maxR, candidates: near.length, placed };
 }
 
 // THE MATCH BEGINS WHEN THE PLAYER DOES. Called from the first input of an armed
