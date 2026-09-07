@@ -5854,17 +5854,24 @@ const DESCENT_START = DESCENT_END * DESCENT_SCALE;
 // descent, inside the 30-60% the probe asks for with room for a child who drags
 // late or diagonally.
 //
-// HOW MANY SLOTS IS GEOMETRY, NOT TASTE. A drag that runs between two slots
-// misses both by ring*sin(pi/N), and a bite needs the void's radius plus the
-// prop's — about 1.6 units at spawn. Four slots leave a 3.54-unit gap, and the
-// isometric camera makes the diagonals the NATURAL drag directions: with the
-// camera at +x,+z, dragging toward the top of the screen is the -x,-z diagonal,
-// which is exactly the middle of a four-slot gap. The first build of this ring
-// placed all four correctly and the void still threaded between them for 17.4
-// units without eating anything. Eight slots leave 1.91 and still thread; ten
-// leave 1.55 and cannot.
+// HOW MANY SLOTS IS GEOMETRY, NOT TASTE. A drag between two slots misses both by
+// ring*sin(pi/N), and the bite test is `d < R + r*0.7` — with R = 0.9 at spawn and
+// the small props that qualify running r = 0.55-0.76, that threshold is 1.285 to
+// 1.390 units, NOT the 1.6 this comment claimed for two revisions. On the wrong
+// figure ten slots looked sufficient at 1.545; against the real one they were
+// never enough, and the evidence was sitting in the logs: maple's first bite
+// landed at 0.42 of the descent while pirate, gameday and skylark came in at
+// 0.60-0.71, all with a full ten-slot ring and the void travelling 18-20 units.
+// Maple was passing because its drag happened to line up near a slot.
+//
+//   10 slots -> 1.545 miss   misses a 0.55 prop
+//   12 slots -> 1.294 miss   misses a 0.55 prop
+//   14 slots -> 1.113 miss   caught, with 0.17 of margin
+//
+// Fourteen it is. The four-slot original and the ten-slot revision failed the
+// same way for the same reason; only the arithmetic behind them was wrong.
 const FIRST_BITE_RING = 5;
-const FIRST_BITE_N = 10;
+const FIRST_BITE_N = 14;
 // THE GOAL CARD is on its own timer and answers to nothing else. Theirs unrolls
 // about half a second after the first gameplay frame, holds, and rolls away —
 // before any input, and it never waits for one. holeio.recon.md 11.5.
