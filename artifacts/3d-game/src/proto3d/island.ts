@@ -4183,10 +4183,16 @@ installPropShader(PROP_SMOOTH_MAT);
 // hook would inherit the previous occluder's 0.3 and disappear — the bug this
 // whole feature exists to prevent, applied to the entire island. One shared
 // function object, no per-frame allocation, and userData.fade defaults to 1.
+// …and it now writes a CONSTANT 1. The dissolve moved to alpha (see
+// setDissolve): if this still drove uFade from userData.fade the prop would be
+// dithered AND blended, which is the halftone back with a ghost behind it. The
+// hook stays rather than going, for the reason it was written — uFade lives on
+// a shared program and keeps whatever the last draw wrote, so something has to
+// keep saying 1 out loud.
 const _fadeHook = function (this: THREE.Object3D) {
   const m = (this as THREE.Mesh).material as { userData?: { shader?: { uniforms: Record<string, { value: number }> } } } | undefined;
   const sh = m?.userData?.shader;
-  if (sh) sh.uniforms.uFade.value = (this.userData.fade as number | undefined) ?? 1;
+  if (sh) sh.uniforms.uFade.value = 1;
 };
 
 // ── AND A FADING PROP NEEDS A MATERIAL OF ITS OWN ──────────────────────────
@@ -4254,6 +4260,7 @@ export function setMeshFade(o: THREE.Object3D, fade: number): void {
   const base = (mesh.userData.fadeBase as THREE.Material | undefined) ?? mesh.material;
   const pool = _fadePools.get(base);
   if (fade >= 0.999) {                                // solid again: give the slot back
+    setDissolve(mesh, 1);
     if (mesh.userData.fadeBase) {
       const slot = pool?.find((q) => q.owner === mesh);
       if (slot) slot.owner = null;
@@ -4263,14 +4270,13 @@ export function setMeshFade(o: THREE.Object3D, fade: number): void {
     }
     return;
   }
-  if (mesh.userData.fadeBase) { fadeStats.held++; return; }   // already holds one
   // A GATED PROP ALREADY OWNS ITS MATERIAL. The too-big-to-eat tint clones one
   // per mesh so a single prop can grey without taking the island with it, which
-  // is exactly what a slot would have bought: a private uniform and an ID that
-  // differs from its neighbours'. Taking a slot here would also throw the grey
-  // away. Not a failure — the common case, since anything big enough to hide
-  // the hero is big enough to be gated.
-  if (mesh.material === mesh.userData.gateMat) { fadeStats.private++; return; }
+  // is exactly what a slot would have bought. Taking a slot here would also
+  // throw the grey away. Not a failure — the common case, since anything big
+  // enough to hide the hero is big enough to be gated.
+  if (mesh.material === mesh.userData.gateMat) { fadeStats.private++; setDissolve(mesh, fade); return; }
+  if (mesh.userData.fadeBase) { fadeStats.held++; setDissolve(mesh, fade); return; }
   // only the two materials that carry the fade shader can dissolve at all
   if (base !== PROP_SHARED_MAT && base !== PROP_SMOOTH_MAT) { fadeStats.notBase++; return; }
   const slot = fadePool(base).find((q) => q.owner === null);
@@ -4279,6 +4285,40 @@ export function setMeshFade(o: THREE.Object3D, fade: number): void {
   mesh.userData.fadeBase = base;
   mesh.material = slot.mat;
   fadeStats.swapped++;
+  setDissolve(mesh, fade);
+}
+
+// ── AND IT DISSOLVES BY ALPHA, NOT BY DITHER ───────────────────────────────
+// The Bayer discard is still in the prop shader and is no longer driven: uFade
+// stays at 1 and nothing is thrown away. It went because round 3 was RIGHT
+// about it, and I had argued it was only right by accident.
+//
+// Round 3 measured 0.28 reading as "a black-and-red halftone print" on POWDER's
+// snow, and I put that down to the shared-uniform leak dissolving the whole
+// field at once. Fixing the leak, opening the floor to 0.28 and looking at
+// POWDER again: the hero reads beautifully — 70.8% of him through a building
+// standing right in front of him — and the building is a coarse grey
+// crosshatch on white snow. A regular 4x4 mask at low density on a large pale
+// surface is a screen door however few props are wearing it. The leak made it
+// worse; it did not make it.
+//
+// Dithering was the right call when it was made, for two reasons that have both
+// since gone: it needs no per-object material, and it needs no sorting. Props
+// now own their materials (see the pool and the gate tint above), and an
+// occluder is drawn between the opaques and nothing else, so ordinary alpha is
+// available — which is what every third-person game actually uses to get a
+// camera occluder out of the way. depthWrite goes off with it, or the ghost
+// keeps writing the depth that hides the hero behind it.
+//
+// ONLY EVER CALLED ON A MATERIAL THE MESH OWNS. Setting opacity on
+// PROP_SHARED_MAT would ghost the entire island in one frame.
+function setDissolve(mesh: THREE.Mesh, fade: number): void {
+  const m = mesh.material as THREE.Material;
+  if (!m || Array.isArray(m)) return;
+  const want = fade < 0.999;
+  if (m.transparent !== want) { m.transparent = want; m.needsUpdate = true; }
+  m.opacity = want ? fade : 1;
+  m.depthWrite = !want;
 }
 // Built at module init, not on first use. Material.clone() puts userData through
 // JSON.parse(JSON.stringify(...)), and once a prop material has been drawn its

@@ -98,7 +98,7 @@ await p.evaluate((seconds) => {
   const T = window.__THREE, cam = window.__cam;
   const ray = new T.Raycaster();
   const audit = { frames: 0, worst: 0, sum: 0, blocked: 0, blockedFading: 0,
-    everFaded: 0, done: false, t0: null, hold: false };
+    everFaded: 0, done: false, t0: null, hold: false, misses: [] };
   window.__occ = audit;
 
   // 13 rays: the centre, four at 45% of his radius, eight at 85%. The disc is
@@ -149,6 +149,36 @@ await p.evaluate((seconds) => {
     return 100 * blocked / RING.length;
   };
 
+  // ── WHO BLOCKS HIM WHEN NOTHING IS FADING ─────────────────────────────────
+  // O2's gap is frames where the triangles say he is covered and the game is
+  // doing nothing about it. Naming the culprit is the whole diagnosis, and the
+  // candidates look nothing alike: a prop armed nowhere (life.ts builds its
+  // cars and people from plain materials), a prop the cylinder misses because
+  // it measures from an origin at the foot of something tall, or scenery that
+  // is not an edible at all and so was never in the search.
+  window.__whoBlocks = () => {
+    const vs = window.__voidState(), vg = window.__voidGroup();
+    const c = new T.Vector3(vs.x, vg.position.y, vs.z);
+    const len = cam.position.distanceTo(c);
+    const d = new T.Vector3().subVectors(c, cam.position).multiplyScalar(1 / len);
+    const rc = new T.Raycaster(cam.position.clone(), d, 0.1, len - 0.05);
+    const all = [];
+    scene.traverse((q) => {
+      if (!q.isMesh || !q.visible || !q.geometry || !q.material) return;
+      let a = q, shown = true;
+      while (a) { if (!a.visible) { shown = false; break; } a = a.parent; }
+      if (shown && !vg.getObjectById(q.id)) all.push(q);
+    });
+    const h = rc.intersectObjects(all, false)[0];
+    if (!h) return null;
+    let e = null, anc = h.object;
+    while (anc && !e) { e = window.__edibles.find((x) => x.mesh === anc) || null; anc = anc.parent; }
+    return { mat: h.object.material ? h.object.material.type : 'none',
+      armed: h.object.userData.fade !== undefined,
+      edible: !!e, r: e ? e.radius : null, reachable: !!(e && e.fadeTo),
+      dist: +h.distance.toFixed(1), camToHero: +len.toFixed(1) };
+  };
+
   // is the game fading anything at all, right now
   window.__fadingNow = () => {
     let n = 0;
@@ -184,7 +214,14 @@ await p.evaluate((seconds) => {
     audit.frames++; audit.sum += share;
     if (share > audit.worst) audit.worst = share;
     if (fading) audit.everFaded++;
-    if (share > 0) { audit.blocked++; if (fading) audit.blockedFading++; }
+    if (share > 0) {
+      audit.blocked++;
+      if (fading) audit.blockedFading++;
+      else if (audit.misses.length < 4) {
+        const who = window.__whoBlocks();
+        if (who) audit.misses.push(who);
+      }
+    }
     requestAnimationFrame(tick);
   };
   window.__RR = window.__renderer.render.bind(window.__renderer);
@@ -197,7 +234,7 @@ const drive = await p.evaluate(() => ({
   frames: window.__occ.frames, worst: window.__occ.worst,
   mean: window.__occ.sum / Math.max(1, window.__occ.frames),
   blocked: window.__occ.blocked, blockedFading: window.__occ.blockedFading,
-  everFaded: window.__occ.everFaded,
+  everFaded: window.__occ.everFaded, misses: window.__occ.misses,
 }));
 
 // ── O3 NEEDS A MOMENT IT CAN REPRODUCE ─────────────────────────────────────
@@ -373,14 +410,27 @@ const shot = await p.evaluate(() => {
   const DIFF = 14;
   const dif = (X, Y, i) => Math.abs(X[i] - Y[i]) > DIFF
     || Math.abs(X[i + 1] - Y[i + 1]) > DIFF || Math.abs(X[i + 2] - Y[i + 2]) > DIFF;
-  let mask = 0, seen = 0, ifGone = 0, ifZero = 0;
+  // ── HOW MUCH OF HIM, NOT HOW MANY PIXELS MENTION HIM ──────────────────────
+  // Counting pixels where A differs from C answers a dither honestly — each of
+  // its pixels is either all hero or all prop — and flatters a blend, where
+  // every pixel differs a little and the count reads 100% at any opacity. So
+  // O3 is now his CONTRIBUTION: how far each pixel moves when he is hidden,
+  // against how far that pixel would move if nothing were in front of him at
+  // all. A dither scores exactly as before (6 pixels in 16 at full strength,
+  // the rest at none, is 0.375); a 28% ghost scores the 0.72 it actually lets
+  // through. The two mechanisms become comparable, which they were not.
+  const lum = (X, i) => 0.2126 * X[i] + 0.7152 * X[i + 1] + 0.0722 * X[i + 2];
+  let mask = 0, seenSum = 0, ifGone = 0, ifZero = 0;
   for (let i = 0; i < A.length; i += 4) {
     if (!dif(B, D, i)) continue;          // not the hero
     mask++;
-    if (dif(A, C, i)) seen++;             // and he reached the screen here
+    const full = Math.abs(lum(B, i) - lum(D, i));      // him against the bare ground
+    const got = Math.abs(lum(A, i) - lum(C, i));       // him against what is in front
+    if (full > 2) seenSum += Math.min(1, got / full);
     if (E && dif(E, A, i)) ifGone++;      // and here, only once the occluder was off
     if (F && dif(F, A, i)) ifZero++;      // and here, only once it was faded to nothing
   }
+  const seen = seenSum;
   for (const q of why) delete q.obj;
   return { blocked, fadingNow, mask, seen, ifGone, ifZero, didExperiment: !!E, w, h, why,
     fadeStats: window.__fadeStats ? { ...window.__fadeStats() } : null,
@@ -401,8 +451,10 @@ console.log(`    armed on the object fadeOccluders reads: ${armed.onTop}`
 console.log(`  raycast: hero blocked in ${drive.blocked}/${drive.frames} frames`
   + `   worst ${drive.worst.toFixed(0)}%   mean ${drive.mean.toFixed(1)}%`);
 console.log(`  the game was fading something in ${drive.everFaded}/${drive.frames} frames`);
+for (const m of drive.misses) console.log(`    blocked with nothing fading, by: ${JSON.stringify(m)}`);
 console.log(`  the shot: hero ${shot.blocked.toFixed(0)}% blocked by raycast, `
-  + `${shot.fadingNow} props fading, ${shot.mask} px of silhouette, ${shot.seen} px of him seen`);
+  + `${shot.fadingNow} props fading, ${shot.mask} px of silhouette, `
+  + `${shot.seen.toFixed(0)} px worth of him coming through`);
 console.log(`  walked to the chosen occluder: ${walk.ok ? 'arrived' : 'did NOT arrive'}`
   + ` (${JSON.stringify(walk)})`);
 for (const q of shot.why) console.log(`    in the way at ${q.dist}: ${q.name} ${q.mat}`

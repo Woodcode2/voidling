@@ -209,30 +209,48 @@ how often the raycast finds him blocked at all, the worst and mean blockage over
 the drive, the material state of every occluder in the way at the shot, and the
 branch counts inside `setMeshFade`.
 
-## 5. 0.62 IS NOW A CHOICE, NOT A CONSTANT
+## 5. THE FLOOR OPENED, AND THEN THE DITHER HAD TO GO
 
-The gap from 37.5% to 60% is the fade constant, and the argument that fixed it
-at 0.62 no longer applies. Round 3 rejected 0.28 because on POWDER's snow a
-5-in-16 keep-mask read as a black-and-red halftone print — and that is what it
-looked like, because **every prop sharing the material dissolved together**. A
-whole snowfield flashing is a different thing from one building opening up.
+### 5.1 0.62 → 0.28, and the correction that came with it
 
-Now that an occluder owns its material, the constant can be per-prop, and the
-sensible shape is graded: a prop grazing the hero's edge stays a solid ghost at
-0.62; a prop dead in his sight line opens toward 0.30, which discards eleven
-steps of sixteen and leaves 68.75% of him visible. The signal is already in
-hand — `fadeOccluders` computes the perpendicular distance from the
-camera-to-hero axis, and how centred that is against the prop's own reach is
-exactly "how much of him is this covering".
+The dither keeps every Bayer step below the fade and discards the rest, so the
+floor is a fraction, not a brightness: 0.62 leaves exactly 6/16 of a covered
+hero showing, and O3 measured 37.5% to three figures. 0.28 discards eleven of
+sixteen. Measured: **MAPLE 68.8%, POWDER 70.8%** — both past the 60% bar, and
+Maple landed on the predicted 68.75% again.
 
-If a graded floor is not enough, the fallback is not a smaller number: it is to
-draw him where he is hidden — an upper-hemisphere overlay in his own skin colour
-with `depthFunc: GreaterDepth`, which paints only the pixels where something
-nearer is already in the depth buffer. One extra low-poly draw, the trick every
-third-person game uses, and it keeps him a creature rather than turning the
-world into a flicker. The hemisphere matters: a full sphere would draw a disc of
-skin colour at ground level wherever the ground is in front of his sunken half,
-which is the ring a previous round already rejected by measurement.
+I had argued that round 3's rejection of 0.28 was about the shared-uniform leak
+rather than the dither, so the number it killed was fair game. **I was wrong,
+and looking at POWDER is what said so.** The hero reads beautifully; the lodge
+in front of him is a coarse grey crosshatch on white snow. A regular 4×4 mask at
+low density on a large pale surface is a screen door however few props are
+wearing it. The leak made it worse across the whole field; it did not make it.
+
+Round 3 caught this by looking, and no bar in this probe would have. That is the
+argument for keeping a human frame in the loop next to every number.
+
+### 5.2 So the dissolve is alpha now
+
+Dithering was the right call when it was made, for two reasons that have both
+since gone: it needs no per-object material, and it needs no sorting. Props now
+own their materials (§2.3), and an occluder is drawn between the opaques and
+nothing else — so ordinary alpha is available, which is what third-person games
+actually use to get a camera occluder out of the way. `depthWrite` goes off with
+it, or the ghost keeps writing the depth that hides the hero behind it. The
+Bayer discard stays in the prop shader, undriven: `uFade` is pinned at 1 by the
+hook, which exists precisely because a uniform on a shared program keeps
+whatever the last draw wrote.
+
+### 5.3 And O3 had to change with it
+
+Counting pixels where the frame differs with and without the hero answers a
+dither honestly — each of its pixels is all hero or all prop — and flatters a
+blend, where every pixel differs a little and the count reads 100% at any
+opacity. O3 now measures his **contribution**: how far each pixel moves when he
+is hidden, against how far it would move with nothing in front of him at all. A
+dither scores exactly what it scored before (6 pixels in 16 at full strength is
+0.375); a 28% ghost scores the 0.72 it actually lets through. The two mechanisms
+became comparable, which they were not.
 
 ## 6. WHAT IS STILL OPEN
 
