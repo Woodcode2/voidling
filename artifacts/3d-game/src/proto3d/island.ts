@@ -4183,10 +4183,36 @@ installPropShader(PROP_SMOOTH_MAT);
 // hook would inherit the previous occluder's 0.3 and disappear — the bug this
 // whole feature exists to prevent, applied to the entire island. One shared
 // function object, no per-frame allocation, and userData.fade defaults to 1.
+// ── AND IT PINS uFade AT 1. THE DITHER IS OFF. ─────────────────────────────
+// Driven from userData.fade, this paints the Bayer mask across the WHOLE
+// SCENE, not across the one prop standing in front of the hero. Measured on a
+// rendered frame: on plain ground the 4x4 lattice spreads 116 levels (55 vs
+// 171) where a flat surface should spread none, and the trees and the building
+// spread 67 and 107. The owner's words on seeing it: "why is our void in that
+// picture not high definition... a serious step back". It is, and it was mine.
+//
+// The mechanism is the one this file already half-documents. uFade lives on a
+// material shared by hundreds of props, and three.js uploads a material's
+// uniforms only when the material ID changes between draws — so one dissolving
+// prop's 0.62 is what the entire batch draws with. Round 3 saw this on POWDER's
+// snow and recorded it as a halftone print; I read that as an argument about
+// the CONSTANT, opened it to 0.28, was corrected by looking at POWDER, reverted
+// to 0.62, and reintroduced the same leak because the leak was never about the
+// constant at all.
+//
+// Per-prop private materials (the pool, and the gate tint's clones) fix it for
+// the props that get one, and "the props that get one" is not all of them —
+// which is why the mask is still on the ground. Rather than chase that, the
+// dissolve stops here: the hero is drawn OVER whatever hides him (void3d's
+// occluded silhouette), which needs no per-object uniform, cannot leak, and
+// leaves the world solid. The occlusion fade's machinery stays wired and
+// inert — fadeOccluders still tracks who is in the way, setMeshFade still
+// resolves private materials — so the next attempt starts from a working
+// selection rather than from nothing.
 const _fadeHook = function (this: THREE.Object3D) {
   const m = (this as THREE.Mesh).material as { userData?: { shader?: { uniforms: Record<string, { value: number }> } } } | undefined;
   const sh = m?.userData?.shader;
-  if (sh) sh.uniforms.uFade.value = (this.userData.fade as number | undefined) ?? 1;
+  if (sh) sh.uniforms.uFade.value = 1;
 };
 
 // ── AND A FADING PROP NEEDS A MATERIAL OF ITS OWN ──────────────────────────
