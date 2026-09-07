@@ -61,10 +61,25 @@ export const WORLD = {
   // park reading 67% one flat colour. A district you cannot see the edge of is
   // not a district. Re-spaced so neighbours that actually meet on the map are
   // at least ~1.35:1 apart, keeping the hue families intact.
-  meadow: 0x74c352,      // base grass
-  park: 0x9ae878,        // park grass — was 0x86d766, 1.23 against meadow
-  forest: 0x479046,      // forest ground — was 0x67b25c, 1.19 against meadow
-  sand: 0xf6e3a4,        // beach sand
+  // ── THE STAGE IS QUIET SO THE ACTORS ARE LOUD ─────────────────────────────
+  // Round 7, stream D. HOLE.IO's pop is not brighter objects, it is a GAP: their
+  // city ground sits at chroma 0.10 with 52% of the playfield below 0.12, and the
+  // props on it run 57-100% saturation. Ours measured 26% below 0.12 with the
+  // grass itself at chroma 0.44 — a ground competing with everything standing on
+  // it. (holeio.recon.md §6.1; ours in docs/crews/round-7/recon/self/.)
+  //
+  // Desaturated toward the grey of the SAME LUMINANCE, not toward mid-grey. That
+  // distinction is the whole reason the ramp above survives: the render audit
+  // re-spaced these so neighbours that meet on the map are >= ~1.35:1 apart, and
+  // a naive desaturation moves luminance and flattens exactly those edges.
+  // Measured before -> after: chroma falls ~62%, luminance moves < 1%, and every
+  // boundary holds — meadow/forest 1.81 -> 1.81, park/forest 2.65 -> 2.68,
+  // sand/meadow 1.70 -> 1.72. They are still plainly green; they have stopped
+  // shouting over the props.
+  meadow: 0x99b78c,      // base grass — was 0x74c352, chroma 0.443 -> 0.169
+  park: 0xbedcb1,        // park grass — was 0x9ae878, chroma 0.439 -> 0.169
+  forest: 0x6b866a,      // forest ground — was 0x479046, chroma 0.290 -> 0.110
+  sand: 0xebe3cb,        // beach sand — was 0xf6e3a4, chroma 0.322 -> 0.125
   pavement: 0xbcc4d4,    // plaza / sidewalk — was 0xe4e4ec, 1.01 against sand
   road: 0x6b7292,        // asphalt (cool lavender-gray)
   roadLine: 0xdce3ee,    // lane paint
