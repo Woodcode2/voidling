@@ -2140,32 +2140,40 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     campus: 0x8fd06a,    // athletic turf
     strip: 0xa8a294,     // highway gravel and dust (was 1.04 against the fairground above it)
     // ── PIRATE BAY ground: sun-bleached sand, teak decking, jungle green
-    port: 0xa8814f,      // wet dock timber
-    resort: 0xf7ecd0,    // raked resort sand — the bay's three sands measured
-                         // 1.05 and 1.12 apart, so the resort, the cove and the
-    party: 0x6a4a7a,     // the dance floor slab (lit up in the bake)
-    market: 0xcfa462,    // packed market ground — market were one beige field
-    jungle: 0x2f7a4a,    // deep tropical canopy floor
-    cove: 0xe0c78e,      // pale cove sand
+    // ── PIRATE BAY ground: null — the bay paints its own regions from CSS
+    // literals in the pirate bake above (pool decks, the dance floor's
+    // checkerboard, raked sand), and this table is read ONLY under
+    // `if (WORLD_ID === 'maple')`. The names and the intent are kept in the
+    // bake beside the code that draws them.
+    port: null, resort: null, party: null, market: null, jungle: null, cove: null,
     // ── GAME DAY ground. An autumn Saturday: warm asphalt, worn turf and
     // fallen leaves, kept a clear step apart from each other in value so the
     // districts read as separate surfaces from the play camera rather than one
     // beige field — which is the mistake the three pirate sands made above.
-    bowl: 0x3f8f4e,      // the playing surface, deeper than any campus turf
-    gate: 0xc4beb2,      // swept concourse concrete
-    // SUN-BLEACHED, NOT FRESH. A framebuffer sample put Game Day's mean scene
-    // luminance at 0.357 against Maple's 0.626 — 43% darker than the flagship
-    // world, in a game for six-year-olds — and it was NOT the light: the level
-    // measured 0.357 under Maple's own midday rig too. It is the albedo. The
-    // lot is over half the frame and it was fresh-laid tarmac; a car park that
-    // has been baking since August is a pale grey, which is both truer and
-    // most of a stop brighter.
-    lot: 0x918e97,       // parking asphalt, cool against everything around it
-    rvpark: 0x9d978a,    // compacted gravel hardstanding
-    greek: 0x8fc76a,     // frat lawn, worn but green
-    quad: 0x76b85a,      // the old campus quad, greener and better kept
-    practice: 0x5fa356,  // practice turf, between the bowl and the quad
-    treeline: 0x9a6a3a,  // leaf litter at the rim
+    // ── GAME DAY ground: null — gameday bakes its own regions from GD_FLOOR
+    // (see the `if (WORLD_ID === 'gameday')` block above), and this table is
+    // read ONLY under `if (WORLD_ID === 'maple')` a hundred lines below. Same
+    // reason POWDER's six are null.
+    //
+    // THEY WERE NOT NULL, AND WHAT SAT HERE WAS WRONG IN BOTH DIRECTIONS.
+    // A round measured Game Day at mean luminance 0.357 against Maple's 0.626,
+    // correctly diagnosed the tarmac albedo, and lifted `lot` from 0x6e6b74 to
+    // 0x918e97 — HERE, in the copy that paints nothing. The level went on
+    // rendering 0x6e6b74 and still measures a playfield value median of 0.33.
+    // A measured, reasoned, committed art fix that never reached a pixel.
+    //
+    // And the comments rotted the other way too. `bowl: 0x3f8f4e // the playing
+    // surface` describes a mesh, not this ground: makeStadium (tailgate.ts:211)
+    // builds the field itself as a 22x12 box in TURF 0x3f8f4e with end zones,
+    // yard lines and a centre circle, while GD_FLOOR.bowl is the PRECINCT the
+    // stadium stands in and is properly the same concrete as the concourse.
+    // island.ts:1965 already records that confusion costing a green striped
+    // ellipse 152 units wide around a 57-unit stadium. I read this line as
+    // ground truth anyway and reported the game as shipping a grey football
+    // pitch. It does not. That is what a dead table with live-looking comments
+    // does, and it is why these are null rather than merely stale.
+    bowl: null, gate: null, lot: null, rvpark: null,
+    greek: null, quad: null, practice: null, treeline: null,
     // ── LANTERN NIGHT ground. Everything above is an albedo read under a sun.
     // These are read under lantern light, so they are chosen for what they do
     // to a WARM POOL falling on them from two metres up, not for what they look
@@ -2177,26 +2185,13 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     // 0.10 to 0.26 — because at night the districts must separate by HUE and
     // by what is lit, not by albedo. GAME DAY's three sands taught the opposite
     // lesson under a sun; the same trick at night just produces grey.
-    torii: 0x585269,     // swept granite flags, cool — lifted from 0x3a3547
-    stalls: 0x7d6552,    // packed earth of the market street, warm under the lanterns
-    canal: 0x24455f,     // the channel: deep and blue, and the one surface that
-                         // takes a specular from every lantern above it
-    teahouse: 0x715a49,  // cedar decking, a step warmer and lighter than the street
-    shrine: 0x5c5c6b,    // mossy stone steps, cooler than the market
-    moonbridge: 0x7d6753, // the bridge's timber, the lightest ground in the level
-                          // because it is the one thing the moon actually hits
-    nightgarden: 0x33573e, // clipped hedge and dark lawn
-    bathhouse: 0x82443f,  // the terrace's red lacquer boards
-    // THE HOT SPRING is the warmest and PALEST ground in the level, and that is
-    // the read: wet rock under standing steam, lit from the water rather than
-    // from a lantern. It is the only district whose light comes from below.
-    onsen: 0x8a7a6e,
-    // THE RIM WAS THE PROBLEM. At 0x18202c this is 27.6% of the map at a
-    // luminance of 0.12 — a quarter of every frame, functionally black, with
-    // three hundred bamboo stems in it that nobody could see. Lifted to a
-    // readable blue-grey; it is still the darkest ground in the level and it
-    // still says "the light stops here", but there is something there now.
-    bamboo: 0x44526a,     // the valley wall: blue-grey, where the light stops
+    // ── LANTERN NIGHT ground: null — painted from LN_FLOOR (island.ts, the
+    // `if (WORLD_ID === 'lantern')` bake), and this table is read ONLY under
+    // `if (WORLD_ID === 'maple')`. These ten DID agree with LN_FLOOR value for
+    // value, which is the only reason lantern never suffered what gameday did:
+    // somebody kept both copies in step by hand. That is not a mechanism.
+    torii: null, stalls: null, canal: null, teahouse: null, shrine: null,
+    moonbridge: null, nightgarden: null, bathhouse: null, onsen: null, bamboo: null,
   };
   if (WORLD_ID === 'maple') for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
     const col = biomeColor[PLAN[gy][gx]];
