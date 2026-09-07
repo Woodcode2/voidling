@@ -116,7 +116,7 @@ function fitEasing(series) {          // series: [{x, y}] both normalised 0..1
 const SAMPLER = () => {
   const w = window;
   w.__op = { rows: [], floaters: [], t0: performance.now(), touchAt: null };
-  const seen = new WeakSet();
+  const live0 = new WeakMap();   // element -> was it live on the previous frame
   const tick = () => {
     try {
       const ms = w.__matchState ? w.__matchState() : null;
@@ -131,9 +131,18 @@ const SAMPLER = () => {
           vx: vs.x, vz: vs.z, vr: vs.r,
         });
       }
-      // Floaters are DOM (.vf in bubbles.ts). Record the first sighting of each.
+      // FLOATERS ARE A POOL, NOT SPAWNED NODES. bubbles.ts creates fourteen
+      // div.vf on the body at startup and recycles them; a first-sighting test
+      // therefore banks all fourteen on the probe's own first frame and never
+      // reports another. That is why this read "first floater none" through five
+      // runs while the void was demonstrably eating. A floater is LIVE when it
+      // carries text and the `go` class, so the transition into that state is the
+      // spawn, and the same element spawning again must count again.
       for (const el of document.querySelectorAll('.vf')) {
-        if (!seen.has(el)) { seen.add(el); w.__op.floaters.push({ t: performance.now() - w.__op.t0, text: el.textContent || '' }); }
+        const live = el.classList.contains('go') && !!(el.textContent || '').trim();
+        const was = live0.get(el) || false;
+        if (live && !was) w.__op.floaters.push({ t: performance.now() - w.__op.t0, text: el.textContent || '' });
+        live0.set(el, live);
       }
     } catch { /* a frame we could not read is a frame we do not report */ }
     requestAnimationFrame(tick);
