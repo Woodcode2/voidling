@@ -426,8 +426,13 @@
          which is the whole match.
          Now: no fill at all, and a soft ring at 0.30 that reads as a control
          under a thumb without becoming part of the character. */
-      #joy { position: fixed; width: 128px; height: 128px; border-radius: 50%; z-index: 6;
-        background: transparent; border: 2px solid rgba(255,255,255,0.30);
+      /* 108px = 2 x JOY_R, and JOY_R is where full deflection sits — the ring must
+         be exactly the control's radius or it lies about where full speed is.
+         25.1% of a 430 viewport, matching HOLE.IO's measured 25.0%. The border is
+         quieter than it was (0.22 from 0.30) because we have the ghost hand to do
+         the teaching; their stick has to carry that job as well as feedback. */
+      #joy { position: fixed; width: 108px; height: 108px; border-radius: 50%; z-index: 6;
+        background: transparent; border: 2px solid rgba(255,255,255,0.22);
         transform: translate(-50%, -50%); pointer-events: none; display: none; }
       #joyNub { position: fixed; width: 52px; height: 52px; border-radius: 50%; z-index: 6;
         background: rgba(201,166,255,0.55); box-shadow: 0 0 14px rgba(172,108,255,0.5);

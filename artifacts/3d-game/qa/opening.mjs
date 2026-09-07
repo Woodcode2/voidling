@@ -72,6 +72,9 @@ const BARS = {
   A11:{ what: 'goal card animation duration (unroll + hold + roll-up)', want: '450-750', unit: 'ms', cmp: (v) => v >= 450 && v <= 750 },
   A12:{ what: 'goal card appears after the world is up, on a timer', want: '0.3-0.9', unit: 's', cmp: (v) => v >= 0.3 && v <= 0.9 },
   A13:{ what: 'goal card frames that could swallow input (pointer-events)', want: 0, unit: 'frames', cmp: (v) => v === 0 },
+  A14:{ what: 'joystick base offset from the touch point', want: '<= 12', unit: 'px', cmp: (v) => v <= 12 },
+  A15:{ what: 'joystick ring diameter as a share of screen width', want: '24-26', unit: '%', cmp: (v) => v >= 24 && v <= 26 },
+  A15b:{ what: 'joystick frames drawn BEFORE the first touch (theirs draws a default that then jumps 321 px)', want: 0, unit: 'frames', cmp: (v) => v === 0 },
   A21:{ what: 'descent length difference, early tap vs late tap', want: '<= 100', unit: 'ms', cmp: (v) => v <= 100 },
   // A9 stays failing until the guaranteed first bite lands (brief 3.2): their
   // first point arrives at 45% of the descent by luck of the map, ours by rule.
@@ -125,7 +128,7 @@ function fitEasing(series) {          // series: [{x, y}] both normalised 0..1
 // wrong camera maths must not be able to pass itself.
 const SAMPLER = () => {
   const w = window;
-  w.__op = { rows: [], floaters: [], card: [], t0: performance.now(), touchAt: null };
+  w.__op = { rows: [], floaters: [], card: [], joy: [], t0: performance.now(), touchAt: null };
   const live0 = new WeakMap();   // element -> was it live on the previous frame
   // THE CARD IS CAUGHT BY EVENTS, NOT BY SAMPLING. Its trigger is in game time but
   // its animation is a CSS animation, which runs on the WALL clock: 600 ms. Under
@@ -199,6 +202,18 @@ const SAMPLER = () => {
       // here as a non-zero A13 rather than as a child whose first tap did nothing.
       // (the card is captured by events, below — a 600 ms CSS animation cannot be
       // seen by a sampler running at roughly one frame a second)
+      // The joystick: where its base sits, how big the ring is drawn, and whether it
+      // is on screen before the player has touched anything. That last one is the
+      // thing we deliberately do NOT copy — their stick is drawn at a default spot
+      // and jumps 321 px to the finger on touch, which tells the player a lie about
+      // where the control is (holeio.recon.md 11.9).
+      const jr = document.getElementById('joy');
+      if (jr) {
+        const vis = getComputedStyle(jr).display !== 'none';
+        w.__op.joy.push({ t: performance.now() - w.__op.t0, vis,
+          x: parseFloat(jr.style.left) || 0, y: parseFloat(jr.style.top) || 0,
+          d: jr.getBoundingClientRect().width, W: window.innerWidth });
+      }
       for (const el of document.querySelectorAll('.vf')) {
         const live = el.classList.contains('go') && !!(el.textContent || '').trim();
         const was = live0.get(el) || false;
@@ -237,7 +252,7 @@ async function runOnce(browser, tapMs, shots) {
   // Reset the sampler to the first gameplay frame, not to page load, and assert
   // the camera really is still high — if it is not, the intro was missed and
   // every descent number below would be measuring the tail of something.
-  await p.evaluate(() => { window.__op.rows = []; window.__op.floaters = []; window.__op.card = []; window.__op.t0 = performance.now(); });
+  await p.evaluate(() => { window.__op.rows = []; window.__op.floaters = []; window.__op.card = []; window.__op.joy = []; window.__op.t0 = performance.now(); });
   await p.waitForTimeout(60);
   // Sampling must begin before the camera reaches its intro peak. Checking
   // rows[0] is the wrong test — the camera is still at its menu position there.
@@ -261,7 +276,8 @@ async function runOnce(browser, tapMs, shots) {
   // The touch. Held and dragged, because a tap that does not move the stick
   // measures nothing about how long it takes the void to answer.
   const box = { x: 215, y: 700 };
-  await p.evaluate(() => { window.__op.touchAt = performance.now() - window.__op.t0; });
+  await p.evaluate((pt) => { window.__op.touchAt = performance.now() - window.__op.t0;
+    window.__op.touchX = pt.x; window.__op.touchY = pt.y; }, box);
   await p.mouse.move(box.x, box.y);
   await p.mouse.down();
   for (let i = 1; i <= 30; i++) { await p.mouse.move(box.x, box.y - i * 4); await p.waitForTimeout(16); }
@@ -387,6 +403,12 @@ function analyse(d) {
   const cardMs = cStart?.dur || cShow?.dur || 0;
   const cardAt = cShow ? cShow.g - (rows[0]?.tc ?? cShow.g) : -1;
   const cardBlocks = cEv.filter((c) => c.blocks).length;
+  // Joystick. The anchor test uses the probe's own touch point, which it knows.
+  const jOn = (d.joy || []).filter((j) => j.vis);
+  const jPre = (d.joy || []).filter((j) => j.vis && j.t < touchAt).length;
+  const jFirst = jOn[0];
+  const jOffset = jFirst ? Math.hypot(jFirst.x - (d.touchX ?? jFirst.x), jFirst.y - (d.touchY ?? jFirst.y)) : 999;
+  const jShare = jFirst && jFirst.W ? 100 * jFirst.d / jFirst.W : 0;
   const f0w = d.floaters[0]?.t ?? null;
   const f0 = f0w == null ? null : gm(rows.reduce((a, b) => (Math.abs(b.t - f0w) < Math.abs(a.t - f0w) ? b : a), rows[0]));
   const floaterFrac = f0 == null ? null : (f0 - gm(rows[iA])) / (descentMs || 1);
@@ -409,7 +431,7 @@ function analyse(d) {
     if (rows[i].t < touchAt) continue;
     travelled += Math.hypot(rows[i].vx - rows[i - 1].vx, rows[i].vz - rows[i - 1].vz);
   }
-  return { rows: rows.length, touchAt, clockPre, clock0, idleG, descentMs, authoredMs, cap, sampleMs, q1: q1.y, q3: q3.y, travelled, samples: seg.length, cardMs, cardAt, cardBlocks, descentFrom: gm(rows[iA]), fit, mid: mid.y, missedClimb, iPeak, peakDist: rows[iPeak]?.camDist ?? 0,
+  return { rows: rows.length, touchAt, clockPre, clock0, idleG, descentMs, authoredMs, cap, sampleMs, q1: q1.y, q3: q3.y, travelled, samples: seg.length, cardMs, cardAt, cardBlocks, jOffset, jShare, jPre, descentFrom: gm(rows[iA]), fit, mid: mid.y, missedClimb, iPeak, peakDist: rows[iPeak]?.camDist ?? 0,
     groundScale, dead, firstMove, floater: f0, floaterFrac, yStart, yEnd };
 }
 
@@ -424,6 +446,7 @@ const got = {
   A5: late.authoredMs, A6: late.q1, A6c: late.q3, A6b: late.mid, A7: late.groundScale,
   A8: late.dead, A9: late.floaterFrac ?? -1,
   A11: late.cardMs, A12: late.cardAt, A13: late.cardBlocks,
+  A14: late.jOffset, A15: late.jShare, A15b: late.jPre,
   A21: Math.abs(late.descentMs - early.descentMs),
 };
 let fails = 0;

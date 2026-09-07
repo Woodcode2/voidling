@@ -3155,8 +3155,27 @@ const joy = { active: false, id: -1, ax: 0, ay: 0, dx: 0, dy: 0, mag: 0,
   // Both exist for the edge rescue below; `moved` also decides who owns the
   // stick when two fingers are down.
   px: 0, py: 0, moved: false };
-const JOY_R = 64;
+// THE RING IS THE CONTROL. `joy.mag = min(1, m / JOY_R)`, so the drawn circle's
+// edge IS full deflection — the visual cannot be resized without moving the
+// control, and a ring drawn at any other size would be lying about where full
+// speed lives. Ours was 128 css-px on a 430 viewport = 29.8% of the width;
+// HOLE.IO's is 110 css-px on 440 = 25.0% (measured at 165 device-px, DPR 3;
+// holeio.recon.md 11.9). At 29.8% the ring was the most prominent object on
+// screen in our own mid-match frame, with the void hidden behind a landmark
+// (recon/self/maple-mid-t88.png) — the wrong hierarchy for a game whose hero has
+// a face. 54 puts us at 25.1%.
+//
+// The two tuned ramp constants below are expressed in MAG, which is relative to
+// this radius, so they would have silently shrunk with it: the deadzone from
+// 10.0 px to 8.4 px and full speed from 37.1 px to 31.3 px. Those were tuned
+// against thumbs, not against the drawing, so they are rescaled to hold their
+// absolute distances.
+const JOY_R = 54;
 // "pinned": this close to the bezel there is no glass left to deflect into
+// Deadzone and full-speed points, in MAG. Held at their tuned ABSOLUTE distances
+// (10.0 px and 37.1 px of thumb travel) across the ring resize — see JOY_R.
+const JOY_DEAD = 10.0 / JOY_R;
+const JOY_FULL = 37.1 / JOY_R;
 const JOY_EDGE = 22;
 // px of base travel per rescue tick — ~4 frames from crippled to full reach
 const JOY_STEP = 16;
@@ -9389,7 +9408,7 @@ function animate() {
   joyEdgeTick();   // a thumb jammed on the bezel stops emitting events — see joyEdgeTick
   // screen-space input: joystick first, else keys
   let inX = 0, inY = 0;
-  if (joy.active && joy.mag > 0.156) { inX = joy.dx; inY = joy.dy; }
+  if (joy.active && joy.mag > JOY_DEAD) { inX = joy.dx; inY = joy.dy; }
   else if (keys.size) {
     if (keys.has('KeyW') || keys.has('ArrowUp')) inY -= 1;
     if (keys.has('KeyS') || keys.has('ArrowDown')) inY += 1;
@@ -9434,7 +9453,7 @@ function animate() {
       // so the resting thumb IS full throttle and the ring means "past here
       // is always full", which is what hole.io's stick does. Deadzone stays
       // 10 px so a resting touch is genuinely at rest.
-      const jm = joy.active ? THREE.MathUtils.clamp((joy.mag - 0.156) / (0.58 - 0.156), 0, 1) : 1;
+      const jm = joy.active ? THREE.MathUtils.clamp((joy.mag - JOY_DEAD) / (JOY_FULL - JOY_DEAD), 0, 1) : 1;
       // The 58 cap bound at camDist 181 — a radius ABOVE the WORLD ENDER
       // threshold — after which world speed stopped rising while the camera
       // kept pulling back. Measured: 440-470 screen px/s up to r=6, then 291
