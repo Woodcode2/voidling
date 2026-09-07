@@ -145,8 +145,14 @@ const SAMPLER = () => {
     const stamp = (k) => ({ k, t: performance.now() - w.__op.t0,
       g: w.__matchState ? w.__matchState().tClock : 0,
       blocks: getComputedStyle(tcEl).pointerEvents !== 'none' });
-    tcEl.addEventListener('animationstart', () => w.__op.card.push(stamp('start')));
-    tcEl.addEventListener('animationend', () => w.__op.card.push(stamp('end')));
+    // FILTER BY ANIMATION AND BY TARGET. Animation events BUBBLE, and the card runs
+    // two: `goalRoll` on the ribbon and `goalInk` on its three lines. Catching the
+    // first start and the first end of anything measured 0.3 ms — two different
+    // animations on two different elements, not a duration.
+    const mine = (e) => e.target === tcEl && e.animationName === 'goalRoll';
+    tcEl.addEventListener('animationstart', (e) => { if (mine(e)) w.__op.card.push(stamp('start')); });
+    tcEl.addEventListener('animationend', (e) => { if (mine(e)) w.__op.card.push(stamp('end')); });
+    tcEl.addEventListener('animationcancel', (e) => { if (mine(e)) w.__op.card.push(stamp('cancel')); });
     new MutationObserver(() => {
       if (tcEl.classList.contains('show')) w.__op.card.push(stamp('show'));
     }).observe(tcEl, { attributes: true, attributeFilter: ['class'] });
