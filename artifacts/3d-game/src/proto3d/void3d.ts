@@ -639,8 +639,22 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // buffer; depthWrite off, so it never occludes anything itself; toneMapped
   // off and fog off, so a distant hero behind a building is as legible as a
   // near one — the point of the pass is that he is never lost.
+  // ── IT HAS TO READ AS HIM BEHIND SOMETHING, NOT AS A HOLE IN IT ───────────
+  // First cut was his mid tone at 0.9. Measured, that PASSES: O3 came back 94%
+  // with a building over a third of him, because the bar counts how much of his
+  // luminance reaches the screen and a solid dome delivers plenty. Looked at, it
+  // is a flat purple disc with no face, no eyes and no gloss — the third time
+  // this week a passing number has hidden a visual problem.
+  //
+  // So it is lighter, and see-through. His RIM tone rather than his mid, at 0.5:
+  // the wall stays legible through him, which is what says "he is behind this"
+  // instead of "something has been cut out of this", and the lighter tone keeps
+  // him findable against the dark interiors he is usually hidden by. He is
+  // still a shape rather than a face — a second pass of the full body shader
+  // would be a true ghost, and it would also read as him standing IN FRONT of
+  // the building, which is a worse lie than a soft shape.
   const ghostMat = new THREE.MeshBasicMaterial({
-    color: VOID_COL.bodyMid.clone(), transparent: true, opacity: 0.9,
+    color: VOID_COL.bodyRim.clone(), transparent: true, opacity: 0.5,
     depthFunc: THREE.GreaterDepth, depthWrite: false, toneMapped: false, fog: false,
   });
   const ghost = new THREE.Mesh(
@@ -1783,7 +1797,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       bodyMat.uniforms.uRim.value.set(s.rim);
       bodyMat.uniforms.uSwirl.value.set(s.glow);
       glowMat.uniforms.uColor.value.set(s.glow);
-      ghostMat.color.set(s.mid);   // the silhouette is HIM, so it wears his skin
+      ghostMat.color.set(s.rim);   // the silhouette is HIM, so it wears his skin — rim, to stay findable against a dark interior
       ringMats.forEach((m) => m.color.set(s.glow));
       orbStars.forEach((sp) => (sp.material as THREE.SpriteMaterial).color.set(s.glow));
       for (const k in acc) acc[k].visible = false;
