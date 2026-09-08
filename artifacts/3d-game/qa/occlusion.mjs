@@ -40,7 +40,7 @@
 // needs no frame drawn. fadeOccluders lives in the game loop, not in render(),
 // so stubbing does not disturb what is under test.
 import { chromium } from 'playwright';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 
 const WORLD = process.argv[2] || 'maple';
 const PORT = process.argv[3] || '4177';
@@ -62,8 +62,27 @@ const OUT = 'qa-out/occ';
 mkdirSync(OUT, { recursive: true });
 
 const BARS = {
-  O2: { what: 'blocked frames in which something is fading', want: '>= 90%', cmp: (v) => v >= 90 },
-  O3: { what: 'the hero you can see at his worst moment', want: '>= 60%', cmp: (v) => v >= 60 },
+  O2: { what: 'blocked frames in which something is fading', want: '>= 90%', unit: '%', cmp: (v) => v >= 90 },
+  // ── O3 ASKS WHETHER YOU CAN FIND HIM, NOT HOW MUCH OF HIM SURVIVED ────────
+  // It used to score his CONTRIBUTION: how much of his own luminance reaches
+  // the screen where something covers him. That bar rewarded exactly the wrong
+  // thing. A solid dome at 0.9 opacity scored 94% and rendered as a flat purple
+  // disc with no face; the translucent ghost that actually reads as "he is
+  // behind this" scored 35.8% and was the better artefact. Contribution
+  // measures how opaque the overlay is, and opacity is not the goal.
+  //
+  // What matters is whether there is an obvious region where he is. Measured on
+  // that frame: the ghost is rgb(141,112,191) on a rgb(149,148,148) wall — only
+  // 1.33:1 in luminance and 0.306 apart in chroma. He separates almost entirely
+  // by HUE, which is why he is plainly visible and why a luminance metric
+  // undervalued him. Same blind spot that cost the menu logo two attempts.
+  //
+  // So: CIE76 dE between his region and what surrounds it, which is the
+  // convention qa/formsep.mjs already grades palette separation with (it fails
+  // under dE 6). That frame measures dE 47.4. The bar is 20 — comfortably above
+  // formsep's 6 because a hero must beat "distinguishable" by a margin, and far
+  // enough below 47 that a darker world or a duller skin still clears it.
+  O3: { what: 'how far the hero stands out from what covers him', want: '>= 20 dE', unit: ' dE', cmp: (v) => v >= 20 },
 };
 
 const pageLog = [];
@@ -490,20 +509,102 @@ const shot = await p.evaluate(() => {
     if (F && dif(F, A, i)) ifZero++;      // and here, only once it was faded to nothing
   }
   const seen = seenSum;
+
+  // ── SEPARATION: HIS OWN PIXELS AGAINST WHAT SURROUNDS THEM ───────────────
+  // The mask (B vs D) says which pixels are his, by construction. Frame A says
+  // what each of them actually looks like. So the question is asked directly:
+  // for every pixel of him, how far is it from the colour of the wall around
+  // him, in CIE76 dE — the convention qa/formsep.mjs already grades palette
+  // separation with (it fails under dE 6).
+  //
+  // Reported at the 75th PERCENTILE, not the mean, and that choice is load-
+  // bearing. A silhouette does not have to be uniformly loud to be findable,
+  // and different designs put their strength in different places: a flat fill
+  // spreads it evenly, a rim-lit ghost concentrates it in the outer fifth, a
+  // dither leaves three quarters of its pixels showing pure wall. The mean
+  // punishes the last two for being see-through, which is the same mistake the
+  // contribution metric made. p75 asks the honest question instead — is there
+  // a quarter of him that is unmistakably not-the-wall — and every one of those
+  // three designs can answer it if it is any good.
+  //
+  // An earlier version sampled a disc at the centroid against an annulus. It
+  // assumed he is a circle, it included wall pixels inside the disc wherever he
+  // is not, and it would have scored a rim-lit design on its emptiest region.
+  const lab = (r, g, b) => {
+    const f = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    const R = f(r), G = f(g), Bl = f(b);
+    let X = (R * 0.4124 + G * 0.3576 + Bl * 0.1805) / 0.95047;
+    let Y = R * 0.2126 + G * 0.7152 + Bl * 0.0722;
+    let Z = (R * 0.0193 + G * 0.1192 + Bl * 0.9505) / 1.08883;
+    const k = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+    X = k(X); Y = k(Y); Z = k(Z);
+    return [116 * Y - 16, 500 * (X - Y), 200 * (Y - Z)];
+  };
+  let hx = 0, hy = 0, hn = 0;
+  for (let i = 0, px = 0; i < A.length; i += 4, px++) {
+    if (!dif(B, D, i)) continue;
+    hx += px % w; hy += (px / w) | 0; hn++;
+  }
+  let sep = 0, surround = null;
+  if (hn > 50) {
+    const cx = hx / hn, cy = hy / hn, rad = Math.sqrt(hn / Math.PI);
+    // the ground truth for "around him": frame A, outside his mask, in a band
+    // just wide of him — near enough to be the same surface, clear of his edge
+    const o = [0, 0, 0]; let no = 0;
+    for (let y = Math.max(0, (cy - 3 * rad) | 0); y < Math.min(h, cy + 3 * rad); y++) {
+      for (let x = Math.max(0, (cx - 3 * rad) | 0); x < Math.min(w, cx + 3 * rad); x++) {
+        const i = (y * w + x) * 4, d = Math.hypot(x - cx, y - cy);
+        if (d < rad * 1.25 || d > rad * 2.1) continue;
+        if (dif(B, D, i)) continue;                 // never count him as his own background
+        o[0] += A[i]; o[1] += A[i + 1]; o[2] += A[i + 2]; no++;
+      }
+    }
+    if (no > 20) {
+      const bg = lab(o[0] / no, o[1] / no, o[2] / no);
+      const ds = [];
+      for (let i = 0; i < A.length; i += 4) {
+        if (!dif(B, D, i)) continue;
+        const c = lab(A[i], A[i + 1], A[i + 2]);
+        ds.push(Math.hypot(c[0] - bg[0], c[1] - bg[1], c[2] - bg[2]));
+      }
+      ds.sort((p1, p2) => p1 - p2);
+      sep = ds[Math.floor(ds.length * 0.75)];       // ascending, so 0.75 is the 75th percentile
+      surround = [Math.round(o[0] / no), Math.round(o[1] / no), Math.round(o[2] / no)];
+    }
+  }
+  // ── THE PICTURE HAS TO BE THE FRAME THE NUMBERS DESCRIBE ─────────────────
+  // The eyeball check used to be a Playwright screenshot taken 1.2 s of wall
+  // time after this evaluate returned — a different composition, with the HUD
+  // on top. Three regressions in this project passed their own bar and were
+  // caught only by opening a frame, so the frame being the wrong one is not a
+  // small thing. These come straight off the same four renders: A is exactly
+  // what was scored, B is the hero alone, so anything visible in A but absent
+  // from B is something OTHER than him reaching the screen.
+  const png = (X) => {
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const ctx = cv.getContext('2d'), im = ctx.createImageData(w, h);
+    for (let y = 0; y < h; y++) {                    // readPixels is bottom-up
+      const src = (h - 1 - y) * w * 4, dst = y * w * 4;
+      for (let k = 0; k < w * 4; k++) im.data[dst + k] = X[src + k];
+    }
+    ctx.putImageData(im, 0, 0);
+    return cv.toDataURL('image/png');
+  };
   for (const q of why) delete q.obj;
-  return { blocked, fadingNow, mask, seen, scored, ifGone, ifZero, didExperiment: !!E, w, h, why,
+  return { blocked, fadingNow, mask, seen, scored, sep, ifGone, ifZero, didExperiment: !!E, w, h, why,
+    pngA: png(A), pngB: png(B), surround,
     fadeStats: window.__fadeStats ? { ...window.__fadeStats() } : null,
     px: { x: (na.x * 0.5 + 0.5) * w, y: (-na.y * 0.5 + 0.5) * h,
           r: Math.abs(nb.x - na.x) * 0.5 * w } };
 });
 
-await p.waitForTimeout(1200);
-await p.screenshot({ path: `${OUT}/${WORLD}-worst.png` });
 await b.close();
-// over the pixels the denominator is defined on, not over the whole mask
+for (const [tag, url] of [['worst', shot.pngA], ['heroalone', shot.pngB]])
+  writeFileSync(`${OUT}/${WORLD}-${tag}.png`, Buffer.from(url.split(',')[1], 'base64'));
+// contribution is now a DIAGNOSTIC, printed beside the bar rather than being it
 const visible = shot.scored ? 100 * shot.seen / shot.scored : 100;
 
-const got = { O2: drive.blocked ? 100 * drive.blockedFading / drive.blocked : 100, O3: visible };
+const got = { O2: drive.blocked ? 100 * drive.blockedFading / drive.blocked : 100, O3: shot.sep };
 if (SECONDS <= 0) delete BARS.O2;   // not sampled, so not scored — silence is not a pass
 console.log(`\nOCCLUSION — ${WORLD} @ ${PORT}, ${SECONDS} game-seconds, ${drive.frames} frames`);
 console.log(`  edibles ${armed.n}`);
@@ -532,13 +633,17 @@ if (shot.didExperiment) {
     + `(${(100 * shot.ifZero / Math.max(1, shot.mask)).toFixed(1)}%) `
     + `— near 0 means the value never reaches the GPU`);
 }
+console.log(`  of him that reaches the screen where he is covered: ${visible.toFixed(1)}% `
+  + `(a diagnostic — a solid overlay scores high here and looks like a disc)`);
+console.log(`  what surrounds him in that frame: rgb(${(shot.surround || []).join(',')})`);
 if (shot.fadeStats) console.log(`  setMeshFade: ${JSON.stringify(shot.fadeStats)}`);
-console.log(`  that frame: ${OUT}/${WORLD}-worst.png\n`);
+console.log(`  the scored frame: ${OUT}/${WORLD}-worst.png`);
+console.log(`  him alone, same instant: ${OUT}/${WORLD}-heroalone.png\n`);
 let pass = 0;
 for (const [id, bar] of Object.entries(BARS)) {
   const v = got[id], ok = bar.cmp(v);
   if (ok) pass++;
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${id}   ${bar.what.padEnd(46)} got ${v.toFixed(1).padStart(7)}%   want ${bar.want}`);
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${id}   ${bar.what.padEnd(48)} got ${(v.toFixed(1) + bar.unit).padStart(9)}   want ${bar.want}`);
 }
 if (pageLog.length) { console.log('\n  the page said:');
   for (const l of pageLog.slice(0, 12)) console.log('    ' + l); }

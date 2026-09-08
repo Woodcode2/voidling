@@ -653,9 +653,40 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // still a shape rather than a face — a second pass of the full body shader
   // would be a true ghost, and it would also read as him standing IN FRONT of
   // the building, which is a worse lie than a soft shape.
-  const ghostMat = new THREE.MeshBasicMaterial({
-    color: VOID_COL.bodyRim.clone(), transparent: true, opacity: 0.5,
-    depthFunc: THREE.GreaterDepth, depthWrite: false, toneMapped: false, fog: false,
+  //
+  // AND IT HAS TO BE A BALL, NOT A STICKER. A flat fill at one alpha is a
+  // circle of paint; the scored frame showed exactly that. He is a sphere whose
+  // own body shader is a fresnel — dark heart, lit rim — so the silhouette
+  // speaks the same language at a fraction of the cost: one ramp from his mid
+  // tone at the centre to his rim tone at the edge, alpha rising with it. The
+  // edge is where the eye finds an object, so that is where the strength goes,
+  // and the middle stays see-through enough to keep the wall legible.
+  // pow 0.9 deliberately: a tight exponent puts the whole ramp in an 11%-wide
+  // hairline and the rest reads flat again. This one gradates the whole disc.
+  const ghostMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uCore: { value: VOID_COL.bodyMid.clone() },
+      uEdge: { value: VOID_COL.bodyRim.clone() },
+    },
+    vertexShader: `
+      varying vec3 vN; varying vec3 vV;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vN = normalize(normalMatrix * normal);
+        vV = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform vec3 uCore; uniform vec3 uEdge;
+      varying vec3 vN; varying vec3 vV;
+      void main() {
+        float f = 1.0 - clamp(dot(normalize(vN), normalize(vV)), 0.0, 1.0);
+        float e = pow(f, 0.9);
+        gl_FragColor = vec4(mix(uCore, uEdge, e), mix(0.32, 0.92, e));
+        #include <colorspace_fragment>
+      }`,
+    transparent: true,
+    depthFunc: THREE.GreaterDepth, depthWrite: false, fog: false,
   });
   const ghost = new THREE.Mesh(
     new THREE.SphereGeometry(0.985, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.80), ghostMat);
@@ -855,6 +886,23 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // reflected-light crescent at the bottom and both catchlights baked in.
   // Baking the catchlights also retired four meshes.
   const SCL_R = 0.21;
+  // ── THE GHOST HAS TO BE HIM, NOT A MARKER ─────────────────────────────────
+  // The body silhouette above answers "he is behind this". It does not answer
+  // "he" — a violet ball is a waypoint, and the frame said so. Two eyes settle
+  // it in one glance, which is the whole reason this character has a face.
+  //
+  // Each part is a CHILD of its real counterpart, sharing that mesh's geometry
+  // and riding its transform, so it blinks when he blinks, looks where he
+  // looks, and fattens with the outline as he shrinks on screen — for free, and
+  // with no second copy of the animation to fall out of sync. What it does NOT
+  // share is the material: these draw with GreaterDepth, so they appear only on
+  // the pixels where something nearer already covered him.
+  const ghostFace: THREE.Mesh[] = [];
+  const ghostEyeMat = (color: number, opacity: number) => new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity,
+    depthFunc: THREE.GreaterDepth, depthWrite: false, toneMapped: false, fog: false,
+  });
+  const gDark = ghostEyeMat(0x241a3c, 0.9), gWhite = ghostEyeMat(0xffffff, 0.88);
   // ── THE EYES ARE THE FOCAL POINT, SO THEY GET THE RESOLUTION ────────────
   // These were 128px. Measured on a DPR-3 phone with the void at r=6, ONE EYE
   // COVERS 284 DEVICE PIXELS — a 2.2x magnification of the texture, and worse
@@ -974,6 +1022,11 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     // sclera.scale.y / sclera.scale.x and wait for the lid to open.
     sclera.name = 'sclera';
     g.position.set(sx, 0.06, 0);
+    for (const [host, mat] of [[outline, gDark], [white, gWhite], [pupil, gDark]] as const) {
+      const gm = new THREE.Mesh(host.geometry, mat);
+      gm.position.z = 0.001;          // in front of its host, which never writes depth anyway
+      host.add(gm); ghostFace.push(gm);
+    }
     ball.add(sclera); ball.add(pupilGrp); g.add(ball);
     face.add(g); eyes.push({ g, ball, sclera, pupilGrp, outline, white });
   }
@@ -1257,6 +1310,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // against the sphere depending on camera angle — which is how you end up
   // with a pupil hidden behind its own eye white.
   face.traverse((o) => { o.renderOrder += 1; });
+  // set last, and absolutely, so the blanket +1 above cannot slide these under
+  // the body silhouette (renderOrder 8) they are meant to sit on top of
+  ghostFace.forEach((m, i) => { m.renderOrder = 9 + (i % 3); });
   // remember the blush materials — moods flush and fade the cheeks
   const blushMats: THREE.MeshBasicMaterial[] = [];
   face.children.forEach((c) => {
@@ -1797,7 +1853,11 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       bodyMat.uniforms.uRim.value.set(s.rim);
       bodyMat.uniforms.uSwirl.value.set(s.glow);
       glowMat.uniforms.uColor.value.set(s.glow);
-      ghostMat.color.set(s.rim);   // the silhouette is HIM, so it wears his skin — rim, to stay findable against a dark interior
+      // the silhouette is HIM, so it wears his skin: his mid tone through the
+      // middle, his rim tone at the edge — the same two colours his body ramps
+      // between, which is what makes the ghost read as the same creature
+      ghostMat.uniforms.uCore.value.set(s.mid);
+      ghostMat.uniforms.uEdge.value.set(s.rim);
       ringMats.forEach((m) => m.color.set(s.glow));
       orbStars.forEach((sp) => (sp.material as THREE.SpriteMaterial).color.set(s.glow));
       for (const k in acc) acc[k].visible = false;
