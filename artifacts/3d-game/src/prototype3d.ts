@@ -6390,11 +6390,30 @@ function coverRelease(who: string, then?: () => void) {
   const scr = el('loadScr');
   scr.style.transition = 'opacity 0.45s ease';
   scr.style.opacity = '0';
+  // ── AND IT STOPS EATING TOUCHES THE MOMENT IT STOPS BEING A COVER ────────
+  // The cover is dismissed by ANIMATING opacity, and `.show` — the class that
+  // sets display:flex — is not removed for another 480 ms below. #loadScr is
+  // `position: fixed; inset: 0; z-index: 60` with no pointer-events rule of its
+  // own (index.html:1292), and opacity 0 does NOT stop hit-testing. Meanwhile
+  // the match ARMS at the start of this fade, because `then?.()` runs
+  // synchronously at the end of this function. So the world was live, visible,
+  // and behind half a second of transparent glass — and the pointerdown that
+  // starts a match is bound to renderer.domElement (:3347), not to window, so
+  // a touch the glass eats is simply gone. The child taps, nothing happens,
+  // and they tap again.
+  //
+  // MEASURED, qa/firsttouch.mjs on a BRAND-NEW INSTALL: 475 ms blocked by
+  // #loadScr. On a returning player's profile it does not reproduce at all,
+  // which is why five probes and a code read all missed it — the first-launch
+  // path (:6115, no voidPlayed: splash straight into the game, no menu) is the
+  // one nothing had ever walked, and it is every new player's only first
+  // impression.
+  scr.style.pointerEvents = 'none';
   setTimeout(() => {
     // …and only tear down if nothing grabbed it again during the fade
     if (!coverHeld.size) {
       scr.classList.remove('show'); scr.classList.remove('boot');
-      scr.style.opacity = ''; scr.style.transition = '';
+      scr.style.opacity = ''; scr.style.transition = ''; scr.style.pointerEvents = '';
     }
     coverFading = false;
   }, 480);
