@@ -5881,7 +5881,13 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // unpatched build, the worst 5.4 units deep. (spotOpen's own-claim rule is
     // position-based since round 5, so the drop is NOT forced: it keeps the
     // burial test.)
-    for (const p2 of PW.scatterInRegion(REG('village'), 24, 150, { sep: 5.4 })) {
+    // 6.9, NOT 5.4: a chalet is 10.0 x 5.3 on the ground, a half-diagonal of
+    // 5.66, and spotFree spaces two props at (sepA + sepB) x 0.82 — so the
+    // claim has to be 5.66 / 0.82 for the building to hold its own footprint.
+    // At 5.4 qa/placement.mjs found a snowman and a prop standing INSIDE
+    // chalet #15, which powder had none of before this round's layout changed.
+    // Same arithmetic as Skylark's food vans and Game Day's RVs.
+    for (const p2 of PW.scatterInRegion(REG('village'), 24, 150, { sep: 6.9 })) {
       const face = Math.atan2(PW.LAKE.cx - p2[0], PW.LAKE.cy - p2[1]);
       drop(AL.makeChalet(), p2, 3.6, face, false, 'chalet');
     }
