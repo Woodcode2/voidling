@@ -163,6 +163,21 @@ for (const world of WORLDS) {
     // not cost quality, it costs a draw call per prop, silently, and only on
     // the worlds dense enough to reach it. Density work makes that worse, so
     // it is measured in the same pass rather than assumed.
+    // ── AND WHETHER ANY PROP IS LYING ABOUT BEING TOO BIG ───────────────────
+    // The gate greys a prop the void cannot eat yet. Its un-gate used to sit
+    // below the distance test, so a prop greyed while you were small and then
+    // left behind as you grew kept saying "you cannot eat me" for the rest of
+    // the match — the signal inverted, on exactly the props a growing player
+    // heads back toward. Counted here every run: a gated prop whose radius is
+    // now inside the eat ratio is a liar, and there should never be one.
+    let liars = 0;
+    {
+      const vr = window.__voidState().r;
+      for (const e of window.__edibles) {
+        if (!e.mesh || e.eaten) continue;
+        if (e.mesh.userData.gated && e.radius <= vr * 1.11) liars++;
+      }
+    }
     let shBatched = 0, shLoose = 0;
     for (const e of window.__edibles) {
       const m = e.mesh; if (!m) continue;
@@ -170,7 +185,7 @@ for (const world of WORLDS) {
       else if (m.children && m.children.some((c) => c.userData && c.userData.cshadow)) shLoose++;
     }
     const ms = window.__matchState ? window.__matchState() : { t: -1 };
-    return { w, h, coverage: 100 * food / (w * h), t: ms.t, shBatched, shLoose,
+    return { w, h, coverage: 100 * food / (w * h), t: ms.t, shBatched, shLoose, liars,
       edibles: eds.length, inView, eatableInView, eatableTotal: eatable.length,
       voidR: vs.r,
       nearest: eatable.length ? eatable[0] : null,
@@ -236,6 +251,9 @@ const BARS = [
     get: (r) => (r.twentieth == null ? Infinity : r.twentieth / SPEED),
     fmt: (v) => (v === Infinity ? 'never' : v.toFixed(2) + ' s'), ok: (v) => v <= 1.5 },
 ];
+const anyLiar = rows.some((r) => r.liars > 0);
+console.log(`\n  props greyed as "too big" that the void can already eat: `
+  + rows.map((r) => `${r.world} ${r.liars}`).join(', ') + (anyLiar ? '   <- the gate is lying' : ''));
 console.log('\n  contact shadows — batched into the one InstancedMesh, and left loose past the cap:');
 for (const r of rows)
   console.log(`    ${r.world.padEnd(10)} batched ${String(r.shBatched).padStart(5)}`

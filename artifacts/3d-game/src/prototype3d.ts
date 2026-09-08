@@ -9969,10 +9969,25 @@ function animate() {
     const Rg = voidling.radius, reach = Rg * 26 + 40;
     for (const e of edibles) {
       if (e.eaten || !e.mesh.visible) continue;
-      const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
-      if (dx * dx + dz * dz > reach * reach) continue;
       const tooBig = e.radius > Rg * eatRatioNow();
       if (tooBig === e.mesh.userData.gated) continue;   // no per-frame churn: only on the transition
+      // ── A PROP MAY NEVER LIE ABOUT BEING TOO BIG ──────────────────────────
+      // The reach test used to sit ABOVE this, before anything was read or
+      // written — so it skipped the un-gate as well as the gate. A prop that
+      // greyed while you were small, and was then left behind as you grew, kept
+      // saying "you cannot eat me" for the rest of the match: the whole point
+      // of the signal, inverted, on exactly the props a growing player is
+      // heading back toward. It only ever corrected itself if the prop happened
+      // to be within reach on the tick its size class flipped.
+      //
+      // So reach now guards the GATE only. Un-gating is unconditional. The
+      // saving was never the distance test anyway — the material work below
+      // already runs only on a transition, and what is left is one float
+      // compare per edible at 2.5 Hz.
+      if (tooBig) {
+        const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
+        if (dx * dx + dz * dz > reach * reach) continue;   // too far to be worth telling them about
+      }
       e.mesh.userData.gated = tooBig;
       e.mesh.traverse((o) => {
         const mm = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
