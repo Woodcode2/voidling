@@ -155,8 +155,22 @@ for (const world of WORLDS) {
       }
       ctx.putImageData(im, 0, 0); return cv.toDataURL('image/png');
     };
+    // ── AND WHAT THE CONTACT-SHADOW CAP IS DOING WHILE WE ARE HERE ──────────
+    // bakeContactShadows batches the little grounding discs into ONE
+    // InstancedMesh and returns outright at `if (shCount >= SH_CAP) return`
+    // (prototype3d.ts:3108). Everything after that point keeps its own
+    // transparent, depthWrite-false disc as a separate child — so the cap does
+    // not cost quality, it costs a draw call per prop, silently, and only on
+    // the worlds dense enough to reach it. Density work makes that worse, so
+    // it is measured in the same pass rather than assumed.
+    let shBatched = 0, shLoose = 0;
+    for (const e of window.__edibles) {
+      const m = e.mesh; if (!m) continue;
+      if (m.userData.shIdx !== undefined) shBatched++;
+      else if (m.children && m.children.some((c) => c.userData && c.userData.cshadow)) shLoose++;
+    }
     const ms = window.__matchState ? window.__matchState() : { t: -1 };
-    return { w, h, coverage: 100 * food / (w * h), t: ms.t,
+    return { w, h, coverage: 100 * food / (w * h), t: ms.t, shBatched, shLoose,
       edibles: eds.length, inView, eatableInView, eatableTotal: eatable.length,
       voidR: vs.r,
       nearest: eatable.length ? eatable[0] : null,
@@ -222,6 +236,11 @@ const BARS = [
     get: (r) => (r.twentieth == null ? Infinity : r.twentieth / SPEED),
     fmt: (v) => (v === Infinity ? 'never' : v.toFixed(2) + ' s'), ok: (v) => v <= 1.5 },
 ];
+console.log('\n  contact shadows — batched into the one InstancedMesh, and left loose past the cap:');
+for (const r of rows)
+  console.log(`    ${r.world.padEnd(10)} batched ${String(r.shBatched).padStart(5)}`
+    + `   loose ${String(r.shLoose).padStart(5)}`
+    + (r.shLoose > 0 ? '   <- a draw call each' : ''));
 console.log(`\n  at spawn he moves ${SPEED} units/second (src/prototype3d.ts)\n`);
 let fail = 0;
 for (const r of rows) for (const b of BARS) {

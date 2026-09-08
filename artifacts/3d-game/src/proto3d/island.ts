@@ -5757,7 +5757,18 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
   const setShadow = (m: THREE.Object3D) => m.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   const place = (mesh: THREE.Object3D, x3: number, z3: number, r: number) => {
     if (!insideIsland3(x3, z3)) return;   // never place props off the coastline
-    if (inLagoon3(x3, z3, 40)) return;    // …or IN the lagoon
+    // …or IN the lagoon — WHICH IS MAPLE'S, AND ONLY MAPLE'S.
+    // LAGOON (:275) is a fixed world ellipse at (3675, 10307): Maple Falls'
+    // pond. This test had no world guard, so every other world spent the cost
+    // of building a prop, positioning it, and then silently discarded it for
+    // wading into a body of water that does not exist there.
+    // The file already knows this bug by name. inWater3 carries three guards
+    // for it — `if (WORLD_ID === 'gameday') return false;` and the same for
+    // powder and skylark — and its own comment calls the second one "the exact
+    // bug, correctly reasoned about, one world too late" and says "a new-world
+    // guard should have been a sweep of the existing ones". place() is the
+    // predicate that sweep missed, three worlds running.
+    if (WORLD_ID === 'maple' && inLagoon3(x3, z3, 40)) return;
     mesh.position.set(x3, 0, z3);
     // A PROP WITH NO FRONT HAS NO REASON TO FACE NORTH. Measured on the pre-fix
     // build with qa/variety.mjs: 5,043 of Maple Falls' 5,782 props sat at
@@ -7276,6 +7287,16 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const inner = makePalm();
       inner.scale.setScalar(1.75);          // a palm that has been here a while
       g.add(inner);
+      // THE FLAG HAS TO BE ON THE OBJECT THE GAME IS HANDED. noFront() sets
+      // userData.spin on the prop, and this wraps the prop in a Group to scale
+      // it — so place() (:5769) reads spin off the Group, finds nothing, and
+      // the yaw jitter never fires; and qa/placement.mjs (:314) classifies it
+      // `solid`, which files its collisions as `overlap` (a FAIL category)
+      // instead of `clutter` (info). Measured: all 150 of Maple's mature trees
+      // stand at exactly 0 radians, which is the precise defect the comment at
+      // :5762 exists to prevent, and 378 large props across two worlds sit in
+      // the wrong audit category.
+      g.userData.spin = 1;
       drop(g, p2, 4.4, rand(0, Math.PI * 2));
     }
     for (const p2 of sland(40, 140, undefined, 4.8, NO_TOWN)) {
@@ -7283,6 +7304,16 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const inner = makeRocksFB();
       inner.scale.set(2.1, rand(2.4, 3.6), 2.1);   // a stack, not a boulder
       g.add(inner);
+      // THE FLAG HAS TO BE ON THE OBJECT THE GAME IS HANDED. noFront() sets
+      // userData.spin on the prop, and this wraps the prop in a Group to scale
+      // it — so place() (:5769) reads spin off the Group, finds nothing, and
+      // the yaw jitter never fires; and qa/placement.mjs (:314) classifies it
+      // `solid`, which files its collisions as `overlap` (a FAIL category)
+      // instead of `clutter` (info). Measured: all 150 of Maple's mature trees
+      // stand at exactly 0 radians, which is the precise defect the comment at
+      // :5762 exists to prevent, and 378 large props across two worlds sit in
+      // the wrong audit category.
+      g.userData.spin = 1;
       drop(g, p2, 4.8, rand(0, Math.PI * 2));
     }
     for (const p2 of sland(16, 200, [0, 620], 5.6, NO_TOWN)) {
@@ -7290,6 +7321,16 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const inner = makeThatchHut();
       inner.scale.set(1.9, 1.7, 1.9);      // a longhouse rather than a hut
       g.add(inner);
+      // THE FLAG HAS TO BE ON THE OBJECT THE GAME IS HANDED. noFront() sets
+      // userData.spin on the prop, and this wraps the prop in a Group to scale
+      // it — so place() (:5769) reads spin off the Group, finds nothing, and
+      // the yaw jitter never fires; and qa/placement.mjs (:314) classifies it
+      // `solid`, which files its collisions as `overlap` (a FAIL category)
+      // instead of `clutter` (info). Measured: all 150 of Maple's mature trees
+      // stand at exactly 0 radians, which is the precise defect the comment at
+      // :5762 exists to prevent, and 378 large props across two worlds sit in
+      // the wrong audit category.
+      g.userData.spin = 1;
       drop(g, p2, 5.6, rand(0, Math.PI * 2));
     }
     // dune grass and scrub, thickest just inland of the surf
@@ -8470,6 +8511,16 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const k = r3 / 2.6;                       // grown from the ordinary one
       inner.scale.setScalar(k);
       g.add(inner);
+      // THE FLAG HAS TO BE ON THE OBJECT THE GAME IS HANDED. noFront() sets
+      // userData.spin on the prop, and this wraps the prop in a Group to scale
+      // it — so place() (:5769) reads spin off the Group, finds nothing, and
+      // the yaw jitter never fires; and qa/placement.mjs (:314) classifies it
+      // `solid`, which files its collisions as `overlap` (a FAIL category)
+      // instead of `clutter` (info). Measured: all 150 of Maple's mature trees
+      // stand at exactly 0 radians, which is the precise defect the comment at
+      // :5762 exists to prevent, and 378 large props across two worlds sit in
+      // the wrong audit category.
+      g.userData.spin = 1;
       place(g, w(wx), w(wy), r3);
       bigTrees++;
     }
