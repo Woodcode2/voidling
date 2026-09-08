@@ -281,3 +281,74 @@ still be green. The choice is one number:
 - **0.11** — passes D1. The ground goes noticeably pale; the props carry the colour.
 
 Both are one edit and both are measurable. The frames go to the owner side by side.
+
+---
+
+## 10. THE DIAL WAS THE WRONG OPERATOR — corrected 2026-09-08, same day
+
+§9 shipped a chroma CLAMP and a probe that could not see what it broke. Ten
+agents read the day's diff adversarially; the verdict was nine defects, four of
+them reaching pixels. The important one:
+
+**A clamp merges any two surfaces that differed only in how saturated they
+were.** Measured through the dial's own ledger, on MAPLE: **60 pairs** of
+authored ground colours ended under CIE76 dE 6, the floor `qa/formsep.mjs`
+already fails palette separation at. The fairground's gold against a sand,
+dE 41.2 → 1.2. The meadow against a mown lawn, 39.0 → 2.1.
+
+`qa/groundtruth.mjs` was structurally incapable of noticing: it graded chroma
+percentiles against the cap the dial itself had set, which is guaranteed to
+pass. **A probe that grades a change against the parameter that produced it can
+only agree with itself.**
+
+### A scale beats a clamp on both axes at once
+
+Swept offline over maple's 31 dialled colours and pirate's 9 district floors:
+
+| transform | collapsed pairs | mean chroma |
+|---|---|---|
+| clamp 0.16 | 20 of 443 | 0.151 |
+| **scale 0.40** | **2 of 443** | **0.130** |
+| scale 0.50 | 0 of 443 | 0.162 |
+
+Not a trade-off — a defeat. 0.40 is *quieter* than the clamp and keeps ten
+times more separation, because a clamp leaves everything already-quiet
+untouched while a scale pulls the whole distribution down.
+
+Measured on the finished bakes: maple's collapsed pairs 60 → 10 with its stage
+p75 falling 0.161 → 0.118; pirate 9 → 0 at p75 0.153.
+
+### What this cost, honestly
+
+Maple's on-screen D1 fell **46.6% → 42.8%**, below the 45% bar. The frame is
+better — the ground reads as grass rather than paint, and the props separate
+harder than they did under the clamp. Tuning the dial down to recover 2.2
+points would make the lawn greyer to satisfy a proxy, and the frame is the
+product. **D1 stays red on maple and the reason is written down.**
+
+Maple's remaining ten collapsed pairs were all authored between dE 12.3 and
+15.2 — adjacent shades of one sand or one green rather than two districts —
+and land at 4.8 to 5.6. The bar could be cleared by calling a 12-dE pair "not
+plainly different"; that is moving the goalposts to meet the ball. It fails
+visibly, and the fix is per-world value spacing.
+
+### And the other eight
+
+- `deadpaint.mjs` counted a mention in a **comment** as a read. `PROPS.person`
+  — eight colours, seven rewritten that same round — matched exactly one line
+  in the repository: a comment, in a file that never imports the palette. It
+  printed 41/41 and the table was dead.
+- `groundtruth.mjs` printed its "no ground canvas" error and exited **0**. It
+  also box-filtered where its comment claimed a lattice, which can only lower
+  chroma — worst for the thin marks the ceiling bar exists to catch.
+- `occlusion.mjs`'s O3 never required anything to be **in front of** the hero.
+- `pop.mjs`'s `rimOf` measured inner-edge-to-silhouette rather than the band,
+  and sampled ring medians through a hue mask a brightening rim falls out of.
+  Its "interior" was his **sclera**, not the pit.
+- POWDER's lake — the surface its own bake calls the poster's centrepiece —
+  was dialled at the stage number instead of water's.
+- The ghost's eyes rendered flat and ungraded beside his real ones.
+- `loud()` is global where `quiet()` is per-world; deliberate, now stated.
+- `_worldshots.mjs` claimed it seeded "exactly as placement.mjs does" while
+  making mandatory what that probe makes opt-in, for a reason `lookpair.mjs`
+  states in writing.
