@@ -106,7 +106,15 @@ for (const world of WORLDS) {
     // A is the frame. B is the same frame with every edible switched off, so
     // A != B is food, by construction — no colour test, and a prop hidden
     // behind a building correctly counts as zero because it reaches no pixel.
+    // ── AND WHAT THE GPU IS ASKED FOR ───────────────────────────────────────
+    // Draw calls and triangles are renderer-independent — swiftshader counts
+    // them exactly as a phone would — so they are the honest way to price the
+    // contact-shadow cap. Every prop past SH_CAP keeps its own transparent disc
+    // as a separate child, which is a draw call; batching them is the whole
+    // point of the InstancedMesh. Read on the un-stubbed render below.
+    R.info.reset();
     const A = grab();
+    const draws = { calls: R.info.render.calls, tris: R.info.render.triangles };
     const was = eds.map((e) => e.mesh.visible);
     for (const e of eds) e.mesh.visible = false;
     const B = grab();
@@ -158,11 +166,23 @@ for (const world of WORLDS) {
     // ── AND WHAT THE CONTACT-SHADOW CAP IS DOING WHILE WE ARE HERE ──────────
     // bakeContactShadows batches the little grounding discs into ONE
     // InstancedMesh and returns outright at `if (shCount >= SH_CAP) return`
-    // (prototype3d.ts:3108). Everything after that point keeps its own
-    // transparent, depthWrite-false disc as a separate child — so the cap does
-    // not cost quality, it costs a draw call per prop, silently, and only on
-    // the worlds dense enough to reach it. Density work makes that worse, so
-    // it is measured in the same pass rather than assumed.
+    // (prototype3d.ts:3108). Everything after that keeps its own transparent
+    // disc as a separate child.
+    //
+    // I WROTE HERE THAT THIS COSTS "A DRAW CALL PER PROP" AND IT DOES NOT.
+    // Measured at the play camera, same run, six worlds: GAME DAY carries 1,526
+    // loose discs and renders 90 draw calls a frame — the second LOWEST of the
+    // six, against maple's 96 with 315 loose. Every world lands between 75 and
+    // 105. A loose disc is an ordinary Object3D child and is frustum-culled
+    // like everything else, so off-screen it costs nothing at all.
+    //
+    // The batched mesh is the one that is never free: shMesh.frustumCulled is
+    // false and its count is pinned at SH_CAP (prototype3d.ts:3111-3113), so it
+    // submits all 4,096 instances every frame wherever the camera is pointing.
+    // Raising the cap would therefore move work from "culled when off screen"
+    // to "always drawn" — a pessimisation, not a fix. Both numbers stay printed
+    // because density work changes them, but the cap is not the blocker it was
+    // reported as.
     // ── AND WHETHER ANY PROP IS LYING ABOUT BEING TOO BIG ───────────────────
     // The gate greys a prop the void cannot eat yet. Its un-gate used to sit
     // below the distance test, so a prop greyed while you were small and then
@@ -186,6 +206,7 @@ for (const world of WORLDS) {
     }
     const ms = window.__matchState ? window.__matchState() : { t: -1 };
     return { w, h, coverage: 100 * food / (w * h), t: ms.t, shBatched, shLoose, liars,
+      calls: draws.calls, tris: draws.tris,
       edibles: eds.length, inView, eatableInView, eatableTotal: eatable.length,
       voidR: vs.r,
       nearest: eatable.length ? eatable[0] : null,
@@ -258,7 +279,8 @@ console.log('\n  contact shadows — batched into the one InstancedMesh, and lef
 for (const r of rows)
   console.log(`    ${r.world.padEnd(10)} batched ${String(r.shBatched).padStart(5)}`
     + `   loose ${String(r.shLoose).padStart(5)}`
-    + (r.shLoose > 0 ? '   <- a draw call each' : ''));
+    + (r.shLoose > 0 ? '   <- a draw call each' : '')
+    + `      frame: ${String(r.calls).padStart(5)} draw calls, ${(r.tris / 1000).toFixed(0)}k triangles`);
 console.log(`\n  at spawn he moves ${SPEED} units/second (src/prototype3d.ts)\n`);
 let fail = 0;
 for (const r of rows) for (const b of BARS) {
