@@ -13,7 +13,8 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const PORT = process.argv[3] || '4177';
-const MARKS = [{ t: 5, tag: 'spawn' }, { t: 88, tag: 'mid' }, { t: 163, tag: 'late' }];
+// spawn is shot separately and undriven — see the block before the drive.
+const MARKS = [{ t: 88, tag: 'mid' }, { t: 163, tag: 'late' }];
 fs.mkdirSync('qa-out/gw', { recursive: true });
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -35,6 +36,30 @@ for (const wid of WORLDS) {
   await p.click('#btnPlay'); await p.waitForTimeout(1400);
   await p.click(`#worldRow .wCard[data-world="${wid}"]`);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
+
+  // ── THE SPAWN FRAME IS SHOT BEFORE ANYTHING DRIVES ────────────────────────
+  // It used to be shot at t=5 with the drive already running, so it was five
+  // game-seconds of play, and under swiftshader dt varies enough that the void
+  // takes a different path every run. Measured: MAPLE's stage share came out
+  // 53.2% and then 28.1% on the SAME BUILD, actors 18.1% then 12.3%. The colour
+  // bars D1, D2 and D3 are graded on this frame, so they were being graded on a
+  // different composition each time — and a passing reading was one draw of a
+  // noisy instrument rather than a fact about the world.
+  //
+  // Untouched, the void sits at the authored spawn (an armed world waits; see
+  // the attract-mode note in prototype3d) and MAPLE's layout is seeded, so this
+  // frame is the same every run. It is also the frame the brief means: what a
+  // child sees when the world appears, before they have moved.
+  await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 5, null, { timeout: 900000 });
+  await p.waitForTimeout(1200);
+  await p.screenshot({ path: `qa-out/gw/${wid}-spawn.png` });
+  {
+    const st = await p.evaluate(() => {
+      const ms = window.__matchState(), vs = window.__voidState();
+      return { t: ms.t, r: vs.r };
+    });
+    console.log(`  spawn t=${st.t.toFixed(1).padStart(5)} r=${st.r.toFixed(2).padStart(5)}  (undriven, deterministic)`);
+  }
 
   await p.evaluate(() => {
     window.__RR = window.__renderer.render.bind(window.__renderer);
