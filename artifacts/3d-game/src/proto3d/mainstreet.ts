@@ -13,6 +13,7 @@
 //   • no Math.random(). The town is hand-built and the same every load —
 //     use mrnd()/mr()/mpick(), which run off a fixed seed.
 import * as THREE from 'three';
+import { mulberry32 } from './rng';
 import { part, mergedProp, PROP_SMOOTH_MAT, shade, tint } from './island';
 import { registerGloss } from './gloss';
 import { roundedBox } from './life';
@@ -30,14 +31,13 @@ const noFront = <T extends THREE.Object3D>(m: T): T => { m.userData.spin = 1; re
 // seeded stream (mulberry32) that is reset before the bake and before
 // populate. Two loads of the same build are pixel-identical.
 const SEED = 0x4d41504c;   // 'MAPL'
-let _s = SEED;
-export function resetMapleRng(seed = SEED): void { _s = seed; }
-export function mrnd(): number {
-  _s = (_s + 0x6d2b79f5) | 0;
-  let t = Math.imul(_s ^ (_s >>> 15), 1 | _s);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-}
+// The generator itself lives in ./rng now. Maple Falls had the only sound one
+// in the repo — the other five worlds carried a glibc LCG that overflows 2^53
+// in JavaScript and cycles after 10,466 states — so mulberry32 was lifted out
+// of here to serve all six, and this is the same stream it always was.
+let _next = mulberry32(SEED);
+export function resetMapleRng(seed = SEED): void { _next = mulberry32(seed); }
+export function mrnd(): number { return _next(); }
 export const mr = (a: number, b: number): number => a + mrnd() * (b - a);
 export const mpick = <T,>(arr: readonly T[]): T => arr[Math.floor(mrnd() * arr.length) % arr.length];
 export const mchance = (p: number): boolean => mrnd() < p;

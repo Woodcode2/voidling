@@ -35,6 +35,8 @@ import {
   spotFree, spotOpen, claimSpot, resetPlacement,
 } from './bay';
 
+import { stream, tally, STALL, CAP } from './rng';
+
 export { pointInPoly, smoothPoly, distToPath, pathPointAt, spotFree, spotOpen, claimSpot, resetPlacement };
 
 export type Pt = [number, number];
@@ -294,48 +296,62 @@ const LAND_BOX = bbox(SK_LAND_SMOOTH);
 
 /** N legal points inside a district. The rough's polygon is the whole island —
  *  use scatterLand with a band for the three bites. */
-export function scatterInRegion(r: SkRegion, n: number, rnd: () => number, clear = 40, o?: SkScatterOpts): Pt[] {
+
+export function scatterInRegion(r: SkRegion, n: number, clear = 40, o?: SkScatterOpts): Pt[] {
+  const rnd = stream('skylark', r.id, n, clear, o?.sep, o?.avoid?.join(','));
   const [minX, maxX, minY, maxY] = bbox(r.poly);
   const out: Pt[] = [];
-  for (let tries = 0; tries < n * 60 && out.length < n; tries++) {
+  // WHY a scatter came up short, not just that it did — see ./rng's ledger.
+  let outside = 0, blocked = 0, busy = 0, tries = 0, miss = 0;
+  for (; tries < CAP(n, 60) && out.length < n && miss < STALL; tries++) {
     const x = minX + rnd() * (maxX - minX), y = minY + rnd() * (maxY - minY);
-    if (!pointInPoly(x, y, r.poly)) continue;
-    if (!skPlaceable(x, y, clear)) continue;
-    if (!passes(x, y, o)) continue;
+    if (!pointInPoly(x, y, r.poly)) { outside++; miss++; continue; }
+    if (!skPlaceable(x, y, clear)) { blocked++; miss++; continue; }
+    if (!passes(x, y, o)) { busy++; miss++; continue; }
     take(x, y, o);
     out.push([x, y]);
+    miss = 0;
   }
+  tally(`skylark/${r.id}`, n, out.length, { tries, outside, blocked, busy });
   return out;
 }
 
 /** N legal points anywhere on the field. `band` filters on distance to the
  *  coast, so "out in the rough" needs no polygon. */
-export function scatterLand(n: number, rnd: () => number, clear = 40, band?: [number, number], o?: SkScatterOpts): Pt[] {
+export function scatterLand(n: number, clear = 40, band?: [number, number], o?: SkScatterOpts): Pt[] {
+  const rnd = stream('skylark', 'land', n, clear, band?.join(','), o?.sep, o?.avoid?.join(','));
   const [minX, maxX, minY, maxY] = LAND_BOX;
   const out: Pt[] = [];
-  for (let tries = 0; tries < n * 90 && out.length < n; tries++) {
+  let outside = 0, blocked = 0, busy = 0, tries = 0, miss = 0;
+  for (; tries < CAP(n, 90) && out.length < n && miss < STALL; tries++) {
     const x = minX + rnd() * (maxX - minX), y = minY + rnd() * (maxY - minY);
-    if (!skPlaceable(x, y, clear)) continue;
-    if (band) { const d = distToEdge(x, y); if (d < band[0] || d > band[1]) continue; }
-    if (!passes(x, y, o)) continue;
+    if (!skPlaceable(x, y, clear)) { blocked++; miss++; continue; }
+    if (band) { const d = distToEdge(x, y); if (d < band[0] || d > band[1]) { outside++; miss++; continue; } }
+    if (!passes(x, y, o)) { busy++; miss++; continue; }
     take(x, y, o);
     out.push([x, y]);
+    miss = 0;
   }
+  tally('skylark/land', n, out.length, { tries, outside, blocked, busy });
   return out;
 }
 
 /** A clump around a point — a crew round a basket, a queue at a van, a stand
  *  of cylinders. */
-export function clusterAt(cx: number, cy: number, n: number, radius: number, rnd: () => number,
+export function clusterAt(cx: number, cy: number, n: number, radius: number,
                           clear = 30, o?: SkScatterOpts): Pt[] {
+  const rnd = stream('skylark', 'cluster', cx, cy, n, radius, clear, o?.sep);
   const out: Pt[] = [];
-  for (let tries = 0; tries < n * 40 && out.length < n; tries++) {
+  let blocked = 0, busy = 0, tries = 0, miss = 0;
+  for (; tries < CAP(n, 40) && out.length < n && miss < STALL; tries++) {
     const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * radius;
     const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
-    if (!skPlaceable(x, y, clear)) continue;
-    if (!passes(x, y, o)) continue;
+    if (!skPlaceable(x, y, clear)) { blocked++; miss++; continue; }
+    if (!passes(x, y, o)) { busy++; miss++; continue; }
     take(x, y, o);
     out.push([x, y]);
+    miss = 0;
   }
+  tally('skylark/cluster', n, out.length, { tries, outside: 0, blocked, busy });
   return out;
 }

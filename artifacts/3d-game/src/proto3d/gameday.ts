@@ -33,6 +33,8 @@ import {
   pointInPoly, smoothPoly, distToPath, pathPointAt,
   spotFree, spotOpen, claimSpot, resetPlacement,
 } from './bay';
+import { stream, tally, fixed, STALL, CAP } from './rng';
+
 export { pointInPoly, smoothPoly, distToPath, pathPointAt, spotFree, spotOpen, claimSpot, resetPlacement };
 
 export type Pt = [number, number];
@@ -265,7 +267,10 @@ export const LOT_ROWS: GdLotRow[] = [
 /** Every parking slot in the lot, west to east along each row.
  *  `jitter` (world units) nudges each vehicle off the exact centreline —
  *  a perfectly straight row of identical spacing reads as a fence, not a lot. */
-export function lotSlots(rnd: () => number, jitter = 26): { x: number; y: number; ang: number }[] {
+export function lotSlots(jitter = 26): { x: number; y: number; ang: number }[] {
+  // The lot's rows, on their own fixed stream — see ./rng. This is the hero
+  // district and the spawn, and it was riding the global Math.random.
+  const rnd = fixed('gameday', 'lotSlots', jitter);
   const out: { x: number; y: number; ang: number }[] = [];
   for (const row of LOT_ROWS) {
     const dx = row.b[0] - row.a[0], dy = row.b[1] - row.a[1];
@@ -373,47 +378,61 @@ const bbox = (poly: Pt[]): [number, number, number, number] => {
 const LAND_BOX = bbox(GD_LAND_SMOOTH);
 
 /** N legal points inside a district. */
-export function scatterInRegion(r: GdRegion, n: number, rnd: () => number, clear = 40, o?: GdScatterOpts): Pt[] {
+
+export function scatterInRegion(r: GdRegion, n: number, clear = 40, o?: GdScatterOpts): Pt[] {
+  const rnd = stream('gameday', r.id, n, clear, o?.sep, o?.avoid?.join(','));
   const [minX, maxX, minY, maxY] = bbox(r.poly);
   const out: Pt[] = [];
-  for (let tries = 0; tries < n * 60 && out.length < n; tries++) {
+  // WHY a scatter came up short, not just that it did — see ./rng's ledger.
+  let outside = 0, blocked = 0, busy = 0, tries = 0, miss = 0;
+  for (; tries < CAP(n, 60) && out.length < n && miss < STALL; tries++) {
     const x = minX + rnd() * (maxX - minX), y = minY + rnd() * (maxY - minY);
-    if (!pointInPoly(x, y, r.poly)) continue;
-    if (!gdPlaceable(x, y, clear)) continue;
-    if (!passes(x, y, o)) continue;
+    if (!pointInPoly(x, y, r.poly)) { outside++; miss++; continue; }
+    if (!gdPlaceable(x, y, clear)) { blocked++; miss++; continue; }
+    if (!passes(x, y, o)) { busy++; miss++; continue; }
     take(x, y, o);
     out.push([x, y]);
+    miss = 0;
   }
+  tally(`gameday/${r.id}`, n, out.length, { tries, outside, blocked, busy });
   return out;
 }
 
 /** N legal points anywhere on the plateau. `band` filters on distance to the
  *  tree line, so "in among the trees" or "well inside" needs no polygon. */
-export function scatterLand(n: number, rnd: () => number, clear = 40, band?: [number, number], o?: GdScatterOpts): Pt[] {
+export function scatterLand(n: number, clear = 40, band?: [number, number], o?: GdScatterOpts): Pt[] {
+  const rnd = stream('gameday', 'land', n, clear, band?.join(','), o?.sep, o?.avoid?.join(','));
   const [minX, maxX, minY, maxY] = LAND_BOX;
   const out: Pt[] = [];
-  for (let tries = 0; tries < n * 90 && out.length < n; tries++) {
+  let outside = 0, blocked = 0, busy = 0, tries = 0, miss = 0;
+  for (; tries < CAP(n, 90) && out.length < n && miss < STALL; tries++) {
     const x = minX + rnd() * (maxX - minX), y = minY + rnd() * (maxY - minY);
-    if (!gdPlaceable(x, y, clear)) continue;
-    if (band) { const d = distToEdge(x, y); if (d < band[0] || d > band[1]) continue; }
-    if (!passes(x, y, o)) continue;
+    if (!gdPlaceable(x, y, clear)) { blocked++; miss++; continue; }
+    if (band) { const d = distToEdge(x, y); if (d < band[0] || d > band[1]) { outside++; miss++; continue; } }
+    if (!passes(x, y, o)) { busy++; miss++; continue; }
     take(x, y, o);
     out.push([x, y]);
+    miss = 0;
   }
+  tally('gameday/land', n, out.length, { tries, outside, blocked, busy });
   return out;
 }
 
 /** A clump around a point — a knot of tents, a stand of maples. */
-export function clusterAt(cx: number, cy: number, n: number, radius: number, rnd: () => number,
+export function clusterAt(cx: number, cy: number, n: number, radius: number,
                           clear = 30, o?: GdScatterOpts): Pt[] {
+  const rnd = stream('gameday', 'cluster', cx, cy, n, radius, clear, o?.sep);
   const out: Pt[] = [];
-  for (let tries = 0; tries < n * 40 && out.length < n; tries++) {
+  let blocked = 0, busy = 0, tries = 0, miss = 0;
+  for (; tries < CAP(n, 40) && out.length < n && miss < STALL; tries++) {
     const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * radius;
     const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
-    if (!gdPlaceable(x, y, clear)) continue;
-    if (!passes(x, y, o)) continue;
+    if (!gdPlaceable(x, y, clear)) { blocked++; miss++; continue; }
+    if (!passes(x, y, o)) { busy++; miss++; continue; }
     take(x, y, o);
     out.push([x, y]);
+    miss = 0;
   }
+  tally('gameday/cluster', n, out.length, { tries, outside: 0, blocked, busy });
   return out;
 }

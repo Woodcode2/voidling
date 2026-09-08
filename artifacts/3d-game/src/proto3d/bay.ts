@@ -8,6 +8,8 @@
 // All coordinates are WORLD units (0..12000, centre 6000) — the same space
 // Maple Isle's silhouette uses, so the shared world->3D scale still applies.
 
+import { stream, tally, STALL, CAP } from './rng';
+
 export type Pt = [number, number];
 
 // the coastline, north headland clockwise round the hook and up the wild west
@@ -225,32 +227,41 @@ const LAND_BOX = (() => {
 // sand BETWEEN the districts, which a per-region scatter can never reach.
 // band: optional [minDistToCoast, maxDistToCoast] so a caller can ask for
 // "the shoreline" or "well inland" without hand-authoring a polygon.
-export function scatterLand(n: number, rnd: () => number, clear = 40, band?: [number, number], o?: ScatterOpts): Pt[] {
+
+export function scatterLand(n: number, clear = 40, band?: [number, number], o?: ScatterOpts): Pt[] {
+  const rnd = stream('pirate', 'land', n, clear, band?.join(','), o?.sep, o?.avoid?.join(','));
   const [minX, maxX, minY, maxY] = LAND_BOX;
   const out: Pt[] = [];
-  for (let tries = 0; tries < n * 90 && out.length < n; tries++) {
+  let outside = 0, blocked = 0, busy = 0, tries = 0, miss = 0;
+  for (; tries < CAP(n, 90) && out.length < n && miss < STALL; tries++) {
     const x = minX + rnd() * (maxX - minX), y = minY + rnd() * (maxY - minY);
-    if (!bayPlaceable(x, y, clear)) continue;
-    if (band) { const d = distToCoast(x, y); if (d < band[0] || d > band[1]) continue; }
-    if (!passes(x, y, o)) continue;
+    if (!bayPlaceable(x, y, clear)) { blocked++; miss++; continue; }
+    if (band) { const d = distToCoast(x, y); if (d < band[0] || d > band[1]) { outside++; miss++; continue; } }
+    if (!passes(x, y, o)) { busy++; miss++; continue; }
     take(x, y, o);
     out.push([x, y]);
+    miss = 0;
   }
+  tally('pirate/land', n, out.length, { tries, outside, blocked, busy });
   return out;
 }
 
 // a clump around a point — groves and rock piles read far better than an even
 // dusting when you are looking straight down at them
-export function clusterAt(cx: number, cy: number, n: number, radius: number, rnd: () => number, clear = 30, o?: ScatterOpts): Pt[] {
+export function clusterAt(cx: number, cy: number, n: number, radius: number, clear = 30, o?: ScatterOpts): Pt[] {
+  const rnd = stream('pirate', 'cluster', cx, cy, n, radius, clear, o?.sep);
   const out: Pt[] = [];
-  for (let tries = 0; tries < n * 40 && out.length < n; tries++) {
+  let blocked = 0, busy = 0, tries = 0, miss = 0;
+  for (; tries < CAP(n, 40) && out.length < n && miss < STALL; tries++) {
     const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * radius;
     const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
-    if (!bayPlaceable(x, y, clear)) continue;
-    if (!passes(x, y, o)) continue;
+    if (!bayPlaceable(x, y, clear)) { blocked++; miss++; continue; }
+    if (!passes(x, y, o)) { busy++; miss++; continue; }
     take(x, y, o);
     out.push([x, y]);
+    miss = 0;
   }
+  tally('pirate/cluster', n, out.length, { tries, outside: 0, blocked, busy });
   return out;
 }
 
@@ -332,20 +343,25 @@ const take = (x: number, y: number, o?: ScatterOpts): void => {
 };
 
 // rejection-sample N legal points inside a region — organic scatter, no grid
-export function scatterInRegion(r: BayRegion, n: number, rnd: () => number, clear = 40, o?: ScatterOpts): Pt[] {
+export function scatterInRegion(r: BayRegion, n: number, clear = 40, o?: ScatterOpts): Pt[] {
+  const rnd = stream('pirate', r.id, n, clear, o?.sep, o?.avoid?.join(','));
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (const [x, y] of r.poly) {
     minX = Math.min(minX, x); maxX = Math.max(maxX, x);
     minY = Math.min(minY, y); maxY = Math.max(maxY, y);
   }
   const out: Pt[] = [];
-  for (let tries = 0; tries < n * 60 && out.length < n; tries++) {
+  // WHY a scatter came up short, not just that it did — see ./rng's ledger.
+  let outside = 0, blocked = 0, busy = 0, tries = 0, miss = 0;
+  for (; tries < CAP(n, 60) && out.length < n && miss < STALL; tries++) {
     const x = minX + rnd() * (maxX - minX), y = minY + rnd() * (maxY - minY);
-    if (!pointInPoly(x, y, r.poly)) continue;
-    if (!bayPlaceable(x, y, clear)) continue;
-    if (!passes(x, y, o)) continue;
+    if (!pointInPoly(x, y, r.poly)) { outside++; miss++; continue; }
+    if (!bayPlaceable(x, y, clear)) { blocked++; miss++; continue; }
+    if (!passes(x, y, o)) { busy++; miss++; continue; }
     take(x, y, o);
     out.push([x, y]);
+    miss = 0;
   }
+  tally(`pirate/${r.id}`, n, out.length, { tries, outside, blocked, busy });
   return out;
 }

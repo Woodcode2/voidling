@@ -36,6 +36,8 @@ import {
   spotFree, spotOpen, claimSpot, resetPlacement,
 } from './bay';
 
+import { stream, tally, fixed, STALL, CAP } from './rng';
+
 export { pointInPoly, smoothPoly, distToPath, pathPointAt, spotFree, spotOpen, claimSpot, resetPlacement };
 
 export type Pt = [number, number];
@@ -260,7 +262,11 @@ export interface LnStallSlot { x: number; y: number; ang: number; side: -1 | 1 }
 /** `pitch` is the gap between stall centres in world units — 210 gives a
  *  10.5-unit gap in 3D, about one stall's width, so the row reads as a row
  *  rather than a wall. */
-export function stallSlots(rnd: () => number, pitch = 210, jitter = 26): LnStallSlot[] {
+export function stallSlots(pitch = 230, jitter = 30): LnStallSlot[] {
+  // ONE LAYOUT, ONE STREAM — see ./rng's `fixed`. Three callers read this and
+  // they must get the same street; the default pitch is the one the stalls are
+  // actually placed at, so a caller that takes the default agrees with them.
+  const rnd = fixed('lantern', 'stallSlots', pitch, jitter);
   const out: LnStallSlot[] = [];
   // walk the canal, not the market line: the stalls belong to the WATER, and
   // both banks get a row so the player drives down a corridor of them
@@ -321,47 +327,61 @@ const bbox = (poly: Pt[]): [number, number, number, number] => {
 const LAND_BOX = bbox(LN_LAND_SMOOTH);
 
 /** N legal points inside a district. */
-export function scatterInRegion(r: LnRegion, n: number, rnd: () => number, clear = 40, o?: LnScatterOpts): Pt[] {
+
+export function scatterInRegion(r: LnRegion, n: number, clear = 40, o?: LnScatterOpts): Pt[] {
+  const rnd = stream('lantern', r.id, n, clear, o?.sep, o?.avoid?.join(','));
   const [minX, maxX, minY, maxY] = bbox(r.poly);
   const out: Pt[] = [];
-  for (let tries = 0; tries < n * 60 && out.length < n; tries++) {
+  // WHY a scatter came up short, not just that it did — see ./rng's ledger.
+  let outside = 0, blocked = 0, busy = 0, tries = 0, miss = 0;
+  for (; tries < CAP(n, 60) && out.length < n && miss < STALL; tries++) {
     const x = minX + rnd() * (maxX - minX), y = minY + rnd() * (maxY - minY);
-    if (!pointInPoly(x, y, r.poly)) continue;
-    if (!lnPlaceable(x, y, clear)) continue;
-    if (!passes(x, y, o)) continue;
+    if (!pointInPoly(x, y, r.poly)) { outside++; miss++; continue; }
+    if (!lnPlaceable(x, y, clear)) { blocked++; miss++; continue; }
+    if (!passes(x, y, o)) { busy++; miss++; continue; }
     take(x, y, o);
     out.push([x, y]);
+    miss = 0;
   }
+  tally(`lantern/${r.id}`, n, out.length, { tries, outside, blocked, busy });
   return out;
 }
 
 /** N legal points anywhere in the valley. `band` filters on distance to the
  *  valley wall, so "in among the bamboo" needs no polygon. */
-export function scatterLand(n: number, rnd: () => number, clear = 40, band?: [number, number], o?: LnScatterOpts): Pt[] {
+export function scatterLand(n: number, clear = 40, band?: [number, number], o?: LnScatterOpts): Pt[] {
+  const rnd = stream('lantern', 'land', n, clear, band?.join(','), o?.sep, o?.avoid?.join(','));
   const [minX, maxX, minY, maxY] = LAND_BOX;
   const out: Pt[] = [];
-  for (let tries = 0; tries < n * 90 && out.length < n; tries++) {
+  let outside = 0, blocked = 0, busy = 0, tries = 0, miss = 0;
+  for (; tries < CAP(n, 90) && out.length < n && miss < STALL; tries++) {
     const x = minX + rnd() * (maxX - minX), y = minY + rnd() * (maxY - minY);
-    if (!lnPlaceable(x, y, clear)) continue;
-    if (band) { const d = distToEdge(x, y); if (d < band[0] || d > band[1]) continue; }
-    if (!passes(x, y, o)) continue;
+    if (!lnPlaceable(x, y, clear)) { blocked++; miss++; continue; }
+    if (band) { const d = distToEdge(x, y); if (d < band[0] || d > band[1]) { outside++; miss++; continue; } }
+    if (!passes(x, y, o)) { busy++; miss++; continue; }
     take(x, y, o);
     out.push([x, y]);
+    miss = 0;
   }
+  tally('lantern/land', n, out.length, { tries, outside, blocked, busy });
   return out;
 }
 
 /** A clump around a point — a knot of crates, a stand of bamboo. */
-export function clusterAt(cx: number, cy: number, n: number, radius: number, rnd: () => number,
+export function clusterAt(cx: number, cy: number, n: number, radius: number,
                           clear = 30, o?: LnScatterOpts): Pt[] {
+  const rnd = stream('lantern', 'cluster', cx, cy, n, radius, clear, o?.sep);
   const out: Pt[] = [];
-  for (let tries = 0; tries < n * 40 && out.length < n; tries++) {
+  let blocked = 0, busy = 0, tries = 0, miss = 0;
+  for (; tries < CAP(n, 40) && out.length < n && miss < STALL; tries++) {
     const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * radius;
     const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
-    if (!lnPlaceable(x, y, clear)) continue;
-    if (!passes(x, y, o)) continue;
+    if (!lnPlaceable(x, y, clear)) { blocked++; miss++; continue; }
+    if (!passes(x, y, o)) { busy++; miss++; continue; }
     take(x, y, o);
     out.push([x, y]);
+    miss = 0;
   }
+  tally('lantern/cluster', n, out.length, { tries, outside: 0, blocked, busy });
   return out;
 }

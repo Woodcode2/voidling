@@ -302,6 +302,17 @@ const SUITE = [
     env: { SEED: '7' }, verdict: pf,
     why: 'every prop earns the spot it stands on — no tree on a road, no road ending in nothing, nothing inside a building or standing in the sea, measured against a frozen ceiling that can only go down' },
 
+  // THE SCATTER GETS WHAT IT ASKED FOR. This is in PUSH from the day it was
+  // written, because the fault it catches shipped silently in five worlds: the
+  // repo's LCG multiplied past 2^53, its period collapsed to 10,466 states, and
+  // pirate and skylark took 181,318 and 169,139 draws through it. A lapped
+  // stream re-proposes ground it has already claimed, so the scatter gives up
+  // short — skylark's launchfield asked for 620 props and placed 133, and every
+  // screenshot of that world still looked fine.
+  { id: 'rng', tier: 'quality', profiles: ['push', 'live', 'quality'], timeout: 1800,
+    cmd: ['node', 'qa/rng.mjs', 'all', PORT], verdict: exitCode,
+    why: 'every prop the level design authored is actually on the island — asked against placed, per district, read off the live page' },
+
   // HOW MUCH OF THE SCREEN IS FOOD. Registered in QUALITY and not yet in push,
   // and that is a statement rather than a dodge: three worlds fail F2 today
   // (lantern 1.83 s, gameday 2.11, pirate 3.00 against a 1.5 s bar) and one

@@ -3850,7 +3850,7 @@ export function createLife(
   if (worldId() === 'pirate') {
     const region = (id: BAY.BayBiome) => BAY.BAY_REGIONS.find((r) => r.id === id)!;
     const spread = (id: BAY.BayBiome, n: number, clear = 45): [number, number][] =>
-      BAY.scatterInRegion(region(id), n, Math.random, clear).map(w3);
+      BAY.scatterInRegion(region(id), n, clear).map(w3);
 
     // ── who works and who holidays WHERE. Every district gets a cast list, not
     // a crowd count: rich guests and their staff at the resort, dock hands and
@@ -4170,7 +4170,7 @@ export function createLife(
     // troop reads as a place and an even dusting reads as noise.
     const MONKEYS: [number, number][] = [];
     for (const [gx, gy] of [[3960, 5250], [3560, 5820], [4380, 4560]] as [number, number][])
-      for (const p2 of BAY.clusterAt(gx, gy, 2, 320, Math.random, 25)) MONKEYS.push(w3(p2));
+      for (const p2 of BAY.clusterAt(gx, gy, 2, 320, 25)) MONKEYS.push(w3(p2));
     for (const p2 of spread('jungle', 4, 30)) MONKEYS.push(p2);
     for (const [x, z] of MONKEYS) {
       const m = makeMonkey();
@@ -4265,13 +4265,13 @@ export function createLife(
     // whole region, half kept in the middle where the district reads from.
     for (const [x, z] of spread('jungle', 5, 40))
       place(pick(['guest', 'guest', 'grounds', 'kid', 'digger'] as Role[]), 'jungle', x, z, 'jungle');
-    for (const p2 of BAY.clusterAt(3760, 5060, 5, 430, Math.random, 40)) {
+    for (const p2 of BAY.clusterAt(3760, 5060, 5, 430, 40)) {
       const [x, z] = w3(p2);
       place(pick(['guest', 'grounds', 'kid', 'guest'] as Role[]), 'jungle', x, z, 'jungle');
     }
     // (a parrot is seven meshes, not one — three of them, in the one place the
     // district reads from, buys more than eight dusted across the region)
-    for (const p2 of BAY.clusterAt(3820, 5180, 3, 400, Math.random, 25)) {
+    for (const p2 of BAY.clusterAt(3820, 5180, 3, 400, 25)) {
       const [x, z] = w3(p2);
       addWanderer(makeParrot(), x, z, 14, rand(1.8, 3.0), 22, 1.4, 'jungle');
     }
@@ -4576,7 +4576,7 @@ export function createLife(
         });
       }
       // …and the people who came to watch: towels, kids and a drinks waiter
-      for (const [bx, by] of BAY.clusterAt(CX - 120, CY + 60, 7, 380, Math.random, 40)) {
+      for (const [bx, by] of BAY.clusterAt(CX - 120, CY + 60, 7, 380, 40)) {
         const role = pick(['guest', 'kid', 'rich', 'kid', 'waiter'] as Role[]);
         const [x, z] = w3([bx, by]);
         place(role, 'beach', x, z, 'beach');
@@ -4645,7 +4645,7 @@ export function createLife(
     for (const [id, n, clear] of LN_CAST) {
       const r = lnRegion(id);
       if (!r) continue;
-      const pts = LN.scatterInRegion(r, n, Math.random, clear);
+      const pts = LN.scatterInRegion(r, n, clear);
       for (const [wx, wy] of pts) {
         // a fifth of the market crowd is a child, because a festival is where
         // children are, and a small fast silhouette among slow tall ones is
@@ -4663,7 +4663,7 @@ export function createLife(
     // arrivals still coming down the path — so they walk with a purpose and a
     // long tether rather than milling.
     {
-      for (const [wx, wy] of LN.scatterLand(70, Math.random, 40, [0, 620])) {
+      for (const [wx, wy] of LN.scatterLand(70, 40, [0, 620])) {
         lnPlace(wx, wy, 'bamboo', { tether: 26, speed: rand(0.6, 1.2),
           kid: Math.random() < 0.22 });
       }
@@ -4672,7 +4672,7 @@ export function createLife(
     // are the spirits who do the greeting, so they stand where the player will
     // actually drive past them.
     {
-      const slots = LN.stallSlots(Math.random, 230, 30);
+      const slots = LN.stallSlots();   // the SAME street the stalls stand on — see lantern.ts
       for (const sl of slots) {
         // just BEHIND the counter, on the far side from the water
         const bx = sl.x + Math.cos(sl.ang + Math.PI) * 46;
@@ -4707,12 +4707,12 @@ export function createLife(
     for (const [id, n, clear] of PW_CAST) {
       const r = pwRegion(id);
       if (!r) continue;
-      for (const [wx, wy] of PW.scatterInRegion(r, n, Math.random, clear))
+      for (const [wx, wy] of PW.scatterInRegion(r, n, clear))
         pwPlace(wx, wy, id, { kid: Math.random() < 0.45 });
     }
     // the HIGH SHOULDER is the rim band, not a polygon (powder.ts's own note:
     // never scatterInRegion into it) — stragglers coming down for the day
-    for (const [wx, wy] of PW.scatterLand(30, Math.random, 40, [0, 600]))
+    for (const [wx, wy] of PW.scatterLand(30, 40, [0, 600]))
       pwPlace(wx, wy, 'rim', { tether: 26, speed: rand(1.0, 1.8), kid: Math.random() < 0.3 });
 
     // ── SKATERS: the lake's signature. They LOOP — long oval orbits at real
@@ -4998,7 +4998,7 @@ export function createLife(
         const starts = bins.length >= 4 ? bins : [];
         for (let i = 0; i < 14; i++) {
           const home = starts.length ? pick2(starts) : null;
-          const [hx, hz] = home ? off(home.position.x, home.position.z, 2) : g3(pick2(SK.scatterInRegion(skRegion(i % 2 ? 'breakfast' : 'arrivals'), 1, Math.random, 40)));
+          const [hx, hz] = home ? off(home.position.x, home.position.z, 2) : g3(pick2(SK.scatterInRegion(skRegion(i % 2 ? 'breakfast' : 'arrivals'), 1, 40)));
           const route = home ? nearest(bins, hx, hz, 60).slice(0, 4).map((bn) => off(bn.position.x, bn.position.z, 1.4)) : undefined;
           cast('cleaner', hx, hz, { stops: route, leg: route ? undefined : 24, tether: 30, speed: rand(0.7, 1.0), dwellMode: i % 2 ? 8 : undefined, side: i % 2 });
         }
@@ -5047,7 +5047,7 @@ export function createLife(
       for (const [id, n, leg] of PUBLIC) {
         const r = skRegion(id);
         if (!r) continue;
-        for (const [wx, wy] of SK.scatterInRegion(r, n, Math.random, 26)) {
+        for (const [wx, wy] of SK.scatterInRegion(r, n, 26)) {
           const [x, z] = g3([wx, wy]);
           cast(Math.random() < 0.22 ? 'kid' : 'tourist', x, z, { leg, tether: 12 });
         }
@@ -5107,7 +5107,7 @@ export function createLife(
 
       // ── SPECTATORS — the fence line, come to watch and therefore already
       // arrived (leg 0 keeps them local, as Game Day's lot crowd is).
-      for (const [wx, wy] of SK.scatterLand(50, Math.random, 40, [260, 900])) {
+      for (const [wx, wy] of SK.scatterLand(50, 40, [260, 900])) {
         const [x, z] = g3([wx, wy]);
         cast('spectator', x, z, { leg: 0, tether: 6, speed: rand(0.4, 0.8) });
       }
@@ -5120,7 +5120,7 @@ export function createLife(
       }
 
       // ── DOG WALKERS — the long way round, as today.
-      for (const [wx, wy] of SK.scatterInRegion(skRegion('meadow'), 6, Math.random, 40)) {
+      for (const [wx, wy] of SK.scatterInRegion(skRegion('meadow'), 6, 40)) {
         const [x, z] = g3([wx, wy]);
         cast('dogwalker', x, z, { leg: 44, tether: 40, voice: 'spectator' });   // VOICE_OF says 'gossip', which on this field is Maple's suburb
       }
@@ -5454,7 +5454,7 @@ export function createLife(
     ];
     for (const [id, roles, clear] of GD_CAST) {
       let total = 0; for (const r of roles) total += r[1];
-      const pts = GD.scatterInRegion(gdRegion(id), total, Math.random, clear);
+      const pts = GD.scatterInRegion(gdRegion(id), total, clear);
       let i = 0;
       for (const [voice, n] of roles) for (let k = 0; k < n && i < pts.length; k++, i++) {
         // a quarter of the 'parent' slots come with an actual child, which is
