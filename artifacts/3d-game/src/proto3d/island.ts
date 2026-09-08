@@ -6750,15 +6750,24 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // fix never landed. Big things claim their ground before small things fill
     // in around them. It is the same order the launch field's envelopes and
     // Pirate Bay's landmark reserve already use, written down here.
-    plant('stalls', 76, 46, 3.4, NM.makeMarketShed, false, 'house', 7.5);
-    plant('teahouse', 30, 50, 3.4, NM.makeMarketShed, false, 'house', 7.5);
-    plant('bathhouse', 26, 54, 3.4, NM.makeMarketShed, false, 'house', 7.5);
-    plant('bathhouse', 22, 74, 4.6, NM.makeKura, false, 'house', 6.5);
-    plant('bridge', 10, 56, 3.4, NM.makeMarketShed, false, 'house', 7.5);
-    plant('shrine', 20, 56, 3.4, NM.makeMarketShed, false, 'house', 7.5);
-    plant('shrine', 14, 82, 4.6, NM.makeKura, false, 'house', 6.5);
-    plant('garden', 18, 62, 3.4, NM.makeMarketShed, false, 'house', 7.5);
-    plant('gate', 8, 96, 4.6, NM.makeKura, false, 'house', 6.5);
+    // AND `clear` HAS TO COVER THE BUILDING, NOT ITS CENTRE. lnPlaceable tests
+    // ONE POINT against the canal bank, the market street and the bathhouse, so
+    // `clear` is how far the building's MIDDLE is held back — and a market shed
+    // is 12.2 units long, 122 world units of it, against the 46 these asked
+    // for. With two sheds on the island that never showed; with seventy-six it
+    // put twenty of them out over the canal, and qa/placement.mjs read water 23
+    // against a frozen ceiling of 3. 130 is the shed's own half-diagonal in
+    // world units plus a little, so the building clears the bank rather than
+    // its centre point doing so.
+    plant('stalls', 76, 130, 3.4, NM.makeMarketShed, false, 'house', 7.5);
+    plant('teahouse', 30, 130, 3.4, NM.makeMarketShed, false, 'house', 7.5);
+    plant('bathhouse', 26, 130, 3.4, NM.makeMarketShed, false, 'house', 7.5);
+    plant('bathhouse', 22, 130, 4.6, NM.makeKura, false, 'house', 6.5);
+    plant('bridge', 10, 130, 3.4, NM.makeMarketShed, false, 'house', 7.5);
+    plant('shrine', 20, 130, 3.4, NM.makeMarketShed, false, 'house', 7.5);
+    plant('shrine', 14, 130, 4.6, NM.makeKura, false, 'house', 6.5);
+    plant('garden', 18, 130, 3.4, NM.makeMarketShed, false, 'house', 7.5);
+    plant('gate', 8, 130, 4.6, NM.makeKura, false, 'house', 6.5);
 
     // ── LANTERN ROW ───────────────────────────────────────────────────────
     // The stalls, laid along the canal on both banks and turned to face the
@@ -7549,17 +7558,21 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     }
     if (axFail) console.warn('[pirate] resort axis: ' + axFail + ' sites rejected');
 
-    // ── THE DOCKS: the galleon at the pier head    // ── THE DOCKS: the galleon at the pier head, cargo, cannons, lighthouse
-    for (const p2 of spread('port', 34, 40)) drop(rnd2() < 0.6 ? makeBarrel() : makeChest(), p2, 1.4);
+    // ── THE DOCKS: the galleon at the pier head, cargo, cannons, lighthouse
     dropGlb('lighthouse', [8150, 2500], 6.5, 19, makeLighthouseFB);
     landmark(makeWarehouse(), [6850, 3450], 7.5, 0.5, 260);        // the cargo shed + crane
-    for (const p2 of spread('port', 6, 60, 2)) drop(makeCannon(), p2, 2, rand(0, Math.PI * 2));
+    // BIGGEST FIRST, for the reason the beach records below: the huts and the
+    // anchor monument need two to three times the ground a bollard does, and
+    // running them after the barrels left the docks placing three of eight.
     for (const p2 of spread('port', 4, 90, 5)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2));   // sep 5 = a 6x6 hut's half-diagonal + margin; forced past drop()'s own-claim test
+    for (const p2 of spread('port', 3, 90, 2.6)) drop(LUXE.makeAnchorMonument(), p2, 2.6, rand(0, Math.PI * 2));
+    for (const p2 of spread('port', 6, 60, 2)) drop(makeCannon(), p2, 2, rand(0, Math.PI * 2));
     // makeShopBox was a bare grey cube — 24 of them across two districts were the
     // first thing your eye landed on. Real dockside furniture instead.
-    for (const p2 of spread('port', 10, 40, 1.4)) drop(LUXE.makeRopeBollard(), p2, 1.4, rand(0, Math.PI * 2));
     for (const p2 of spread('port', 8, 45, 1.5)) drop(LUXE.makeDeckChest(), p2, 1.5, rand(0, Math.PI * 2));
-    for (const p2 of spread('port', 3, 90, 2.6)) drop(LUXE.makeAnchorMonument(), p2, 2.6, rand(0, Math.PI * 2));
+    for (const p2 of spread('port', 10, 40, 1.4)) drop(LUXE.makeRopeBollard(), p2, 1.4, rand(0, Math.PI * 2));
+    // no sep, so it claims nothing and can take whatever is left — last by right
+    for (const p2 of spread('port', 34, 40)) drop(rnd2() < 0.6 ? makeBarrel() : makeChest(), p2, 1.4);
 
     // ── OLD TOWN: a huddle of thatch houses and market clutter on the bluff
     for (const p2 of spread('oldtown', 24, 55, 5)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2));   // qa/placement.mjs: 21 hut-through-hut footprints at sep 3
@@ -7701,13 +7714,20 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       landmark(wreck, [2520, 6620], 7, 1.9, 120);
     }
 
-    // ── SUNSET BEACH: the long outer sweep — umbrellas, castles, palms
+    // ── SUNSET BEACH: the long outer sweep — palms, umbrellas, castles
+    // BIGGEST FIRST. These ran the other way round and qa/rng.mjs measured the
+    // cost: the palms and the lifeguard chairs are the last two passes and both
+    // placed NOTHING — 36 palms and 6 chairs asked for, none on the beach. They
+    // need 2.6 units of ground against an umbrella's 1.8, and by the time they
+    // ran the sweep was already dressed with sixty umbrellas, forty-four chairs
+    // and twenty-eight sandcastles. It is the same fault as Lantern's market
+    // sheds and Game Day's Frat Row, on the third world.
+    for (const p2 of spread('beach', 18, 50, 2.6)) dropGlb('palm', p2, 2.6, rand(6.5, 9), makePalm, rand(0, Math.PI * 2));
+    for (const p2 of spread('beach', 3, 90, 2.6)) drop(makeLifeguardFB(), p2, 2.6, rand(0, Math.PI * 2));
     for (const p2 of spread('beach', 30, 36, 1.8)) dropGlb('umbrella', p2, 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
     for (const p2 of spread('beach', 22, 34, 1.4)) drop(makeBeachChairFB(), p2, 1.4, rand(0, Math.PI * 2));
     for (const p2 of spread('beach', 14, 36, 1.2)) drop(makeSandcastleFB(), p2, 1.2);
-    for (const p2 of spread('beach', 18, 50, 2.6)) dropGlb('palm', p2, 2.6, rand(6.5, 9), makePalm, rand(0, Math.PI * 2));
     for (const p2 of spread('beach', 20, 22, 0.5)) drop(makeShell(), p2, 0.5, rand(0, Math.PI * 2));
-    for (const p2 of spread('beach', 3, 90, 2.6)) drop(makeLifeguardFB(), p2, 2.6, rand(0, Math.PI * 2));
     // the beach had NOTHING over 3 units tall — a dusting of confetti on cream
     // ground. A centre, an edge, and a straight row of MATCHED parasols
     // parallel to the tideline instead of 30 umbrellas at random rotation.
