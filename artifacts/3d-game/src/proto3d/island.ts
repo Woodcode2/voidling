@@ -7216,9 +7216,21 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // the multiplier lives HERE, in the one helper they all go through: every
     // prop type grows by the same factor and their proportions are untouched.
     const BAY_DENSITY = 2.0;
+    // ── ITS OWN STREAM, LIKE POWDER AND SKYLARK ───────────────────────────
+    // PIRATE BAY was the third world still drawing its placement from the
+    // global Math.random, and the cost showed up the moment anything was added
+    // to it: giving the party deck its litter moved 587 props in and swung the
+    // spawn frame's food coverage from 37.9% to 16.2% — not because content
+    // left, but because ~266 extra scatter draws shifted the shared stream and
+    // reshuffled everything downstream of the island, the crowd included. A
+    // measurement that moves when you add to a different district is not a
+    // measurement. Same generator, same shape, its own seed — the fix powder
+    // and skylark took this morning, and the house rule at :297.
+    const rnd2 = (() => { let sd = 4242; return () => ((sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); })();
+
     const spread = (id: string, n: number, clear = 60, sep?: number) =>
       BAY.scatterInRegion(BAY.BAY_REGIONS.find((r) => r.id === id)!,
-        Math.round(n * BAY_DENSITY), Math.random, clear, { sep });
+        Math.round(n * BAY_DENSITY), rnd2, clear, { sep });
     BAY.resetPlacement();   // a fresh island starts with empty ground
 
     // A landmark is big enough that "on land" isn't sufficient — it must also
@@ -7250,9 +7262,9 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // and palm trees were growing on the lit dance floor.
     const NO_TOWN: BAY.BayBiome[] = ['party', 'port', 'resort', 'market', 'oldtown'];
     const sland = (n: number, clear = 45, band?: [number, number], sep?: number, avoid?: BAY.BayBiome[]) =>
-      BAY.scatterLand(Math.round(n * BAY_DENSITY), Math.random, clear, band, { sep, avoid });
+      BAY.scatterLand(Math.round(n * BAY_DENSITY), rnd2, clear, band, { sep, avoid });
     const grove = (cx2: number, cy2: number, n: number, rad: number, clear = 30) =>
-      BAY.clusterAt(cx2, cy2, n, rad, Math.random, clear, { sep: 2.6 });
+      BAY.clusterAt(cx2, cy2, n, rad, rnd2, clear, { sep: 2.6 });
 
     // ══ THE WILD ISLAND ═══════════════════════════════════════════════════
     // Everything below is a district; MOST of Pirate Bay is the open sand and
@@ -7267,7 +7279,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // palm GROVES (clumps, not an even dusting — from above a clump reads as
     // a place, a dusting reads as noise)
     for (const [gx2, gy2] of sland(17, 240, undefined, undefined, NO_TOWN)) {
-      for (const p2 of grove(gx2, gy2, 4 + Math.floor(Math.random() * 5), 420, 55))
+      for (const p2 of grove(gx2, gy2, 4 + Math.floor(rnd2() * 5), 420, 55))
         dropGlb('palm', p2, 2.6, rand(6.5, 10.5), makePalm, rand(0, Math.PI * 2));
     }
     // ── THE BIG ONES ──────────────────────────────────────────────────────
@@ -7466,7 +7478,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     if (axFail) console.warn('[pirate] resort axis: ' + axFail + ' sites rejected');
 
     // ── THE DOCKS: the galleon at the pier head    // ── THE DOCKS: the galleon at the pier head, cargo, cannons, lighthouse
-    for (const p2 of spread('port', 34, 40)) drop(Math.random() < 0.6 ? makeBarrel() : makeChest(), p2, 1.4);
+    for (const p2 of spread('port', 34, 40)) drop(rnd2() < 0.6 ? makeBarrel() : makeChest(), p2, 1.4);
     dropGlb('lighthouse', [8150, 2500], 6.5, 19, makeLighthouseFB);
     landmark(makeWarehouse(), [6850, 3450], 7.5, 0.5, 260);        // the cargo shed + crane
     for (const p2 of spread('port', 6, 60, 2)) drop(makeCannon(), p2, 2, rand(0, Math.PI * 2));
@@ -7572,7 +7584,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         }
       }
     }
-    for (const p2 of spread('market', 16, 36)) drop(Math.random() < 0.5 ? makeChest() : makeBarrel(), p2, 1.4);
+    for (const p2 of spread('market', 16, 36)) drop(rnd2() < 0.5 ? makeChest() : makeBarrel(), p2, 1.4);
     for (const p2 of spread('market', 10, 50, 2.6)) dropGlb('palm', p2, 2.6, rand(6, 8.5), makePalm, rand(0, Math.PI * 2));
     for (const p2 of spread('market', 8, 34, 1.6)) drop(LUXE.makeGiftKiosk(), p2, 1.6, rand(0, Math.PI * 2));
     for (const p2 of spread('market', 4, 60, 2.2)) drop(LUXE.makeParrotPerch(), p2, 2.2);
@@ -7582,7 +7594,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
 
     // ── THE JUNGLE: dense canopy, boulders, a hidden chest
     for (const p2 of spread('jungle', 62, 34)) {
-      if (Math.random() < 0.72) dropGlb('palm', p2, 2.6, rand(7, 10.5), makePalm, rand(0, Math.PI * 2));
+      if (rnd2() < 0.72) dropGlb('palm', p2, 2.6, rand(7, 10.5), makePalm, rand(0, Math.PI * 2));
       else drop(makePine(), p2, 3);
     }
     landmark(makeJungleTemple(), [4300, 4200], 9, 0.6, 280);       // THE LOST TEMPLE
@@ -7665,6 +7677,50 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       // council wheelie bins on a five-star waterfront. Planters instead.
       if (pi % 3 === 1) drop(LUXE.makePotPlant(), [a2.x - nx * side * (BAY.PROM_HALF - 25), a2.y - ny * side * (BAY.PROM_HALF - 25)], 0.9);
       if (pi % 8 === 4) drop(LUXE.makeSignpost(), [a2.x + nx * side * (BAY.PROM_HALF - 30), a2.y + ny * side * (BAY.PROM_HALF - 30)], 1.6, -a2.ang);
+    }
+    // ── THE FIVE DISTRICTS NOTHING SCATTERS INTO ──────────────────────────
+    // NO_TOWN (:7251) keeps the wild-island pass off the five authored
+    // districts, which is right — reeds and sea stacks do not belong on a dance
+    // floor. But nothing was put back, and the void SPAWNS on the party deck.
+    //
+    // Measured by qa/food.mjs at the play camera: the twentieth thing Pirate
+    // Bay lets you eat is 36.5 units away, three full seconds of travel at
+    // spawn speed, against maple's 0.74 s. The party district's entire eatable
+    // stock is 14 coins and a twenty-torch ring; everything else it owns —
+    // barrels 1.3, speaker stacks 2.6, tiki bars 3.4 — is over the size gate on
+    // the first bite. A child's opening minute here is a floor they cannot
+    // touch.
+    //
+    // So the districts get their own litter, in their own idiom: spilled
+    // treasure where the party is, shells where the sand meets the buildings,
+    // petals through the resort. All are radius <= 0.7 and therefore eatable at
+    // the spawn radius of 0.9, and all are well under the 2.0 that
+    // qa/placement.mjs calls `solid` (:314) — so they can only ever file as
+    // `clutter`, which is uncapped information, never as `overlap`, which is a
+    // failure against the frozen ceiling.
+    // AND SOME OF IT HAS TO STAND UP. The first cut of this was all FLAT —
+    // coins, shells and petals lying on the ground — and it fixed the pacing
+    // completely while barely touching how full the frame looks: from a camera
+    // at 45 degrees a disc on the floor is a few pixels and a suitcase is a
+    // hundred. Measured, litter added and pacing solved: the twentieth mouthful
+    // fell from 36.5 units to 9.3, and the share of the frame that is food went
+    // DOWN. Half the answer was standing things up.
+    for (const [id, coins, shells, petals, tall] of [
+      ['party', 34, 26, 20, 16],      // the deck the match opens on — the heaviest
+      ['resort', 12, 24, 22, 14],
+      ['market', 22, 14, 10, 12],
+      ['oldtown', 16, 16, 8, 10],
+      ['port', 20, 22, 0, 14],        // no petals on a working dock
+    ] as const) {
+      for (const p2 of spread(id, coins, 18, 0.6)) drop(makeCoins(), p2, 0.6);
+      for (const p2 of spread(id, shells, 20, 0.5)) drop(makeShell(), p2, 0.5, rnd2() * Math.PI * 2);
+      for (const p2 of spread(id, petals, 22, 0.7)) drop(makeFlowers(), p2, 0.7);
+      // the standing half: luggage where holidaymakers drop it, torches where
+      // the party is. Both radius 1.0 — still inside the 1.11 ratio the size
+      // gate uses at the spawn radius of 0.9, so they are eatable on the first
+      // bite, and both are well under the 2.0 that qa/placement.mjs calls solid
+      for (const p2 of spread(id, tall, 24, 1.0))
+        drop(id === 'party' || id === 'oldtown' ? makeTorch() : makeLuggage(), p2, 1.0);
     }
     return;   // Pirate Bay is fully populated — the Maple grid pass never runs
   }

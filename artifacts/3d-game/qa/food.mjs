@@ -119,15 +119,31 @@ for (const world of WORLDS) {
     for (const e of eds) e.mesh.visible = false;
     const B = grab();
     eds.forEach((e, i) => { e.mesh.visible = was[i]; });
+    // ── AND THE HALF OF IT HE CAN ACTUALLY EAT ──────────────────────────────
+    // F1 hides EVERY edible, so it counts a frame full of barrels as full of
+    // food — and at the spawn radius a barrel is over the size gate and cannot
+    // be touched for another minute. Its own numbers caught it: giving PIRATE's
+    // party deck the litter it was missing took the twentieth mouthful from
+    // 3.00 s of travel to 0.87 s, and DROPPED F1 from 37.9% to 16.1%, because
+    // coins lying flat cover a fraction of the pixels a barrel does. The frame
+    // got better and the bar went red.
+    // So both are measured now: everything that is food, and the food he can
+    // eat right now, at the same 1.11 ratio the game itself gates on.
+    const eat = eds.filter((e) => (e.radius || 0) <= vs.r * 1.11);
+    for (const e of eat) e.mesh.visible = false;
+    const C = grab();
+    eds.forEach((e, i) => { e.mesh.visible = was[i]; });
     RR(scene, cam);
 
     const DIFF = 10;
-    let food = 0;
+    let food = 0, eatPx = 0;
     const tint = new Uint8Array(w * h * 4);
     for (let i = 0, px = 0; i < A.length; i += 4, px++) {
       const changed = Math.abs(A[i] - B[i]) > DIFF || Math.abs(A[i + 1] - B[i + 1]) > DIFF
         || Math.abs(A[i + 2] - B[i + 2]) > DIFF;
       if (changed) food++;
+      if (Math.abs(A[i] - C[i]) > DIFF || Math.abs(A[i + 1] - C[i + 1]) > DIFF
+        || Math.abs(A[i + 2] - C[i + 2]) > DIFF) eatPx++;
       // the diagnostic picture: the frame, with everything edible pulled
       // toward magenta, so a human can see what the number is counting
       tint[i] = changed ? Math.min(255, A[i] * 0.45 + 255 * 0.55) : A[i];
@@ -205,7 +221,8 @@ for (const world of WORLDS) {
       else if (m.children && m.children.some((c) => c.userData && c.userData.cshadow)) shLoose++;
     }
     const ms = window.__matchState ? window.__matchState() : { t: -1 };
-    return { w, h, coverage: 100 * food / (w * h), t: ms.t, shBatched, shLoose, liars,
+    return { w, h, coverage: 100 * food / (w * h), eatCoverage: 100 * eatPx / (w * h),
+      t: ms.t, shBatched, shLoose, liars,
       calls: draws.calls, tris: draws.tris,
       edibles: eds.length, inView, eatableInView, eatableTotal: eatable.length,
       voidR: vs.r,
@@ -222,9 +239,9 @@ for (const world of WORLDS) {
 await b.close();
 
 console.log(`\nFOOD ON SCREEN — spawn frame, seed ${SEED}, ${rows[0] ? rows[0].w + 'x' + rows[0].h : ''}\n`);
-console.log('world        screen is food   edibles   in view   eatable in view      nearest   5th    20th    t');
+console.log('world        screen is food   of it eatable   edibles   in view   eatable in view      nearest   5th    20th    t');
 for (const r of rows)
-  console.log(`${r.world.padEnd(11)} ${r.coverage.toFixed(1).padStart(9)}%   ${String(r.edibles).padStart(7)}`
+  console.log(`${r.world.padEnd(11)} ${r.coverage.toFixed(1).padStart(9)}%   ${r.eatCoverage.toFixed(1).padStart(12)}%   ${String(r.edibles).padStart(7)}`
     + `   ${String(r.inView).padStart(7)}   ${String(r.eatableInView).padStart(15)}`
     + `   ${(r.nearest == null ? '  —' : r.nearest.toFixed(1)).padStart(10)}`
     + `   ${(r.fifth == null ? ' —' : r.fifth.toFixed(1)).padStart(5)}`
