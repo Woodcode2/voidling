@@ -1117,7 +1117,26 @@ const GROUND_CHROMA = 0.16;
 // qa/groundtruth.mjs reads this set out of the running page and grades only the
 // worlds in it, so the coverage is visible instead of assumed.
 const GROUND_DIALLED = new Set(['maple', 'pirate']);
+// ── AND A CEILING, WHICH IS A DIFFERENT QUESTION FROM THE STAGE ───────────
+// The loudest slice of a ground is legitimately not stage. MAPLE's autumn leaf
+// litter is the reason the world is called Maple Falls; lane paint, crosswalks
+// and a runway's painted 09 are marks ON the surface, not the surface; PIRATE's
+// lagoon is water. Holding those to the stage cap would demand grey leaves and
+// a grey-blue puddle, so they are held to a ceiling instead: nothing painted on
+// the ground may shout louder than this, which still catches a stray neon
+// literal. Measured on maple after the dial: p75 0.165 (the stage), p90 0.243
+// (the leaves) — a p90 bar would have called a correctly-dialled world red.
+const GROUND_CEILING = 0.40;
+// water gets its own, between the two: a tropical lagoon at the stage cap is a
+// grey puddle, and PIRATE BAY's bay is a fifth of its island
+const WATER_CHROMA = 0.34;
 function quiet(css: string, cap = GROUND_CHROMA): string {
+  // THE GATE LIVES HERE, not at sixty call sites. Two of the call sites below
+  // are shared across every world — hex() and the biomeColor fill — so a dial
+  // that applied unconditionally would silently repaint LANTERN's warm night
+  // and POWDER's snow on the way past. A world that has not adopted the dial
+  // gets its authored colour back untouched, byte for byte.
+  if (!GROUND_DIALLED.has(WORLD_ID)) return css;
   let r: number, g: number, b: number, tail = '';
   const h = /^#([0-9a-fA-F]{6})$/.exec(css);
   if (h) { const n = parseInt(h[1], 16); r = (n >> 16) & 255; g = (n >> 8) & 255; b = n & 255; } else {
@@ -1137,8 +1156,9 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
     // QA reaches the dial through the page rather than through a copy of the
     // number: qa/groundtruth.mjs grades the baked albedo against exactly what
     // this build is using, and reads null for a world that has not adopted it.
-    (window as unknown as { __groundChroma: number | null }).__groundChroma =
-      GROUND_DIALLED.has(WORLD_ID) ? GROUND_CHROMA : null;
+    const qaWin = window as unknown as { __groundChroma: number | null; __groundCeiling: number };
+    qaWin.__groundChroma = GROUND_DIALLED.has(WORLD_ID) ? GROUND_CHROMA : null;
+    qaWin.__groundCeiling = GROUND_CEILING;
 
     // ── baked ground texture ───────────────────────────────────────────────────
   const TEX = 3072;   // high-res bake so roads/crosswalks stay crisp up close
@@ -1148,7 +1168,17 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
   const py = (z3: number) => ((z3 - minZ) / H3) * TEX;
   const pxW = (worldX: number) => px(w(worldX));
   const pyW = (worldY: number) => py(w(worldY));
-  const hex = (n: number) => '#' + n.toString(16).padStart(6, '0');
+  // ── EVERY PALETTE COLOUR REACHES THE GROUND THROUGH HERE ────────────────
+  // The first pass of the dial wrapped the CSS literals and missed two whole
+  // families that arrive as numbers instead: the biomeColor block fills (of
+  // which `campus: 0x8fd06a`, athletic turf at chroma 0.400, was 5.9% of
+  // maple's ground all by itself) and every water surface. Measured after that
+  // pass, maple's albedo p99 read 0.412 — and the leaf litter I first blamed
+  // turned out to paint nothing here at all. So the dial goes on the door.
+  const WATERS = new Set([WORLD.waterShallow, WORLD.waterDeep, WORLD.riverMid,
+    WORLD.riverDeep, WORLD.foam]);
+  const hex = (n: number) => quiet('#' + n.toString(16).padStart(6, '0'),
+    WATERS.has(n) ? WATER_CHROMA : GROUND_CHROMA);
 
   // clip to the island silhouette so everything is masked to the coast
   g.save();
@@ -1363,7 +1393,7 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
       const L = pts[pts.length - 1]; g.lineTo(pxW(L[0]), pyW(L[1]));
     };
     // 1. base sand across the whole landmass, with a sun-bleached gradient
-    g.fillStyle = '#f2e2b8'; g.fillRect(0, 0, TEX, TEX);
+    g.fillStyle = quiet('#f2e2b8'); g.fillRect(0, 0, TEX, TEX);
     for (let k = 0; k < 900; k++) {   // grain
       const x = Math.random() * TEX, y = Math.random() * TEX;
       g.fillStyle = `rgba(${208 + ((Math.random() * 30) | 0)},${190 + ((Math.random() * 26) | 0)},140,0.16)`;
@@ -1381,9 +1411,9 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
       // than every other step of the bake put together.
       g.save();
       g.lineJoin = 'round'; g.lineCap = 'round';
-      g.fillStyle = '#7fb85c'; g.fillRect(0, 0, TEX, TEX);           // lush core
+      g.fillStyle = quiet('#7fb85c'); g.fillRect(0, 0, TEX, TEX);           // lush core
       // dappled canopy over the core so it isn't a flat green field
-      g.fillStyle = 'rgba(46,110,62,0.20)';
+      g.fillStyle = quiet('rgba(46,110,62,0.20)');
       for (let k = 0; k < 260; k++) {
         g.beginPath();
         g.ellipse(pxW(rand(1700, 10400)), pyW(rand(600, 10900)),
@@ -1392,9 +1422,9 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
       }
       // sun-bleached scrub band between the green and the sand
       for (const [ring, wdt] of [[BAY.LAND_SMOOTH, 3000], [BAY.WATER_SMOOTH, 2700]] as [[number, number][], number][]) {
-        wpath(ring); g.strokeStyle = '#bfcb7e'; g.lineWidth = pxW(wdt) - pxW(0); g.stroke();
+        wpath(ring); g.strokeStyle = quiet('#bfcb7e'); g.lineWidth = pxW(wdt) - pxW(0); g.stroke();
       }
-      g.fillStyle = 'rgba(168,182,106,0.28)';
+      g.fillStyle = quiet('rgba(168,182,106,0.28)');
       for (let k = 0; k < 160; k++) {
         g.beginPath();
         g.ellipse(pxW(rand(1700, 10400)), pyW(rand(600, 10900)),
@@ -1403,11 +1433,11 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
       }
       // the beach itself — bright sand wherever the land touches water
       for (const [ring, wdt] of [[BAY.LAND_SMOOTH, 1500], [BAY.WATER_SMOOTH, 1350]] as [[number, number][], number][]) {
-        wpath(ring); g.strokeStyle = '#f2e2b8'; g.lineWidth = pxW(wdt) - pxW(0); g.stroke();
+        wpath(ring); g.strokeStyle = quiet('#f2e2b8'); g.lineWidth = pxW(wdt) - pxW(0); g.stroke();
       }
       // damp sand right at the tideline
       for (const [ring, wdt] of [[BAY.LAND_SMOOTH, 420], [BAY.WATER_SMOOTH, 360]] as [[number, number][], number][]) {
-        wpath(ring); g.strokeStyle = 'rgba(216,196,150,0.55)'; g.lineWidth = pxW(wdt) - pxW(0); g.stroke();
+        wpath(ring); g.strokeStyle = quiet('rgba(216,196,150,0.55)'); g.lineWidth = pxW(wdt) - pxW(0); g.stroke();
       }
       // wind-blown grain over everything
       for (let k = 0; k < 700; k++) {
@@ -1423,20 +1453,20 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
       g.restore();
     }
     const DCOL: Record<string, string> = {
-      port: '#b58a52', oldtown: '#e6d9c4', resort: '#ffcf8a', party: '#5e2f72',
-      beach: '#ffe6a8', cove: '#c39a4e', jungle: '#2f7a4a', market: '#e5a942',
+      port: quiet('#b58a52'), oldtown: '#e6d9c4', resort: quiet('#ffcf8a'), party: quiet('#5e2f72'),
+      beach: quiet('#ffe6a8'), cove: quiet('#c39a4e'), jungle: quiet('#2f7a4a'), market: quiet('#e5a942'),
     };
     // 3. THE BAY — sheltered water carved out, with a shallow shelf + foam
     g.save(); wpath(BAY.WATER_SMOOTH); g.clip();
-    g.fillStyle = '#43cfdd'; g.fillRect(0, 0, TEX, TEX);
-    g.fillStyle = 'rgba(31,136,168,0.6)';
+    g.fillStyle = quiet('#43cfdd', WATER_CHROMA); g.fillRect(0, 0, TEX, TEX);
+    g.fillStyle = quiet('rgba(31,136,168,0.6)', WATER_CHROMA);
     g.beginPath(); g.ellipse(pxW(7100), pyW(7000), pxW(1450) - pxW(0), pxW(2050) - pxW(0), 0.3, 0, Math.PI * 2); g.fill();
     g.fillStyle = 'rgba(255,255,255,0.16)';
     for (let k = 0; k < 40; k++) {
       g.beginPath(); g.ellipse(pxW(rand(5300, 9500)), pyW(rand(3800, 9900)), pxW(rand(60, 190)) - pxW(0), pxW(rand(18, 46)) - pxW(0), rand(0, 3), 0, Math.PI * 2); g.fill();
     }
     g.restore();
-    wpath(BAY.WATER_SMOOTH); g.strokeStyle = 'rgba(255,246,214,0.85)'; g.lineWidth = pxW(90) - pxW(0); g.stroke();
+    wpath(BAY.WATER_SMOOTH); g.strokeStyle = quiet('rgba(255,246,214,0.85)'); g.lineWidth = pxW(90) - pxW(0); g.stroke();
     // 2b. DISTRICT FLOORS — painted AFTER the bay is cut and clipped to LAND,
     // so a shoreline district (the dance cove on the hook) is never drowned
     for (const r of BAY.BAY_REGIONS) {
@@ -1444,15 +1474,15 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
       wpath(BAY.LAND_SMOOTH); g.clip();          // land only
       wpath(BAY.smoothPoly(r.poly, 5)); g.clip();  // ...inside this region
       // erase the bay from the region before filling it
-      g.fillStyle = DCOL[r.id] ?? '#f2e2b8';
+      g.fillStyle = DCOL[r.id] ?? quiet('#f2e2b8');
       g.fillRect(0, 0, TEX, TEX);
       g.restore();
       // re-cut the water over the region edge so the shore stays crisp
       g.save(); wpath(BAY.WATER_SMOOTH); g.clip();
-      g.fillStyle = 'rgba(67,207,221,0.96)'; g.fillRect(0, 0, TEX, TEX);
+      g.fillStyle = quiet('rgba(67,207,221,0.96)', WATER_CHROMA); g.fillRect(0, 0, TEX, TEX);
       g.restore();
     }
-    wpath(BAY.WATER_SMOOTH); g.strokeStyle = 'rgba(255,246,214,0.85)'; g.lineWidth = pxW(90) - pxW(0); g.stroke();
+    wpath(BAY.WATER_SMOOTH); g.strokeStyle = quiet('rgba(255,246,214,0.85)'); g.lineWidth = pxW(90) - pxW(0); g.stroke();
     // 3b. per-district detail — canopy dapple, the lit dance floor, the
     // resort's pools and raked sand. This MUST come after the district
     // floors above: those are an opaque fill and were erasing all of it.
@@ -1469,9 +1499,9 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
         const ex = pxW(rand(2600, 5300)), ey = pyW(rand(3000, 7100));
         const rx = pxW(rand(130, 300)) - pxW(0), ry = pxW(rand(100, 240)) - pxW(0);
         const grd = g.createRadialGradient(ex, ey, 0, ex, ey, Math.max(rx, ry));
-        grd.addColorStop(0, 'rgba(18,62,38,0.40)');
-        grd.addColorStop(0.55, 'rgba(18,62,38,0.30)');
-        grd.addColorStop(1, 'rgba(18,62,38,0)');
+        grd.addColorStop(0, quiet('rgba(18,62,38,0.40)'));
+        grd.addColorStop(0.55, quiet('rgba(18,62,38,0.30)'));
+        grd.addColorStop(1, quiet('rgba(18,62,38,0)'));
         g.fillStyle = grd;
         g.beginPath();
         g.ellipse(ex, ey, rx, ry, rand(0, 3), 0, Math.PI * 2);
@@ -1498,7 +1528,7 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
       // the dance floor needs an EDGE, not a crop line: the checkerboard used
       // to terminate against the void wherever the region met the coast
       wpath(BAY.smoothPoly(pr.poly, 5));
-      g.strokeStyle = '#f0e2c4'; g.lineWidth = pxW(120) - pxW(0); g.stroke();
+      g.strokeStyle = quiet('#f0e2c4'); g.lineWidth = pxW(120) - pxW(0); g.stroke();
       g.strokeStyle = quiet('rgba(255,120,220,0.85)'); g.lineWidth = pxW(38) - pxW(0); g.stroke();
       g.restore();
       // the resort's pools + raked sand
@@ -1508,11 +1538,11 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
       for (const [ox, oy, rr] of [[8900, 4900, 470], [9050, 6300, 430]] as [number, number, number][]) {
         g.fillStyle = '#f8efd8';
         g.beginPath(); g.ellipse(pxW(ox), pyW(oy), pxW(rr) - pxW(0), pxW(rr * 0.72) - pxW(0), 0.62, 0, Math.PI * 2); g.fill();
-        g.fillStyle = 'rgba(214,190,140,0.35)';
+        g.fillStyle = quiet('rgba(214,190,140,0.35)');
         g.beginPath(); g.ellipse(pxW(ox), pyW(oy), pxW(rr) - pxW(0), pxW(rr * 0.72) - pxW(0), 0.62, 0, Math.PI * 2);
-        g.lineWidth = pxW(22) - pxW(0); g.strokeStyle = 'rgba(214,190,140,0.45)'; g.stroke();
+        g.lineWidth = pxW(22) - pxW(0); g.strokeStyle = quiet('rgba(214,190,140,0.45)'); g.stroke();
       }
-      g.strokeStyle = 'rgba(214,190,140,0.4)'; g.lineWidth = Math.max(1, pxW(9) - pxW(0));
+      g.strokeStyle = quiet('rgba(214,190,140,0.4)'); g.lineWidth = Math.max(1, pxW(9) - pxW(0));
       for (let k = 3300; k < 7400; k += 105) {
         g.beginPath(); g.moveTo(pxW(8150), pyW(k)); g.lineTo(pxW(9700), pyW(k + 60)); g.stroke();
       }
@@ -1550,8 +1580,8 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
         if (!grass && d2 > 900) continue;
         const a2 = rand(0, Math.PI * 2), L = grass ? rand(26, 62) : rand(40, 120);
         g.strokeStyle = grass
-          ? (Math.random() < 0.5 ? 'rgba(28,82,44,0.42)' : 'rgba(176,222,132,0.40)')
-          : 'rgba(202,176,124,0.34)';
+          ? (Math.random() < 0.5 ? quiet('rgba(28,82,44,0.42)') : quiet('rgba(176,222,132,0.40)'))
+          : quiet('rgba(202,176,124,0.34)');
         g.beginPath();
         g.moveTo(pxW(wx), pyW(wy));
         g.lineTo(pxW(wx + Math.cos(a2) * L), pyW(wy + Math.sin(a2) * L));
@@ -1565,10 +1595,10 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
     g.lineCap = 'round'; g.lineJoin = 'round';
     // the jungle trail goes down FIRST: it starts on the promenade's centreline
     // (bay.ts TRAIL[0]) and the deck must cover its round cap, not the reverse
-    opath(BAY.TRAIL); g.strokeStyle = 'rgba(206,178,124,0.8)'; g.lineWidth = pxW(BAY.TRAIL_HALF * 2) - pxW(0); g.stroke();
+    opath(BAY.TRAIL); g.strokeStyle = quiet('rgba(206,178,124,0.8)'); g.lineWidth = pxW(BAY.TRAIL_HALF * 2) - pxW(0); g.stroke();
     opath(BAY.PROMENADE); g.strokeStyle = '#fdf3de'; g.lineWidth = pxW(BAY.PROM_HALF * 2 + 150) - pxW(0); g.stroke();
-    opath(BAY.PROMENADE); g.strokeStyle = '#efe0c2'; g.lineWidth = pxW(BAY.PROM_HALF * 2) - pxW(0); g.stroke();
-    g.strokeStyle = 'rgba(198,176,138,0.55)'; g.lineWidth = Math.max(1, pxW(9) - pxW(0));
+    opath(BAY.PROMENADE); g.strokeStyle = quiet('#efe0c2'); g.lineWidth = pxW(BAY.PROM_HALF * 2) - pxW(0); g.stroke();
+    g.strokeStyle = quiet('rgba(198,176,138,0.55)'); g.lineWidth = Math.max(1, pxW(9) - pxW(0));
     for (let t = 0; t < 1; t += 0.005) {
       const a2 = BAY.pathPointAt(BAY.PROMENADE, t);
       const nx = Math.cos(a2.ang + Math.PI / 2), ny = Math.sin(a2.ang + Math.PI / 2);
@@ -1589,11 +1619,11 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
       g.strokeStyle = '#ffffff'; g.lineWidth = pxW(34) - pxW(0); g.stroke();
     }
     // 6. piers into the water — pale decking to match
-    g.strokeStyle = '#efe0c2'; g.lineWidth = pxW(150) - pxW(0);
+    g.strokeStyle = quiet('#efe0c2'); g.lineWidth = pxW(150) - pxW(0);
     for (const [x0, y0, x1, y1] of BAY.PIERS) {
       g.beginPath(); g.moveTo(pxW(x0), pyW(y0)); g.lineTo(pxW(x1), pyW(y1)); g.stroke();
     }
-    g.strokeStyle = 'rgba(198,176,138,0.5)'; g.lineWidth = Math.max(1, pxW(8) - pxW(0));
+    g.strokeStyle = quiet('rgba(198,176,138,0.5)'); g.lineWidth = Math.max(1, pxW(8) - pxW(0));
     for (const [x0, y0, x1, y1] of BAY.PIERS) {
       const L = Math.hypot(x1 - x0, y1 - y0), ux = (x1 - x0) / L, uy = (y1 - y0) / L;
       for (let d = 0; d < L; d += 55) {
@@ -3154,7 +3184,10 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
     };
     const drange = (a: number, b: number) => a + dr() * (b - a);
     const U = TEX / W3;                       // canvas px per 3D unit
-    const LEAF = ['#c4622c', '#d98a34', '#b03f2a', '#e0a63c', '#a86b30'];
+    // Held to the CEILING, not to the stage cap: the world is called Maple
+    // Falls and grey leaves would be a poor trade for 3% of one percentile.
+    // Measured, this is the entire reason maple's p99 read 0.412 against 0.40.
+    const LEAF = [quiet('#c4622c', GROUND_CEILING), quiet('#d98a34', GROUND_CEILING), quiet('#b03f2a', GROUND_CEILING), quiet('#e0a63c', GROUND_CEILING), quiet('#a86b30', GROUND_CEILING)];
     const GRASSY: Biome[] = ['cozy', 'fancy', 'plaza', 'park', 'forest'];
     g.save();
     g.beginPath();

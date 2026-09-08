@@ -29,11 +29,22 @@
 // props, no frame to choose — the same texture every player gets, so two runs
 // agree exactly rather than approximately.
 //
-// THE BAR is island.ts's own GROUND_CHROMA dial, read out of the page rather
-// than copied here, so the probe cannot drift from the source it grades. It
-// fails when the ground's 90th-percentile chroma exceeds the cap: not the mean
-// (a big quiet field hides a loud square inside it) and not the maximum (one
-// painted line is not a stage).
+// THE BARS are island.ts's own dials, read out of the page rather than copied
+// here, so the probe cannot drift from the source it grades. There are two,
+// because a ground has two different jobs in one texture:
+//
+//   THE STAGE — the 75th percentile against GROUND_CHROMA. Three quarters of
+//     the ground is the surface the props stand on and it has to stay quiet.
+//     Not the mean, which lets a big quiet field hide a loud square inside it.
+//   THE CEILING — the 99th percentile against GROUND_CEILING. The loudest
+//     quarter of a ground is legitimately not stage: MAPLE's autumn leaf
+//     litter (the world is called Maple Falls), lane paint, crosswalks, the
+//     painted 09 on a runway, PIRATE's lagoon. Grading those at the stage cap
+//     would demand grey leaves and a grey-blue puddle. The ceiling still says
+//     nothing on the ground may shout, so a stray neon literal is caught.
+//
+// Measured before this split: maple p75 0.165, p90 0.243 — the p90 was its leaf
+// litter, and a p90 bar would have called a correctly-dialled world red.
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { assertFreshDist } from './_freshdist.mjs';
@@ -81,7 +92,7 @@ for (const world of WORLDS) {
     }
     chs.sort((a, b2) => a - b2); vs.sort((a, b2) => a - b2);
     const q = (a, f) => (a.length ? a[Math.min(a.length - 1, Math.floor(a.length * f))] : NaN);
-    return { n: chs.length, cap: window.__groundChroma,
+    return { n: chs.length, cap: window.__groundChroma, ceil: window.__groundCeiling,
       c50: q(chs, 0.50), c75: q(chs, 0.75), c90: q(chs, 0.90), c99: q(chs, 0.99),
       v50: q(vs, 0.50), over: 100 * chs.filter((x) => x > 0.12).length / chs.length };
   });
@@ -114,11 +125,16 @@ console.log('');
 for (const r of rows) {
   if (r.cap === null) { console.log(`----  ${r.world.padEnd(10)} not on the dial yet — ground chroma p90 ${r.c90.toFixed(3)}, ungraded`); continue; }
   if (r.cap === undefined) { console.log(`FAIL  ${r.world.padEnd(10)} the page exposes no __groundChroma at all — nothing to grade against`); fail++; continue; }
-  const ok = r.c90 <= r.cap + 0.005;   // one rounding step of slack on the cap itself
-  if (!ok) fail++;
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${r.world.padEnd(10)} 90th-percentile ground chroma `
-    + `${r.c90.toFixed(3)}   cap ${r.cap.toFixed(2)}`);
+  // one rounding step of slack: quiet() lands ON the cap and rounds to whole
+  // 8-bit channels, so an exactly-dialled colour can read 0.161 for 0.160
+  const stage = r.c75 <= r.cap + 0.005, roof = r.c99 <= r.ceil + 0.005;
+  if (!stage) fail++;
+  if (!roof) fail++;
+  console.log(`${stage ? 'PASS' : 'FAIL'}  ${r.world.padEnd(10)} stage   ground chroma p75 `
+    + `${r.c75.toFixed(3)}   cap ${r.cap.toFixed(2)}`);
+  console.log(`${roof ? 'PASS' : 'FAIL'}  ${r.world.padEnd(10)} ceiling ground chroma p99 `
+    + `${r.c99.toFixed(3)}   max ${r.ceil.toFixed(2)}`);
 }
-const graded = rows.filter((r) => r.cap != null).length;
-console.log(`\n${graded - fail}/${graded} graded, ${rows.length - graded} not yet on the dial`);
+const graded = rows.filter((r) => r.cap != null).length * 2;
+console.log(`\n${graded - fail}/${graded} graded, ${rows.length - graded / 2} worlds not yet on the dial`);
 process.exit(fail ? 1 : 0);
