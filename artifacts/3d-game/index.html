@@ -939,34 +939,32 @@
         line-height: 1.02;
         -webkit-text-stroke: 0.055em rgba(22,7,42,0.94); paint-order: stroke fill;
         text-shadow: 0 0 34px rgba(147,80,232,0.9), 0 4px 12px rgba(0,0,0,0.65); }
-      /* The gradient goes on last and only where the browser can clip it to the
-         glyphs. A failed background-clip with a transparent fill is an INVISIBLE
-         TITLE, so the solid white above stays the fallback and this only ever
-         adds to it. Stops start at 30% because the parent box also contains the
-         "THE CUTE" line above: WORLD ENDER occupies the lower two thirds of it,
-         so a 0%-anchored ramp would spend half its range on a line that
-         overrides the fill anyway. */
-      @supports ((-webkit-background-clip: text) or (background-clip: text)) {
-        #menu .logo {
-          /* WARM, AND MOSTLY WHITE. The first ramp ran white -> pale violet ->
-             #c9a3ff, which is the nebula's own hue: the letters ended in the
-             colour they are sitting on. Measured on the rendered menu, the
-             glyphs came out rgb(203,189,220) — a grey-violet on violet — at
-             8.26:1 upper and 8.75:1 lower, against roughly 20:1 for the flat
-             white it replaced. Both pass WCAG AAA and it still looked washed
-             out, because the loss was HUE separation, which a contrast ratio
-             does not see. Gold against violet separates on both axes, and
-             holding white to 68% keeps the punch that made the old title work
-             at all. */
-          background: linear-gradient(180deg, #ffffff 30%, #ffffff 68%, #fff2dc 86%, #ffd9a0 100%);
-          -webkit-background-clip: text; background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
-      }
+      /* NO GRADIENT FILL, AND THAT IS A DECISION AGAINST D11's THIRD LAYER.
+         Bar D11 asks display type for a two-stop gradient fill, a stroke and a
+         shadow. The stroke earns its place here and is above. The gradient was
+         tried twice and made the title worse both times, measured on the
+         rendered menu each time:
+           white -> pale violet -> #c9a3ff   glyphs rgb(203,189,220), 8.26:1
+           white -> cream -> gold            glyphs rgb(211,200,214), 9.00:1
+         against roughly 20:1 for the flat white both replaced. The second
+         attempt was meant to fix the first by separating on hue as well as
+         luminance, and barely moved: the brightest pixel in the title is
+         rgb(255,255,255) either way, so the letter CORES were never the
+         problem. What washes this title out is the 34px rgba(147,80,232,0.9)
+         glow bleeding violet around every glyph edge, and a gradient fill only
+         gives that bleed more to blend with. Flat white keeps the core
+         dominant, which is why the original read crisp.
+         A bar is a description of a good result, not an instruction to be
+         followed off a cliff — and on a dark nebula, three layers is one too
+         many. The stroke stays because it protects the title on the light
+         shoulder of the key art, where a glow structurally cannot. */
       /* "THE CUTE" rides above at half scale — one name, two beats */
-      /* and it takes its fill back: -webkit-text-fill-color INHERITS, so without
-         this the child would be transparent over the parent's gradient box and
-         the words would simply not be there. */
+      /* The explicit text-fill-color is a leftover guard from the gradient
+         attempt above, kept deliberately: nothing sets a transparent fill on
+         the parent any more, so it is currently a no-op that agrees with
+         `color`. It stays because the two must never disagree, and because a
+         comment claiming a mechanism that is no longer there is how a dead
+         value in this repo cost a round already. */
       #menu .logo i { display: block; font-style: normal; font-size: 0.44em;
         letter-spacing: 8px; color: #ffd9f2; -webkit-text-fill-color: #ffd9f2;
         -webkit-text-stroke: 0.05em rgba(22,7,42,0.9); paint-order: stroke fill;
