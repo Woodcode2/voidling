@@ -35,23 +35,30 @@ export const VOID = {
   // however narrow you make it. 58% saturation survives the key multiply and
   // still reads as a LIT edge against the 0x5f2ab4 body.
   bodyRim: 0xa96bff,    // lit violet rim — this is the highlight now, by a mile
-  rimLight: 0xb678ff,   // luminous event-horizon rim
   glow: 0xb875ff,       // warm amethyst aura
   swirl: 0xd4b2ff,      // faint interior swirl arcs
-  star: 0xffffff,       // interior star specks
-  pupil: 0x160a30,
-  sclera: 0xffffff,
   blush: 0xff7da8,
   mouth: 0x4a1a68,      // warm dark plum smile — reads friendly, never a black slit
-  spark: 0xfff0c8,      // warm-white companion spark
 };
+// ── FIVE COLOURS RETIRED, 2026-09-08, and where the live ones are ──────────
+// qa/deadpaint.mjs found rimLight, star, pupil, sclera and spark read by
+// nothing anywhere in the repo. They are 2D-era entries the 3D void outgrew,
+// and leaving them is not free: the next person to edit `sclera` here — having
+// read its name and believed it — changes no pixel and gets no error. That is
+// exactly how biomeColor, GD_FLOOR.lot and the ground desaturation each cost a
+// round. What actually paints these now:
+//   rimLight  the body shader's own fresnel, void3d.ts, from bodyRim
+//   star      the interior starfield sampler and the specks in VOID_FRAG
+//   pupil     void3d.ts's pupilTex, and 0x2a1f45 for the eye's backing disc
+//   sclera    void3d.ts's scleraTex
+//   spark     the companion draws its own in life.ts
+
 
 // ── world terrain (drawMap COL) ─────────────────────────────────────────────
 export const WORLD = {
   space: 0x0d0821,       // cosmic backdrop the island floats in
   haloFar: 0x7b4fe0,     // wide violet energy halo off the island edge
   haloNear: 0xa87bff,    // brighter inner violet halo
-  rimWhite: 0xffffff,    // island white "sticker" rim + surf foam
   cliff: 0x574a63,       // island cliff band
   // deepened toward the 2D COMPOSITE (flat colour + soft-light grass wash) so
   // the world reads rich, not pastel-washed
@@ -82,7 +89,10 @@ export const WORLD = {
   sand: 0xebe3cb,        // beach sand — was 0xf6e3a4, chroma 0.322 -> 0.125
   pavement: 0xbcc4d4,    // plaza / sidewalk — was 0xe4e4ec, 1.01 against sand
   road: 0x6b7292,        // asphalt (cool lavender-gray)
-  roadLine: 0xdce3ee,    // lane paint
+  // WIRED, not retired: the lane dashes were a literal 0xf2f5fa in island.ts
+  // while this said 0xdce3ee. Same disagreement, same fix — this is the shipped
+  // value and the dash material reads it.
+  roadLine: 0xf2f5fa,    // lane paint
   waterShallow: 0x7fd4e8,
   waterDeep: 0x5bb8d4,
   riverMid: 0x8fc6d4,
@@ -90,9 +100,10 @@ export const WORLD = {
   foam: 0xe9f6ff,
   zooGround: 0xd8cc96,
   dirtPath: 0xcfc0a0,
-  mountainBack: 0x66708a,
-  mountainFront: 0x4e576b,
-  snow: 0xf2f6ff,
+  // WIRED, not retired: the powder bake painted '#dfe7f6' as a literal while
+  // this said 0xf2f6ff, so the two disagreed and only one of them shipped. The
+  // value here is now the one that ships and the bake reads it.
+  snow: 0xdfe7f6,
 };
 
 // ── AND THE OTHER HALF OF THE SAME THESIS: THE ACTORS ───────────────────────
@@ -174,8 +185,10 @@ export const PROPS = {
   pine: loud(0x3e9a54),
   trunk: 0x8a6a4a,
   person: [loud(0xff7a5a), loud(0x5ec8d8), loud(0xffd23f), loud(0x8fa9d8), loud(0xf06fb0), loud(0x9b7bd8), 0xffffff, loud(0x7ed57a)],
-  skin: [0xf4c9a0, 0xe0a878, 0xc98a5a, 0xffd9b0],
 };
+// PROPS.skin retired: four tones, read by nothing. life.ts:630 carries the
+// live list and it is EIGHT tones deep, 0xffdcb8 to 0x6a3d22 — a narrower
+// duplicate sitting here is worse than no entry at all.
 
 // ── skins: void identity colour sets (ported from the 2D shop) ───────────────
 // rarity tiers: colour skins (common, coins) → `tex` AI-texture skins (epic,

@@ -1062,9 +1062,14 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     const cv = document.createElement('canvas'); cv.width = cv.height = 512;
     const g = cv.getContext('2d')!;
     const grd = g.createRadialGradient(256, 256, 211, 256, 256, 256);
-    grd.addColorStop(0, 'rgba(168,123,255,0.16)');
-    grd.addColorStop(0.55, 'rgba(123,79,224,0.06)');
-    grd.addColorStop(1, 'rgba(123,79,224,0)');
+    // rgba(168,123,255) and rgba(123,79,224) ARE WORLD.haloNear and WORLD.haloFar,
+    // written out by hand — so the palette entries described this gradient
+    // exactly and were read by nothing. qa/deadpaint.mjs found them.
+    const rgb = (n: number, a: number) =>
+      `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+    grd.addColorStop(0, rgb(WORLD.haloNear, 0.16));
+    grd.addColorStop(0.55, rgb(WORLD.haloFar, 0.06));
+    grd.addColorStop(1, rgb(WORLD.haloFar, 0));
     g.fillStyle = grd; g.fillRect(0, 0, 512, 512);
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;   // see above — this was the 1.7-2.4x
@@ -1232,7 +1237,7 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
     const PU = (pxW(1000) - pxW(0)) / 1000;   // canvas px per world unit
 
     // 1. BASE — dusk snow: pale blue-white, never pure white
-    g.fillStyle = '#dfe7f6'; g.fillRect(0, 0, TEX, TEX);
+    g.fillStyle = hex(WORLD.snow); g.fillRect(0, 0, TEX, TEX);
     for (let i = 0; i < 3600; i++) {
       const x = Math.random() * TEX, y = Math.random() * TEX;
       g.fillStyle = Math.random() < 0.6 ? quiet('rgba(150,175,220,0.10)') : 'rgba(255,255,255,0.16)';
@@ -3620,7 +3625,7 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
   // Pirate Bay has no traffic lanes: its boardwalk is one curve, not a grid.
   if (WORLD_ID === 'maple') {
     const dashGeo = new THREE.BoxGeometry(2.6, 0.03, 0.34);
-    const dashMat = new THREE.MeshBasicMaterial({ color: 0xf2f5fa });
+    const dashMat = new THREE.MeshBasicMaterial({ color: WORLD.roadLine });
     const spots: { x: number; z: number; rot: number }[] = [];
     for (const c of ROAD_CENTERS.map((v) => w(v))) {
       for (let a = -292; a < 292; a += 5.6) {

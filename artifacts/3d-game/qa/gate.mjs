@@ -247,6 +247,18 @@ const SUITE = [
     cmd: ['node', 'qa/gamutzero.mjs'], verdict: pf,
     why: 'no chromatic surface loses colour channels to the grade — Game Day rendered rgb(168,0,0) out of 0xc4342f' },
 
+  // A COLOUR NOBODY READS IS A LANDMINE. Three times this project has spent a
+  // round on a measured, reasoned, committed colour fix that reached no pixel,
+  // and every one had the same shape — an authoritative-looking table nothing
+  // paints from (biomeColor live for one world of six; GD_FLOOR.lot; the
+  // ground desaturation in palette.ts, overpainted by sixty CSS literals). The
+  // cost is not the wasted round; it is that the next person to edit the entry
+  // gets no pixels and no error and has to find the whole story again.
+  // Zero seconds, no browser, no port, no build.
+  { id: 'deadpaint', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
+    cmd: ['node', 'qa/deadpaint.mjs'], verdict: pf,
+    why: 'every colour in the palette is read by something that paints — an entry nothing reads is a comment that lies to whoever edits it next' },
+
   { id: 'packfresh', tier: 'art', profiles: ['art'], timeout: 30,
     cmd: ['node', 'qa/packfresh.mjs'], verdict: pf,
     why: 'the studio pack is a photograph of THIS source — two rounds were spent on a build that no longer existed' },
