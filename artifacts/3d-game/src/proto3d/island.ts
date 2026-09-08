@@ -1913,7 +1913,33 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     // 2. DISTRICT FLOORS, tree line first so the built ground overlaps it.
     const GD_FLOOR: Record<GD.GdBiome, number> = {
       woods: 0x9a6a3a, practice: 0x5fa356, campus: 0x76b85a, greek: 0x8fc76a,
-      rvpark: 0x8a8578, lot: 0x6e6b74, plaza: 0xb9b3a8, bowl: 0xb9b3a8,
+      // THE LIFT THAT WENT TO THE DEAD TABLE, LANDED WHERE IT PAINTS. A round
+      // measured Game Day at mean scene luminance 0.357 against Maple's 0.626,
+      // ruled the light out (the level measured 0.357 under Maple's own midday
+      // rig too), correctly diagnosed the tarmac albedo, and wrote its fix into
+      // biomeColor — which only maple reads. The level kept rendering 0x6e6b74
+      // and kept measuring a playfield value median of 0.333 against D3's
+      // 0.50-0.80. This is that fix, in GD_FLOOR, which is what paints.
+      //
+      // +46 ON EVERY CHANNEL, not a new colour. 0x9c99a2 = 0x6e6b74 + 0x2e2e2e,
+      // so max-min is 9/255 before and after: the hue is 260.0 deg either way
+      // and the albedo's chroma does not move at all, which is what keeps D1
+      // (stage, chroma < 0.12) and D4 (hue within 12 deg) out of it. The three
+      // Rec.709 weights sum to 1, so adding N to every channel adds exactly
+      // N/255 to luminance: 0.4247 -> 0.6050.
+      //
+      // WHY IT IS AN ALBEDO AND NOT THE RIG. An albedo change is a linear
+      // multiply, so every ratio inside the district survives it exactly —
+      // the lot's own lit:shadow spread is unchanged and the low sun still
+      // rakes. Reaching the same median by lifting ambient flattens that
+      // spread and takes the actors share with it. Section 4: no world may
+      // lose its mood to hit a number, and this is the lever that does not.
+      //
+      // Separation holds where it means anything. Against the concourse, the
+      // one neighbour that is also grey: 0.7038 / 0.6050 = 1.163. The tighter
+      // ratios on the table (campus 1.058, practice 1.079) are a grey against
+      // saturated greens at chroma 0.36-0.42 — they separate by hue, not value.
+      rvpark: 0x8a8578, lot: 0x9c99a2, plaza: 0xb9b3a8, bowl: 0xb9b3a8,
     };
     fillPoly(GD_R('woods').poly, GD_FLOOR.woods);
     // leaf litter: the rim is the only place in the level with fallen colour
