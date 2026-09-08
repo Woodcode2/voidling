@@ -442,11 +442,14 @@ const shot = await p.evaluate(() => {
   vg.visible = false;
   const C = grab();
   vg.visible = true;
-  let E = null;
+  let E = null, G = null;
   const F = null;
   if (why.length) {
     const o = why[0].obj;
-    o.visible = false; E = grab(); o.visible = true;
+    o.visible = false;
+    E = grab();                                          // no occluder, hero present
+    vg.visible = false; G = grab(); vg.visible = true;    // no occluder, no hero
+    o.visible = true;
   }
   window.__RR(scene, cam);
 
@@ -463,19 +466,32 @@ const shot = await p.evaluate(() => {
   // the rest at none, is 0.375); a 28% ghost scores the 0.72 it actually lets
   // through. The two mechanisms become comparable, which they were not.
   const lum = (X, i) => 0.2126 * X[i] + 0.7152 * X[i + 1] + 0.0722 * X[i + 2];
-  let mask = 0, seenSum = 0, ifGone = 0, ifZero = 0;
+  // -- THE DENOMINATOR HAS TO BE THE SAME WORLD -----------------------------
+  // This divided his contribution in the real frame by his contribution in
+  // frame B: him rendered ALONE on an empty layer, against the CLEARED buffer.
+  // So a pixel with nothing whatsoever in front of him scored 1.0 only if the
+  // ground happened to match the clear colour, and scored low otherwise. It
+  // read 54.6% on a shot where removing the occluder changed 14.5% of him --
+  // 85% of him in plain view, called half hidden.
+  // E (occluder hidden, hero present) against G (occluder hidden, hero hidden)
+  // is his contribution with nothing in the way, over the SAME ground, at the
+  // SAME instant. That is the denominator. B against D goes back to what it is
+  // actually good for: deciding which pixels are his at all.
+  let mask = 0, seenSum = 0, ifGone = 0, ifZero = 0, scored = 0;
   for (let i = 0; i < A.length; i += 4) {
     if (!dif(B, D, i)) continue;          // not the hero
     mask++;
-    const full = Math.abs(lum(B, i) - lum(D, i));      // him against the bare ground
-    const got = Math.abs(lum(A, i) - lum(C, i));       // him against what is in front
-    if (full > 2) seenSum += Math.min(1, got / full);
+    if (E && G) {
+      const full = Math.abs(lum(E, i) - lum(G, i));   // him over this ground, unobstructed
+      const got = Math.abs(lum(A, i) - lum(C, i));    // him over this ground, as it is
+      if (full > 4) { seenSum += Math.min(1, got / full); scored++; }
+    }
     if (E && dif(E, A, i)) ifGone++;      // and here, only once the occluder was off
     if (F && dif(F, A, i)) ifZero++;      // and here, only once it was faded to nothing
   }
   const seen = seenSum;
   for (const q of why) delete q.obj;
-  return { blocked, fadingNow, mask, seen, ifGone, ifZero, didExperiment: !!E, w, h, why,
+  return { blocked, fadingNow, mask, seen, scored, ifGone, ifZero, didExperiment: !!E, w, h, why,
     fadeStats: window.__fadeStats ? { ...window.__fadeStats() } : null,
     px: { x: (na.x * 0.5 + 0.5) * w, y: (-na.y * 0.5 + 0.5) * h,
           r: Math.abs(nb.x - na.x) * 0.5 * w } };
@@ -484,7 +500,8 @@ const shot = await p.evaluate(() => {
 await p.waitForTimeout(1200);
 await p.screenshot({ path: `${OUT}/${WORLD}-worst.png` });
 await b.close();
-const visible = shot.mask ? 100 * shot.seen / shot.mask : 100;
+// over the pixels the denominator is defined on, not over the whole mask
+const visible = shot.scored ? 100 * shot.seen / shot.scored : 100;
 
 const got = { O2: drive.blocked ? 100 * drive.blockedFading / drive.blocked : 100, O3: visible };
 if (SECONDS <= 0) delete BARS.O2;   // not sampled, so not scored — silence is not a pass
