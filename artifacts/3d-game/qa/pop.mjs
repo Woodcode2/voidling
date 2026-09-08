@@ -21,6 +21,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
+import { assertFreshDist } from './_freshdist.mjs';
 
 const PORT = Number(process.argv[2] || 4177);
 const WORLDS = process.argv.slice(3).length ? process.argv.slice(3)
@@ -157,6 +158,8 @@ function rimOf(img, v) {
 // `--stale` opts back into the old behaviour for the one legitimate case:
 // re-reading frames you already shot, without a preview server running.
 const STALE = process.argv.includes('--stale');
+// refuse to measure a bundle older than the source it is meant to contain
+if (!STALE) assertFreshDist('qa/pop.mjs');
 function frameFor(world) {
   const p = `qa-out/gw/${world}-spawn.png`;
   if (!STALE || !existsSync(p)) {
