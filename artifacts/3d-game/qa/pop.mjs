@@ -24,7 +24,11 @@ import { PNG } from 'pngjs';
 import { assertFreshDist } from './_freshdist.mjs';
 
 const PORT = Number(process.argv[2] || 4177);
-const WORLDS = process.argv.slice(3).length ? process.argv.slice(3)
+// flags are not worlds. `node qa/pop.mjs 4177 maple --stale` used to ask
+// _worldshots to render a world called "--stale", which boots a browser, waits
+// out the full match-clock timeout and reports nothing.
+const ARGW = process.argv.slice(3).filter((a) => !a.startsWith('--'));
+const WORLDS = ARGW.length ? ARGW
   : ['maple', 'pirate', 'gameday', 'lantern', 'powder', 'skylark'];
 const OUT = 'qa-out/pop';
 const REF = 'docs/crews/round-7/reference/holeio';
@@ -117,9 +121,10 @@ function findVoid(img) {
     if (!mask[p] || seen[p]) continue;
     const stack = [p]; seen[p] = 1;
     let count = 0, minX = w, maxX = 0, minY = h, maxY = 0;
+    const pts = [];
     while (stack.length) {
       const q = stack.pop(); const qx = q % w, qy = (q / w) | 0;
-      count++;
+      count++; pts.push(q);
       if (qx < minX) minX = qx; if (qx > maxX) maxX = qx;
       if (qy < minY) minY = qy; if (qy > maxY) maxY = qy;
       for (const nq of [q - 1, q + 1, q - w, q + w]) {
@@ -127,7 +132,7 @@ function findVoid(img) {
         seen[nq] = 1; stack.push(nq);
       }
     }
-    if (!best || count > best.count) best = { count, minX, maxX, minY, maxY };
+    if (!best || count > best.count) best = { count, minX, maxX, minY, maxY, pts };
   }
   if (!best) return null;
   return { ...best, wpx: best.maxX - best.minX + 1, hpx: best.maxY - best.minY + 1,
@@ -138,24 +143,57 @@ function findVoid(img) {
 // of the brightest band at each edge as a fraction of his diameter, plus its
 // contrast against the darkest interior tone. On the untouched tree there is no
 // rim, so this reports a small number and D7/D8 fail — which is the point.
+// ── THE RIM, ON A RADIUS — AND NOT ON HIS EYES ──────────────────────────────
+// This took ONE horizontal row through the middle of his bounding box and
+// called the brightest pixel on it "the rim". At 430x932 DPR 3 that row is 305
+// px wide and it runs straight through both eyes: measured on maple, the peak
+// it found was rgb(194,187,200) at 33% across — the sclera — against a body
+// quartile of 0.25, which is where D8's 2.57:1 came from. D7 then counted how
+// many pixels near the edges were as bright as an eye white, and found five.
+// Neither number was ever about a rim.
+//
+// He is a sphere, so the rim is a RADIUS, not a row. This walks his own violet
+// mask outward in normalised radius and takes the MEDIAN luminance per ring:
+// the eyes, the mouth and the starfield each occupy a limited arc, so a median
+// across the whole ring steps over them without needing to know where they are.
+//
+// R comes from the bounding box, not from the pixel count — the mask drops the
+// face and the darkest heart, so an area-derived radius would run small; the
+// outer boundary is violet the whole way round, so the box is exact.
 function rimOf(img, v) {
   const { w, d } = img;
-  const cy = Math.round((v.minY + v.maxY) / 2);
-  const lum = (x) => { const i = (cy * w + x) * 4; return (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255; };
-  const row = [];
-  for (let x = v.minX; x <= v.maxX; x++) row.push(lum(x));
-  if (row.length < 8) return { width: 0, contrast: 0 };
-  const sorted = [...row].sort((a, b) => a - b);
-  const interior = sorted[Math.floor(sorted.length * 0.25)];   // the body's darker quartile
-  const peak = sorted[sorted.length - 1];
-  const thresh = interior + 0.6 * (peak - interior);
-  // count only pixels within 25% of each edge — a bright specular highlight in
-  // the middle of the body is gloss, not a rim
-  const edge = Math.max(2, Math.round(row.length * 0.25));
-  let lit = 0;
-  for (let k = 0; k < edge; k++) { if (row[k] > thresh) lit++; if (row[row.length - 1 - k] > thresh) lit++; }
-  const contrast = (peak + 0.05) / (interior + 0.05);
-  return { width: 100 * lit / row.length, contrast };
+  const lum = (i) => (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+  if (!v || !v.pts || v.pts.length < 400) return { width: 0, contrast: 0, core: 0, rim: 0 };
+  const cx = (v.minX + v.maxX) / 2, cy = (v.minY + v.maxY) / 2;
+  const R = (v.wpx + v.hpx) / 4;
+  const NB = 32, bins = Array.from({ length: NB }, () => []);
+  const core = [];
+  for (const q of v.pts) {
+    const x = q % w, y = (q / w) | 0, t = Math.hypot(x - cx, y - cy) / R;
+    if (t >= 1) continue;
+    bins[Math.min(NB - 1, Math.floor(t * NB))].push(lum(q * 4));
+    if (t < 0.35) core.push(lum(q * 4));
+  }
+  const med = (a) => (a.length ? a.slice().sort((p1, p2) => p1 - p2)[a.length >> 1] : NaN);
+  const prof = bins.map(med);
+  const c = med(core);
+  if (!(c >= 0) || core.length < 50) return { width: 0, contrast: 0, core: 0, rim: 0 };
+  // The outermost ring is half background: a pixel straddling his edge still
+  // passes the hue test while carrying the ground's brightness with it, and on
+  // a pale world that reads as a rim twice as bright as the one he has. So the
+  // rim is read from the last ring that is entirely his.
+  const LAST = Math.floor(NB * 0.97);
+  let peak = 0, peakBin = 0;
+  for (let k = Math.floor(NB * 0.55); k < LAST; k++)
+    if (prof[k] > peak) { peak = prof[k]; peakBin = k; }
+  const half = c + 0.5 * (peak - c);
+  let k0 = peakBin;
+  while (k0 > 0 && prof[k0 - 1] >= half) k0--;
+  // width as a share of his DIAMETER, which is how their 13.4% was measured:
+  // a band from t0 to the edge spans (1 - t0) of the radius, half that of the
+  // diameter
+  const width = 100 * (1 - k0 / NB) * 0.5;
+  return { width, contrast: (peak + 0.05) / (c + 0.05), core: c, rim: peak };
 }
 
 // Frames come from qa/_worldshots.mjs, not from a second copy of the same
@@ -196,7 +234,8 @@ for (const world of WORLDS) {
   const st = stats(img);
   const v = findVoid(img);
   const rim = v ? rimOf(img, v) : { width: 0, contrast: 0 };
-  rows.push({ world, ...st, share: v ? v.share : 0, rim: rim.width, contrast: rim.contrast });
+  rows.push({ world, ...st, share: v ? v.share : 0, rim: rim.width, contrast: rim.contrast,
+    core: rim.core, rimLum: rim.rim });
 }
 
 // Their two frames, measured by the identical function, so the table is one artefact.
@@ -211,6 +250,12 @@ for (const r of rows) {
   const f = (x, n = 1) => (Number.isNaN(x) ? '   —' : x.toFixed(n));
   console.log(`${r.world.padEnd(16)} ${f(r.stage).padStart(6)} ${f(r.actors).padStart(9)} ${f(r.value, 2).padStart(7)} ${f(r.chroma, 3).padStart(8)} ${f(r.gap, 1).padStart(5)}x ${f(r.share).padStart(7)} ${f(r.rim).padStart(7)} ${f(r.contrast, 1).padStart(7)}`);
 }
+
+// the two luminances D8 is a ratio of, so a failing contrast says WHICH end is
+// wrong — a dim rim and a washed-out interior fail identically as a ratio
+console.log('');
+for (const r of rows.filter((x) => !x.ref && x.core !== undefined))
+  console.log(`  ${r.world.padEnd(10)} rim lum ${r.rimLum.toFixed(3)}  interior lum ${r.core.toFixed(3)}`);
 
 let fails = 0;
 console.log('');

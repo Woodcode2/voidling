@@ -729,11 +729,24 @@ function coastSolid(R0: number): (x: number, z: number) => boolean {
 // on-screen size goes as 1/distance, so this one number sets the void's share of
 // the screen — measured at 19.6% of width against HOLE.IO's 22.6%, their hero
 // being consistently larger than ours at every size (holeio.recon.md §2 L4).
-// 38 -> 33 puts him at about 24%, mid-band. Used by the descent's end, the
-// settled follow distance and the steering cap's stand-in during the descent;
-// declared HERE, above every one of them, so none of the three can read it in
-// its temporal dead zone.
-const PLAY_DIST = 33;
+// 38 -> 33 was predicted to put him "at about 24%, mid-band". It did not, and
+// that prediction sat in this comment reading like a measurement until the
+// probe was pointed at it: qa/pop.mjs measures 20.5-21.7% of width across all
+// six worlds, every one of them under the 22% floor. The prediction was the
+// arithmetic of 19.6 * 38/33 = 22.6 done on a figure that had itself been
+// measured on a different build.
+//
+// So: 33 -> 29, and this time from the six numbers rather than from one.
+// Size goes as 1/distance, so every world scales by 33/29 = 1.138: the lowest
+// (20.5) lands at 23.3 and the highest (21.7) at 24.7, which puts the whole
+// spread inside 22-26 with room at both ends rather than pinned to one edge.
+//
+// The pace does not move with it. steerCap normalises by PLAY_DIST (see the
+// note below), which is exactly the trap this constant sprang the last time it
+// was touched. Used by the descent's end, the settled follow distance and the
+// steering cap's stand-in during the descent; declared HERE, above every one of
+// them, so none of the three can read it in its temporal dead zone.
+const PLAY_DIST = 29;
 
 /** THE STEERING CAP, in one place. `Math.min(96, 16 * (camDist / 50))` was
  *  written out at three call sites — the input block, the shore recovery and

@@ -5587,7 +5587,18 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       PW.claimSpot(p2[0], p2[1], r * 20);
     };
     const REG = (id: PW.PwBiome) => PW.PW_REGIONS.find((r2) => r2.id === id)!;
-    const rnd2 = Math.random;
+    // ── ITS OWN STREAM, LIKE EVERY OTHER WORLD ────────────────────────────
+    // This was `Math.random`, and it is the reason qa/placement.mjs would not
+    // settle. The gate seeds the page (SEED=7 replaces Math.random at init), so
+    // the draws ARE reproducible in isolation — but the global stream is shared
+    // with every other consumer on the page, and how many of those have drawn
+    // by the time the world is built depends on load order and frame timing.
+    // Two runs of one build gave maple overlap 113 and 116; these two worlds
+    // drifted the same way, because they were the only two still reading it.
+    // Every other world in this file already carries its own LCG closure
+    // (:1766, :1792, :1811, :1820, :1872) and the house rule at :297 says so in
+    // as many words. Same generator, same shape, its own seed.
+    const rnd2 = (() => { let sd = 1204; return () => ((sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); })();
     // ── SNOWMAN YAW — owner decision 3, 2026-08-26: "sure" ────────────────
     // The face is built on local +X (alpine.ts:461-464). rotation.y = t sends
     // local +X to world (cos t, 0, -sin t), and the camera rides the hero at
@@ -5829,7 +5840,18 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       SK.claimSpot(p2[0], p2[1], c * 20);
     };
     const REG = (id: SK.SkBiome) => SK.SK_REGIONS.find((r2) => r2.id === id)!;
-    const rnd2 = Math.random;
+    // ── ITS OWN STREAM, LIKE EVERY OTHER WORLD ────────────────────────────
+    // This was `Math.random`, and it is the reason qa/placement.mjs would not
+    // settle. The gate seeds the page (SEED=7 replaces Math.random at init), so
+    // the draws ARE reproducible in isolation — but the global stream is shared
+    // with every other consumer on the page, and how many of those have drawn
+    // by the time the world is built depends on load order and frame timing.
+    // Two runs of one build gave maple overlap 113 and 116; these two worlds
+    // drifted the same way, because they were the only two still reading it.
+    // Every other world in this file already carries its own LCG closure
+    // (:1766, :1792, :1811, :1820, :1872) and the house rule at :297 says so in
+    // as many words. Same generator, same shape, its own seed.
+    const rnd2 = (() => { let sd = 747; return () => ((sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); })();
     /** PAINT AND LIGHTS ARE NOT FOOD. Everything a runway carries by design —
      *  the threshold numerals, the centreline, the painted launch ring, the
      *  blue edge lights still on from the night — goes on the ground WITHOUT
