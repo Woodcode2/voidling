@@ -302,6 +302,18 @@ const SUITE = [
     env: { SEED: '7' }, verdict: pf,
     why: 'every prop earns the spot it stands on — no tree on a road, no road ending in nothing, nothing inside a building or standing in the sea, measured against a frozen ceiling that can only go down' },
 
+  // HOW MUCH OF THE SCREEN IS FOOD. Registered in QUALITY and not yet in push,
+  // and that is a statement rather than a dodge: three worlds fail F2 today
+  // (lantern 1.83 s, gameday 2.11, pirate 3.00 against a 1.5 s bar) and one
+  // fails F1 (powder at 11.5% of frame against 20%). Putting it in push now
+  // would block every commit on a debt that takes a level-design pass to
+  // clear. It runs, it is measured, and the number is visible — which is the
+  // difference between a debt and a blind spot. It moves to push the day the
+  // six worlds are green.
+  { id: 'food', tier: 'quality', profiles: ['quality'], timeout: 2400,
+    cmd: ['node', 'qa/food.mjs', PORT], verdict: exitCode,
+    why: 'there is enough to eat on screen at spawn, and the twentieth mouthful is not a hike — measured by hiding every edible and rendering the same frame twice' },
+
   { id: 'seasonprop', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/seasonprop.mjs'], verdict: pf,
     why: 'every limited-time season dresses its own world — no world wears another world\'s seasonal props' },

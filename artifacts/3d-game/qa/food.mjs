@@ -37,7 +37,7 @@
 // buffer, so there are no bands to exclude and no chance of counting a
 // scoreboard as a snack.
 import { chromium } from 'playwright';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { assertFreshDist } from './_freshdist.mjs';
 
 const PORT = Number(process.argv[2] || 4177);
@@ -182,7 +182,53 @@ for (const r of rows)
     + `   ${r.t.toFixed(1).padStart(5)}`);
 console.log(`\n  distances are world units from the void at spawn (radius ${rows[0] ? rows[0].voidR.toFixed(2) : '?'});`);
 console.log(`  the pictures, with everything edible tinted magenta: ${OUT}/*-food.png`);
-console.log('\n  NO BARS YET, DELIBERATELY. A bar wants a number somebody can defend, and');
-console.log('  the only honest way to get one here is to look at these six and at the');
-console.log('  reference frames first. Measure, then decide — the other order is how');
-console.log('  this project ended up grading its hero on being a hole.\n');
+// ── THE BARS, AND WHERE EACH NUMBER COMES FROM ──────────────────────────────
+// Both are drawn from evidence rather than from the reference game, because the
+// reference is a set of screenshots: their frames can be measured for colour,
+// and cannot be measured for how far their hero would have to walk.
+//
+// F1  THE FRAME HAS SOMETHING IN IT — 20% of it is food.
+//     Measured on the six: 30.5, 31.9, 42.8, 23.6, 11.5, 24.8. Five of them
+//     sit between 23.6 and 42.8, and the sixth is POWDER PASS, which is also
+//     the one frame a human looks at and calls empty — a spawn ring of
+//     snow-rocks and then blank snow to the horizon. The bar goes in the gap
+//     our own evidence leaves: under all five, over the one that reads wrong.
+//
+// F2  AND THE NEXT MOUTHFULS ARE NOT A HIKE — the 20th within 1.5 seconds.
+//     Expressed in TIME, not distance, because time is what a player feels and
+//     because distance alone hides the pace: the void moves at SPAWN_SPEED
+//     units per second at spawn, so the same 20 metres is a different game in
+//     a fast world and a slow one. SPAWN_SPEED is read out of the source here
+//     rather than copied, so retuning the pace retunes the bar with it.
+//     Measured: maple 0.73 s, powder 1.07, skylark 1.26 — then lantern 1.83,
+//     gameday 2.11 and pirate 3.00. The first three are the worlds that read
+//     as full. Three seconds of travel to your twentieth bite is the emptiness
+//     the whole probe was written to name.
+//
+//     NEAREST AND 5TH ARE NOT BARS. They are ~4 units in every world because
+//     the spawn sits in a cleared circle with a ring of props at its edge —
+//     a shared mechanism, doing its job, identical everywhere. Grading it would
+//     be grading a constant.
+const SPEED = (() => {
+  const m = /const SPAWN_SPEED = ([\d.]+)/.exec(readFileSync('src/prototype3d.ts', 'utf8'));
+  if (!m) { console.error('\n  SPAWN_SPEED is no longer where this probe reads it (src/prototype3d.ts).'
+    + '\n  F2 is a time bar and cannot be graded without it. Nothing was measured.\n'); process.exit(2); }
+  return Number(m[1]);
+})();
+const BARS = [
+  { id: 'F1', what: 'of the frame is something you can eat', want: '>= 20%',
+    get: (r) => r.coverage, fmt: (v) => v.toFixed(1) + '%', ok: (v) => v >= 20 },
+  { id: 'F2', what: 'travel to the 20th mouthful, at spawn speed', want: '<= 1.5 s',
+    get: (r) => (r.twentieth == null ? Infinity : r.twentieth / SPEED),
+    fmt: (v) => (v === Infinity ? 'never' : v.toFixed(2) + ' s'), ok: (v) => v <= 1.5 },
+];
+console.log(`\n  at spawn he moves ${SPEED} units/second (src/prototype3d.ts)\n`);
+let fail = 0;
+for (const r of rows) for (const b of BARS) {
+  const v = b.get(r), good = b.ok(v);
+  if (!good) fail++;
+  console.log(`${good ? 'PASS' : 'FAIL'}  ${r.world.padEnd(9)} ${b.id}  ${b.what.padEnd(44)}`
+    + ` got ${b.fmt(v).padStart(7)}   want ${b.want}`);
+}
+console.log(`\n${rows.length * BARS.length - fail}/${rows.length * BARS.length}`);
+process.exit(fail ? 1 : 0);
