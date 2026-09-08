@@ -1116,7 +1116,24 @@ const GROUND_CHROMA = 0.16;
 // night world whose whole effect is warm light pools that a cap would grey out.
 // qa/groundtruth.mjs reads this set out of the running page and grades only the
 // worlds in it, so the coverage is visible instead of assumed.
-const GROUND_DIALLED = new Set(['maple', 'pirate']);
+// ── AND THE CAP IS PER WORLD, BECAUSE THE WORLDS ARE NOT THE SAME ─────────
+// MAPLE and PIRATE are daylight worlds whose identity is in the ground, so
+// they sit at what palette.ts chose. POWDER is SNOW and SKYLARK drains its
+// ground by design — its own brief says so, "the only saturated colour in the
+// frame is the ninety balloons the child is here to eat" — and both measured
+// just above the line rather than far above it: skylark's albedo is uniformly
+// 0.169 and its playfield still scored 11% below chroma 0.12, because 0.169
+// renders at about 0.17. Those two want a lower number, not a repaint.
+//
+// LANTERN and GAME DAY are deliberately absent. Lantern's bake draws the warm
+// light POOLS into the ground texture — that is illumination, not albedo, and
+// capping it would grey out the one effect the whole world is built on. Game
+// Day already measures 76.5% of its playfield below chroma 0.12 with no help,
+// and its loud slice is the crimson end zones and the painted turf, which are
+// the world's identity rather than its stage.
+const GROUND_DIALLED = new Map<string, number>([
+  ['maple', 0.16], ['pirate', 0.16], ['powder', 0.10], ['skylark', 0.10],
+]);
 // ── AND A CEILING, WHICH IS A DIFFERENT QUESTION FROM THE STAGE ───────────
 // The loudest slice of a ground is legitimately not stage. MAPLE's autumn leaf
 // litter is the reason the world is called Maple Falls; lane paint, crosswalks
@@ -1136,7 +1153,9 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
   // that applied unconditionally would silently repaint LANTERN's warm night
   // and POWDER's snow on the way past. A world that has not adopted the dial
   // gets its authored colour back untouched, byte for byte.
-  if (!GROUND_DIALLED.has(WORLD_ID)) return css;
+  const world = GROUND_DIALLED.get(WORLD_ID);
+  if (world === undefined) return css;
+  if (cap === GROUND_CHROMA) cap = world;   // the world's own dial, unless a call site named its own
   let r: number, g: number, b: number, tail = '';
   const h = /^#([0-9a-fA-F]{6})$/.exec(css);
   if (h) { const n = parseInt(h[1], 16); r = (n >> 16) & 255; g = (n >> 8) & 255; b = n & 255; } else {
@@ -1157,7 +1176,7 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
     // number: qa/groundtruth.mjs grades the baked albedo against exactly what
     // this build is using, and reads null for a world that has not adopted it.
     const qaWin = window as unknown as { __groundChroma: number | null; __groundCeiling: number };
-    qaWin.__groundChroma = GROUND_DIALLED.has(WORLD_ID) ? GROUND_CHROMA : null;
+    qaWin.__groundChroma = GROUND_DIALLED.get(WORLD_ID) ?? null;
     qaWin.__groundCeiling = GROUND_CEILING;
 
     // ── baked ground texture ───────────────────────────────────────────────────
@@ -1216,7 +1235,7 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
     g.fillStyle = '#dfe7f6'; g.fillRect(0, 0, TEX, TEX);
     for (let i = 0; i < 3600; i++) {
       const x = Math.random() * TEX, y = Math.random() * TEX;
-      g.fillStyle = Math.random() < 0.6 ? 'rgba(150,175,220,0.10)' : 'rgba(255,255,255,0.16)';
+      g.fillStyle = Math.random() < 0.6 ? quiet('rgba(150,175,220,0.10)') : 'rgba(255,255,255,0.16)';
       g.beginPath(); g.arc(x, y, rand(3, 10), 0, Math.PI * 2); g.fill();
     }
     // 1b. WIND. Snow's texture is not speckle, it is DIRECTION: the wind that
@@ -1288,7 +1307,7 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
     // 1c. CRUST CHIPS — the only high-frequency thing on this ground.
     for (let i = 0; i < 9000; i++) {
       const x = Math.random() * TEX, y = Math.random() * TEX;
-      g.fillStyle = Math.random() < 0.5 ? 'rgba(122,148,196,0.13)' : 'rgba(255,255,255,0.15)';
+      g.fillStyle = Math.random() < 0.5 ? quiet('rgba(122,148,196,0.13)') : 'rgba(255,255,255,0.15)';
       g.fillRect(x, y, 1 + Math.random() * 2.4, 1 + Math.random() * 2.4);
     }
     g.restore();
@@ -1298,10 +1317,10 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
       ppath(ring as PW.Pt[], true);
       g.save();
       g.clip();
-      g.strokeStyle = 'rgba(92,116,176,0.34)';
+      g.strokeStyle = quiet('rgba(92,116,176,0.34)');
       g.lineWidth = 900 * PU;
       ppath(ring as PW.Pt[], true); g.stroke();
-      g.strokeStyle = 'rgba(92,116,176,0.22)';
+      g.strokeStyle = quiet('rgba(92,116,176,0.22)');
       g.lineWidth = 1700 * PU;
       ppath(ring as PW.Pt[], true); g.stroke();
       g.restore();
@@ -1313,17 +1332,17 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
     }
     // 4. THE HOME RUN — trampled piste, faintly darker, with sled lines
     ppath(PW.PISTE);
-    g.strokeStyle = 'rgba(178,194,226,0.55)'; g.lineWidth = PW.PISTE_HALF * 2 * PU;
+    g.strokeStyle = quiet('rgba(178,194,226,0.55)'); g.lineWidth = PW.PISTE_HALF * 2 * PU;
     g.lineCap = 'round'; g.lineJoin = 'round'; g.stroke();
     for (let i = -2; i <= 2; i++) {
-      g.strokeStyle = 'rgba(130,150,196,0.30)'; g.lineWidth = 3;
+      g.strokeStyle = quiet('rgba(130,150,196,0.30)'); g.lineWidth = 3;
       g.save(); g.translate(i * 60 * PU, 0); ppath(PW.PISTE); g.stroke(); g.restore();
     }
     // 5. THE GRIT ROAD — Old Bess's route, brown-grey over the white
     ppath(PW.GRIT);
     g.strokeStyle = '#9a938c'; g.lineWidth = PW.GRIT_HALF * 2 * PU; g.stroke();
     ppath(PW.GRIT);
-    g.strokeStyle = 'rgba(122,110,96,0.5)'; g.lineWidth = PW.GRIT_HALF * 1.2 * PU; g.stroke();
+    g.strokeStyle = quiet('rgba(122,110,96,0.5)'); g.lineWidth = PW.GRIT_HALF * 1.2 * PU; g.stroke();
     // 6. THE LAKE — the poster's cracked teal ice
     {
       const L = PW.LAKE;
@@ -1331,14 +1350,14 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
       g.translate(pxW(L.cx), pyW(L.cy));
       g.scale(L.rx * PU, L.ry * PU);
       const grd = g.createRadialGradient(0, 0, 0.15, 0, 0, 1);
-      grd.addColorStop(0, '#8fd0e8');
-      grd.addColorStop(0.72, '#5fa8cf');
-      grd.addColorStop(1, '#cfdff0');
+      grd.addColorStop(0, quiet('#8fd0e8'));
+      grd.addColorStop(0.72, quiet('#5fa8cf'));
+      grd.addColorStop(1, quiet('#cfdff0'));
       g.beginPath(); g.arc(0, 0, 1, 0, Math.PI * 2);
       g.fillStyle = grd; g.fill();
       g.restore();
       // cracks: pale jagged polylines radiating off-centre, like the poster
-      g.strokeStyle = 'rgba(226,244,252,0.75)'; g.lineWidth = 3.5; g.lineCap = 'round';
+      g.strokeStyle = quiet('rgba(226,244,252,0.75)'); g.lineWidth = 3.5; g.lineCap = 'round';
       for (let c2 = 0; c2 < 9; c2++) {
         const a0 = (c2 / 9) * Math.PI * 2 + rand(-0.3, 0.3);
         let cx2 = pxW(L.cx) + Math.cos(a0) * L.rx * PU * rand(0.05, 0.25);

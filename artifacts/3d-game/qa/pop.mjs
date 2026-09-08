@@ -161,9 +161,9 @@ function findVoid(img) {
 // face and the darkest heart, so an area-derived radius would run small; the
 // outer boundary is violet the whole way round, so the box is exact.
 function rimOf(img, v) {
-  const { w, d } = img;
+  const { w, h, d } = img;
   const lum = (i) => (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
-  if (!v || !v.pts || v.pts.length < 400) return { width: 0, contrast: 0, core: 0, rim: 0 };
+  if (!v || !v.pts || v.pts.length < 400) return { width: 0, contrast: 0, core: 0, rim: 0, find: 0, round: 0 };
   const cx = (v.minX + v.maxX) / 2, cy = (v.minY + v.maxY) / 2;
   const R = (v.wpx + v.hpx) / 4;
   const NB = 32, bins = Array.from({ length: NB }, () => []);
@@ -177,7 +177,7 @@ function rimOf(img, v) {
   const med = (a) => (a.length ? a.slice().sort((p1, p2) => p1 - p2)[a.length >> 1] : NaN);
   const prof = bins.map(med);
   const c = med(core);
-  if (!(c >= 0) || core.length < 50) return { width: 0, contrast: 0, core: 0, rim: 0 };
+  if (!(c >= 0) || core.length < 50) return { width: 0, contrast: 0, core: 0, rim: 0, find: 0, round: 0 };
   // The outermost ring is half background: a pixel straddling his edge still
   // passes the hue test while carrying the ground's brightness with it, and on
   // a pale world that reads as a rim twice as bright as the one he has. So the
@@ -193,7 +193,61 @@ function rimOf(img, v) {
   // a band from t0 to the edge spans (1 - t0) of the radius, half that of the
   // diameter
   const width = 100 * (1 - k0 / NB) * 0.5;
-  return { width, contrast: (peak + 0.05) / (c + 0.05), core: c, rim: peak };
+  // ── TWO FIGURES FOR BARS THAT DESCRIBE OUR HERO INSTEAD OF THEIRS ────────
+  // D7 (rim 10-15% of the diameter) and D8 (>= 8:1 against the interior) were
+  // both read off HOLE.IO's hero, and their hero is a HOLE: a near-black disc
+  // with a hard bright annulus round it. Ours is a sphere with a fresnel, a
+  // face and a starfield inside it, and the owner's standing instruction is
+  // that he is refined rather than replaced. The arithmetic is decisive rather
+  // than a matter of taste — with his interior at luminance 0.10, (rim+0.05) /
+  // (0.10+0.05) tops out at 7.0:1 with a rim of PURE WHITE. D8 cannot be met
+  // by any rim; it can only be met by hollowing him out.
+  //
+  // So these two are printed beside them, measuring what actually matters for
+  // a character who has to be findable and has to read as a ball:
+  //
+  //   FINDABILITY  how far he is from the ground he is standing on, CIE76 dE
+  //                over his own pixels at the 75th percentile — the same
+  //                question and the same convention qa/occlusion.mjs uses for
+  //                him when something is in the way, and qa/formsep.mjs for
+  //                the palette (which fails under dE 6).
+  //   ROUNDNESS    rim luminance minus core luminance. A flat disc scores 0
+  //                whatever colour it is; this is what says "sphere".
+  //
+  // They are DIAGNOSTICS until the owner rules on the bars. A number this
+  // probe prints is not a bar until someone says it is.
+  const lab = (r, g, b) => {
+    const f = (c2) => { c2 /= 255; return c2 <= 0.04045 ? c2 / 12.92 : Math.pow((c2 + 0.055) / 1.055, 2.4); };
+    const R = f(r), G = f(g), B = f(b);
+    let X = (R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047;
+    let Y = R * 0.2126 + G * 0.7152 + B * 0.0722;
+    let Z = (R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883;
+    const k2 = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+    X = k2(X); Y = k2(Y); Z = k2(Z);
+    return [116 * Y - 16, 500 * (X - Y), 200 * (Y - Z)];
+  };
+  const inMask = new Set(v.pts);
+  const bg = [0, 0, 0]; let nb = 0;
+  for (let y = Math.max(0, (cy - 2.6 * R) | 0); y < Math.min(h, cy + 2.6 * R); y++) {
+    for (let x = Math.max(0, (cx - 2.6 * R) | 0); x < Math.min(w, cx + 2.6 * R); x++) {
+      const q = y * w + x, dd = Math.hypot(x - cx, y - cy);
+      if (dd < R * 1.3 || dd > R * 2.2 || inMask.has(q)) continue;
+      bg[0] += d[q * 4]; bg[1] += d[q * 4 + 1]; bg[2] += d[q * 4 + 2]; nb++;
+    }
+  }
+  let find = 0;
+  if (nb > 50) {
+    const B0 = lab(bg[0] / nb, bg[1] / nb, bg[2] / nb);
+    const ds = [];
+    for (const q of v.pts) {
+      const c2 = lab(d[q * 4], d[q * 4 + 1], d[q * 4 + 2]);
+      ds.push(Math.hypot(c2[0] - B0[0], c2[1] - B0[1], c2[2] - B0[2]));
+    }
+    ds.sort((a2, b2) => a2 - b2);
+    find = ds[Math.floor(ds.length * 0.75)];
+  }
+  return { width, contrast: (peak + 0.05) / (c + 0.05), core: c, rim: peak,
+    find, round: peak - c };
 }
 
 // Frames come from qa/_worldshots.mjs, not from a second copy of the same
@@ -235,7 +289,7 @@ for (const world of WORLDS) {
   const v = findVoid(img);
   const rim = v ? rimOf(img, v) : { width: 0, contrast: 0 };
   rows.push({ world, ...st, share: v ? v.share : 0, rim: rim.width, contrast: rim.contrast,
-    core: rim.core, rimLum: rim.rim });
+    core: rim.core, rimLum: rim.rim, find: rim.find, round: rim.round });
 }
 
 // Their two frames, measured by the identical function, so the table is one artefact.
@@ -255,7 +309,8 @@ for (const r of rows) {
 // wrong — a dim rim and a washed-out interior fail identically as a ratio
 console.log('');
 for (const r of rows.filter((x) => !x.ref && x.core !== undefined))
-  console.log(`  ${r.world.padEnd(10)} rim lum ${r.rimLum.toFixed(3)}  interior lum ${r.core.toFixed(3)}`);
+  console.log(`  ${r.world.padEnd(10)} rim lum ${r.rimLum.toFixed(3)}  interior lum ${r.core.toFixed(3)}`
+    + `   |  findability ${r.find.toFixed(1)} dE   roundness ${r.round.toFixed(3)}`);
 
 let fails = 0;
 console.log('');

@@ -26,6 +26,21 @@ for (const wid of WORLDS) {
   // enough to compose one, and the first run died on the very first shot.
   p.setDefaultTimeout(400000);
   await p.route('**/functions/v1/ingest-events', r => r.fulfill({ status: 200, body: '{}' }));
+  // ── THE SAME FRAME EVERY TIME, OR THE NUMBERS ARE NOISE ──────────────────
+  // Three runs of qa/pop.mjs on nominally similar builds gave maple's D1 as
+  // 45.1, 46.2 and 47.3 — a two-point spread with nothing but the crowd's
+  // starting positions between them. Colour work is being decided on
+  // differences of one and two points, so a probe whose frame moves by two on
+  // its own is worse than no probe: it launders noise as progress.
+  //
+  // Seeded exactly as qa/placement.mjs and qa/lookpair.mjs do it — Math.random
+  // replaced at page init, before a single module runs — so every consumer on
+  // the page draws the same stream and the spawn frame is reproducible.
+  await p.addInitScript((seed) => {
+    let a = (seed >>> 0) + 0x6D2B79F5;
+    Math.random = () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }, Number(process.env.SEED || 7));
   await p.addInitScript(() => { try {
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1'); localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
     localStorage.setItem('voidDailyLast', new Date().toDateString()); } catch {} });

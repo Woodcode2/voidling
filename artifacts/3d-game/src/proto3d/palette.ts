@@ -95,6 +95,47 @@ export const WORLD = {
   snow: 0xf2f6ff,
 };
 
+// ── AND THE OTHER HALF OF THE SAME THESIS: THE ACTORS ───────────────────────
+// island.ts's quiet() took the ground down. This takes the props up, and the
+// pair is the whole of what HOLE.IO's "pop" actually is — a GAP, not a global
+// saturation. What made this measurable was quieting the ground: maple's D2
+// (playfield above chroma 0.35) read 35.7% before and 9.8% after, because
+// 26 points of "actors" WERE THE LAWN. Our props were never carrying the
+// colour; the ground was drowning out the question.
+//
+// loud() is quiet()'s mirror — same transform, opposite direction: push the
+// colour away from the grey of its OWN luminance until it meets the floor, so
+// hue and value survive and only the saturation moves.
+//
+// IT REFUSES TO INVENT COLOUR. Anything under 0.28 to begin with is left
+// exactly as authored, and that guard is doing real work rather than being
+// cautious boilerplate: `roof` carries 0x6a6480 and 0x746e8c as deliberate
+// neutral slate, `house` and `tower` each carry three dark members, and every
+// one of those exists because of a note two rounds old — "one dark tower
+// between two bright ones is what makes the bright ones read as lit". A blanket
+// floor turns 0x6a6480 into a vivid blue-violet and deletes that structure.
+// So loud() raises colours that are already colours, and leaves the rests alone.
+const PROP_CHROMA = 0.46;
+const loud = (n: number, floor = PROP_CHROMA): number => {
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const span = Math.max(r, g, b) - Math.min(r, g, b);
+  if (span >= floor * 255 || span < 0.28 * 255) return n;
+  const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  // ── AND IT NEVER CLIPS, BECAUSE CLIPPING IS A HUE SHIFT ───────────────────
+  // A channel driven past 255 and clamped is not the colour asked for: it is a
+  // different hue at a different luminance, which is exactly the fault the
+  // ground's tone-map gamut guard exists to stop. Measured before this: the
+  // house pastel 0xf2c9a0 pushed to 0xffc78c with red pinned at 255, and the
+  // tower pink 0xff9fbf lost 0.014 of luminance on the way. So the push takes
+  // the largest factor that keeps every channel inside the byte, and a colour
+  // with no headroom simply gets as far as it can. Nothing is invented and
+  // nothing is thrown away.
+  const room = (c: number) => (c > y ? (255 - y) / (c - y) : c < y ? y / (y - c) : Infinity);
+  const k = Math.min((floor * 255) / span, room(r), room(g), room(b));
+  const f = (c: number) => Math.max(0, Math.min(255, Math.round(y + (c - y) * k)));
+  return (f(r) << 16) | (f(g) << 8) | f(b);
+};
+
 // ── props (buildings/trees/etc — matched to the 2D toy-city screenshot) ──────
 export const PROPS = {
   // ── HOUSE WALLS, WITH A DARK END AT LAST ────────────────────────────────
@@ -107,29 +148,32 @@ export const PROPS = {
   // Five deeper members go in and the eight pastels stay, so a row still reads
   // as a friendly toy town and now has somewhere for the eye to rest. The
   // range is 0.10 to 0.80 rather than 0.53 to 0.80.
-  house: [0xbfe0cf, 0xc9b8e8, 0xf2c9a0, 0xa9c4e8, 0xeab8cc, 0xf0e6d2, 0xb8d8c8, 0xd8c8ec,
-    0x8c4a3f,   // brick red — the one every small town actually has
+  house: [0xbfe0cf, 0xc9b8e8, loud(0xf2c9a0), 0xa9c4e8, 0xeab8cc, 0xf0e6d2, 0xb8d8c8, 0xd8c8ec,
+    loud(0x8c4a3f),   // brick red — the one every small town actually has
     0x2f5d52,   // deep teal, a painted clapboard
     0x4a3f6b,   // plum, for the odd house that went its own way
     0x6b5330,   // stained timber
     0x33506e],  // navy weatherboard
   // warm-but-clean roofs (terracotta / slate / teal — no mud)
-  roof: [0xc97f5a, 0x6a6480, 0xb5654a, 0x6fa8a0, 0xcf8a63, 0x746e8c],
+  roof: [loud(0xc97f5a), 0x6a6480, loud(0xb5654a), 0x6fa8a0, loud(0xcf8a63), 0x746e8c],
   // downtown towers — cooler pastels + glass, plus three that are actually
   // dark. Same argument as `house`: a skyline of eight bright faces is a
   // sticker sheet, and one dark tower between two bright ones is what makes
   // the bright ones read as lit.
-  tower: [0xff8a7a, 0x5ec8d8, 0xf7c85a, 0x8fa9d8, 0xf6efe2, 0xb98cff, 0x7ed57a, 0xff9fbf,
+  tower: [loud(0xff8a7a), loud(0x5ec8d8), loud(0xf7c85a), 0x8fa9d8, 0xf6efe2, loud(0xb98cff), loud(0x7ed57a), loud(0xff9fbf),
     0x2d4055,   // slate
     0x4a2f52,   // aubergine
     0x1f4a46],  // deep sea green
   towerGlass: 0x2c3a52,
-  car: [0xff5a4d, 0x2f9bd8, 0xffd23f, 0x7ed57a, 0xf06fb0, 0x9fe8f0, 0xf2f4f8, 0xb98cff],
+  car: [loud(0xff5a4d), loud(0x2f9bd8), loud(0xffd23f), loud(0x7ed57a), loud(0xf06fb0), loud(0x9fe8f0), 0xf2f4f8, loud(0xb98cff)],
   carGlass: 0xbfeaff,
-  foliage: [0x5dbe63, 0x4faa5a, 0x6cc86e],
-  pine: 0x3e9a54,
+  // trees and bushes are the most numerous prop in four of six worlds, and
+  // they measured rgb(107,175,92) — chroma 0.327 — on screen: under D2's 0.35
+  // by two hundredths, so a frame full of them scored zero actors
+  foliage: [loud(0x5dbe63), loud(0x4faa5a), loud(0x6cc86e)],
+  pine: loud(0x3e9a54),
   trunk: 0x8a6a4a,
-  person: [0xff7a5a, 0x5ec8d8, 0xffd23f, 0x8fa9d8, 0xf06fb0, 0x9b7bd8, 0xffffff, 0x7ed57a],
+  person: [loud(0xff7a5a), loud(0x5ec8d8), loud(0xffd23f), loud(0x8fa9d8), loud(0xf06fb0), loud(0x9b7bd8), 0xffffff, loud(0x7ed57a)],
   skin: [0xf4c9a0, 0xe0a878, 0xc98a5a, 0xffd9b0],
 };
 
