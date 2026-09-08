@@ -65,8 +65,26 @@ function stats(img) {
     }
   }
   vals.sort((a, b) => a - b); chs.sort((a, b) => a - b);
+  // ── THE GAP, WHICH IS WHAT THE BRIEF ACTUALLY CLAIMS ──────────────────────
+  // D1 and D2 are absolute thresholds — below 0.12 is "stage", above 0.35 is
+  // "actors" — and they were calibrated on HOLE.IO's city, whose ground is grey
+  // concrete. Applied literally to a park they ask us to make the lawn grey to
+  // score well on a metric named after separation. The brief's own section 3.1
+  // even prescribes "a pale, chalky green at chroma ~0.15", which is ABOVE its
+  // own 0.12 bar: the prescription cannot satisfy the bar it is written under.
+  //
+  // The thesis those bars are a proxy for is a RATIO: "they stage saturated
+  // objects on a neutral ground, so the two separate". So measure that too —
+  // the 25th percentile of chroma (the ground the props stand on) against the
+  // 90th (the props). It needs no world to be grey to score well, and it says
+  // in one number what two thresholds say from opposite ends: measured, GAME
+  // DAY is 76% stage / 11% actors and MAPLE is 25% / 37%, both failing, one for
+  // having no props and one for having no ground.
+  const q = (a, f) => a[Math.min(a.length - 1, Math.floor(a.length * f))];
+  const ground = q(chs, 0.25), props = q(chs, 0.90);
   return { stage: 100 * below / n, actors: 100 * above / n,
-    value: vals[Math.floor(vals.length / 2)], chroma: chs[Math.floor(chs.length / 2)] };
+    value: vals[Math.floor(vals.length / 2)], chroma: chs[Math.floor(chs.length / 2)],
+    ground, props, gap: ground > 0.001 ? props / ground : 0 };
 }
 
 // The void: his violet body, in the middle band of the playfield so neither the
@@ -188,10 +206,10 @@ for (const [f, label] of [['02-match-city.png', 'HOLE.IO city'], ['10-match-flow
 }
 
 console.log(`\nCOLOUR AND POP — spawn frames @ ${PORT}\n`);
-console.log('world             stage%   actors%   value   chroma   void%    rim%   rim:1');
+console.log('world             stage%   actors%   value   chroma   gap    void%    rim%   rim:1');
 for (const r of rows) {
   const f = (x, n = 1) => (Number.isNaN(x) ? '   —' : x.toFixed(n));
-  console.log(`${r.world.padEnd(16)} ${f(r.stage).padStart(6)} ${f(r.actors).padStart(9)} ${f(r.value, 2).padStart(7)} ${f(r.chroma, 3).padStart(8)} ${f(r.share).padStart(7)} ${f(r.rim).padStart(7)} ${f(r.contrast, 1).padStart(7)}`);
+  console.log(`${r.world.padEnd(16)} ${f(r.stage).padStart(6)} ${f(r.actors).padStart(9)} ${f(r.value, 2).padStart(7)} ${f(r.chroma, 3).padStart(8)} ${f(r.gap, 1).padStart(5)}x ${f(r.share).padStart(7)} ${f(r.rim).padStart(7)} ${f(r.contrast, 1).padStart(7)}`);
 }
 
 let fails = 0;
