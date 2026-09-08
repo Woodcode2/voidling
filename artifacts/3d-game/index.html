@@ -948,7 +948,17 @@
          overrides the fill anyway. */
       @supports ((-webkit-background-clip: text) or (background-clip: text)) {
         #menu .logo {
-          background: linear-gradient(180deg, #ffffff 30%, #f4e8ff 62%, #c9a3ff 100%);
+          /* WARM, AND MOSTLY WHITE. The first ramp ran white -> pale violet ->
+             #c9a3ff, which is the nebula's own hue: the letters ended in the
+             colour they are sitting on. Measured on the rendered menu, the
+             glyphs came out rgb(203,189,220) — a grey-violet on violet — at
+             8.26:1 upper and 8.75:1 lower, against roughly 20:1 for the flat
+             white it replaced. Both pass WCAG AAA and it still looked washed
+             out, because the loss was HUE separation, which a contrast ratio
+             does not see. Gold against violet separates on both axes, and
+             holding white to 68% keeps the punch that made the old title work
+             at all. */
+          background: linear-gradient(180deg, #ffffff 30%, #ffffff 68%, #fff2dc 86%, #ffd9a0 100%);
           -webkit-background-clip: text; background-clip: text;
           -webkit-text-fill-color: transparent;
         }
