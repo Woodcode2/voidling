@@ -1077,6 +1077,69 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     scene.add(halo);
   }
 
+
+// ── THE GROUND HAS ONE LOUDNESS DIAL ──────────────────────────────────────
+// palette.ts desaturated the ground a round ago and recorded the arithmetic:
+// meadow 0.443 -> 0.169, park 0.439 -> 0.169, forest 0.290 -> 0.110, sand
+// 0.322 -> 0.125, "they are still plainly green; they have stopped shouting
+// over the props". The player never saw a pixel of it. WORLD.meadow is one
+// fillRect at the top of this bake and about sixty CSS literals below paint
+// over it — the town square at #8ddc63 (chroma 0.475), the farm's five crop
+// strips at 0.373-0.443, the park lawns at 0.376-0.408 — none of which have
+// ever heard of palette.ts. Measured on the shipped build, maple's spawn frame
+// renders that square at rgb(122,180,70), which is the OLD pre-desaturation
+// green to within a few counts.
+//
+// That is the third colour fix this project has found that never reached a
+// pixel, after biomeColor (five worlds inert) and GD_FLOOR.lot. The pattern is
+// always the same: the authoritative-looking table is not what paints.
+//
+// So the authored colour stays in the source, where it is reviewable, and the
+// loudness becomes a DIAL. quiet() pulls a colour toward the grey of its OWN
+// luminance until its chroma meets the cap: hue kept, luminance kept to a
+// rounding step — which is what protects the district edges a render audit
+// re-spaced by value at >= 1.35:1. Anything already at or under the cap comes
+// back untouched, byte for byte.
+//
+// THE CAP IS 0.16 BECAUSE THAT IS WHAT palette.ts ALREADY CHOSE. It is not the
+// number that passes stream D's D1 bar: D1 wants 45% of the playfield under
+// chroma 0.12, and HOLE.IO reaches 52-61% by painting a ground at chroma 0.055
+// — a near-white city and a near-white flower meadow with the colour entirely
+// in the objects. Ours at 0.16 is a green town with quieter grass. Which of
+// those two this game is, is the owner's call, not a probe's, and it is one
+// number away either way.
+const GROUND_CHROMA = 0.16;
+// WHICH WORLDS ARE ON THE DIAL, stated rather than implied. MAPLE opens the
+// game and PIRATE opens on a magenta dance floor, so those two came first;
+// GAME DAY already measures 76.5% of its playfield under chroma 0.12 without
+// help, POWDER is snow, SKYLARK drains its ground by design, and LANTERN is a
+// night world whose whole effect is warm light pools that a cap would grey out.
+// qa/groundtruth.mjs reads this set out of the running page and grades only the
+// worlds in it, so the coverage is visible instead of assumed.
+const GROUND_DIALLED = new Set(['maple', 'pirate']);
+function quiet(css: string, cap = GROUND_CHROMA): string {
+  let r: number, g: number, b: number, tail = '';
+  const h = /^#([0-9a-fA-F]{6})$/.exec(css);
+  if (h) { const n = parseInt(h[1], 16); r = (n >> 16) & 255; g = (n >> 8) & 255; b = n & 255; } else {
+    const m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(,[^)]*)?\)$/.exec(css);
+    if (!m) return css;
+    r = +m[1]; g = +m[2]; b = +m[3]; tail = m[4] || '';
+  }
+  const span = Math.max(r, g, b) - Math.min(r, g, b);
+  if (span <= cap * 255) return css;
+  const y = 0.2126 * r + 0.7152 * g + 0.0722 * b, k = (cap * 255) / span;
+  const f = (c: number) => Math.max(0, Math.min(255, Math.round(y + (c - y) * k)));
+  const [R, G, B] = [f(r), f(g), f(b)];
+  return h ? '#' + ((R << 16) | (G << 8) | B).toString(16).padStart(6, '0')
+    : `rgb${tail ? 'a' : ''}(${R},${G},${B}${tail})`;
+}
+
+    // QA reaches the dial through the page rather than through a copy of the
+    // number: qa/groundtruth.mjs grades the baked albedo against exactly what
+    // this build is using, and reads null for a world that has not adopted it.
+    (window as unknown as { __groundChroma: number | null }).__groundChroma =
+      GROUND_DIALLED.has(WORLD_ID) ? GROUND_CHROMA : null;
+
     // ── baked ground texture ───────────────────────────────────────────────────
   const TEX = 3072;   // high-res bake so roads/crosswalks stay crisp up close
   const cv = document.createElement('canvas'); cv.width = cv.height = TEX;
@@ -1420,14 +1483,23 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       const cell = 175;
       for (let iy = 0; iy < 16; iy++) for (let ix = 0; ix < 18; ix++) {
         const x = 5950 + ix * cell, y = 9900 + iy * cell;
-        g.fillStyle = (ix + iy) % 2 === 0 ? 'rgba(255,120,200,0.62)' : 'rgba(90,200,255,0.5)';
+    // ── THE HERO MUST NOT SPAWN ON HIS OWN HUE ────────────────────────────
+    // PIRATE BAY opens on the party deck, and the deck was a hot magenta and
+    // cyan checkerboard: measured, 15.4% of the spawn frame at rgb(161,54,134),
+    // chroma 0.416, with a violet void standing in the middle of it. Maple's
+    // town square carries a comment forbidding exactly this — "a pale-violet
+    // pavement slab under a violet void is how you make the void invisible in
+    // its own first frame" — and the rule was never carried across the worlds.
+    // Through the dial the deck keeps its checker and its hues and stops
+    // competing with the character standing on it.
+        g.fillStyle = (ix + iy) % 2 === 0 ? quiet('rgba(255,120,200,0.62)') : quiet('rgba(90,200,255,0.5)');
         g.fillRect(pxW(x), pyW(y), pxW(cell) - pxW(0), pxW(cell) - pxW(0));
       }
       // the dance floor needs an EDGE, not a crop line: the checkerboard used
       // to terminate against the void wherever the region met the coast
       wpath(BAY.smoothPoly(pr.poly, 5));
       g.strokeStyle = '#f0e2c4'; g.lineWidth = pxW(120) - pxW(0); g.stroke();
-      g.strokeStyle = 'rgba(255,120,220,0.85)'; g.lineWidth = pxW(38) - pxW(0); g.stroke();
+      g.strokeStyle = quiet('rgba(255,120,220,0.85)'); g.lineWidth = pxW(38) - pxW(0); g.stroke();
       g.restore();
       // the resort's pools + raked sand
       g.save(); wpath(BAY.smoothPoly(BAY_R('resort').poly, 5)); g.clip();
@@ -2288,7 +2360,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       // 1. TONE — mown and worn. Matched pairs so the block's mean does not move.
       for (let i = 0; i < 26; i++) {
         for (const up of [true, false]) {
-          g.fillStyle = up ? 'rgba(178,214,112,0.15)' : 'rgba(78,124,60,0.15)';
+          g.fillStyle = up ? quiet('rgba(178,214,112,0.15)') : quiet('rgba(78,124,60,0.15)');
           g.beginPath();
           g.arc(x0 + lr() * bw, y0 + lr() * bh, lrange(bw * 0.07, bw * 0.22), 0, Math.PI * 2);
           g.fill();
@@ -2363,7 +2435,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       g.beginPath(); g.moveTo(x0, pyW(ty)); g.lineTo(x1, pyW(ty)); g.stroke();
     }
     // the back of the block: a green service yard with a gravel lot in it
-    g.fillStyle = '#8fc96a';
+    g.fillStyle = quiet('#8fc96a');
     g.fillRect(pxW(cxB - 470), pyW(cyB - 470), pxW(940) - pxW(0), pyW(940) - pyW(0));
     g.fillStyle = '#c3bcaa';
     g.fillRect(pxW(cxB - 330), pyW(cyB - 250), pxW(660) - pxW(0), pyW(500) - pyW(0));
@@ -2454,9 +2526,9 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       const yx = lot.x - (lot.fx !== 0 ? lot.fx * (yd / 2 - frontClear) : 0);
       const yy = lot.y - (lot.fy !== 0 ? lot.fy * (yd / 2 - frontClear) : 0);
       const rw = lot.fy !== 0 ? yw : yd, rh = lot.fy !== 0 ? yd : yw;
-      g.fillStyle = 'rgba(210,245,170,0.10)';
+      g.fillStyle = quiet('rgba(210,245,170,0.10)');
       g.fillRect(pxW(yx - rw / 2), pyW(yy - rh / 2), pxW(yx + rw / 2) - pxW(yx - rw / 2), pyW(yy + rh / 2) - pyW(yy - rh / 2));
-      g.strokeStyle = 'rgba(70,110,60,0.10)'; g.lineWidth = Math.max(1.5, pxW(14) - pxW(0));
+      g.strokeStyle = quiet('rgba(70,110,60,0.10)'); g.lineWidth = Math.max(1.5, pxW(14) - pxW(0));
       g.strokeRect(pxW(yx - rw / 2), pyW(yy - rh / 2), pxW(yx + rw / 2) - pxW(yx - rw / 2), pyW(yy + rh / 2) - pyW(yy - rh / 2));
       // driveway: from the house's front edge, over the sidewalk, to the asphalt
       g.fillStyle = '#d9d5df';
@@ -2479,7 +2551,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       }
       // backyard: garden bed + patio square behind the house
       const bx = lot.x - lot.fx * (frontClear + 240), by = lot.y - lot.fy * (frontClear + 240);
-      g.fillStyle = 'rgba(126,213,122,0.35)';
+      g.fillStyle = quiet('rgba(126,213,122,0.35)');
       g.fillRect(pxW(bx - 130), pyW(by - 130), pxW(260) - pxW(0), pxW(260) - pxW(0));
       g.fillStyle = 'rgba(226,216,206,0.12)';   // soft warm patio slab
       g.fillRect(pxW(bx + 40 * (li % 2 ? 1 : -1) - 55), pyW(by - 55), pxW(110) - pxW(0), pxW(110) - pxW(0));
@@ -2505,16 +2577,16 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     g.clip();
     // the river bisects this block near its centre — the course lives entirely
     // WEST of the water, the pond walk keeps the east (no drowned fairways)
-    g.strokeStyle = '#a8de7e'; g.lineWidth = pxW(340) - pxW(0); g.lineCap = 'round';
+    g.strokeStyle = quiet('#a8de7e'); g.lineWidth = pxW(340) - pxW(0); g.lineCap = 'round';
     g.beginPath();
     g.moveTo(pxW(gcx - 600), pyW(gcy + 500));
     g.quadraticCurveTo(pxW(gcx - 560), pyW(gcy - 40), pxW(gcx - 300), pyW(gcy - 420));
     g.stroke();
     // putting green + hole ring (matches the flag prop in ./life)
-    g.fillStyle = '#b8ec8a'; g.beginPath(); g.arc(pxW(gcx - 300), pyW(gcy - 420), pxW(180) - pxW(0), 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#8cc961'; g.beginPath(); g.arc(pxW(gcx - 300), pyW(gcy - 420), pxW(24) - pxW(0), 0, Math.PI * 2); g.fill();
+    g.fillStyle = quiet('#b8ec8a'); g.beginPath(); g.arc(pxW(gcx - 300), pyW(gcy - 420), pxW(180) - pxW(0), 0, Math.PI * 2); g.fill();
+    g.fillStyle = quiet('#8cc961'); g.beginPath(); g.arc(pxW(gcx - 300), pyW(gcy - 420), pxW(24) - pxW(0), 0, Math.PI * 2); g.fill();
     // tee box
-    g.fillStyle = '#b8ec8a'; g.fillRect(pxW(gcx - 680), pyW(gcy + 460), pxW(160) - pxW(0), pyW(120) - pyW(0));
+    g.fillStyle = quiet('#b8ec8a'); g.fillRect(pxW(gcx - 680), pyW(gcy + 460), pxW(160) - pxW(0), pyW(120) - pyW(0));
     // bunkers
     g.fillStyle = hex(WORLD.sand);
     g.beginPath(); g.ellipse(pxW(gcx - 480), pyW(gcy + 60), pxW(110) - pxW(0), pyW(75) - pyW(0), 0.5, 0, Math.PI * 2); g.fill();
@@ -2535,9 +2607,9 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     const gy0 = SQ_GREEN[1], gy1 = SQ_GREEN[3], gx0 = SQ_GREEN[0], gx1 = SQ_GREEN[2];
     const gcx = (gx0 + gx1) / 2, gcy = (gy0 + gy1) / 2;
     // the green itself, a shade brighter than the meadow so it reads mown
-    g.fillStyle = '#8ddc63';
+    g.fillStyle = quiet('#8ddc63');
     g.fillRect(pxW(gx0), pyW(gy0), pxW(gx1 - gx0) - pxW(0), pyW(gy1 - gy0) - pyW(0));
-    g.strokeStyle = 'rgba(120,170,96,0.6)'; g.lineWidth = Math.max(1.5, pxW(22) - pxW(0));
+    g.strokeStyle = quiet('rgba(120,170,96,0.6)'); g.lineWidth = Math.max(1.5, pxW(22) - pxW(0));
     g.strokeRect(pxW(gx0), pyW(gy0), pxW(gx1 - gx0) - pxW(0), pyW(gy1 - gy0) - pyW(0));
     // mow stripes, so the green reads MAINTAINED from the top-down camera
     g.fillStyle = 'rgba(255,255,255,0.075)';
@@ -2576,7 +2648,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     // gathers, and the bare patch the parking-meter protest has worn into it
     g.fillStyle = '#e2ddcd';
     g.fillRect(pxW(6120), pyW(gy0 - 60), pxW(190) - pxW(0), pyW(gy1 - gy0 + 120) - pyW(0));
-    g.fillStyle = 'rgba(186,166,116,0.45)';
+    g.fillStyle = quiet('rgba(186,166,116,0.45)');
     g.beginPath(); g.ellipse(pxW(6300), pyW(5090), pxW(190) - pxW(0), pyW(140) - pyW(0), 0.2, 0, Math.PI * 2); g.fill();
   }
 
@@ -2593,9 +2665,9 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   {
     const bwY0 = 9475, bwY1 = 9660;
     const bx0 = 925, bx1 = 9365;
-    g.fillStyle = '#e2b378';
+    g.fillStyle = quiet('#e2b378');
     g.fillRect(pxW(bx0), pyW(bwY0), pxW(bx1) - pxW(bx0), pyW(bwY1) - pyW(bwY0));
-    g.strokeStyle = 'rgba(160,110,60,0.35)'; g.lineWidth = Math.max(1, pxW(8) - pxW(0));
+    g.strokeStyle = quiet('rgba(160,110,60,0.35)'); g.lineWidth = Math.max(1, pxW(8) - pxW(0));
     for (let bx = bx0; bx < bx1; bx += 55) {   // plank joints
       g.beginPath(); g.moveTo(pxW(bx), pyW(bwY0)); g.lineTo(pxW(bx), pyW(bwY1)); g.stroke();
     }
@@ -2611,7 +2683,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     for (let i = 0; i < 1400; i++) {
       const mx = 1100 + Math.random() * 7900, my = 9700 + Math.random() * 1050;
       if (!insideIslandWorld(mx, my)) continue;
-      g.fillStyle = i % 3 ? 'rgba(230,200,140,0.22)' : 'rgba(255,255,255,0.07)';
+      g.fillStyle = i % 3 ? quiet('rgba(230,200,140,0.22)') : 'rgba(255,255,255,0.07)';
       const mr = (pxW(10) - pxW(0)) * (0.5 + Math.random());
       g.beginPath(); g.arc(pxW(mx), pyW(my), mr, 0, Math.PI * 2); g.fill();
     }
@@ -2624,7 +2696,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       if (Math.hypot(twx - LAGOON.x, (twy - LAGOON.y) * 1.35) < LAGOON.rx + 160) continue;
       g.save(); g.translate(pxW(twx), pyW(twy)); g.rotate(Math.random() * 0.8 - 0.4);
       // offset shadow first (sun from NW — matches the 3D sun)
-      g.fillStyle = 'rgba(90,70,40,0.18)';
+      g.fillStyle = quiet('rgba(90,70,40,0.18)');
       g.fillRect(-(pxW(55) - pxW(0)) + (pxW(14) - pxW(0)), -(pxW(90) - pxW(0)) + (pxW(16) - pxW(0)), pxW(110) - pxW(0), pxW(180) - pxW(0));
       g.fillStyle = towelCols[i % towelCols.length];
       g.fillRect(-(pxW(55) - pxW(0)), -(pxW(90) - pxW(0)), pxW(110) - pxW(0), pxW(180) - pxW(0));
@@ -2648,7 +2720,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     g.rect(pxW(sx1 - BLOCK_SIZE / 2), pyW(sy1 - BLOCK_SIZE / 2), pxW(BLOCK_SIZE) - pxW(0), pyW(BLOCK_SIZE) - pyW(0));
     g.clip();
     // the running track: a rounded rectangle of clay around the field
-    g.strokeStyle = '#c4643f'; g.lineWidth = pxW(190) - pxW(0); g.lineJoin = 'round'; g.lineCap = 'round';
+    g.strokeStyle = quiet('#c4643f'); g.lineWidth = pxW(190) - pxW(0); g.lineJoin = 'round'; g.lineCap = 'round';
     g.beginPath();
     g.moveTo(pxW(sx1 - 480), pyW(sy1 - 300)); g.lineTo(pxW(sx1 + 480), pyW(sy1 - 300));
     g.lineTo(pxW(sx1 + 480), pyW(sy1 + 300)); g.lineTo(pxW(sx1 - 480), pyW(sy1 + 300));
@@ -2661,14 +2733,14 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       g.moveTo(pxW(sx1 - 480), pyW(sy1 + 300 - inset)); g.lineTo(pxW(sx1 + 480), pyW(sy1 + 300 - inset)); g.stroke();
     }
     // the field
-    g.fillStyle = '#63b84e';
+    g.fillStyle = quiet('#63b84e');
     g.fillRect(pxW(sx1 - 480), pyW(sy1 - 250), pxW(960) - pxW(0), pyW(500) - pyW(0));
     for (let s2 = 0; s2 < 8; s2 += 2) {   // mow bands down the field
       g.fillStyle = 'rgba(255,255,255,0.075)';
       g.fillRect(pxW(sx1 - 480 + (s2 / 8) * 960), pyW(sy1 - 250), pxW(960 / 8) - pxW(0), pyW(500) - pyW(0));
     }
     // end zones in the school colours
-    g.fillStyle = '#2f4a7a';
+    g.fillStyle = quiet('#2f4a7a');
     g.fillRect(pxW(sx1 - 480), pyW(sy1 - 250), pxW(130) - pxW(0), pyW(500) - pyW(0));
     g.fillRect(pxW(sx1 + 350), pyW(sy1 - 250), pxW(130) - pxW(0), pyW(500) - pyW(0));
     // yard lines + hash marks
@@ -2686,7 +2758,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       }
     }
     // the 50-yard-line maple leaf, in navy
-    g.fillStyle = 'rgba(47,74,122,0.75)';
+    g.fillStyle = quiet('rgba(47,74,122,0.75)');
     g.beginPath(); g.arc(pxW(sx1), pyW(sy1), pxW(96) - pxW(0), 0, Math.PI * 2); g.fill();
     g.restore();
   }
@@ -2694,7 +2766,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     // the PRACTICE field on (4,3), drawn to the same rectangle ./life's pitch
     // plane covers, so the two agree instead of z-fighting
     const px2 = blockCenter(4), py2 = blockCenter(3);
-    g.fillStyle = '#6fc255';
+    g.fillStyle = quiet('#6fc255');
     g.fillRect(pxW(px2 - 320), pyW(py2 - 220), pxW(640) - pxW(0), pyW(440) - pyW(0));
     g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = Math.max(1.5, pxW(13) - pxW(0));
     g.strokeRect(pxW(px2 - 300), pyW(py2 - 200), pxW(600) - pxW(0), pyW(400) - pyW(0));
@@ -2704,7 +2776,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     const scx2 = blockCenter(5), scy2 = blockCenter(4);
     g.fillStyle = '#9aa0ac';
     g.fillRect(pxW(scx2 - 620), pyW(scy2 + 120), pxW(1240) - pxW(0), pyW(420) - pyW(0));
-    g.strokeStyle = 'rgba(255,210,60,0.7)'; g.lineWidth = Math.max(1.5, pxW(18) - pxW(0));
+    g.strokeStyle = quiet('rgba(255,210,60,0.7)'); g.lineWidth = Math.max(1.5, pxW(18) - pxW(0));
     g.beginPath(); g.moveTo(pxW(scx2 - 600), pyW(scy2 + 330)); g.lineTo(pxW(scx2 + 600), pyW(scy2 + 330)); g.stroke();
     // the STUDENT LOT on (4,4), east of the creek
     const lx = 8880, ly = blockCenter(4) - 190;
@@ -2726,7 +2798,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   {
     const my = blockCenter(1);
     const mx0 = blockCenter(0) - 700, mx1 = blockCenter(2) + 700;
-    g.fillStyle = '#b8a473';
+    g.fillStyle = quiet('#b8a473');
     g.fillRect(pxW(mx0), pyW(my - 260), pxW(mx1 - mx0) - pxW(0), pyW(520) - pyW(0));
     g.strokeStyle = 'rgba(250,244,220,0.55)'; g.lineWidth = Math.max(1.5, pxW(22) - pxW(0));
     g.strokeRect(pxW(mx0), pyW(my - 260), pxW(mx1 - mx0) - pxW(0), pyW(520) - pyW(0));
@@ -2735,17 +2807,17 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       const tx = mx0 + 260 + s * 500;
       if (tx > mx1 - 200) break;
       for (const side of [-1, 1]) {
-        g.fillStyle = 'rgba(214,198,158,0.9)';
+        g.fillStyle = quiet('rgba(214,198,158,0.9)');
         g.beginPath(); g.arc(pxW(tx), pyW(my + side * 420), pxW(190) - pxW(0), 0, Math.PI * 2); g.fill();
       }
     }
     // the show ring at the east end
-    g.fillStyle = '#cbb98c';
+    g.fillStyle = quiet('#cbb98c');
     g.beginPath(); g.ellipse(pxW(blockCenter(2) + 420), pyW(my + 560), pxW(430) - pxW(0), pyW(320) - pyW(0), 0, 0, Math.PI * 2); g.fill();
     g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = Math.max(1.5, pxW(22) - pxW(0));
     g.beginPath(); g.ellipse(pxW(blockCenter(2) + 420), pyW(my + 560), pxW(430) - pxW(0), pyW(320) - pyW(0), 0, 0, Math.PI * 2); g.stroke();
     // the parking meadow: rows of tyre-flattened grass north of the midway
-    g.strokeStyle = 'rgba(150,140,100,0.35)'; g.lineWidth = Math.max(1.5, pxW(60) - pxW(0));
+    g.strokeStyle = quiet('rgba(150,140,100,0.35)'); g.lineWidth = Math.max(1.5, pxW(60) - pxW(0));
     for (let s = 0; s < 7; s++) {
       const ry = my - 640 - s * 105;
       g.beginPath(); g.moveTo(pxW(blockCenter(0) - 400), pyW(ry)); g.lineTo(pxW(blockCenter(2) + 300), pyW(ry)); g.stroke();
@@ -2763,20 +2835,20 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     g.beginPath();
     g.rect(pxW(cx2 - BLOCK_SIZE / 2), pyW(cy2 - BLOCK_SIZE / 2), pxW(BLOCK_SIZE) - pxW(0), pyW(BLOCK_SIZE) - pyW(0));
     g.clip();
-    const CROP = ['#8fbf4e', '#cfa94a', '#a8c96a', '#b78f52', '#dcc76a'];
+    const CROP = [quiet('#8fbf4e'), quiet('#cfa94a'), quiet('#a8c96a'), quiet('#b78f52'), quiet('#dcc76a')];
     for (let s = 0; s < 7; s++) {
       const y0f = cy2 - 800 + s * 230;
       g.fillStyle = CROP[(fgx * 3 + fgy * 2 + s) % CROP.length];
       g.fillRect(pxW(cx2 - 800), pyW(y0f), pxW(1600) - pxW(0), pyW(230) - pyW(0));
       // plough lines down each strip
-      g.strokeStyle = 'rgba(90,70,40,0.13)'; g.lineWidth = Math.max(1, pxW(9) - pxW(0));
+      g.strokeStyle = quiet('rgba(90,70,40,0.13)'); g.lineWidth = Math.max(1, pxW(9) - pxW(0));
       for (let k = 0; k < 9; k++) {
         const ly2 = y0f + 12 + k * 25;
         g.beginPath(); g.moveTo(pxW(cx2 - 800), pyW(ly2)); g.lineTo(pxW(cx2 + 800), pyW(ly2)); g.stroke();
       }
     }
     // field boundaries
-    g.strokeStyle = 'rgba(96,120,60,0.4)'; g.lineWidth = Math.max(1.5, pxW(26) - pxW(0));
+    g.strokeStyle = quiet('rgba(96,120,60,0.4)'); g.lineWidth = Math.max(1.5, pxW(26) - pxW(0));
     for (let s = 0; s <= 7; s++) {
       const yb = cy2 - 800 + s * 230;
       g.beginPath(); g.moveTo(pxW(cx2 - 800), pyW(yb)); g.lineTo(pxW(cx2 + 800), pyW(yb)); g.stroke();
@@ -2786,9 +2858,9 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   {
     // THE CORN MAZE — a cut spiral on (3,1). Kids find this on the map.
     const mzx = blockCenter(3), mzy = blockCenter(1);
-    g.fillStyle = '#5f9a34';
+    g.fillStyle = quiet('#5f9a34');
     g.beginPath(); g.arc(pxW(mzx), pyW(mzy), pxW(560) - pxW(0), 0, Math.PI * 2); g.fill();
-    g.strokeStyle = '#d8c98a'; g.lineWidth = pxW(90) - pxW(0); g.lineCap = 'round';
+    g.strokeStyle = quiet('#d8c98a'); g.lineWidth = pxW(90) - pxW(0); g.lineCap = 'round';
     g.beginPath();
     for (let t = 0; t < 1; t += 0.004) {
       const a2 = t * Math.PI * 7, r2 = 60 + t * 480;
@@ -2798,7 +2870,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     g.stroke();
     // THE PUMPKIN PATCH on (4,1): dark tilled soil in short rows
     const ppx = blockCenter(4), ppy = blockCenter(1) + 460;
-    g.fillStyle = '#7d5c36';
+    g.fillStyle = quiet('#7d5c36');
     g.fillRect(pxW(ppx - 620), pyW(ppy - 230), pxW(1240) - pxW(0), pyW(460) - pyW(0));
     g.strokeStyle = 'rgba(50,36,20,0.3)'; g.lineWidth = Math.max(1.5, pxW(26) - pxW(0));
     for (let s = 0; s < 8; s++) {
@@ -2823,7 +2895,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
         g.beginPath(); g.moveTo(pxW(sx0 + 420), pyW(py3)); g.lineTo(pxW(sx0 + 780), pyW(py3)); g.stroke();
       }
       // dust and gravel behind it
-      g.fillStyle = 'rgba(190,178,146,0.55)';
+      g.fillStyle = quiet('rgba(190,178,146,0.55)');
       g.fillRect(pxW(sx0 - 700), pyW(sy - 620), pxW(920) - pxW(0), pyW(1240) - pyW(0));
     }
     // THE DRIVE-IN, on (0,3): the fan of viewing ramps facing the screen
@@ -2887,8 +2959,8 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   {
     const [sx2, sy2] = RIVER[0];
     for (const [ox, oy, rr, col] of [
-      [0, 0, 215, 'rgba(77,138,160,0.55)'], [-70, 40, 165, 'rgba(77,138,160,0.75)'],
-      [60, -30, 150, 'rgba(77,138,160,0.75)'],
+      [0, 0, 215, quiet('rgba(77,138,160,0.55)')], [-70, 40, 165, quiet('rgba(77,138,160,0.75)')],
+      [60, -30, 150, quiet('rgba(77,138,160,0.75)')],
     ] as [number, number, number, string][]) {
       g.fillStyle = col;
       g.beginPath(); g.ellipse(pxW(sx2 + ox), pyW(sy2 + oy), pxW(rr) - pxW(0), pyW(rr * 0.8) - pyW(0), 0, 0, Math.PI * 2); g.fill();
@@ -2900,13 +2972,13 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   }
 
   // pond sand bank — UNDER the river so the channel flows over it
-  g.fillStyle = 'rgba(230,212,148,0.9)';
+  g.fillStyle = quiet('rgba(230,212,148,0.9)');
   g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2] + 46) - pxW(0), pyW(POND[2] + 46) - pyW(0), 0, 0, Math.PI * 2); g.fill();
 
   // banks: wide + translucent first so the edge dissolves, then the channel
-  riverStroke('rgba(120,170,150,0.30)', 196);    // damp grass fringe
-  riverStroke('rgba(214,206,166,0.45)', 168);    // wet sand shoulder
-  riverStroke('rgba(77,138,160,0.85)', 140);     // shallow bank
+  riverStroke(quiet('rgba(120,170,150,0.30)'), 196);    // damp grass fringe
+  riverStroke(quiet('rgba(214,206,166,0.45)'), 168);    // wet sand shoulder
+  riverStroke(quiet('rgba(77,138,160,0.85)'), 140);     // shallow bank
   riverStroke(hex(WORLD.riverMid), 118);         // water
   riverStroke(hex(WORLD.riverDeep), 58);         // deep channel
   // foam sparkle: narrow and broken, riding the middle (was 128 wide — nearly
@@ -2916,7 +2988,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   riverPath(); g.stroke(); g.setLineDash([]);
 
   // pond water + deep centre — over the river so the junction reads as ONE body
-  g.fillStyle = 'rgba(77,138,160,0.8)';
+  g.fillStyle = quiet('rgba(77,138,160,0.8)');
   g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2] + 22) - pxW(0), pyW(POND[2] + 22) - pyW(0), 0, 0, Math.PI * 2); g.fill();
   g.fillStyle = hex(WORLD.riverMid);
   g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2]) - pxW(0), pyW(POND[2]) - pyW(0), 0, 0, Math.PI * 2); g.fill();
@@ -2983,12 +3055,12 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     const pen = (px0: number, py0: number, wns: number, hns: number, col: string) => {
       g.fillStyle = col;
       g.fillRect(pxW(px0), pyW(py0), pxW(wns) - pxW(0), pyW(hns) - pyW(0));
-      g.strokeStyle = 'rgba(120,100,60,0.45)'; g.lineWidth = Math.max(1.5, pxW(18) - pxW(0));
+      g.strokeStyle = quiet('rgba(120,100,60,0.45)'); g.lineWidth = Math.max(1.5, pxW(18) - pxW(0));
       g.strokeRect(pxW(px0), pyW(py0), pxW(wns) - pxW(0), pyW(hns) - pyW(0));
     };
-    pen(zcx - 560, zcy - 620, 520, 380, '#a8cf72');            // grazing paddock, north
-    pen(zcx - 560, zcy + 240, 520, 380, '#9ac468');            // grazing paddock, south
-    pen(zcx - 20, zcy - 200, 440, 400, '#b8c28a');             // the mud yard
+    pen(zcx - 560, zcy - 620, 520, 380, quiet('#a8cf72'));            // grazing paddock, north
+    pen(zcx - 560, zcy + 240, 520, 380, quiet('#9ac468'));            // grazing paddock, south
+    pen(zcx - 20, zcy - 200, 440, 400, quiet('#b8c28a'));             // the mud yard
     g.fillStyle = hex(WORLD.waterShallow);                      // the duck pond in it
     g.beginPath(); g.ellipse(pxW(zcx + 200), pyW(zcy), pxW(150) - pxW(0), pyW(115) - pyW(0), 0, 0, Math.PI * 2); g.fill();
     g.fillStyle = 'rgba(255,255,255,0.35)';
@@ -3008,7 +3080,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   // BEACH VOLLEYBALL COURT — lined sand court under the net event at (2,5)
   {
     const vcx = blockCenter(2), vcy = blockCenter(5) + 180;
-    g.fillStyle = '#fbeab2';
+    g.fillStyle = quiet('#fbeab2');
     g.fillRect(pxW(vcx - 200), pyW(vcy - 130), pxW(400) - pxW(0), pyW(260) - pyW(0));
     g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = Math.max(1.5, pxW(12) - pxW(0));
     g.strokeRect(pxW(vcx - 180), pyW(vcy - 110), pxW(360) - pxW(0), pyW(220) - pyW(0));
@@ -3035,7 +3107,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
 
   // coast: sand band + white foam rim, stroked along the silhouette
   g.lineJoin = 'round';
-  g.strokeStyle = 'rgba(246,227,164,0.9)'; g.lineWidth = TEX * 0.02;
+  g.strokeStyle = quiet('rgba(246,227,164,0.9)'); g.lineWidth = TEX * 0.02;
   g.beginPath(); g.moveTo(px(sil3[0].x), py(sil3[0].y));
   for (const p of sil3) g.lineTo(px(p.x), py(p.y));
   g.closePath(); g.stroke();

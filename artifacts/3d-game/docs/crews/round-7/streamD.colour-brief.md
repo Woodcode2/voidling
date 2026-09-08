@@ -213,3 +213,71 @@ stops and reports.
 
 *The world to judge this by is GAME DAY. It already has the stage. When the other five read
 the way it does — and it reads brighter — this stream is done.*
+
+---
+
+## 9. WHAT THE GROUND IS ACTUALLY PAINTED — found 2026-09-08
+
+§7 step 4 ("the stage, world by world") was written on the assumption that the stage is
+`palette.ts`. It is not.
+
+`palette.ts` desaturated the ground a round ago and recorded the arithmetic in its own
+comments — meadow 0.443 → 0.169, park 0.439 → 0.169, forest 0.290 → 0.110, sand
+0.322 → 0.125, *"they are still plainly green; they have stopped shouting over the props"*.
+**The player never saw a pixel of it.** `WORLD.meadow` is one `fillRect` at the top of
+`island.ts`'s bake; roughly sixty CSS literals below it paint over that base:
+
+| where | literal | chroma |
+|---|---|---|
+| MAPLE, the town square — the block the match **opens on** | `#8ddc63` | 0.475 |
+| MAPLE, the farm's five crop strips | `#8fbf4e` … `#dcc76a` | 0.373–0.447 |
+| MAPLE, the park lawns | `#a8de7e`, `#b8ec8a`, `#8cc961` | 0.376–0.408 |
+| PIRATE, the party deck the match **opens on** | `rgba(255,120,200)` / `rgba(90,200,255)` | 0.529 / 0.647 |
+
+Measured on the shipped build, maple's square renders `rgb(122,180,70)` — the *old*,
+pre-desaturation green to within a few counts.
+
+This is the **third** time this repo has found a colour fix that never reached a pixel,
+after `biomeColor` (a full ground table, live for one world of six) and `GD_FLOOR.lot`.
+The shape is always the same: an authoritative-looking table that does not paint.
+
+### The consequences for the bars
+
+1. **D1 was never measuring what §7 step 4 proposed to change.** Editing `palette.ts`
+   moves a base fill that is covered up.
+2. **The hero spawns on his own hue in PIRATE BAY.** 15.4% of that spawn frame is
+   `rgb(161,54,134)` at chroma 0.416 with a violet void standing on it. Maple's square
+   carries a comment forbidding exactly this — *"a pale-violet pavement slab under a
+   violet void is how you make the void invisible in its own first frame"* — and the rule
+   was never carried across the worlds.
+3. **D7 and D8 were measuring his eye whites.** `rimOf` took one horizontal row through
+   the middle of his bounding box and called the brightest pixel on it the rim; at DPR 3
+   that row runs through both eyes. Rewritten as a radial median profile. First true
+   figures, maple: rim luminance 0.351 against interior 0.100 — 21.9% wide at 2.66:1,
+   where the bar wants 10–15% at ≥ 8:1. Broad and weak, where it should be tight and bright.
+
+### The dial
+
+`island.ts` now carries `GROUND_CHROMA` and `quiet()`: the authored colour stays in the
+source where it is reviewable, and `quiet()` pulls it toward the grey of **its own
+luminance** until it meets the cap — hue kept, luminance kept to a rounding step, which is
+what protects the district edges the render audit re-spaced at ≥ 1.35:1 by value.
+`GROUND_DIALLED` names which worlds have adopted it. `qa/groundtruth.mjs` reads both out of
+the running page and grades the baked **albedo**, before any light — no camera, no
+exposure, no props, so two runs agree exactly rather than approximately.
+
+### The decision this leaves for the owner
+
+The cap is **0.16**, which is what `palette.ts` already chose and defended. That is *not*
+the number that passes D1. D1 wants 45% of the playfield under chroma 0.12, and HOLE.IO
+reaches 52–61% by painting a ground at **chroma 0.055** — measured on their own frames,
+their city ground is `rgb(210,196,204)` and their flower meadow is `rgb(227,213,221)`. Near
+white, with all of the colour in the objects.
+
+So D1 as written imports their art direction wholesale: a green town cannot pass it and
+still be green. The choice is one number:
+
+- **0.16** — a green town with quieter grass. Agrees with `palette.ts`. D1 stays red.
+- **0.11** — passes D1. The ground goes noticeably pale; the props carry the colour.
+
+Both are one edit and both are measurable. The frames go to the owner side by side.

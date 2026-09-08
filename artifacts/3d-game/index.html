@@ -992,10 +992,13 @@
       /* THE WORLD PICKER. PLAY lands here, so it is a destination, not a
          footnote: three 154x114 tiles in the corner of a 1000px screen with
          system emoji standing in for the art of two fully built 3D islands. */
-      #worlds { display: none; flex-direction: column; }
+      /* the GRID scrolls, not the screen — that is what lets the header stay
+         put at the top and the mode switch dock at the bottom */
+      #worlds { display: none; flex-direction: column; overflow: hidden; }
       #worlds.show { display: flex; }
-      #worlds #worldRow { display: grid; gap: 14px; padding: 8px 4vw 40px; margin: 0 auto;
-        width: 100%; max-width: 1080px; box-sizing: border-box; flex: 1;
+      #worlds #worldRow { display: grid; gap: 14px; margin: 0 auto;
+        padding: 8px 4vw 20px; flex: 1; min-height: 0; overflow-y: auto;
+        width: 100%; max-width: 1080px; box-sizing: border-box;
         /* start-aligned: a shelf reads from the top. Centring left a 174px gap
            under the header on a phone. */
         align-content: start; padding-top: 4px;
@@ -1451,12 +1454,27 @@
          between two words they cannot read, one of which leads nowhere new.
          Here it is a setting on the screen where the run is actually chosen,
          and it costs the splash nothing. */
-      #soloTog { position: absolute; right: 18px; bottom: 18px; z-index: 3; cursor: pointer;
-        display: flex; flex-direction: column; align-items: center; gap: 2px;
-        background: rgba(28,12,52,0.82); border: 2px solid rgba(255,255,255,0.16); border-radius: 14px;
-        color: #cbb2ff; font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: 1.4px;
-        padding: 9px 16px; }
-      #soloTog em { font-style: normal; font-size: 11px; letter-spacing: 1px; opacity: 0.8; }
+      /* ── THE MODE SWITCH IS DOCKED BY LAYOUT, NOT DROPPED ON A POSTER ──
+         This was `position: absolute; right: 18px; bottom: 18px`, which parks
+         it permanently over the bottom-right card. On the six-world grid that
+         card is SKYLARK FIELD and the line it covered was `🔒 FINISH POWDER
+         PASS` — so the one card that has to explain itself was the one card
+         you could not finish reading. qa/pickerfit.mjs never saw it: it grades
+         wrap and contrast on the type, and type covered by a sibling element
+         is neither wrapped nor low-contrast.
+         `position: fixed` would NOT have fixed it either: .metaScr carries a
+         backdrop-filter, and a filtered ancestor becomes the containing block
+         for fixed descendants — so it would have gone on scrolling with the
+         grid, exactly as the absolute one did. So it is docked the way a bar
+         should be: a plain flex child after the grid, with the grid taking the
+         scroll instead of the screen. Nothing can overlap anything. */
+      #soloTog { flex: 0 0 auto; margin: 10px 0 2px; cursor: pointer;
+        display: flex; flex-direction: row; align-items: baseline; gap: 9px;
+        background: rgba(28,12,52,0.92); border: 2px solid rgba(255,255,255,0.16); border-radius: 16px;
+        color: #cbb2ff; font-family: inherit; font-size: 13px; font-weight: 700; letter-spacing: 1.4px;
+        padding: 10px 20px; }
+      #soloTog em { font-style: normal; font-size: 11px; letter-spacing: 1px; opacity: 0.72; }
+      #soloTog em::before { content: '·'; margin-right: 9px; opacity: 0.55; }
       #soloTog.on { border-color: rgba(255,210,90,0.85); color: #ffd23f;
         box-shadow: 0 0 16px rgba(255,210,90,0.28); }
       #soloTog:active { transform: translateY(2px); }
@@ -2026,7 +2044,6 @@
         <button class="backBtn" data-close="worlds">‹ BACK</button>
         <div class="shopTitle">WORLDS</div>
       </div>
-      <button id="soloTog">🏝️ BY MYSELF<em>NO RIVALS</em></button>
       <div id="worldRow">
         <div class="wCard sel" data-world="maple">
           <div class="wArt"></div><div class="wNum">WORLD 1</div>
@@ -2065,6 +2082,9 @@
             <div class="wBest"></div><div class="wGo">▶ PLAY</div></div>
         </div>
       </div>
+      <!-- AFTER the grid, so it docks below it instead of floating on top of
+           the last poster. See the note on #soloTog. -->
+      <button id="soloTog">🏝️ BY MYSELF<em>NO RIVALS</em></button>
     </div>
 
     <!-- ── daily login rewards (agar.io calendar) ── -->
