@@ -1101,10 +1101,29 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
 //
 // So the authored colour stays in the source, where it is reviewable, and the
 // loudness becomes a DIAL. quiet() pulls a colour toward the grey of its OWN
-// luminance until its chroma meets the cap: hue kept, luminance kept to a
-// rounding step — which is what protects the district edges a render audit
-// re-spaced by value at >= 1.35:1. Anything already at or under the cap comes
-// back untouched, byte for byte.
+// LUMA until its chroma meets the cap: hue kept. Anything already at or under
+// the cap comes back untouched, byte for byte.
+//
+// TWO CORRECTIONS TO WHAT THIS COMMENT USED TO CLAIM, both measured:
+//
+// It said "luminance kept to a rounding step". It preserves the weighted sum of
+// the sRGB BYTES — luma — not relative luminance, which is a convex function of
+// the linear channels, so pulling toward the grey always lowers it. Measured on
+// the shipped function: the running track 0.212 -> 0.183, the school field
+// 0.375 -> 0.347, the town green 0.577 -> 0.546. Three to thirteen percent. An
+// 8-bit step is 0.4%.
+//
+// And it said that protected "the district edges a render audit re-spaced by
+// value at >= 1.35:1". It does not, because those pairs were never at 1.35:1.
+// PIRATE's beach and sand sit at 1.05:1 in luminance and separated by CHROMA
+// alone, so capping chroma merges them: measured, CIE76 dE 11.0 -> 1.5, with
+// five of its nine floor pairs landing under dE 6 — the threshold
+// qa/formsep.mjs already fails at. A beige world whose districts differ only in
+// how beige they are cannot survive a chroma cap, and no hue-preserving
+// transform fixes it: at every setting tried, from a hard clamp to a soft knee
+// that leaves the loudest surface at 0.46, some pair still collapses. The fix
+// is VALUE, and it is a per-world art decision. qa/groundtruth.mjs grades the
+// separation now, so the trade is visible instead of being found by a reader.
 //
 // THE CAP IS 0.16 BECAUSE THAT IS WHAT palette.ts ALREADY CHOSE. It is not the
 // number that passes stream D's D1 bar: D1 wants 45% of the playfield under
@@ -1113,7 +1132,10 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
 // in the objects. Ours at 0.16 is a green town with quieter grass. Which of
 // those two this game is, is the owner's call, not a probe's, and it is one
 // number away either way.
-const GROUND_CHROMA = 0.16;
+// (There was a single GROUND_CHROMA = 0.16 here. Once the cap became per-world
+// and "no cap named" became absence rather than that value, nothing read it —
+// so it went, rather than sit in the file looking authoritative. That is the
+// exact failure mode qa/deadpaint.mjs was written for, one level up.)
 // WHICH WORLDS ARE ON THE DIAL, stated rather than implied. MAPLE opens the
 // game and PIRATE opens on a magenta dance floor, so those two came first;
 // GAME DAY already measures 76.5% of its playfield under chroma 0.12 without
@@ -1152,7 +1174,7 @@ const GROUND_CEILING = 0.40;
 // water gets its own, between the two: a tropical lagoon at the stage cap is a
 // grey puddle, and PIRATE BAY's bay is a fifth of its island
 const WATER_CHROMA = 0.34;
-function quiet(css: string, cap = GROUND_CHROMA): string {
+function quiet(css: string, cap?: number): string {
   // THE GATE LIVES HERE, not at sixty call sites. Two of the call sites below
   // are shared across every world — hex() and the biomeColor fill — so a dial
   // that applied unconditionally would silently repaint LANTERN's warm night
@@ -1160,7 +1182,13 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
   // gets its authored colour back untouched, byte for byte.
   const world = GROUND_DIALLED.get(WORLD_ID);
   if (world === undefined) return css;
-  if (cap === GROUND_CHROMA) cap = world;   // the world's own dial, unless a call site named its own
+  // "I did not name a cap" is ABSENCE, not the value 0.16. The first version
+  // defaulted the parameter to a single GROUND_CHROMA and then tested `cap ===
+  // GROUND_CHROMA` to decide whether the caller had meant it — a value
+  // collision, so any future call site writing `quiet(c, 0.16)` to hold a
+  // colour AT 0.16 would have been silently remapped to 0.10 in powder and
+  // skylark. No live call site tripped it; it was a trap, not a defect.
+  cap = cap ?? world;
   let r: number, g: number, b: number, tail = '';
   const h = /^#([0-9a-fA-F]{6})$/.exec(css);
   if (h) { const n = parseInt(h[1], 16); r = (n >> 16) & 255; g = (n >> 8) & 255; b = n & 255; } else {
@@ -1201,8 +1229,11 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
   // turned out to paint nothing here at all. So the dial goes on the door.
   const WATERS = new Set([WORLD.waterShallow, WORLD.waterDeep, WORLD.riverMid,
     WORLD.riverDeep, WORLD.foam]);
+  // undefined, not a literal: naming a cap now means "hold it here", and
+  // naming 0.16 would have pinned POWDER and SKYLARK's palette ground at 0.16
+  // instead of the 0.10 their entry in GROUND_DIALLED asks for.
   const hex = (n: number) => quiet('#' + n.toString(16).padStart(6, '0'),
-    WATERS.has(n) ? WATER_CHROMA : GROUND_CHROMA);
+    WATERS.has(n) ? WATER_CHROMA : undefined);
 
   // clip to the island silhouette so everything is masked to the coast
   g.save();
@@ -1349,20 +1380,30 @@ function quiet(css: string, cap = GROUND_CHROMA): string {
     ppath(PW.GRIT);
     g.strokeStyle = quiet('rgba(122,110,96,0.5)'); g.lineWidth = PW.GRIT_HALF * 1.2 * PU; g.stroke();
     // 6. THE LAKE — the poster's cracked teal ice
+    // ── AND IT GETS THE WATER CAP, WHICH IT DID NOT ─────────────────────────
+    // WATER_CHROMA exists with a comment saying why — "a tropical lagoon at the
+    // stage cap is a grey puddle" — and it reached PIRATE's bay because that
+    // one is named at its call site, and every palette water colour because
+    // hex() keys off the WATERS set. Powder's lake is neither: authored as CSS
+    // literals, taking the default cap, which the world dial then rewrote to
+    // POWDER's 0.10. Measured: #8fd0e8 chroma 0.349 -> 0.098, #5fa8cf 0.439 ->
+    // 0.098. The exact grey puddle the exemption was written to prevent, on the
+    // surface this bake's own header calls the poster's centrepiece, in the
+    // world whose frame already reads as the emptiest in the game.
     {
       const L = PW.LAKE;
       g.save();
       g.translate(pxW(L.cx), pyW(L.cy));
       g.scale(L.rx * PU, L.ry * PU);
       const grd = g.createRadialGradient(0, 0, 0.15, 0, 0, 1);
-      grd.addColorStop(0, quiet('#8fd0e8'));
-      grd.addColorStop(0.72, quiet('#5fa8cf'));
-      grd.addColorStop(1, quiet('#cfdff0'));
+      grd.addColorStop(0, quiet('#8fd0e8', WATER_CHROMA));
+      grd.addColorStop(0.72, quiet('#5fa8cf', WATER_CHROMA));
+      grd.addColorStop(1, quiet('#cfdff0', WATER_CHROMA));
       g.beginPath(); g.arc(0, 0, 1, 0, Math.PI * 2);
       g.fillStyle = grd; g.fill();
       g.restore();
       // cracks: pale jagged polylines radiating off-centre, like the poster
-      g.strokeStyle = quiet('rgba(226,244,252,0.75)'); g.lineWidth = 3.5; g.lineCap = 'round';
+      g.strokeStyle = quiet('rgba(226,244,252,0.75)', WATER_CHROMA); g.lineWidth = 3.5; g.lineCap = 'round';
       for (let c2 = 0; c2 < 9; c2++) {
         const a0 = (c2 / 9) * Math.PI * 2 + rand(-0.3, 0.3);
         let cx2 = pxW(L.cx) + Math.cos(a0) * L.rx * PU * rand(0.05, 0.25);

@@ -683,6 +683,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         float f = 1.0 - clamp(dot(normalize(vN), normalize(vV)), 0.0, 1.0);
         float e = pow(f, 0.9);
         gl_FragColor = vec4(mix(uCore, uEdge, e), mix(0.32, 0.92, e));
+        #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
     transparent: true,
@@ -898,11 +899,22 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // share is the material: these draw with GreaterDepth, so they appear only on
   // the pixels where something nearer already covered him.
   const ghostFace: THREE.Mesh[] = [];
-  const ghostEyeMat = (color: number, opacity: number) => new THREE.MeshBasicMaterial({
-    color, transparent: true, opacity,
-    depthFunc: THREE.GreaterDepth, depthWrite: false, toneMapped: false, fog: false,
-  });
-  const gDark = ghostEyeMat(0x241a3c, 0.9), gWhite = ghostEyeMat(0xffffff, 0.88);
+  // ── AND THE GHOST'S EYES ARE HIS EYES, NOT A FLAT COPY OF THEM ───────────
+  // First cut gave them a plain colour and toneMapped:false while the real ones
+  // carry scleraTex, pupilTex and the frame's grade. Measured on the two frames
+  // that commit shipped, same row: the ghost's eye white was a flat
+  // rgb(229,228,233) and its pupil a flat rgb(55,46,77), where the real eye in
+  // maple-heroalone.png runs 172,151,200 -> 156,134,192 with a catchlight. A
+  // flat, brighter, higher-contrast pair of eyes is what makes a translucent
+  // ball read as a decal ON the wall rather than a creature behind it — and
+  // O3, being a separation score, rises when they do. They share the geometry
+  // and the UVs already, so they share the maps too, and the body ghost below
+  // takes the tone map for the same reason: one object, one grade.
+  // Declared after the textures exist, which is why they are down here and the
+  // array is up there.
+  const ghostEyeMat = (opacity: number, color: number, map?: THREE.Texture) =>
+    new THREE.MeshBasicMaterial({ color, map, transparent: true, opacity,
+      depthFunc: THREE.GreaterDepth, depthWrite: false, fog: false });
   // ── THE EYES ARE THE FOCAL POINT, SO THEY GET THE RESOLUTION ────────────
   // These were 128px. Measured on a DPR-3 phone with the void at r=6, ONE EYE
   // COVERS 284 DEVICE PIXELS — a 2.2x magnification of the texture, and worse
@@ -973,6 +985,10 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     t.anisotropy = 4;
     return t;
   })();
+
+  const gOutline = ghostEyeMat(0.9, 0x241a3c);
+  const gWhite = ghostEyeMat(0.88, 0xffffff, scleraTex);
+  const gPupil = ghostEyeMat(0.9, 0xffffff, pupilTex);
   interface Eye { g: THREE.Group; ball: THREE.Group; sclera: THREE.Group; pupilGrp: THREE.Group; outline: THREE.Mesh; white: THREE.Mesh; }
   const eyes: Eye[] = [];
   const charEyes: { star: THREE.Mesh; ring: THREE.Mesh }[] = [];   // legendary pupil overrides
@@ -1022,7 +1038,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     // sclera.scale.y / sclera.scale.x and wait for the lid to open.
     sclera.name = 'sclera';
     g.position.set(sx, 0.06, 0);
-    for (const [host, mat] of [[outline, gDark], [white, gWhite], [pupil, gDark]] as const) {
+    for (const [host, mat] of [[outline, gOutline], [white, gWhite], [pupil, gPupil]] as const) {
       const gm = new THREE.Mesh(host.geometry, mat);
       gm.position.z = 0.001;          // in front of its host, which never writes depth anyway
       host.add(gm); ghostFace.push(gm);

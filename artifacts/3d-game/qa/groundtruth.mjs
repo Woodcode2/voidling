@@ -59,6 +59,7 @@ assertFreshDist('qa/groundtruth.mjs');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 const rows = [];
+let missing = 0;
 for (const world of WORLDS) {
   const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
@@ -81,6 +82,13 @@ for (const world of WORLDS) {
     const N = 512;
     const c = document.createElement('canvas'); c.width = c.height = N;
     const g = c.getContext('2d');
+    // POINT-SAMPLE. The comment above says lattice and drawImage into a canvas
+    // six times smaller box-filters instead, averaging each 6x6 block. Chroma
+    // is convex in RGB, so chroma(average) <= average(chroma): the downscale
+    // can only ever LOWER a texel's chroma, and it lowers it most for exactly
+    // the thin marks the p99 ceiling exists to catch — a lane line is 2-3
+    // texels wide in a 3072 bake. The ceiling was grading a blur of itself.
+    g.imageSmoothingEnabled = false;
     g.drawImage(img, 0, 0, N, N);
     const d = g.getImageData(0, 0, N, N).data;
     const chs = [], vs = [];
@@ -92,11 +100,62 @@ for (const world of WORLDS) {
     }
     chs.sort((a, b2) => a - b2); vs.sort((a, b2) => a - b2);
     const q = (a, f) => (a.length ? a[Math.min(a.length - 1, Math.floor(a.length * f))] : NaN);
+
+    // ── AND WHETHER THE DISTRICTS STILL SEPARATE ────────────────────────────
+    // The two bars above grade the ground against the cap the dial itself set,
+    // which is guaranteed to pass — so they were structurally incapable of
+    // noticing the thing the dial actually broke. Capping chroma merges any two
+    // surfaces that differed only in how saturated they were: measured on
+    // PIRATE's floors, beach against sand went CIE76 dE 11.0 -> 1.5, and five
+    // of its nine pairs landed under dE 6.
+    //
+    // So: quantise the ground into colour cells, keep the ones big enough to be
+    // a district (>= 1.5% of the island), and report the SMALLEST separation
+    // among them. Not the mean — a mean stays healthy while one pair vanishes,
+    // and one pair vanishing is a boundary the player can no longer see.
+    // dE 6 is qa/formsep.mjs's floor for "distinguishable"; a district edge has
+    // to beat distinguishable, so the bar is 10.
+    const cells = new Map();
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 250) continue;
+      const k = `${(d[i] / 12) | 0},${(d[i + 1] / 12) | 0},${(d[i + 2] / 12) | 0}`;
+      let c2 = cells.get(k); if (!c2) cells.set(k, c2 = { n: 0, r: 0, g: 0, b: 0 });
+      c2.n++; c2.r += d[i]; c2.g += d[i + 1]; c2.b += d[i + 2];
+    }
+    const total = chs.length;
+    const big = [...cells.values()].filter((c2) => c2.n / total >= 0.015)
+      .map((c2) => [c2.r / c2.n, c2.g / c2.n, c2.b / c2.n, 100 * c2.n / total]);
+    const toLab = (r, g, b) => {
+      const f = (c2) => { c2 /= 255; return c2 <= 0.04045 ? c2 / 12.92 : Math.pow((c2 + 0.055) / 1.055, 2.4); };
+      const R = f(r), G = f(g), B = f(b);
+      let X = (R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047;
+      let Y = R * 0.2126 + G * 0.7152 + B * 0.0722;
+      let Z = (R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883;
+      const kk = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+      X = kk(X); Y = kk(Y); Z = kk(Z);
+      return [116 * Y - 16, 500 * (X - Y), 200 * (Y - Z)];
+    };
+    let sep = Infinity, worstPair = null;
+    for (let i = 0; i < big.length; i++) for (let j = i + 1; j < big.length; j++) {
+      const A2 = toLab(big[i][0], big[i][1], big[i][2]), B2 = toLab(big[j][0], big[j][1], big[j][2]);
+      const e = Math.hypot(A2[0] - B2[0], A2[1] - B2[1], A2[2] - B2[2]);
+      if (e < sep) { sep = e; worstPair = [big[i], big[j]]; }
+    }
+    if (!worstPair) sep = NaN;
     return { n: chs.length, cap: window.__groundChroma, ceil: window.__groundCeiling,
+      regions: big.length, sep, worstPair,
       c50: q(chs, 0.50), c75: q(chs, 0.75), c90: q(chs, 0.90), c99: q(chs, 0.99),
       v50: q(vs, 0.50), over: 100 * chs.filter((x) => x > 0.12).length / chs.length };
   });
-  if (r.err) { console.log(`  ${world}: ${r.err}`); await p.close(); continue; }
+  // ── A WORLD THIS PROBE CANNOT MEASURE IS A FAILURE, NOT A SKIP ──────────
+  // This printed the error and continued, incrementing nothing. With `let fail
+  // = 0` and `process.exit(fail ? 1 : 0)`, all six worlds erroring printed six
+  // informational lines and exited GREEN on 0/0 graded. The trigger is one edit
+  // away and signposted in the source this grades: the finder keys on
+  // `image.width === 3072`, and island.ts's TEX is a constant somebody will
+  // change. Same fault this project has now fixed three times elsewhere —
+  // silence is not a pass.
+  if (r.err) { console.log(`FAIL  ${world.padEnd(10)} ${r.err}`); missing++; await p.close(); continue; }
   const png = await p.evaluate(() => {
     let img = null;
     window.__scene.traverse((o) => { const m = o.material;
@@ -112,12 +171,13 @@ for (const world of WORLDS) {
 await b.close();
 
 console.log('\nGROUND ALBEDO — the baked texture, before any light\n');
-console.log('world        texels    chroma p50   p75   p90   p99    value p50   over 0.12   cap');
+console.log('world        texels    chroma p50   p75   p90   p99    value p50   over 0.12   cap   regions   closest');
 for (const r of rows)
   console.log(`${r.world.padEnd(11)} ${String(r.n).padStart(7)}      `
     + `${r.c50.toFixed(3)} ${r.c75.toFixed(3)} ${r.c90.toFixed(3)} ${r.c99.toFixed(3)}`
     + `        ${r.v50.toFixed(2)}      ${r.over.toFixed(1)}%   `
-    + `${r.cap == null ? '   —' : r.cap.toFixed(2)}`);
+    + `${r.cap == null ? '   —' : r.cap.toFixed(2)}`
+    + `   ${String(r.regions).padStart(7)}   ${Number.isFinite(r.sep) ? r.sep.toFixed(1).padStart(7) : '      —'}`);
 console.log(`\n  the textures: ${OUT}/*-ground.png`);
 
 let fail = 0;
@@ -134,7 +194,17 @@ for (const r of rows) {
     + `${r.c75.toFixed(3)}   cap ${r.cap.toFixed(2)}`);
   console.log(`${roof ? 'PASS' : 'FAIL'}  ${r.world.padEnd(10)} ceiling ground chroma p99 `
     + `${r.c99.toFixed(3)}   max ${r.ceil.toFixed(2)}`);
+  const seen = Number.isFinite(r.sep) ? r.sep : NaN;
+  const sepOk = !Number.isFinite(seen) || seen >= 10;
+  if (!sepOk) fail++;
+  const wp = r.worstPair;
+  console.log(`${sepOk ? 'PASS' : 'FAIL'}  ${r.world.padEnd(10)} districts closest pair `
+    + `${Number.isFinite(seen) ? seen.toFixed(1) : '  —'} dE   want >= 10`
+    + (wp && !sepOk ? `   — rgb(${wp[0].slice(0, 3).map((x) => x.toFixed(0)).join(',')}) at `
+      + `${wp[0][3].toFixed(1)}% vs rgb(${wp[1].slice(0, 3).map((x) => x.toFixed(0)).join(',')}) at `
+      + `${wp[1][3].toFixed(1)}%` : ''));
 }
-const graded = rows.filter((r) => r.cap != null).length * 2;
+const graded = rows.filter((r) => r.cap != null).length * 3 + missing;
+fail += missing;
 console.log(`\n${graded - fail}/${graded} graded, ${rows.length - graded / 2} worlds not yet on the dial`);
 process.exit(fail ? 1 : 0);

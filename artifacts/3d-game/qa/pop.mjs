@@ -166,13 +166,36 @@ function rimOf(img, v) {
   if (!v || !v.pts || v.pts.length < 400) return { width: 0, contrast: 0, core: 0, rim: 0, find: 0, round: 0 };
   const cx = (v.minX + v.maxX) / 2, cy = (v.minY + v.maxY) / 2;
   const R = (v.wpx + v.hpx) / 4;
+  // ── THE RINGS ARE GEOMETRIC, NOT HUE-MASKED ─────────────────────────────
+  // These sampled v.pts, and v.pts is findVoid's VIOLET mask: chroma > 0.20,
+  // hue 250-300. A fresnel rim ramps toward white as it brightens, so it LOSES
+  // chroma as it gains luminance — rgb(200,140,255) is chroma 0.451 and kept,
+  // rgb(240,225,255) is 0.118 and dropped. The better the rim got, the more of
+  // it fell out of its own measurement, and D8's contrast could fall while the
+  // rim improved. He is a disc, so the rings are read from the disc.
   const NB = 32, bins = Array.from({ length: NB }, () => []);
   const core = [];
-  for (const q of v.pts) {
-    const x = q % w, y = (q / w) | 0, t = Math.hypot(x - cx, y - cy) / R;
-    if (t >= 1) continue;
-    bins[Math.min(NB - 1, Math.floor(t * NB))].push(lum(q * 4));
-    if (t < 0.35) core.push(lum(q * 4));
+  for (let y = Math.max(0, (cy - R) | 0); y < Math.min(h, cy + R); y++) {
+    for (let x = Math.max(0, (cx - R) | 0); x < Math.min(w, cx + R); x++) {
+      const t = Math.hypot(x - cx, y - cy) / R;
+      if (t >= 1) continue;
+      const i = (y * w + x) * 4;
+      bins[Math.min(NB - 1, Math.floor(t * NB))].push(lum(i));
+    }
+  }
+  // ── AND THE INTERIOR IS HIS BELLY, NOT HIS FACE ─────────────────────────
+  // A disc at t < 0.35 of the centre is exactly where the eyes and the mouth
+  // live, so reading the "interior" there measures his sclera. void3d.ts puts
+  // the pit deliberately BELOW centre — "Drop the core into his belly instead:
+  // face on top, open space below it" — at a screen-space offset of 0.46 in
+  // the projected normal. That is where the dark heart the D8 ratio is against
+  // actually is, so that is where it is read. Measured on maple: the centred
+  // disc gave 0.144 with the face in it, the belly gives the body.
+  for (let y = Math.max(0, (cy + 0.06 * R) | 0); y < Math.min(h, cy + 0.56 * R); y++) {
+    for (let x = Math.max(0, (cx - 0.25 * R) | 0); x < Math.min(w, cx + 0.25 * R); x++) {
+      if (Math.hypot(x - cx, y - (cy + 0.31 * R)) > 0.25 * R) continue;
+      core.push(lum((y * w + x) * 4));
+    }
   }
   const med = (a) => (a.length ? a.slice().sort((p1, p2) => p1 - p2)[a.length >> 1] : NaN);
   const prof = bins.map(med);
@@ -186,13 +209,21 @@ function rimOf(img, v) {
   let peak = 0, peakBin = 0;
   for (let k = Math.floor(NB * 0.55); k < LAST; k++)
     if (prof[k] > peak) { peak = prof[k]; peakBin = k; }
+  // ── THE BAND HAS TWO EDGES ──────────────────────────────────────────────
+  // This walked INWARD from the peak and then assumed the band ran all the way
+  // out to t = 1, so `width` was the distance from the band's inner edge to the
+  // silhouette, not the width of the band. A single bright ring sitting a fifth
+  // of the way in, with everything outside it dark, reported a number inside
+  // D7's pass window. Both edges now, and a band that does not reach the last
+  // full ring is not a rim on the silhouette at all.
   const half = c + 0.5 * (peak - c);
-  let k0 = peakBin;
+  let k0 = peakBin, k1 = peakBin;
   while (k0 > 0 && prof[k0 - 1] >= half) k0--;
-  // width as a share of his DIAMETER, which is how their 13.4% was measured:
-  // a band from t0 to the edge spans (1 - t0) of the radius, half that of the
-  // diameter
-  const width = 100 * (1 - k0 / NB) * 0.5;
+  while (k1 < LAST - 1 && prof[k1 + 1] >= half) k1++;
+  // as a share of his DIAMETER, which is how their 13.4% was measured: a band
+  // of (k1 + 1 - k0) rings out of NB spans that fraction of the RADIUS, and
+  // half of it of the diameter
+  const width = 100 * ((k1 + 1 - k0) / NB) * 0.5;
   // ── TWO FIGURES FOR BARS THAT DESCRIBE OUR HERO INSTEAD OF THEIRS ────────
   // D7 (rim 10-15% of the diameter) and D8 (>= 8:1 against the interior) were
   // both read off HOLE.IO's hero, and their hero is a HOLE: a near-black disc

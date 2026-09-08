@@ -118,6 +118,20 @@ export const WORLD = {
 // colour away from the grey of its OWN luminance until it meets the floor, so
 // hue and value survive and only the saturation moves.
 //
+// IT IS GLOBAL WHERE quiet() IS PER-WORLD, and that asymmetry is deliberate
+// rather than an oversight — it was flagged as one, so it gets stated. quiet()
+// is gated because a GROUND is a world's identity: LANTERN's night and POWDER's
+// snow would be repainted by a cap chosen for a green town. A PROP is not: a
+// tree is a tree in six worlds, a bench is a bench, and the prop kits are
+// shared through PROPS by every level. Making the actors louder in one world
+// and not another would be the same table saying two things. It is also
+// applied at module load, before any WORLD_ID exists, which is exactly right
+// for a table this shared and exactly wrong for a ground bake.
+// WHAT THIS OWES: the measurement behind it was taken on MAPLE. Lantern and
+// Game Day have not been re-shot since, and lantern is the one to watch —
+// louder foliage under warm lantern pools is the case where a global prop dial
+// could be wrong. That frame is on the list, not assumed away.
+//
 // IT REFUSES TO INVENT COLOUR. Anything under 0.28 to begin with is left
 // exactly as authored, and that guard is doing real work rather than being
 // cautious boilerplate: `roof` carries 0x6a6480 and 0x746e8c as deliberate
@@ -184,8 +198,18 @@ export const PROPS = {
   foliage: [loud(0x5dbe63), loud(0x4faa5a), loud(0x6cc86e)],
   pine: loud(0x3e9a54),
   trunk: 0x8a6a4a,
-  person: [loud(0xff7a5a), loud(0x5ec8d8), loud(0xffd23f), loud(0x8fa9d8), loud(0xf06fb0), loud(0x9b7bd8), 0xffffff, loud(0x7ed57a)],
+
 };
+// PROPS.person retired, and it is the reason qa/deadpaint.mjs no longer
+// searches comments. Eight clothing colours, seven of which THIS ROUND rewrote
+// through loud() — and the probe passed the table 41/41, because the only text
+// matching `PROPS.person` anywhere in the repository is a comment in
+// qa/_palette.mjs:103 mentioning it, in a file that never imports this one. A
+// dead table is bad; a dead table that a probe certifies as live is worse, and
+// I edited this one believing the probe. life.ts carries the live people: 93
+// per-district `shirt`/`pants` palettes (life.ts:985 onward), authored per
+// world under that world's light, which is why one global list of eight was
+// never going to be what paints them.
 // PROPS.skin retired: four tones, read by nothing. life.ts:630 carries the
 // live list and it is EIGHT tones deep, 0xffdcb8 to 0x6a3d22 — a narrower
 // duplicate sitting here is worse than no entry at all.

@@ -606,6 +606,22 @@ const visible = shot.scored ? 100 * shot.seen / shot.scored : 100;
 
 const got = { O2: drive.blocked ? 100 * drive.blockedFading / drive.blocked : 100, O3: shot.sep };
 if (SECONDS <= 0) delete BARS.O2;   // not sampled, so not scored — silence is not a pass
+// ── AND O3 MUST NOT SCORE A HERO NOBODY IS COVERING ───────────────────────
+// O3's own wording is "how far the hero stands out from what covers him", and
+// nothing in the computation required anything to be covering him. `sep` comes
+// from his silhouette (B against D, rendered alone on layer 31 — the FULL
+// silhouette whether or not he is occluded) against an annulus of frame A.
+// With the default SECONDS=0 the line above deletes O2, so an unoccluded hero
+// standing in an empty field was scored on the only remaining bar and passed.
+// The two facts that establish the premise were printed and never gated: the
+// walk arrived, and the raycast says he is blocked. Now they are the premise.
+if (walk.ok !== true || shot.blocked < 40) {
+  console.log(`\nO3 IS NOT SCORED: the shot did not have him covered`
+    + ` (walked ${walk.ok ? 'there' : 'NOWHERE'}, raycast blocked ${shot.blocked.toFixed(0)}%,`
+    + ` want >= 40%). A separation measured on an unobstructed hero is not the`
+    + ` question this bar asks, and passing it would be worse than failing it.`);
+  process.exit(2);
+}
 console.log(`\nOCCLUSION — ${WORLD} @ ${PORT}, ${SECONDS} game-seconds, ${drive.frames} frames`);
 console.log(`  edibles ${armed.n}`);
 console.log(`    armed on the object fadeOccluders reads: ${armed.onTop}`

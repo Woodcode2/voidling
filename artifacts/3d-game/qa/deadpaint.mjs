@@ -60,12 +60,26 @@ const walk = (d) => {
 };
 for (const r of ROOTS) { try { walk(r); } catch { /* a root that does not exist here */ } }
 
-const blobs = files.map((f) => [f, readFileSync(f, 'utf8')]);
+// ── A MENTION IN A COMMENT IS NOT A READ ──────────────────────────────────
+// The first version searched raw file text, and a probe whose whole purpose is
+// to catch colours that paint nothing was itself fooled by prose about
+// colours. PROPS.person — eight colours, seven of which had just been rewritten
+// in the same commit — matched exactly one line in the repository:
+//   qa/_palette.mjs:103   // FACADE-ONLY for the towers. PROPS.car and
+//                         // PROPS.person share four hexes
+// a comment, in a file that never imports the palette. The probe printed
+// 41/41 read and I had edited a dead table believing the probe.
+// So comments come out first. Block comments, line comments, and the leading
+// `*` of a jsdoc continuation, in that order.
+const decomment = (t) => t
+  .replace(/\/\*[\s\S]*?\*\//g, ' ')
+  .replace(/(^|[^:])\/\/.*$/gm, '$1');
+const blobs = files.map((f) => [f, decomment(readFileSync(f, 'utf8'))]);
 // palette.ts counts as a consumer of its own keys — VOID_COL is built from
 // VOID a few lines below it, and that is a read. No blanking is needed to keep
 // definitions out of it: a definition line is `  abyss:`, never `VOID.abyss`,
 // so searching for the qualified name cannot match the thing that declares it.
-blobs.push([PALETTE, src]);
+blobs.push([PALETTE, decomment(src)]);
 const dynamic = {};       // table -> files that index it by a computed key
 for (const [f, b] of blobs)
   for (const t of Object.keys(tables))

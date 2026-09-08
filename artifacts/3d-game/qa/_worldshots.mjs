@@ -33,14 +33,24 @@ for (const wid of WORLDS) {
   // differences of one and two points, so a probe whose frame moves by two on
   // its own is worse than no probe: it launders noise as progress.
   //
-  // Seeded exactly as qa/placement.mjs and qa/lookpair.mjs do it — Math.random
+  // Seeded the way qa/placement.mjs and qa/lookpair.mjs seed — Math.random
   // replaced at page init, before a single module runs — so every consumer on
   // the page draws the same stream and the spawn frame is reproducible.
-  await p.addInitScript((seed) => {
+  //
+  // BUT NOT ON THE SAME TERMS, AND THE DIFFERENCE MATTERS. Those two make it
+  // OPT-IN, and lookpair.mjs says why in writing: "a seeded Math.random is not
+  // what a player gets — it freezes the family's wander and every other
+  // unseeded roll, so a frame shot this way is a fair comparison and not a
+  // sample of the shipped game." Here it is ON by default, because the colour
+  // bars are graded on these frames and an unseeded frame moved them two points
+  // between runs on one build. So: these are COMPARISON frames. SEED=off shoots
+  // the player's own stream for anyone who needs to see what actually ships.
+  const seedArg = process.env.SEED === 'off' ? null : Number(process.env.SEED || 7);
+  if (seedArg !== null) await p.addInitScript((seed) => {
     let a = (seed >>> 0) + 0x6D2B79F5;
     Math.random = () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a);
       t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-  }, Number(process.env.SEED || 7));
+  }, seedArg);
   await p.addInitScript(() => { try {
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1'); localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
     localStorage.setItem('voidDailyLast', new Date().toDateString()); } catch {} });
