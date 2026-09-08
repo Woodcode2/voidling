@@ -1158,8 +1158,33 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
 // Day already measures 76.5% of its playfield below chroma 0.12 with no help,
 // and its loud slice is the crimson end zones and the painted turf, which are
 // the world's identity rather than its stage.
+// THE NUMBER IS A SCALE, NOT A CAP, and that is the second version of this.
+// The first clamped every colour above 0.16 down TO 0.16, which is what makes
+// two surfaces that differed only in HOW saturated they were land on the same
+// one. Measured through quiet()'s own ledger: on maple, 60 pairs of authored
+// ground colours ended under dE 6 — the fairground's gold against a sand,
+// dE 41.2 -> 1.2; the meadow against a mown lawn, 39.0 -> 2.1.
+//
+// A scale keeps the ratios and is strictly better on BOTH axes at once, which
+// is not a trade-off but a straight defeat for the clamp. Swept offline over
+// maple's 31 dialled colours and pirate's 9 district floors:
+//
+//                collapsed pairs      mean chroma
+//   clamp 0.16      20 of 443            0.151
+//   scale 0.40       2 of 443            0.130
+//   scale 0.50       0 of 443            0.162
+//
+// 0.40 is quieter than the clamp AND keeps ten times more separation, because
+// a clamp leaves everything already-quiet untouched while a scale pulls the
+// whole distribution down. POWDER and SKYLARK take a gentler 0.55: their
+// grounds start near-neutral (albedo p50 0.090 and 0.098) and 0.40 would take
+// snow to grey paper.
+// PIRATE takes 0.35 rather than maple's 0.40 because its ground is sand almost
+// everywhere: at 0.40 it measured a stage p75 of 0.173 against the 0.16 the
+// finished bake is held to, where maple came in at 0.118 on the same number.
+// A world made of one material needs more of the dial than a world made of six.
 const GROUND_DIALLED = new Map<string, number>([
-  ['maple', 0.16], ['pirate', 0.16], ['powder', 0.10], ['skylark', 0.10],
+  ['maple', 0.40], ['pirate', 0.35], ['powder', 0.55], ['skylark', 0.55],
 ]);
 // ── AND A CEILING, WHICH IS A DIFFERENT QUESTION FROM THE STAGE ───────────
 // The loudest slice of a ground is legitimately not stage. MAPLE's autumn leaf
@@ -1171,10 +1196,19 @@ const GROUND_DIALLED = new Map<string, number>([
 // literal. Measured on maple after the dial: p75 0.165 (the stage), p90 0.243
 // (the leaves) — a p90 bar would have called a correctly-dialled world red.
 const GROUND_CEILING = 0.40;
-// water gets its own, between the two: a tropical lagoon at the stage cap is a
-// grey puddle, and PIRATE BAY's bay is a fifth of its island
-const WATER_CHROMA = 0.34;
-function quiet(css: string, cap?: number): string {
+// ── AND THE OUTCOME THE SCALE IS AIMED AT ─────────────────────────────────
+// The scale is the mechanism; this is the result it has to produce, and they
+// are deliberately two numbers. A probe that grades the ground against the
+// scale that produced it can only ever agree with itself — which is exactly
+// how the clamp's district collapse went unnoticed for a day. This is what
+// qa/groundtruth.mjs actually holds the finished bake to: three quarters of a
+// dialled world's ground at or under this chroma, however it got there.
+const GROUND_STAGE = 0.16;
+// water is dialled more gently than land: a tropical lagoon taken all the way
+// down is a grey puddle, and PIRATE BAY's bay is a fifth of its island while
+// POWDER's lake is the surface its own bake calls the poster's centrepiece
+const WATER_SCALE = 0.75;
+function quiet(css: string, named?: number): string {
   // THE GATE LIVES HERE, not at sixty call sites. Two of the call sites below
   // are shared across every world — hex() and the biomeColor fill — so a dial
   // that applied unconditionally would silently repaint LANTERN's warm night
@@ -1183,12 +1217,11 @@ function quiet(css: string, cap?: number): string {
   const world = GROUND_DIALLED.get(WORLD_ID);
   if (world === undefined) return css;
   // "I did not name a cap" is ABSENCE, not the value 0.16. The first version
-  // defaulted the parameter to a single GROUND_CHROMA and then tested `cap ===
-  // GROUND_CHROMA` to decide whether the caller had meant it — a value
-  // collision, so any future call site writing `quiet(c, 0.16)` to hold a
-  // colour AT 0.16 would have been silently remapped to 0.10 in powder and
-  // skylark. No live call site tripped it; it was a trap, not a defect.
-  cap = cap ?? world;
+  // defaulted the parameter to a single constant and then tested equality
+  // against it to decide whether the caller had meant it — a value collision,
+  // so any future call site naming that exact number would have been silently
+  // remapped to the world's. No live call site tripped it; a trap, not a defect.
+  const scale = named ?? world;
   let r: number, g: number, b: number, tail = '';
   const h = /^#([0-9a-fA-F]{6})$/.exec(css);
   if (h) { const n = parseInt(h[1], 16); r = (n >> 16) & 255; g = (n >> 8) & 255; b = n & 255; } else {
@@ -1196,21 +1229,43 @@ function quiet(css: string, cap?: number): string {
     if (!m) return css;
     r = +m[1]; g = +m[2]; b = +m[3]; tail = m[4] || '';
   }
+  const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  // the scale, then the CEILING — which stays a hard clamp, because a ceiling
+  // is exactly the statement "nothing painted on this ground may shout louder
+  // than this" and that is what a clamp says. It bites on almost nothing.
+  let k = scale;
   const span = Math.max(r, g, b) - Math.min(r, g, b);
-  if (span <= cap * 255) return css;
-  const y = 0.2126 * r + 0.7152 * g + 0.0722 * b, k = (cap * 255) / span;
+  if (span * k > GROUND_CEILING * 255) k = (GROUND_CEILING * 255) / span;
   const f = (c: number) => Math.max(0, Math.min(255, Math.round(y + (c - y) * k)));
   const [R, G, B] = [f(r), f(g), f(b)];
+  QUIET_LEDGER.push([r, g, b, R, G, B]);
   return h ? '#' + ((R << 16) | (G << 8) | B).toString(16).padStart(6, '0')
     : `rgb${tail ? 'a' : ''}(${R},${G},${B}${tail})`;
 }
+// ── THE LEDGER: WHAT THE DIAL DID, PAIR BY PAIR ────────────────────────────
+// The first separation bar quantised the finished TEXTURE into colour cells and
+// graded the closest pair. It measured its own quantisation: maple's worst pair
+// came back rgb(170,195,154) against rgb(164,193,152) — two cells of the same
+// mottled lawn, six counts apart. A surface with grain in it is not one colour,
+// so a lattice over the bake can never be a list of districts.
+//
+// quiet() is the single door every dialled ground colour goes through, so the
+// door keeps the books instead. Every call records what it was handed and what
+// it returned, and qa/groundtruth.mjs asks the only question that matters: did
+// the dial take a pair of colours that were plainly different and make them
+// indistinguishable? "Plainly different" and "indistinguishable" are not
+// invented here — 12 and 6 dE, either side of the floor qa/formsep.mjs already
+// grades palette separation with.
+const QUIET_LEDGER: number[][] = [];
 
     // QA reaches the dial through the page rather than through a copy of the
     // number: qa/groundtruth.mjs grades the baked albedo against exactly what
     // this build is using, and reads null for a world that has not adopted it.
     const qaWin = window as unknown as { __groundChroma: number | null; __groundCeiling: number };
-    qaWin.__groundChroma = GROUND_DIALLED.get(WORLD_ID) ?? null;
+    qaWin.__groundChroma = GROUND_DIALLED.has(WORLD_ID) ? GROUND_STAGE : null;
     qaWin.__groundCeiling = GROUND_CEILING;
+    QUIET_LEDGER.length = 0;   // one bake, one ledger — a rematch must not stack
+    (window as unknown as { __quietLedger: () => number[][] }).__quietLedger = () => QUIET_LEDGER;
 
     // ── baked ground texture ───────────────────────────────────────────────────
   const TEX = 3072;   // high-res bake so roads/crosswalks stay crisp up close
@@ -1233,7 +1288,7 @@ function quiet(css: string, cap?: number): string {
   // naming 0.16 would have pinned POWDER and SKYLARK's palette ground at 0.16
   // instead of the 0.10 their entry in GROUND_DIALLED asks for.
   const hex = (n: number) => quiet('#' + n.toString(16).padStart(6, '0'),
-    WATERS.has(n) ? WATER_CHROMA : undefined);
+    WATERS.has(n) ? WATER_SCALE : undefined);
 
   // clip to the island silhouette so everything is masked to the coast
   g.save();
@@ -1381,7 +1436,7 @@ function quiet(css: string, cap?: number): string {
     g.strokeStyle = quiet('rgba(122,110,96,0.5)'); g.lineWidth = PW.GRIT_HALF * 1.2 * PU; g.stroke();
     // 6. THE LAKE — the poster's cracked teal ice
     // ── AND IT GETS THE WATER CAP, WHICH IT DID NOT ─────────────────────────
-    // WATER_CHROMA exists with a comment saying why — "a tropical lagoon at the
+    // WATER_SCALE exists with a comment saying why — "a tropical lagoon at the
     // stage cap is a grey puddle" — and it reached PIRATE's bay because that
     // one is named at its call site, and every palette water colour because
     // hex() keys off the WATERS set. Powder's lake is neither: authored as CSS
@@ -1396,14 +1451,14 @@ function quiet(css: string, cap?: number): string {
       g.translate(pxW(L.cx), pyW(L.cy));
       g.scale(L.rx * PU, L.ry * PU);
       const grd = g.createRadialGradient(0, 0, 0.15, 0, 0, 1);
-      grd.addColorStop(0, quiet('#8fd0e8', WATER_CHROMA));
-      grd.addColorStop(0.72, quiet('#5fa8cf', WATER_CHROMA));
-      grd.addColorStop(1, quiet('#cfdff0', WATER_CHROMA));
+      grd.addColorStop(0, quiet('#8fd0e8', WATER_SCALE));
+      grd.addColorStop(0.72, quiet('#5fa8cf', WATER_SCALE));
+      grd.addColorStop(1, quiet('#cfdff0', WATER_SCALE));
       g.beginPath(); g.arc(0, 0, 1, 0, Math.PI * 2);
       g.fillStyle = grd; g.fill();
       g.restore();
       // cracks: pale jagged polylines radiating off-centre, like the poster
-      g.strokeStyle = quiet('rgba(226,244,252,0.75)', WATER_CHROMA); g.lineWidth = 3.5; g.lineCap = 'round';
+      g.strokeStyle = quiet('rgba(226,244,252,0.75)', WATER_SCALE); g.lineWidth = 3.5; g.lineCap = 'round';
       for (let c2 = 0; c2 < 9; c2++) {
         const a0 = (c2 / 9) * Math.PI * 2 + rand(-0.3, 0.3);
         let cx2 = pxW(L.cx) + Math.cos(a0) * L.rx * PU * rand(0.05, 0.25);
@@ -1523,8 +1578,8 @@ function quiet(css: string, cap?: number): string {
     };
     // 3. THE BAY — sheltered water carved out, with a shallow shelf + foam
     g.save(); wpath(BAY.WATER_SMOOTH); g.clip();
-    g.fillStyle = quiet('#43cfdd', WATER_CHROMA); g.fillRect(0, 0, TEX, TEX);
-    g.fillStyle = quiet('rgba(31,136,168,0.6)', WATER_CHROMA);
+    g.fillStyle = quiet('#43cfdd', WATER_SCALE); g.fillRect(0, 0, TEX, TEX);
+    g.fillStyle = quiet('rgba(31,136,168,0.6)', WATER_SCALE);
     g.beginPath(); g.ellipse(pxW(7100), pyW(7000), pxW(1450) - pxW(0), pxW(2050) - pxW(0), 0.3, 0, Math.PI * 2); g.fill();
     g.fillStyle = 'rgba(255,255,255,0.16)';
     for (let k = 0; k < 40; k++) {
@@ -1544,7 +1599,7 @@ function quiet(css: string, cap?: number): string {
       g.restore();
       // re-cut the water over the region edge so the shore stays crisp
       g.save(); wpath(BAY.WATER_SMOOTH); g.clip();
-      g.fillStyle = quiet('rgba(67,207,221,0.96)', WATER_CHROMA); g.fillRect(0, 0, TEX, TEX);
+      g.fillStyle = quiet('rgba(67,207,221,0.96)', WATER_SCALE); g.fillRect(0, 0, TEX, TEX);
       g.restore();
     }
     wpath(BAY.WATER_SMOOTH); g.strokeStyle = quiet('rgba(255,246,214,0.85)'); g.lineWidth = pxW(90) - pxW(0); g.stroke();
@@ -3249,10 +3304,12 @@ function quiet(css: string, cap?: number): string {
     };
     const drange = (a: number, b: number) => a + dr() * (b - a);
     const U = TEX / W3;                       // canvas px per 3D unit
-    // Held to the CEILING, not to the stage cap: the world is called Maple
-    // Falls and grey leaves would be a poor trade for 3% of one percentile.
-    // Measured, this is the entire reason maple's p99 read 0.412 against 0.40.
-    const LEAF = [quiet('#c4622c', GROUND_CEILING), quiet('#d98a34', GROUND_CEILING), quiet('#b03f2a', GROUND_CEILING), quiet('#e0a63c', GROUND_CEILING), quiet('#a86b30', GROUND_CEILING)];
+    // A GENTLE scale, not the world's: Maple Falls is named after these and
+    // grey leaves would be a poor trade. 0.75 is water's number, for the same
+    // reason — a feature of the world rather than the stage under it. (This
+    // read `quiet(x, GROUND_CEILING)` while the second argument still meant a
+    // cap; once it became a scale that would have been 0.40.)
+    const LEAF = [quiet('#c4622c', 0.75), quiet('#d98a34', 0.75), quiet('#b03f2a', 0.75), quiet('#e0a63c', 0.75), quiet('#a86b30', 0.75)];
     const GRASSY: Biome[] = ['cozy', 'fancy', 'plaza', 'park', 'forest'];
     g.save();
     g.beginPath();

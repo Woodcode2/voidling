@@ -33,7 +33,7 @@
 // here, so the probe cannot drift from the source it grades. There are two,
 // because a ground has two different jobs in one texture:
 //
-//   THE STAGE — the 75th percentile against GROUND_CHROMA. Three quarters of
+//   THE STAGE — the 75th percentile against GROUND_STAGE. Three quarters of
 //     the ground is the surface the props stand on and it has to stay quiet.
 //     Not the mean, which lets a big quiet field hide a loud square inside it.
 //   THE CEILING — the 99th percentile against GROUND_CEILING. The loudest
@@ -101,30 +101,25 @@ for (const world of WORLDS) {
     chs.sort((a, b2) => a - b2); vs.sort((a, b2) => a - b2);
     const q = (a, f) => (a.length ? a[Math.min(a.length - 1, Math.floor(a.length * f))] : NaN);
 
-    // ── AND WHETHER THE DISTRICTS STILL SEPARATE ────────────────────────────
+    // ── AND WHETHER THE DIAL MADE TWO COLOURS INDISTINGUISHABLE ─────────────
     // The two bars above grade the ground against the cap the dial itself set,
-    // which is guaranteed to pass — so they were structurally incapable of
-    // noticing the thing the dial actually broke. Capping chroma merges any two
-    // surfaces that differed only in how saturated they were: measured on
-    // PIRATE's floors, beach against sand went CIE76 dE 11.0 -> 1.5, and five
-    // of its nine pairs landed under dE 6.
+    // which is guaranteed to pass — structurally incapable of noticing the one
+    // thing the dial actually broke. Capping chroma merges any two surfaces
+    // that differed only in HOW saturated they were: measured on PIRATE's
+    // floors, beach against sand went CIE76 dE 11.0 -> 1.5.
     //
-    // So: quantise the ground into colour cells, keep the ones big enough to be
-    // a district (>= 1.5% of the island), and report the SMALLEST separation
-    // among them. Not the mean — a mean stays healthy while one pair vanishes,
-    // and one pair vanishing is a boundary the player can no longer see.
-    // dE 6 is qa/formsep.mjs's floor for "distinguishable"; a district edge has
-    // to beat distinguishable, so the bar is 10.
-    const cells = new Map();
-    for (let i = 0; i < d.length; i += 4) {
-      if (d[i + 3] < 250) continue;
-      const k = `${(d[i] / 12) | 0},${(d[i + 1] / 12) | 0},${(d[i + 2] / 12) | 0}`;
-      let c2 = cells.get(k); if (!c2) cells.set(k, c2 = { n: 0, r: 0, g: 0, b: 0 });
-      c2.n++; c2.r += d[i]; c2.g += d[i + 1]; c2.b += d[i + 2];
-    }
-    const total = chs.length;
-    const big = [...cells.values()].filter((c2) => c2.n / total >= 0.015)
-      .map((c2) => [c2.r / c2.n, c2.g / c2.n, c2.b / c2.n, 100 * c2.n / total]);
+    // The first attempt quantised the finished TEXTURE and graded the closest
+    // pair of colour cells. It measured its own lattice — maple's "worst pair"
+    // came back as two cells of the same mottled lawn, six counts apart. A
+    // surface with grain in it is not one colour.
+    //
+    // So it reads island.ts's ledger instead: quiet() is the single door every
+    // dialled ground colour passes through, and it records what it was handed
+    // and what it returned. The question is then exact — did the dial take a
+    // pair that was PLAINLY different and make it INDISTINGUISHABLE? Both
+    // thresholds come from qa/formsep.mjs, which fails palette separation under
+    // dE 6: authored >= 12 in, under 6 out.
+    const led = window.__quietLedger ? window.__quietLedger() : null;
     const toLab = (r, g, b) => {
       const f = (c2) => { c2 /= 255; return c2 <= 0.04045 ? c2 / 12.92 : Math.pow((c2 + 0.055) / 1.055, 2.4); };
       const R = f(r), G = f(g), B = f(b);
@@ -135,15 +130,27 @@ for (const world of WORLDS) {
       X = kk(X); Y = kk(Y); Z = kk(Z);
       return [116 * Y - 16, 500 * (X - Y), 200 * (Y - Z)];
     };
-    let sep = Infinity, worstPair = null;
-    for (let i = 0; i < big.length; i++) for (let j = i + 1; j < big.length; j++) {
-      const A2 = toLab(big[i][0], big[i][1], big[i][2]), B2 = toLab(big[j][0], big[j][1], big[j][2]);
-      const e = Math.hypot(A2[0] - B2[0], A2[1] - B2[1], A2[2] - B2[2]);
-      if (e < sep) { sep = e; worstPair = [big[i], big[j]]; }
+    const dE = (A2, B2) => Math.hypot(A2[0] - B2[0], A2[1] - B2[1], A2[2] - B2[2]);
+    const collapsed = [];
+    let ledN = 0;
+    if (led) {
+      // one entry per colour, not per call — a fill inside a loop is one colour
+      const uniq = new Map();
+      for (const e of led) uniq.set(e.join(','), e);
+      const cols = [...uniq.values()].map((e) => ({
+        was: e.slice(0, 3), now: e.slice(3), wL: toLab(e[0], e[1], e[2]), nL: toLab(e[3], e[4], e[5]) }));
+      ledN = cols.length;
+      for (let i = 0; i < cols.length; i++) for (let j = i + 1; j < cols.length; j++) {
+        const before = dE(cols[i].wL, cols[j].wL);
+        if (before < 12) continue;
+        const after = dE(cols[i].nL, cols[j].nL);
+        if (after >= 6) continue;
+        collapsed.push({ a: cols[i].was, b: cols[j].was, before, after });
+      }
+      collapsed.sort((x, y) => x.after - y.after);
     }
-    if (!worstPair) sep = NaN;
     return { n: chs.length, cap: window.__groundChroma, ceil: window.__groundCeiling,
-      regions: big.length, sep, worstPair,
+      ledN, collapsed: collapsed.slice(0, 6), collapsedN: collapsed.length,
       c50: q(chs, 0.50), c75: q(chs, 0.75), c90: q(chs, 0.90), c99: q(chs, 0.99),
       v50: q(vs, 0.50), over: 100 * chs.filter((x) => x > 0.12).length / chs.length };
   });
@@ -171,13 +178,13 @@ for (const world of WORLDS) {
 await b.close();
 
 console.log('\nGROUND ALBEDO — the baked texture, before any light\n');
-console.log('world        texels    chroma p50   p75   p90   p99    value p50   over 0.12   cap   regions   closest');
+console.log('world        texels    chroma p50   p75   p90   p99    value p50   over 0.12   cap   dialled   collapsed');
 for (const r of rows)
   console.log(`${r.world.padEnd(11)} ${String(r.n).padStart(7)}      `
     + `${r.c50.toFixed(3)} ${r.c75.toFixed(3)} ${r.c90.toFixed(3)} ${r.c99.toFixed(3)}`
     + `        ${r.v50.toFixed(2)}      ${r.over.toFixed(1)}%   `
     + `${r.cap == null ? '   —' : r.cap.toFixed(2)}`
-    + `   ${String(r.regions).padStart(7)}   ${Number.isFinite(r.sep) ? r.sep.toFixed(1).padStart(7) : '      —'}`);
+    + `   ${String(r.ledN).padStart(7)}   ${String(r.collapsedN).padStart(9)}`);
 console.log(`\n  the textures: ${OUT}/*-ground.png`);
 
 let fail = 0;
@@ -187,6 +194,8 @@ for (const r of rows) {
   if (r.cap === undefined) { console.log(`FAIL  ${r.world.padEnd(10)} the page exposes no __groundChroma at all — nothing to grade against`); fail++; continue; }
   // one rounding step of slack: quiet() lands ON the cap and rounds to whole
   // 8-bit channels, so an exactly-dialled colour can read 0.161 for 0.160
+  // +0.005 of slack: the transform lands on 8-bit channels, so a colour aimed
+  // at the number can read one rounding step over it
   const stage = r.c75 <= r.cap + 0.005, roof = r.c99 <= r.ceil + 0.005;
   if (!stage) fail++;
   if (!roof) fail++;
@@ -194,17 +203,17 @@ for (const r of rows) {
     + `${r.c75.toFixed(3)}   cap ${r.cap.toFixed(2)}`);
   console.log(`${roof ? 'PASS' : 'FAIL'}  ${r.world.padEnd(10)} ceiling ground chroma p99 `
     + `${r.c99.toFixed(3)}   max ${r.ceil.toFixed(2)}`);
-  const seen = Number.isFinite(r.sep) ? r.sep : NaN;
-  const sepOk = !Number.isFinite(seen) || seen >= 10;
+  const sepOk = r.collapsedN === 0;
   if (!sepOk) fail++;
-  const wp = r.worstPair;
-  console.log(`${sepOk ? 'PASS' : 'FAIL'}  ${r.world.padEnd(10)} districts closest pair `
-    + `${Number.isFinite(seen) ? seen.toFixed(1) : '  —'} dE   want >= 10`
-    + (wp && !sepOk ? `   — rgb(${wp[0].slice(0, 3).map((x) => x.toFixed(0)).join(',')}) at `
-      + `${wp[0][3].toFixed(1)}% vs rgb(${wp[1].slice(0, 3).map((x) => x.toFixed(0)).join(',')}) at `
-      + `${wp[1][3].toFixed(1)}%` : ''));
+  const rgb = (c) => `rgb(${c.join(',')})`;
+  console.log(`${sepOk ? 'PASS' : 'FAIL'}  ${r.world.padEnd(10)} separation `
+    + `${r.collapsedN} pair(s) of ${r.ledN} dialled colours made indistinguishable   want 0`);
+  for (const c of r.collapsed)
+    console.log(`        ${rgb(c.a).padEnd(20)} vs ${rgb(c.b).padEnd(20)} `
+      + `dE ${c.before.toFixed(1)} -> ${c.after.toFixed(1)}`);
 }
 const graded = rows.filter((r) => r.cap != null).length * 3 + missing;
+const notDialled = rows.filter((r) => r.cap == null).length;
 fail += missing;
-console.log(`\n${graded - fail}/${graded} graded, ${rows.length - graded / 2} worlds not yet on the dial`);
+console.log(`\n${graded - fail}/${graded} graded, ${notDialled} world(s) not on the dial`);
 process.exit(fail ? 1 : 0);
