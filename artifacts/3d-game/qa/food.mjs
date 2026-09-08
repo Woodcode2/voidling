@@ -66,7 +66,30 @@ for (const world of WORLDS) {
     localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark'); } catch { } });
   await p.goto(`http://127.0.0.1:${PORT}/?w=${world}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState && !!window.__edibles, null, { timeout: 400000 });
-  await p.waitForTimeout(2500);   // let the settle pass finish retiring props
+  // ── AND THE MATCH HAS TO BE STARTED THROUGH THE MENU ──────────────────────
+  // A bare `?w=<world>` boot loads the world and then WAITS: __matchState().t
+  // never leaves zero, so the first version of the wait below sat there for the
+  // full fifteen-minute timeout. Every probe in this directory that needs a
+  // live match goes in the same way — click PLAY, click the card — because
+  // that is the path the game is built around. qa/occlusion.mjs:111 and
+  // qa/_worldshots.mjs both do exactly this.
+  await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
+    if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
+  await p.click('#btnPlay'); await p.waitForTimeout(1400);
+  await p.click(`#worldRow .wCard[data-world="${world}"]`);
+  await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
+  // ── WAIT FOR THE PLAY CAMERA, NOT FOR A CLOCK ─────────────────────────────
+  // The first version waited 2.5 wall-seconds and shot whatever was there. The
+  // opening DESCENT is still running at that point: the camera is high and
+  // wide, the void renders about half the size he plays at, and the frame
+  // contains a different amount of world than the one the game is actually
+  // about. Two of the six worlds were measured mid-dive.
+  // t > 5 game-seconds is the same condition qa/_worldshots.mjs settled on for
+  // exactly this reason, and its comment says why: at swiftshader speeds wall
+  // time and game time are not the same thing, so the only reliable signal is
+  // the match clock. Nothing drives — this is still the untouched spawn.
+  await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 5, null, { timeout: 900000 });
+  await p.waitForTimeout(400);
 
   const r = await p.evaluate(() => {
     const T = window.__THREE, scene = window.__scene, cam = window.__cam;
@@ -132,7 +155,8 @@ for (const world of WORLDS) {
       }
       ctx.putImageData(im, 0, 0); return cv.toDataURL('image/png');
     };
-    return { w, h, coverage: 100 * food / (w * h),
+    const ms = window.__matchState ? window.__matchState() : { t: -1 };
+    return { w, h, coverage: 100 * food / (w * h), t: ms.t,
       edibles: eds.length, inView, eatableInView, eatableTotal: eatable.length,
       voidR: vs.r,
       nearest: eatable.length ? eatable[0] : null,
@@ -148,13 +172,14 @@ for (const world of WORLDS) {
 await b.close();
 
 console.log(`\nFOOD ON SCREEN — spawn frame, seed ${SEED}, ${rows[0] ? rows[0].w + 'x' + rows[0].h : ''}\n`);
-console.log('world        screen is food   edibles   in view   eatable in view      nearest   5th    20th');
+console.log('world        screen is food   edibles   in view   eatable in view      nearest   5th    20th    t');
 for (const r of rows)
   console.log(`${r.world.padEnd(11)} ${r.coverage.toFixed(1).padStart(9)}%   ${String(r.edibles).padStart(7)}`
     + `   ${String(r.inView).padStart(7)}   ${String(r.eatableInView).padStart(15)}`
     + `   ${(r.nearest == null ? '  —' : r.nearest.toFixed(1)).padStart(10)}`
     + `   ${(r.fifth == null ? ' —' : r.fifth.toFixed(1)).padStart(5)}`
-    + `   ${(r.twentieth == null ? ' —' : r.twentieth.toFixed(1)).padStart(5)}`);
+    + `   ${(r.twentieth == null ? ' —' : r.twentieth.toFixed(1)).padStart(5)}`
+    + `   ${r.t.toFixed(1).padStart(5)}`);
 console.log(`\n  distances are world units from the void at spawn (radius ${rows[0] ? rows[0].voidR.toFixed(2) : '?'});`);
 console.log(`  the pictures, with everything edible tinted magenta: ${OUT}/*-food.png`);
 console.log('\n  NO BARS YET, DELIBERATELY. A bar wants a number somebody can defend, and');
