@@ -942,18 +942,34 @@
       /* NO GRADIENT FILL, AND THAT IS A DECISION AGAINST D11's THIRD LAYER.
          Bar D11 asks display type for a two-stop gradient fill, a stroke and a
          shadow. The stroke earns its place here and is above. The gradient was
-         tried twice and made the title worse both times, measured on the
-         rendered menu each time:
-           white -> pale violet -> #c9a3ff   glyphs rgb(203,189,220), 8.26:1
-           white -> cream -> gold            glyphs rgb(211,200,214), 9.00:1
-         against roughly 20:1 for the flat white both replaced. The second
-         attempt was meant to fix the first by separating on hue as well as
-         luminance, and barely moved: the brightest pixel in the title is
-         rgb(255,255,255) either way, so the letter CORES were never the
-         problem. What washes this title out is the 34px rgba(147,80,232,0.9)
-         glow bleeding violet around every glyph edge, and a gradient fill only
-         gives that bleed more to blend with. Flat white keeps the core
-         dominant, which is why the original read crisp.
+         tried twice and looked worse both times on the rendered menu, so it is
+         gone.
+
+         THE NUMBERS THAT DECISION WAS FIRST WRITTEN WITH WERE MEASURED ON THE
+         WRONG ROWS, and they are corrected here rather than quietly dropped.
+         The title occupies y 166-220 in the DPR-2 menu shot. The two sample
+         bands were y 200-250 and y 255-300: the first caught only the bottom
+         edge of the glyphs plus empty space, and the second sat entirely BELOW
+         the tagline and never contained the title at all — which is why it
+         reported the identical rgb(202,191,210) under the violet ramp, the gold
+         ramp AND flat white. A number that does not move when the thing it
+         measures changes is not measuring it.
+
+         Measured on the rows the title actually occupies, as it now stands:
+           WORLD ENDER top half     glyph rgb(251,250,251)   12.13:1
+           WORLD ENDER bottom half  glyph rgb(251,251,252)   12.61:1
+           THE CUTE                 glyph rgb(239,200,233)    9.15:1
+         A "roughly 20:1 for flat white" figure appeared in the first version of
+         this note and in a commit message. It was never measured; it was an
+         estimate repeated until it sounded like data. The real figure is 12.4:1.
+
+         What stands on evidence rather than on those numbers: three rendered
+         frames were looked at, and both gradient versions read washed out, and
+         the brightest pixel in the title area is rgb(255,255,255) under every
+         version — so the letter CORES were never the problem. What washes this
+         title out is the 34px rgba(147,80,232,0.9) glow bleeding violet around
+         every glyph edge, and a gradient fill only gives that bleed more to
+         blend with. Flat white keeps the core dominant.
          A bar is a description of a good result, not an instruction to be
          followed off a cliff — and on a dark nebula, three layers is one too
          many. The stroke stays because it protects the title on the light
