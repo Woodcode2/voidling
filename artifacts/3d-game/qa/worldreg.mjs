@@ -65,16 +65,24 @@ const keyRe = (w) => new RegExp(`(^|[^A-Za-z0-9_$'"])['"]?${w}['"]?\\s*:`, 'm');
 // table, the world, and a reason that is a FACT about the environment — never
 // "not done yet", which is what the rest of the probe is for.
 const OWED = [
-  { name: 'CARD_ART', world: 'skylark',
-    why: 'the poster is painted (two takes, nano_banana_pro, 3:4) and CANNOT BE '
-       + 'VENDORED FROM THIS ENVIRONMENT: scripts/asset-refs.mjs requires every '
-       + '/assets/hf/ reference to exist on disk, and the origin it fetches from '
-       + '(d8j0ntlcm91z4.cloudfront.net) is refused by this container\'s network '
-       + 'policy -- the proxy answers 403 to CONNECT, on every retry. The card is '
-       + 'not blank meanwhile: CARD_FALLBACK paints skylark\'s own dawn amber, '
-       + 'balloon violet and morning blue, which is exactly what that table was '
-       + 'written for. The two takes are recorded in the CARD_ART comment; '
-       + 'vendoring them is one curl in an environment that can reach the CDN.' },
+  // ── EMPTY, AND THE ONE ENTRY THAT WAS HERE IS WORTH KEEPING IN VIEW ──────
+  // CARD_ART/skylark sat here for a round, on this reasoning: the poster is
+  // painted, it cannot be vendored from this container (the CDN answers 403 to
+  // CONNECT), and "scripts/asset-refs.mjs requires every /assets/hf/ reference
+  // to exist on disk", so writing the path would break the build for everyone.
+  //
+  // The first two facts were true and re-tested. The third was not. That guard
+  // is `node scripts/check-assets.mjs dist`, and package.json runs it in
+  // exactly ONE script — build:ios — where vendor-assets.mjs runs first and
+  // fetches the file from that same CDN. The web build is `vite build` and
+  // touches neither; and vercel.json rewrites /assets/hf/:file straight to the
+  // origin, which is how the other five posters have served in production all
+  // along. The blocker was one container's network policy, read as a property
+  // of the build.
+  //
+  // The lesson for the next entry: an OWED reason has to be a fact about the
+  // ENVIRONMENT, and this one smuggled in a claim about the BUILD that nobody
+  // checked. Cost: a blank card on the world picker for a round.
 ];
 
 const findings = [];

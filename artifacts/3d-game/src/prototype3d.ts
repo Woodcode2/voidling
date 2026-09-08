@@ -6586,14 +6586,29 @@ const CARD_ART: Record<string, string> = {
   //   hf_20260904_175218_7e696395-fbec-4ba2-a7a2-9b02e2b5bdf5.png
   //   hf_20260904_175218_f5a3b880-2309-49d4-9c1a-63b2a7ab05f2.png
   //
-  // They cannot be VENDORED from the container this was built in.
-  // scripts/asset-refs.mjs requires every /assets/hf/ reference to exist on
-  // disk before the build guard passes, and ORIGINS.hf —
-  // d8j0ntlcm91z4.cloudfront.net — is refused by this environment's network
-  // policy: the proxy answers 403 to CONNECT, every time. Writing the path
-  // without the file would break the guard for everyone, so the path is not
-  // written. Vendoring is one curl of each URL above into public/assets/hf/
-  // wherever the CDN is reachable, then a line here.
+  // ── AND THE REASONING ABOVE WAS TOO CAUTIOUS BY ONE STEP ──────────────────
+  // What is true: this container cannot reach the CDN. ORIGINS.hf —
+  // d8j0ntlcm91z4.cloudfront.net — is refused by the egress proxy, 403 to
+  // CONNECT, every time, re-tested today.
+  //
+  // What was WRONG: "writing the path without the file would break the guard
+  // for everyone". The guard is `node scripts/check-assets.mjs dist`, and
+  // package.json runs it in exactly one script — `build:ios`, where
+  // `vendor-assets.mjs` runs FIRST and fetches this file from that same CDN.
+  // The web build is `vite build` and touches neither. So the guard was never
+  // "everyone"; it was one command, on a machine that can reach the CDN, which
+  // fetches the file before checking for it.
+  //
+  // And the web does not need the file on disk at all: vercel.json rewrites
+  // /assets/hf/:file straight to that CloudFront origin, which is how the other
+  // five posters have been serving in production this whole time.
+  //
+  // The downside if this is somehow wrong is EXACTLY WHAT SHIPPED BEFORE IT:
+  // paintWorldCard puts CARD_FALLBACK up first and only swaps on `probe.onload`
+  // (:6630), so a 404 leaves the painted dawn gradient in place. A change whose
+  // worst case is the status quo and whose best case is the one blank card on
+  // the world picker is not a change to sit on for a round.
+  skylark: '/assets/hf/hf_20260904_175218_7e696395-fbec-4ba2-a7a2-9b02e2b5bdf5.png',
   //
   // The card is NOT blank meanwhile — CARD_FALLBACK carries skylark in its own
   // dawn amber, balloon violet and morning blue, which is the whole reason that
