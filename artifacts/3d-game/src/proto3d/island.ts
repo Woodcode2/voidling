@@ -7099,7 +7099,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const p2: GD.Pt = [s.x, s.y];
       const face = s.ang;
       if (i % 7 === 3) drop(TG.makeCanopy(), p2, 2.4, face);
-      else if (i % 11 === 5) { drop(TG.makeRV(), p2, 4.2, face + Math.PI / 2, false, 'rv'); GD.claimSpot(s.x, s.y, 130); }
+      else if (i % 11 === 5) { drop(TG.makeRV(), p2, 4.2, face + Math.PI / 2, false, 'rv'); GD.claimSpot(s.x, s.y, 170); }   // 170 world = 8.5 units — the RV's footprint, not its eat radius; see the rvpark note
       else { drop(TG.makeTailgateTruck(), p2, 3.0, face + Math.PI / 2, false, 'car'); GD.claimSpot(s.x, s.y, 90); }
     }
     // …and the party BETWEEN the rows, which is the whole point of an aisle.
@@ -7158,7 +7158,14 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // People who arrived on Wednesday: motorhomes, awnings, satellite dishes,
     // deck chairs and — per docs/GAMEDAY.md — a hot tub. Four of them, since
     // the joke is better when you can find a second one.
-    plant('rvpark', 52, 100, 4.2, TG.makeRV, true, 'rv');
+    // AN RV CLAIMS ITS LENGTH. This asked for 4.2 — its eat radius — while the
+    // vehicle is 12.2 x 6.6 on the ground, a half-diagonal of 6.93. spotFree
+    // spaces two props at (sepA + sepB) x 0.82, so 4.2 bought it 3.4 units of
+    // clearance against a tailgate table that needs 9.2, and qa/placement.mjs
+    // read the result as the worst overlaps on the world: props 2.35 units
+    // inside an RV. 6.93 / 0.82 is the claim that makes the spacing rule come
+    // out at the vehicle's actual footprint.
+    plant('rvpark', 52, 100, 4.2, TG.makeRV, true, 'rv', 8.5);
     plant('rvpark', 34, 70, 2.2, TG.makeSatelliteRig);
     plant('rvpark', 4, 130, 1.9, TG.makeHotTub);
     plant('rvpark', 26, 46, 1.8, TG.makeSmoker);
