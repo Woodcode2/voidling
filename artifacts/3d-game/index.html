@@ -924,11 +924,43 @@
           #btnPlay { padding: 14px 64px; }
       }
       #menuOrb { display: none; }
+      /* ── THE GAME'S OWN NAME HAD THE LEAST PROTECTION OF ANY TYPE IN IT ────
+         The timer carries a 3px stroke because its urgency colour once measured
+         1.02:1 against beach sand. The logo — the first thing anybody sees, and
+         the only type that has to hold over a full-bleed nebula — was a flat
+         white fill and a glow, with no stroke at all. A glow spreads a colour
+         INTO its background; it does not separate one from the other, and on
+         the light shoulder of the key art there is nothing here that would.
+         Round 7 stream D, bar D11: display type is three layers, not one —
+         a two-stop gradient fill, a stroke, and a shadow.
+         The stroke is in `em` so it tracks the clamp rather than going spindly
+         at 68px and heavy at 40px. */
       #menu .logo { font-size: clamp(40px, 8vw, 68px); font-weight: 700; letter-spacing: 2px; color: #fff;
-        line-height: 1.02; text-shadow: 0 0 34px rgba(147,80,232,0.9), 0 4px 12px rgba(0,0,0,0.65); }
+        line-height: 1.02;
+        -webkit-text-stroke: 0.055em rgba(22,7,42,0.94); paint-order: stroke fill;
+        text-shadow: 0 0 34px rgba(147,80,232,0.9), 0 4px 12px rgba(0,0,0,0.65); }
+      /* The gradient goes on last and only where the browser can clip it to the
+         glyphs. A failed background-clip with a transparent fill is an INVISIBLE
+         TITLE, so the solid white above stays the fallback and this only ever
+         adds to it. Stops start at 30% because the parent box also contains the
+         "THE CUTE" line above: WORLD ENDER occupies the lower two thirds of it,
+         so a 0%-anchored ramp would spend half its range on a line that
+         overrides the fill anyway. */
+      @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+        #menu .logo {
+          background: linear-gradient(180deg, #ffffff 30%, #f4e8ff 62%, #c9a3ff 100%);
+          -webkit-background-clip: text; background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+      }
       /* "THE CUTE" rides above at half scale — one name, two beats */
+      /* and it takes its fill back: -webkit-text-fill-color INHERITS, so without
+         this the child would be transparent over the parent's gradient box and
+         the words would simply not be there. */
       #menu .logo i { display: block; font-style: normal; font-size: 0.44em;
-        letter-spacing: 8px; color: #ffd9f2; margin-bottom: 2px;
+        letter-spacing: 8px; color: #ffd9f2; -webkit-text-fill-color: #ffd9f2;
+        -webkit-text-stroke: 0.05em rgba(22,7,42,0.9); paint-order: stroke fill;
+        margin-bottom: 2px;
         text-shadow: 0 0 18px rgba(255,150,220,0.8), 0 2px 8px rgba(0,0,0,0.65); }
       #menu .tag { font-size: clamp(11px, 1.6vw, 15px); font-weight: 700; letter-spacing: 7px; color: #ffffff; margin-top: 2px;
         text-shadow: 0 2px 8px rgba(0,0,0,0.7); }
