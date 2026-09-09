@@ -313,6 +313,24 @@ const SUITE = [
     cmd: ['node', 'qa/rng.mjs', 'all', PORT], verdict: exitCode,
     why: 'every prop the level design authored is actually on the island — asked against placed, per district, read off the live page' },
 
+  // THE BOOT SWEEP MUST BE IDEMPOTENT. settleFootprints() runs once and retires
+  // every prop that has vanished inside another; run it again over the world it
+  // just finished and it must take nothing, because it has already seen every
+  // pair and retiring props only ever removes CONTAINERS — which un-buries
+  // things rather than burying them. Anything a second pass finds is proof the
+  // first walked past that exact pair.
+  //
+  // NOT IN PUSH, AND SAYING WHY RATHER THAN QUIETLY PARKING IT. It fails today,
+  // on one prop: Pirate's shell #3460 at (57.5,230.5), inside a tower. Five of
+  // six worlds are clean. Putting it in push would hold every release on that
+  // one shell; giving it a frozen ceiling on the day it was written would be
+  // raising a number to fit a known defect, which qa/placement.baseline.json is
+  // explicit is the owner's call and not mine. So it reports here, loudly, and
+  // moving it into push is a decision to take once the shell is gone.
+  { id: 'settle', tier: 'quality', profiles: ['live', 'quality'], timeout: 1200,
+    cmd: ['node', 'qa/settle.mjs', 'all', PORT], env: { SEED: '7' }, verdict: exitCode,
+    why: 'the sweep that retires buried props leaves nothing behind for a second pass to find — a prop standing inside a wall is not something a child should be able to meet' },
+
   // HOW MUCH OF THE SCREEN IS FOOD. Registered in QUALITY and not yet in push,
   // and that is a statement rather than a dodge: three worlds fail F2 today
   // (lantern 1.83 s, gameday 2.11, pirate 3.00 against a 1.5 s bar) and one
