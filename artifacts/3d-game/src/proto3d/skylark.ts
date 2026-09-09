@@ -305,7 +305,14 @@ export function scatterInRegion(r: SkRegion, n: number, clear = 40, o?: SkScatte
   let outside = 0, blocked = 0, busy = 0, tries = 0, miss = 0;
   for (; tries < CAP(n, 60) && out.length < n && (tries < n * 60 || miss < STALL); tries++) {
     const x = minX + rnd() * (maxX - minX), y = minY + rnd() * (maxY - minY);
-    if (!pointInPoly(x, y, r.poly)) { outside++; miss++; continue; }
+    // A SAMPLE OUTSIDE THE POLYGON IS NOT EVIDENCE THE REGION IS FULL. It says
+    // the bounding box is a poor fit for the shape, and nothing else — so it
+    // must not count toward the stall, whose whole meaning is "this ground is
+    // closed". Pirate's beach is a thin diagonal strip inside a fat box and
+    // misses it 79% of the time; counting those as stall evidence let a run of
+    // bad luck end a pass that had open sand left. `tries` still bounds the
+    // work, so a hopeless region is still cheap.
+    if (!pointInPoly(x, y, r.poly)) { outside++; continue; }
     if (!skPlaceable(x, y, clear)) { blocked++; miss++; continue; }
     if (!passes(x, y, o)) { busy++; miss++; continue; }
     take(x, y, o);
