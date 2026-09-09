@@ -6714,6 +6714,19 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       // the one it will actually stand on. See bay.ts's note on Rect.
       if (rotY !== undefined) mesh.rotation.y = rotY;
       const foot = footOf(mesh, p2[0], p2[1]);
+      // ── AND THE CANAL IS KEPT CLEAR OF THE WHOLE PROP, NOT ITS CENTRE ─────
+      // lnPlaceable refuses a POINT within CANAL_HALF + clear of the channel,
+      // which is the right test for the sample the scatter is holding and the
+      // wrong one for the prop that ends up there: a stall placed just outside
+      // the band still hangs its corners over the water. qa/placement.mjs has
+      // always judged the footprint — it samples the centre, the four corners
+      // and the four edge midpoints (qa/placement.mjs:341) — and it found six
+      // props reaching 0.3 to 0.9 units into the channel while this test passed
+      // them. Sampling districts by area made it more likely, because every
+      // district polygon here crosses the canal, but the gap was always open.
+      // The mesh exists by now, so the real rectangle can be asked about.
+      if (!force && foot
+        && LN.distToPath(foot.cx, foot.cz, LN.CANAL) < LN.CANAL_HALF + Math.hypot(foot.hx, foot.hz)) return;
       if (!force && !LN.spotOpen(p2[0], p2[1], r * 20, foot)) return;
       if (force) mesh.userData.authored = true;   // a landmark: the settle pass may never retire it
       const [x3, z3] = P3(p2);
