@@ -7902,24 +7902,29 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     return true;
   };
   let dropSkip = 0;
-  const legalSite = (wx: number, wy: number, r: number): boolean => {
+  const legalSite = (wx: number, wy: number, r: number, foot?: BAY.Rect): boolean => {
     if (!insideIsland3(w(wx), w(wy))) return false;
     if (inMapleWater(wx, wy, r)) return false;
     const band = roadClear(r);
     for (const c of ROAD_CENTERS) if (Math.abs(wx - c) < band || Math.abs(wy - c) < band) return false;
     // drop() claimed ground but never CHECKED it — only landmark() did. That
     // asymmetry is where all 93 of Maple's prop intersections came from.
-    if (!MS.spotOpen(wx, wy, r * 20)) return false;
+    // `foot` is the prop's real ground rectangle when the caller has a built
+    // mesh to measure; dropGlb has none, because glb() resolves later, so it
+    // asks with its circle exactly as before. See bay.ts's note on Rect.
+    if (!MS.spotOpen(wx, wy, r * 20, foot)) return false;
     return true;
   };
   /** place at WORLD coordinates and claim the ground for the separation pass.
    *  Refuses the water and the road bands outright — a prop that survives this
    *  is a prop prototype3d's sweep will leave exactly where it was put. */
   const drop = (mesh: THREE.Object3D, wx: number, wy: number, r: number, rotY?: number): boolean => {
-    if (!legalSite(wx, wy, r)) { dropSkip++; return false; }
+    // turned first: the rectangle it is asked about is the one it will stand on
     if (rotY !== undefined) mesh.rotation.y = rotY;
+    const foot = footOf(mesh, wx, wy);
+    if (!legalSite(wx, wy, r, foot)) { dropSkip++; return false; }
     place(mesh, w(wx), w(wy), r);
-    MS.claimSpot(wx, wy, r * 20);
+    MS.claimSpot(wx, wy, r * 20, foot);
     return true;
   };
   const dropGlb = (name: string, wx: number, wy: number, r: number, h: number,

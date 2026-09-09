@@ -46,48 +46,28 @@ export const mchance = (p: number): boolean => mrnd() < p;
 // Nothing else stops two authored passes dropping a pie table inside a prize
 // wheel. Every claimed prop reserves its footprint in a coarse hash; callers
 // ask spotFree() before they place. Radii are WORLD units (3D radius × 20).
-const CELL = 400;
-interface Claim { x: number; y: number; r: number; }
-const claims = new Map<string, Claim[]>();
-export function resetSpots(): void { claims.clear(); }
-export function claimSpot(x: number, y: number, rWorld: number): void {
-  const k = `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
-  const b = claims.get(k);
-  if (b) b.push({ x, y, r: rWorld }); else claims.set(k, [{ x, y, r: rWorld }]);
-}
-export function spotFree(x: number, y: number, rWorld: number): boolean {
-  const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
-  const reach = Math.ceil((rWorld + 260) / CELL);
-  for (let i = -reach; i <= reach; i++) for (let j = -reach; j <= reach; j++) {
-    const b = claims.get(`${cx + i},${cy + j}`);
-    if (!b) continue;
-    for (const c of b) {
-      const need = (c.r + rWorld) * 0.82;   // a little interlock is fine; burial is not
-      const dx = c.x - x, dy = c.y - y;
-      if (dx * dx + dy * dy < need * need) return false;
-    }
-  }
-  return true;
-}
-/** The BURIAL test — what drop() gates on. `spotFree` refuses any contact,
- *  which is right for a random scatter and wrong for authored dressing: a
- *  mailbox belongs against the house, not 40 units off it. This refuses only
- *  props that would be swallowed whole by something already standing there. */
-export function spotOpen(x: number, y: number, rWorld: number): boolean {
-  const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
-  const reach = Math.ceil((rWorld + 260) / CELL);
-  for (let i = -reach; i <= reach; i++) for (let j = -reach; j <= reach; j++) {
-    const b = claims.get(`${cx + i},${cy + j}`);
-    if (!b) continue;
-    for (const c of b) {
-      const dx = c.x - x, dy = c.y - y;
-      if (dx === 0 && dy === 0) continue;   // your own claim, whatever its radius (see bay.ts spotOpen)
-      const need = Math.max((c.r + rWorld) * 0.45, Math.max(c.r, rWorld) * 0.62);
-      if (dx * dx + dy * dy < need * need) return false;
-    }
-  }
-  return true;
-}
+// ── prop separation ────────────────────────────────────────────────────────
+// THIS WAS A SECOND COPY OF bay.ts's HASH — same CELL, same 0.82 / 0.45 / 0.62,
+// same own-claim escape, its own `claims` table — and the copy is exactly why
+// it is gone. A duplicated system drifts from the one it was copied from, and
+// by tonight the original had four faults in it that this copy shared:
+//
+//   • a search block sized from a hard-coded 260, which is an unstated ceiling
+//     on any claim's radius — Lantern reserves 900 for its bathhouse and Game
+//     Day 780 for its stadium, and claims that big were being missed
+//   • a claim shaped as a CIRCLE where qa/placement.mjs has always graded
+//     oriented rectangles, so a 21.3 x 10.0 building reserved a disc that was
+//     wrong at the ends and wrong at the sides at once
+//
+// Maple carried both of those and could only ever be fixed twice. bay.ts owns
+// the hash now and Maple asks the same questions the other five worlds ask.
+// One world is loaded at a time, so the single claims table is correct — the
+// note at the top of gameday.ts says so, and this file agrees rather than
+// keeping its own.
+export { spotFree, spotOpen, claimSpot } from './bay';
+import { resetPlacement } from './bay';
+/** Maple's name for it, kept so its call sites read as they always did. */
+export function resetSpots(): void { resetPlacement(); }
 
 // ── the town's colours ─────────────────────────────────────────────────────
 // THE TOWN ONLY HAS TWO CANDIDATES. This file used to name a third — "PAT
