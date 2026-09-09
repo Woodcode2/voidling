@@ -303,7 +303,7 @@ export function scatterInRegion(r: SkRegion, n: number, clear = 40, o?: SkScatte
   const out: Pt[] = [];
   // WHY a scatter came up short, not just that it did — see ./rng's ledger.
   let outside = 0, blocked = 0, busy = 0, tries = 0, miss = 0;
-  for (; tries < CAP(n, 60) && out.length < n && miss < STALL; tries++) {
+  for (; tries < CAP(n, 60) && out.length < n && (tries < n * 60 || miss < STALL); tries++) {
     const x = minX + rnd() * (maxX - minX), y = minY + rnd() * (maxY - minY);
     if (!pointInPoly(x, y, r.poly)) { outside++; miss++; continue; }
     if (!skPlaceable(x, y, clear)) { blocked++; miss++; continue; }
@@ -323,7 +323,7 @@ export function scatterLand(n: number, clear = 40, band?: [number, number], o?: 
   const [minX, maxX, minY, maxY] = LAND_BOX;
   const out: Pt[] = [];
   let outside = 0, blocked = 0, busy = 0, tries = 0, miss = 0;
-  for (; tries < CAP(n, 90) && out.length < n && miss < STALL; tries++) {
+  for (; tries < CAP(n, 90) && out.length < n && (tries < n * 90 || miss < STALL); tries++) {
     const x = minX + rnd() * (maxX - minX), y = minY + rnd() * (maxY - minY);
     if (!skPlaceable(x, y, clear)) { blocked++; miss++; continue; }
     if (band) { const d = distToEdge(x, y); if (d < band[0] || d > band[1]) { outside++; miss++; continue; } }
@@ -343,7 +343,7 @@ export function clusterAt(cx: number, cy: number, n: number, radius: number,
   const rnd = stream('skylark', 'cluster', cx, cy, n, radius, clear, o?.sep);
   const out: Pt[] = [];
   let blocked = 0, busy = 0, tries = 0, miss = 0;
-  for (; tries < CAP(n, 40) && out.length < n && miss < STALL; tries++) {
+  for (; tries < CAP(n, 40) && out.length < n && (tries < n * 40 || miss < STALL); tries++) {
     const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * radius;
     const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
     if (!skPlaceable(x, y, clear)) { blocked++; miss++; continue; }

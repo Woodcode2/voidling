@@ -158,6 +158,18 @@ export function tally(where: string, asked: number, placed: number, why: Why): v
 // REGION says no, not until the counter does. STALL consecutive rejections is
 // that signal; CAP is the backstop for a pathological region.
 //
+// AND IT MAY NEVER TAKE BUDGET AWAY. The first cut let STALL fire from the
+// first sample, and qa/rng.mjs caught what that costs: Pirate's six lifeguard
+// towers went to none placed. The counter resets on a success, so a pass that
+// scores early keeps going — the beach's palms ran 12,492 and 16,736 tries —
+// while a pass that has not yet scored once gives up at 2,500 however much
+// budget it was granted. The lifeguards' beach is a thin diagonal strip inside
+// a fat bounding box, so 78% of their samples miss the polygon before any
+// other test runs, and they never got the early hit that would have kept them
+// alive. This detector exists to let a scatter run LONGER; it has no business
+// running one shorter, so the stall only applies once a pass has spent the
+// budget it used to have.
+//
 // IT IS CHEAPER AS WELL AS BETTER, which was not the expected result. Pirate
 // went from 3,940 of 4,042 props placed to 4,210 of 4,268 — and did it on
 // 67,994 samples against 98,652, because a saturated region now bails at 2,500
