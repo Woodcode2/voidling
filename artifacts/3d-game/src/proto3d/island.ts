@@ -478,7 +478,16 @@ export function coastClear(x3: number, z3: number, d = 12): boolean {
  *  banner on a wire — which keeps its circle. See ./footprint and bay.ts:Rect. */
 function footOf(mesh: THREE.Object3D, wx: number, wy: number): BAY.Rect | undefined {
   const f = FP.groundFootprint(mesh);
-  return f ? FP.worldRect(f, wx, wy, mesh.rotation.y) : undefined;
+  if (!f) return undefined;
+  // a prop may reserve ground it does not stand on — see makeBench's note
+  const legroom = mesh.userData.legroom as number | undefined;
+  // the span runs from the prop's own back edge to `legroom` in front of its
+  // centre, which is the distance qa/placement.mjs measures from
+  const g = legroom
+    ? { hx: f.hx, hz: (f.hz + legroom) / 2, cx: f.cx, cz: f.cz + (legroom - f.hz) / 2 }
+    : f;
+  // a claim that includes reserved-but-empty ground tolerates nothing in it
+  return FP.worldRect(g, wx, wy, mesh.rotation.y, legroom !== undefined);
 }
 
 export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
@@ -5341,6 +5350,21 @@ function makeBench(): THREE.Group {
   // it had a seat and a back and NOTHING holding either up — 42 of them hovering
   // a metre off the ground across both islands.
   const g = new THREE.Group();
+  // ── A BENCH RESERVES ITS VIEW ─────────────────────────────────────────────
+  // A bench is 3.0 x 1.0 on the ground, so when the placement hash reserved
+  // ground as a CIRCLE it happened to hold about 1.6 units clear in front of
+  // the seat — not because anyone asked it to, but because a circle around a
+  // long thin thing is fat where the thing is not. Giving the hash the real
+  // rectangle took that away and qa/placement.mjs immediately found benches
+  // facing a prop 1.2 units off their knees: 4 of them became 7.
+  //
+  // The accident was carrying a real intent, so the intent gets stated. That
+  // probe wants 2.8 units of clear ground in front of a bench (it looks at
+  // 1.2, 2.0 and 2.8 — qa/placement.mjs:442), and a bench with a wall in front
+  // of it is a broken bench whatever the geometry says. So the bench claims
+  // its legroom along with its seat, forward down local +z, which is where
+  // makeBench looks (the back slat is at z = -0.36).
+  g.userData.legroom = 2.8;
   const wood = 0x9a7a5a, iron = 0x4a4a52;
   const parts = [
     part(new THREE.BoxGeometry(3, 0.22, 1), wood, 0, 1, 0),          // seat slats

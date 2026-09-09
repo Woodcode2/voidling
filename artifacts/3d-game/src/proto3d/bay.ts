@@ -319,7 +319,15 @@ const blockFor = (reachWorld: number): number => Math.ceil(reachWorld / CELL) + 
 // overlap the audit reports is the same shape, a big thing whose circle is
 // wrong against a small prop, and it is the big thing that gets the rectangle.
 // A claim with no rectangle behaves exactly as it does today.
-export interface Rect { cx: number; cz: number; hx: number; hz: number; c: number; s: number }
+export interface Rect {
+  cx: number; cz: number; hx: number; hz: number; c: number; s: number;
+  /** CLEARANCE, NOT FOOTPRINT. Two footprints may interlock a little — a
+   *  lounger belongs against the villa — which is what PEN_TOL allows. Ground
+   *  a prop reserves but does not stand on is a different claim: a bench's
+   *  legroom is empty ground on purpose, and a prop 0.3 units into it is still
+   *  a prop in front of the bench. A strict claim tolerates nothing. */
+  strict?: boolean;
+}
 
 /** How deep two oriented rectangles are into each other, 0 when they are apart.
  *  A separating-axis test on the four face normals, which is exact for
@@ -411,7 +419,11 @@ export function spotOpen(x: number, y: number, rWorld: number, f?: Rect): boolea
         // set down has a rectangle too and the test is exact. This is the case
         // a centre-only test cannot see: a prop whose middle clears the wall
         // while its body is a foot inside it.
-        if (f) { if (rectPenetration(c.f, f) > PEN_TOL) return false; continue; }
+        if (f) {
+          const tol = c.f.strict || f.strict ? 0 : PEN_TOL;
+          if (rectPenetration(c.f, f) > tol) return false;
+          continue;
+        }
         if (distToRect(x, y, c.f) <= 0) return false;
         continue;
       }
