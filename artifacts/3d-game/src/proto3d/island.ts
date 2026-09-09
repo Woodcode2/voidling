@@ -7243,9 +7243,18 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     plant('greek', 20, 50, 1.8, TG.makeBandRig);
     plant('greek', 44, 36, 1.6, TG.makeTailgateTable);
     plant('greek', 44, 46, 1.5, TG.makePorchSofa);
-    plant('greek', 55, 34, 1.4, TG.makeCoolerStack);
-    plant('greek', 34, 34, 1.4, TG.makeGrill);
-    plant('greek', 26, 46, 1.4, TG.makeHayStack);
+    // ── THREE PROPS OF ONE SIZE SHARE THE GROUND THAT FITS THEM ───────────
+    // Coolers, grills and hay stacks all reserve 1.4, so they compete for the
+    // same gaps and they ran in file order: the first two took every one and
+    // the hay stacks placed NONE of 26 — 2,500 tries, all 2,500 refused as
+    // occupied, no geometry misses at all. Frat Row is simply full at this
+    // size; it was hidden while 45% of every pass's samples were missing the
+    // polygon and starving all three equally.
+    // 115 asked where about 92 fit, so the three are trimmed together rather
+    // than the last one in the file taking the whole shortfall.
+    plant('greek', 44, 34, 1.4, TG.makeCoolerStack);
+    plant('greek', 27, 34, 1.4, TG.makeGrill);
+    plant('greek', 21, 46, 1.4, TG.makeHayStack);
     plant('greek', 70, 36, 1.2, TG.makeBanner);
     plant('greek', 110, 26, 0.7, TG.makeFoldingChair);
 
