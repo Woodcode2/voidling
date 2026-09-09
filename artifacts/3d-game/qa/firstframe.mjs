@@ -49,7 +49,15 @@ mkdirSync(OUT, { recursive: true });
 // COPY.introLen per world, copied from prototype3d.ts WORLD_COPY (the table is
 // not on the debug surface). A wrong number here shows up as the "u" column
 // disagreeing with the picture, which is why both are printed.
-const INTRO_LEN = { maple: 2.2, pirate: 2.2, gameday: 3.4, lantern: 3.6, powder: 3.5 };
+// INTRO_LEN IS READ FROM THE PAGE, NOT KEPT HERE. This was a hand-copy of
+// prototype3d.ts's WORLD_COPY — {maple:2.2, pirate:2.2, gameday:3.4,
+// lantern:3.6, powder:3.5} — and SKYLARK FIELD shipped as world 6 without
+// anyone adding the sixth entry. So this probe timed world 6's title card
+// against `undefined`, printed "introLen undefineds" and "= NaNs", and then
+// died on the NaN wait. qa/worldlists.mjs did not catch it because it knew two
+// shapes of world list, the unlock string and the array literal, and this was
+// a third: an OBJECT keyed by world. It knows all three now.
+let introLen = NaN;
 
 const lum = (r, g, b) => { const f = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
 const ratio = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
@@ -128,8 +136,7 @@ let fails = 0;
 const RUNS = SPLASH_ONLY ? VIEWS.map((v) => ({ WORLD: WORLDS[0], v })) : WORLDS.map((WORLD) => ({ WORLD, v: VIEWS[0] }));
 for (const { WORLD, v } of RUNS) {
   VP = v; VTAG = v.tag;
-  console.log(`== ${WORLD} ${VP.width}x${VP.height}@${VP.dpr}${SPLASH_ONLY ? ' (splash only)' : ` (introLen ${INTRO_LEN[WORLD]}s)`}`);
-  const rec = { world: WORLD, introLen: INTRO_LEN[WORLD], seed: SEED, view: VP, shots: [], contrast: [] };
+  const rec = { world: WORLD, introLen: NaN, seed: SEED, view: VP, shots: [], contrast: [] };
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
   const p = await b.newPage({ viewport: { width: VP.width, height: VP.height }, deviceScaleFactor: VP.dpr });
   p.on('pageerror', (e) => console.log(`  [pageerror] ${e.message.split('\n')[0]}`));
@@ -229,7 +236,18 @@ for (const { WORLD, v } of RUNS) {
   } else console.log('  straight in: no menu (first-ever path)');
   const t0 = await p.evaluate(() => window.__matchState?.().t ?? -1);
   console.log(`  after the card: t=${t0.toFixed(2)}`);
-  const L = INTRO_LEN[WORLD];
+  // READ FROM THE WORLD THAT IS ACTUALLY LOADED. If the hook is missing the
+  // probe stops rather than timing the card against a number it invented —
+  // NaN is how world 6 slipped through as "introLen undefineds" for a whole
+  // round, and a probe that measures nothing must never print a verdict.
+  const L = await p.evaluate(() => window.__introLen?.() ?? NaN);
+  if (!Number.isFinite(L)) {
+    console.log(`\nFAIL — firstframe: ${WORLD} did not report an introLen (window.__introLen missing or NaN); nothing here can be timed against it`);
+    await b.close();
+    process.exit(1);
+  }
+  introLen = L; rec.introLen = L;
+  console.log(`  introLen ${L}s (read from the page)`);
   // THE CARD'S LENGTH, READ FROM THE DOM. Its fade is a CSS animation on WALL
   // time and the match clock here runs 14-40x slow, so no screenshot in this
   // pack can show the card against the shot — every sampled frame reads

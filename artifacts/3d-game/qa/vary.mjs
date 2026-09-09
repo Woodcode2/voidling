@@ -20,15 +20,15 @@ const PORT = process.argv[2] || '4177';
 const args = process.argv.slice(3);
 const WORLDS = args.length ? args : ['maple', 'lantern', 'powder'];
 
-// the shipped middle pair per world — match 0 must deal exactly this
-const BASELINE = {
-  maple: ['maple.dog', 'maple.parade'],
-  pirate: ['pirate.parrot', 'pirate.dance'],
-  gameday: ['gameday.bandfield', 'gameday.dogs'],
-  lantern: ['lantern.free', 'lantern.drum'],
-  powder: ['powder.lake', 'powder.contest'],
-};
-const HOURS_AUTHORED = { maple: 3, pirate: 3, gameday: 3, lantern: 1, powder: 3 };
+// THE AUTHORED TRUTH IS READ, NOT KEPT HERE. Both of these were hand-copied
+// tables — the shipped middle pair per world, and how many hours each world
+// authors — and both were frozen at five worlds. SKYLARK FIELD shipped as
+// world 6 into a probe that had no baseline to compare it against and no hour
+// count to expect, so the checks below simply had nothing to say about it.
+// window.__authored() reads HOURS and MID_POOL, which are what the game itself
+// deals from, so the next world is covered the day it lands.
+const BASELINE = {};
+const HOURS_AUTHORED = {};
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
@@ -67,8 +67,20 @@ for (const world of WORLDS) {
       window.__scene.traverse((o) => {
         if (o.isDirectionalLight && o.intensity > sunI) { sunI = o.intensity; sunHex = o.color.getHexString(); }
       });
-      return { deal: window.__deal, beats: bs, sunI: +sunI.toFixed(3), sunHex };
+      return { deal: window.__deal, beats: bs, sunI: +sunI.toFixed(3), sunHex,
+        authored: window.__authored?.() ?? null };
     });
+    // the authored truth, off the world that is actually loaded — see the note
+    // where BASELINE and HOURS_AUTHORED used to be hand-typed
+    if (k === 0) {
+      if (!snap.authored || !Number.isFinite(snap.authored.hours) || snap.authored.mid.some((m) => !m)) {
+        console.log(`\nFAIL — vary: ${world} did not report its authored variety (window.__authored missing or incomplete); nothing below can be judged against it`);
+        await p.close(); await b.close(); process.exit(1);
+      }
+      BASELINE[world] = snap.authored.mid;
+      HOURS_AUTHORED[world] = snap.authored.hours;
+      console.log(`  ${world}: authored ${snap.authored.hours} hour(s), baseline mids [${snap.authored.mid.join(', ')}]`);
+    }
     hands.push(snap);
     await p.close();
   }

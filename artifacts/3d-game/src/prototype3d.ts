@@ -1969,7 +1969,7 @@ const _dbg = new Proxy(_dbgStore, {
   __firstBite: unknown;
   __openAudio: { k: string; t: number }[];
   __fadeStats: () => Record<string, number>;
-  __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void; __settle: () => { inside: number; through: number; doorstep: number; feet: number; ms: number }; __settleAgain: () => string[];
+  __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void; __settle: () => { inside: number; through: number; doorstep: number; feet: number; ms: number }; __settleAgain: () => string[]; __introLen: () => number; __authored: () => { hours: number; mid: (string | undefined)[] };
   __life: Life; __moverStats: (gate: number) => { near: number; total: number }; __crowdGate: number;
   __hatSheet: (ids: string[]) => Promise<unknown>;
   __voidSheet: (ids: string[]) => Promise<unknown>;
@@ -2083,6 +2083,22 @@ _dbg.__eatNearest = (rel: number) => {
 };
 _dbg.__fadeStats = () => fadeStats;   // QA: why a prop did or did not get its own material
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
+/** QA: the establishing shot's length for the world actually loaded. Read it,
+ *  never copy it — qa/firstframe.mjs kept its own {maple:2.2, …} table and
+ *  SKYLARK FIELD shipped without anyone adding the sixth entry, so the probe
+ *  timed world 6's title card against `undefined` and reported NaN. A second
+ *  copy of one number is a lie waiting for the next world to land. */
+_dbg.__introLen = () => COPY.introLen;
+/** QA: the authored variety of the world actually loaded — how many hours it
+ *  has, and the two middle beats match 0 must deal. qa/vary.mjs kept both as
+ *  hand-copied tables and both were frozen at five worlds, so world 6 had no
+ *  baseline and no hour count. Read from HOURS and MID_POOL, which are the
+ *  things the game itself deals from, so the next world is covered the day it
+ *  lands rather than the round after someone notices. */
+_dbg.__authored = () => ({
+  hours: HOURS[pickedWorld].length,
+  mid: [MID_POOL[pickedWorld][0]?.id, MID_POOL[pickedWorld][1]?.id],
+});
 _dbg.__settle = () => ({ ...settleStat });   // QA: what the footprint settle retired at the boot sweep, and its cost (qa/placement.mjs)
 /** QA: RUN THE SWEEP AGAIN AND SAY WHAT IT WOULD TAKE, without taking it.
  *  The pass must be idempotent — it has already seen every pair, and retiring
