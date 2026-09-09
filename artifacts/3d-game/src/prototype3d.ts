@@ -7293,7 +7293,20 @@ function validateWorld() {
     // a superyacht, two galleons, five speedboats and four jet skis in the bay;
     // without this exemption the off-island cull quietly deleted the entire
     // fleet a few seconds after the match started.
-    if (!insideIsland3(px, pz) && !ud.afloat) { cull.push(i); continue; }
+    // …AND IT ASKS ABOUT THE GROUND THE PROP STANDS ON, NOT ITS ORIGIN. This
+    // tested e.home, which is the prop's ORIGIN, while qa/placement.mjs judges
+    // `offisland` on where the prop MEETS THE GROUND. Maple's #5260 has its
+    // origin at (191.80,204.13) and its ground centre at (192.55,205.80) — 1.83
+    // units apart, which at a coastline is the difference between standing on
+    // sand and standing in the sea. It survived this cull and failed the audit,
+    // intermittently, because a scatter near the shore lands either side of the
+    // line run to run. The road test six lines below already had this right:
+    // "tested on the BOX (px + ox), placed so the BOX clears".
+    const gf = groundFootprint(e.mesh);
+    const gc = Math.cos(e.mesh.rotation.y), gs = Math.sin(e.mesh.rotation.y);
+    const gx = gf ? px + gf.cx * gc + gf.cz * gs : px;
+    const gz = gf ? pz - gf.cx * gs + gf.cz * gc : pz;
+    if (!insideIsland3(gx, gz) && !ud.afloat) { cull.push(i); continue; }
     if (ud.afloat) continue;   // moored: no road/coast correction applies
     // ONLY MAPLE FALLS HAS A ROAD GRID. This sweep nudges props off the road
     // centres, and it was written as "not pirate" — so Pirate Bay was fixed and
