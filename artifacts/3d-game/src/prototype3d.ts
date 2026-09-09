@@ -1969,7 +1969,7 @@ const _dbg = new Proxy(_dbgStore, {
   __firstBite: unknown;
   __openAudio: { k: string; t: number }[];
   __fadeStats: () => Record<string, number>;
-  __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void; __settle: () => { inside: number; through: number; doorstep: number; feet: number; ms: number };
+  __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void; __settle: () => { inside: number; through: number; doorstep: number; feet: number; ms: number }; __settleAgain: () => string[];
   __life: Life; __moverStats: (gate: number) => { near: number; total: number }; __crowdGate: number;
   __hatSheet: (ids: string[]) => Promise<unknown>;
   __voidSheet: (ids: string[]) => Promise<unknown>;
@@ -2084,6 +2084,22 @@ _dbg.__eatNearest = (rel: number) => {
 _dbg.__fadeStats = () => fadeStats;   // QA: why a prop did or did not get its own material
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
 _dbg.__settle = () => ({ ...settleStat });   // QA: what the footprint settle retired at the boot sweep, and its cost (qa/placement.mjs)
+/** QA: RUN THE SWEEP AGAIN AND SAY WHAT IT WOULD TAKE, without taking it.
+ *  The pass must be idempotent — it has already seen every pair, and retiring
+ *  props can only remove CONTAINERS, which un-buries things rather than burying
+ *  them. So anything a second run finds is proof the first run walked past that
+ *  exact pair, which is what qa/settle.mjs exists to catch. It calls the REAL
+ *  settleFootprints() rather than a copy: qa/placement.mjs already carries one
+ *  replica of this geometry and a second drifting out of sync would report
+ *  faults the game does not have. settleFootprints() returns indices and
+ *  applies nothing, so this is read-only apart from settleStat, which is why
+ *  the probe reads __settle() BEFORE calling this. */
+_dbg.__settleAgain = () => settleFootprints().map((i) => {
+  const e = edibles[i]; if (!e) return `#${i} (gone)`;
+  const m = e.mesh;
+  return `#${i} r=${e.radius} at (${m.position.x.toFixed(1)},${m.position.z.toFixed(1)})`
+    + `${m.userData.authored ? ' AUTHORED' : ''}${m.userData.building ? ' bldg' : ''}`;
+});
 
 _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the live templates)
 // QA: what the MUSIC ENGINE is actually doing. qa/music.mjs judged a world by

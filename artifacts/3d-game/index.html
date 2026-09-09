@@ -1044,11 +1044,26 @@
          reason to repaint one. paint-order is what keeps the stroke outside the
          letterform instead of eating it; without it a 3px stroke closes up the
          counters and the word turns to mud. */
+      /* …AND THE HALO HAS TO REACH FURTHER THAN THE STROKE. SKYLARK FIELD
+         arrived after this treatment was tuned and broke it: its subtitle
+         measured 4.24:1 against a bar of 4.5:1, with the bare backdrop under it
+         at 1.74:1 and only 4% of that clearing — qa/pickerfit.mjs's own words
+         were "the art behind is bright AND the type has nothing to sit on".
+         Two things were wrong and neither was the stroke's WIDTH. The stroke
+         was 0.92 opaque, so on a bright poster the art shows through the very
+         ring the ratio is measured against; it is now solid. And the glow
+         stopped at 8px, which is a rim rather than something to sit on; a
+         fourth, wider pass carries the dark outward so the glyph is measured
+         against dark whatever the poster does behind it.
+         Thickening the stroke instead was the wrong lever: at 12px type a 3px
+         stroke closes the counters even with paint-order, and it would have
+         cost every card legibility to fix one. */
       #worlds .wCard b, #worlds .wCard span, #worlds .wCard .wBest {
         paint-order: stroke fill;
-        -webkit-text-stroke: 2.5px rgba(9,5,22,0.92);
-        text-shadow: 0 0 2px rgba(9,5,22,1), 0 0 4px rgba(9,5,22,0.95),
-          0 0 8px rgba(9,5,22,0.8), 0 2px 10px rgba(0,0,0,0.9); }
+        -webkit-text-stroke: 2.5px rgba(9,5,22,1);
+        text-shadow: 0 0 2px rgba(9,5,22,1), 0 0 4px rgba(9,5,22,1),
+          0 0 8px rgba(9,5,22,0.95), 0 0 15px rgba(9,5,22,0.85),
+          0 2px 10px rgba(0,0,0,0.95); }
       #worlds .wCard b { font-size: clamp(15px, 4.1vw, 20px); letter-spacing: 0.4px; font-weight: 700;
         line-height: 1.1; }
       /* TWO LINES ARE ALWAYS RESERVED, even though every subtitle currently
@@ -1069,8 +1084,12 @@
          dark stroke, because the ratio being measured is glyph against halo.
          A paler tagline widens that gap on every poster at once instead of
          trading Powder Pass against Lantern Night. */
+      /* and the fill goes to pure white for the same reason the note above
+         gives — the ratio is glyph against halo, so lifting the glyph widens
+         it on every poster at once instead of trading one world against
+         another. #f4efff was already close; the last step is free. */
       #worlds .wCard span { font-size: 12px; opacity: 1; letter-spacing: 1.4px;
-        min-height: 2.5em; color: #f4efff; }
+        min-height: 2.5em; color: #fff; }
       /* YOUR BEST, on the card. It existed only on the results overlay — a
          screen you leave and never see again — so the picker gave a returning
          child nothing to beat. */
