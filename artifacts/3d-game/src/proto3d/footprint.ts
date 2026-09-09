@@ -23,13 +23,28 @@
 //   - the rectangle's centre is generally OFFSET from the mesh origin, because
 //     a prop is not always modelled around its own middle.
 //
-// WHERE IT DIFFERS, stated because it matters. The audit walks every vertex.
-// Doing that for five thousand props at world build would cost seconds, so
-// this walks each child mesh's bounding box instead — cached on the geometry,
-// which the props share heavily. For a child whose box straddles GROUND_H the
-// box is wider than the true slice, so this can over-report. qa/footprint.mjs
-// measures that difference against the audit's own numbers rather than leaving
-// it as an assumption.
+// A VERTEX WALK, PAID ONCE PER PART. The first cut of this walked each child's
+// BOUNDING BOX instead, which is far cheaper, and qa/footprint.mjs measured it
+// against the audit and rejected it: a pine came out 2.11 x 2.11 against a true
+// 0.32 x 0.37, because the canopy's box dips below the ground line and so the
+// whole canopy was handed to the footprint. A pine reserving forty times the
+// ground it stands on would empty out the forest, which is the exact failure
+// this change exists to prevent. Lantern had 10.5% of its props over by half a
+// unit or more.
+//
+// So it walks vertices, like the audit — but a prop's PARTS are shared. Every
+// pine in the world is the same geometry at the same local transform inside the
+// prop, so the slice below the ground line is the same rectangle every time.
+// That result is cached per (geometry, transform-within-the-prop) and the walk
+// is paid once per distinct part instead of once per prop: on Powder, hundreds
+// of pines cost one walk between them.
+//
+// THE ONE ASSUMPTION, and it is checked rather than trusted. The audit filters
+// on WORLD height; this filters on height within the prop. Those agree while a
+// prop sits on the ground and is turned only about Y, which is how place() sets
+// every prop down. If that ever stops being true qa/footprint.mjs will say so,
+// because it compares against the audit's own world-space numbers.
+
 import * as THREE from 'three';
 
 /** Half-extents and centre offset in the prop's local frame, in 3D units. */
@@ -39,38 +54,60 @@ export interface Foot { hx: number; hz: number; cx: number; cz: number }
  *  qa/placement.mjs calls the same number GROUND_H and uses it the same way. */
 export const GROUND_H = 1.0;
 
-const _box = new THREE.Box3();
 const _v = new THREE.Vector3();
 const _m = new THREE.Matrix4();
+
+/** Local x/z bounds of one part's below-the-line slice, in the prop's frame. */
+interface Slice { x0: number; x1: number; z0: number; z1: number; any: boolean }
+const SLICES = new Map<string, Slice>();
+
+/** A part is the same part in every copy of a prop when it is the same geometry
+ *  at the same transform inside the prop. Six decimals is finer than any
+ *  placement decision and coarse enough that float noise does not miss. */
+const partKey = (g: THREE.BufferGeometry, m: THREE.Matrix4, h: number): string => {
+  let k = g.uuid + '|' + h;
+  for (let i = 0; i < 16; i++) k += ',' + m.elements[i].toFixed(6);
+  return k;
+};
+
+/** Clear the cache. A world build may rebuild geometry, and a stale slice would
+ *  be a prop reserving another prop's ground. */
+export function resetFootprints(): void { SLICES.clear(); }
 
 /** The ground rectangle of a prop, in its own local frame. Returns null for a
  *  prop with nothing at ground level at all — a hanging lantern, a banner on a
  *  wire — which reserves no ground and should not be given a rectangle. */
 export function groundFootprint(root: THREE.Object3D, groundH = GROUND_H): Foot | null {
   root.updateWorldMatrix(false, true);
-  _m.copy(root.matrixWorld).invert();
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
   let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh || !mesh.geometry) return;
-    const g = mesh.geometry;
-    if (!g.boundingBox) g.computeBoundingBox();
-    const bb = g.boundingBox;
-    if (!bb) return;
-    // The child's eight corners, walked into the ROOT's local frame. A child
-    // may be rotated inside the prop, so its own box is not axis-aligned there.
-    _box.makeEmpty();
-    for (let i = 0; i < 8; i++) {
-      _v.set(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z);
-      _v.applyMatrix4(mesh.matrixWorld).applyMatrix4(_m);
-      _box.expandByPoint(_v);
+    const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+    if (!pos) return;
+    // the part's transform WITHIN the prop — the same for every copy of it
+    _m.multiplyMatrices(inv, mesh.matrixWorld);
+    const key = partKey(mesh.geometry, _m, groundH);
+    let s = SLICES.get(key);
+    if (!s) {
+      s = { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity, any: false };
+      for (let i = 0; i < pos.count; i++) {
+        _v.fromBufferAttribute(pos, i).applyMatrix4(_m);
+        if (_v.y > groundH) continue;
+        s.any = true;
+        if (_v.x < s.x0) s.x0 = _v.x;
+        if (_v.x > s.x1) s.x1 = _v.x;
+        if (_v.z < s.z0) s.z0 = _v.z;
+        if (_v.z > s.z1) s.z1 = _v.z;
+      }
+      SLICES.set(key, s);
     }
-    // Nothing at ground level: this child is a canopy, a roof, a hanging sign.
-    if (_box.min.y > groundH) return;
-    if (_box.min.x < x0) x0 = _box.min.x;
-    if (_box.max.x > x1) x1 = _box.max.x;
-    if (_box.min.z < z0) z0 = _box.min.z;
-    if (_box.max.z > z1) z1 = _box.max.z;
+    if (!s.any) return;
+    if (s.x0 < x0) x0 = s.x0;
+    if (s.x1 > x1) x1 = s.x1;
+    if (s.z0 < z0) z0 = s.z0;
+    if (s.z1 > z1) z1 = s.z1;
   });
   if (x0 === Infinity) return null;
   return { hx: (x1 - x0) / 2, hz: (z1 - z0) / 2, cx: (x0 + x1) / 2, cz: (z0 + z1) / 2 };

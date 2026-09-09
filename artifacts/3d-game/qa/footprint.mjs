@@ -10,9 +10,11 @@
 // shape change rests on the two agreeing. So this measures them against each
 // other on every prop in the game rather than assuming.
 //
-// THE BAR. The box walk can only ever be as wide as the vertex walk or wider,
-// because a child straddling GROUND_H contributes its whole box instead of the
-// slice below the line. So:
+// THE BAR. The two walks differ only in WHERE they measure height — the audit
+// in world space, the game within the prop — so they should agree exactly for
+// any prop standing on the ground and turned only about Y, which is how
+// place() sets every prop down. A disagreement means a prop that is tilted or
+// lifted, and the game would be reserving the wrong rectangle for it.
 //   F1  no prop's rectangle is SMALLER than the audit's on either axis by more
 //       than 1mm — that would mean the game reserves less ground than the prop
 //       occupies, which is the bug this is meant to remove.
@@ -66,14 +68,18 @@ for (const wid of WORLDS) {
           if (v.x < ax0) ax0 = v.x; if (v.x > ax1) ax1 = v.x;
           if (v.z < az0) az0 = v.z; if (v.z > az1) az1 = v.z;
         }
-        if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
-        const bb = o.geometry.boundingBox; if (!bb) return;
+        // ── the GAME's way (src/proto3d/footprint.ts): the same vertex walk,
+        //    but filtered on height WITHIN THE PROP rather than in the world,
+        //    which is what lets the result be cached per part. Identical while
+        //    a prop sits on the ground turned only about Y — and that is the
+        //    assumption this probe exists to check.
         let bx0 = Infinity, bx1 = -Infinity, by0 = Infinity, bz0 = Infinity, bz1 = -Infinity;
-        for (let i = 0; i < 8; i++) {
-          v.set(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z);
+        if (pos) for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i);
           o.localToWorld(v); m.worldToLocal(v);
+          if (v.y > GH) continue;
+          by0 = 0;
           if (v.x < bx0) bx0 = v.x; if (v.x > bx1) bx1 = v.x;
-          if (v.y < by0) by0 = v.y;
           if (v.z < bz0) bz0 = v.z; if (v.z > bz1) bz1 = v.z;
         }
         if (by0 > GH) return;
