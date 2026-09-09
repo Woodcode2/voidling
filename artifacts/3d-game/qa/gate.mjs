@@ -309,8 +309,15 @@ const SUITE = [
   // stream re-proposes ground it has already claimed, so the scatter gives up
   // short — skylark's launchfield asked for 620 props and placed 133, and every
   // screenshot of that world still looked fine.
+  // SEED IS PINNED HERE FOR THE REASON IT IS PINNED ON `placement` DIRECTLY
+  // ABOVE, and it was not, which is my own miss: this step went into push
+  // without it while its three siblings had it. An unpinned bar is a lottery —
+  // it came up red on `pirate/beach 0/6` on one roll and green on the next, and
+  // neither run could be argued with. Pinning does NOT make the level robust,
+  // because a child's device runs unseeded; it makes a failure reproducible so
+  // the level can be fixed. The beach ordering fix in island.ts is that fix.
   { id: 'rng', tier: 'quality', profiles: ['push', 'live', 'quality'], timeout: 1800,
-    cmd: ['node', 'qa/rng.mjs', 'all', PORT], verdict: exitCode,
+    cmd: ['node', 'qa/rng.mjs', 'all', PORT], env: { SEED: '7' }, verdict: exitCode,
     why: 'every prop the level design authored is actually on the island — asked against placed, per district, read off the live page' },
 
   // THE BOOT SWEEP MUST BE IDEMPOTENT. settleFootprints() runs once and retires

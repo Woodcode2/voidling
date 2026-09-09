@@ -7811,11 +7811,30 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // ran the sweep was already dressed with sixty umbrellas, forty-four chairs
     // and twenty-eight sandcastles. It is the same fault as Lantern's market
     // sheds and Game Day's Frat Row, on the third world.
-    for (const p2 of spread('beach', 18, 50, 2.6)) dropGlb('palm', p2, 2.6, rand(6.5, 9), makePalm, rand(0, Math.PI * 2));
+    // …AND THE SCARCEST ASK WITH THE WIDEST CLEARANCE GOES FIRST OF ALL. The
+    // note above moved the palms ahead of the umbrellas and stopped one line
+    // short: the LIFEGUARD TOWERS ask for six and need 90 of clearance against
+    // the palms' 50, so running them second left them fighting thirty-six palms
+    // for the widest gaps on the strip. Measured at SEED=7 they landed 4 of 6
+    // off 5,139 tries — 66% of the rejections `occupied`, not off-polygon — and
+    // unseeded, which is what a CHILD's device runs, qa/rng.mjs caught the pass
+    // placing ZERO. Six towers are the beach's landmarks; sixty umbrellas are
+    // its filler, and filler must never get first refusal on the ground.
     for (const p2 of spread('beach', 3, 90, 2.6)) drop(makeLifeguardFB(), p2, 2.6, rand(0, Math.PI * 2));
-    for (const p2 of spread('beach', 30, 36, 1.8)) dropGlb('umbrella', p2, 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
+    for (const p2 of spread('beach', 18, 50, 2.6)) dropGlb('palm', p2, 2.6, rand(6.5, 9), makePalm, rand(0, Math.PI * 2));
+    // ASK FOR THE SAND THERE IS. The strip was authored for 241 props and holds
+    // about 190: at BAY_DENSITY 2.0 the umbrellas asked 60 and landed 33-40,
+    // the sandcastles asked 28 and landed 9, and 71% of every rejection was
+    // `occupied` rather than off-polygon — the beach is full, not badly
+    // generated. An over-ask is not free. It costs ~5,000 wasted samples a run,
+    // it drags the district under qa/rng.mjs's 80% floor on roughly one boot in
+    // three (measured unseeded, which is what a child's device runs), and it
+    // leaves the authored count lying about what is on the island.
+    // NOTHING A PLAYER SEES CHANGES: ~33 umbrellas and ~9 castles are what get
+    // placed either way. Only the number we claim to have placed changes.
+    for (const p2 of spread('beach', 20, 36, 1.8)) dropGlb('umbrella', p2, 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
     for (const p2 of spread('beach', 22, 34, 1.4)) drop(makeBeachChairFB(), p2, 1.4, rand(0, Math.PI * 2));
-    for (const p2 of spread('beach', 14, 36, 1.2)) drop(makeSandcastleFB(), p2, 1.2);
+    for (const p2 of spread('beach', 5, 36, 1.2)) drop(makeSandcastleFB(), p2, 1.2);
     for (const p2 of spread('beach', 20, 22, 0.5)) drop(makeShell(), p2, 0.5, rand(0, Math.PI * 2));
     // the beach had NOTHING over 3 units tall — a dusting of confetti on cream
     // ground. A centre, an edge, and a straight row of MATCHED parasols
