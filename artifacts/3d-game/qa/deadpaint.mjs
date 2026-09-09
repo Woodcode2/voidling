@@ -107,4 +107,15 @@ if (!rows.length) console.log('  every colour is read by something.');
 for (const [t, fs] of Object.entries(dynamic))
   console.log(`\n  ${t} is indexed dynamically by: ${fs.join(', ')}`);
 console.log(`\n${total - dead}/${total} read`);
+// SAY THE VERDICT OUT LOUD. qa/gate.mjs reads this step with `pf`, which looks
+// for a line starting PASS — or FAIL — and treats silence as failure, on the
+// reasoning that a probe printing neither did not reach its own conclusion.
+// This one exited 0 and said "every colour is read by something", which is a
+// sentence and not a verdict, so the gate had been calling it FAIL — correctly
+// — for as long as the two disagreed. Nobody saw it because nobody had run the
+// whole push profile; the same silence hid qa/pickerfit.mjs failing on a world
+// card a child cannot read. The gate is right and this line is the fix.
+console.log(dead
+  ? `FAIL — ${dead} colour(s) in ${PALETTE} are read by nothing; an entry nothing paints is a comment that lies to whoever edits it next`
+  : `PASS — every one of the ${total} colours is read by something that paints`);
 process.exit(dead ? 1 : 0);

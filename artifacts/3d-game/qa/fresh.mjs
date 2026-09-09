@@ -119,6 +119,14 @@ for (const r of rows) {
 if (worstBias > Math.max(0.05, uniBias * 3)) fails.push(
   `distribution skew ${(worstBias * 100).toFixed(1)}% vs ${(uniBias * 100).toFixed(1)}% sampling noise — the guard has favourites`);
 
-console.log('\n  ' + (fails.length ? 'FAIL\n    ' + fails.join('\n    ') : 'PASS — guard beats uniform at every shipped pool size, and stays flat'));
+// The em-dash is the contract, not decoration: qa/gate.mjs reads this step with
+// `pf`, which matches /^\s*FAIL\s*[—-]/ and calls anything else "no verdict
+// printed". A bare `FAIL` on its own line still failed the gate — silence is
+// failure there — but it failed it as "the probe did not reach its own
+// conclusion", so whoever read the report was told the probe broke rather than
+// which pool size the guard lost at.
+console.log('\n  ' + (fails.length
+  ? `FAIL — ${fails.length} freshness check(s) lost to uniform\n    ` + fails.join('\n    ')
+  : 'PASS — guard beats uniform at every shipped pool size, and stays flat'));
 console.log();
 await b.close();
