@@ -7067,6 +7067,14 @@ function settleFootprints(): number[] {
   // slice the same way, so the sweep and the auditor now ask one question.
   interface Foot { i: number; px: number; pz: number; c: number; s: number; lx0: number; lx1: number; lz0: number; lz1: number; cx: number; cz: number; rOut: number; solid: boolean;
     gx: number; gz: number; ghx: number; ghz: number; gcx: number; gcz: number; gArea: number; ground: boolean; container: boolean; }
+  // QA-ONLY TRACE. Set window.__settleTrace = {x, z, log: []} before the first
+  // validateWorld() and this records every container the prop at (x,z) was
+  // offered during the BOOT pass, and why each was turned down. It exists
+  // because the sweep is not idempotent on Pirate and three plausible readings
+  // of the code were all wrong; the loop has to say what it did rather than be
+  // reasoned about. Costs one undefined check per pair when unset.
+  const TRACE = (window as unknown as { __settleTrace?: { x: number; z: number; log: string[] } }).__settleTrace;
+  const traced = (f: Foot) => TRACE && Math.hypot(f.cx - TRACE.x, f.cz - TRACE.z) < 0.5;
   const t0 = performance.now();
   const feet: Foot[] = [];
   const box = new THREE.Box3();
@@ -7115,6 +7123,16 @@ function settleFootprints(): number[] {
       for (let iz = Math.floor((f.cz - f.rOut) / CELL); iz <= Math.floor((f.cz + f.rOut) / CELL); iz++) fn(key(ix, iz));
   };
   for (const f of feet) if (f.solid || f.container) cells(f, (k) => { const b = grid.get(k); if (b) b.push(f); else grid.set(k, [f]); });
+  // QA: which feet exist near the traced point at all, and which reached the grid
+  if (TRACE) {
+    TRACE.log.push(`feet=${feet.length} of ${edibles.length} edibles`);
+    for (const f of feet) if (Math.hypot(f.px - TRACE.x, f.pz - TRACE.z) < 6)
+      TRACE.log.push(`  foot #${f.i} r=${edibles[f.i]?.radius} at (${f.px.toFixed(1)},${f.pz.toFixed(1)}) solid=${f.solid} container=${f.container} inGrid=${f.solid || f.container}`);
+    for (let i = 0; i < edibles.length; i++) { const m = edibles[i].mesh;
+      if (m && Math.hypot(m.position.x - TRACE.x, m.position.z - TRACE.z) < 6 && !feet.some((f) => f.i === i))
+        TRACE.log.push(`  NOT IN FEET #${i} r=${edibles[i].radius} at (${m.position.x.toFixed(1)},${m.position.z.toFixed(1)}) mover=${!!m.userData.mover} afloat=${!!m.userData.afloat}`);
+    }
+  }
   // world point -> inside q's own-frame footprint, shrunk by m
   const inRect = (q: Foot, x: number, z: number, m: number): boolean => {
     const dx = x - q.px, dz = z - q.pz, lx = dx * q.c - dz * q.s, lz = dx * q.s + dz * q.c;
@@ -7177,11 +7195,22 @@ function settleFootprints(): number[] {
     cells(f, (k) => {
       if (dead.has(f.i)) return;
       for (const q of grid.get(k) || []) {
-        if (q === f || seen.has(q) || dead.has(q.i)) continue; seen.add(q);
+        const T = traced(f) ? TRACE!.log : null;
+        if (q === f || seen.has(q) || dead.has(q.i)) {
+          if (T && q !== f) T.push(`skip #${q.i} r=${edibles[q.i]?.radius} at (${q.px.toFixed(1)},${q.pz.toFixed(1)}) — ${seen.has(q) ? 'already seen' : 'container is condemned'}`);
+          continue;
+        }
+        seen.add(q);
         // the cull has to clear BOTH shapes, or an asymmetric prop whose ground
         // slice sits far from its bounding-box centre is skipped before it is asked about
         const far = q.rOut + f.rOut;
-        if (Math.hypot(q.cx - f.cx, q.cz - f.cz) > far && Math.hypot(q.gcx - f.gcx, q.gcz - f.gcz) > far) continue;
+        if (Math.hypot(q.cx - f.cx, q.cz - f.cz) > far && Math.hypot(q.gcx - f.gcx, q.gcz - f.gcz) > far) {
+          if (T) T.push(`skip #${q.i} r=${edibles[q.i]?.radius} at (${q.px.toFixed(1)},${q.pz.toFixed(1)}) — distance ${Math.hypot(q.gcx - f.gcx, q.gcz - f.gcz).toFixed(2)} > far ${far.toFixed(2)}`);
+          continue;
+        }
+        if (T) T.push(`ASK #${q.i} r=${edibles[q.i]?.radius} at (${q.px.toFixed(1)},${q.pz.toFixed(1)})`
+          + ` container=${q.container} ground=${f.ground} area ${q.gArea.toFixed(2)} vs 3x${f.gArea.toFixed(2)}`
+          + ` inGround=${inGround(q, f.gcx, f.gcz, -0.15)}`);
         // ── BURIED, ASKED TWICE ───────────────────────────────────────────
         // Both questions are "has this prop vanished into that one", and each
         // sees a burial the other cannot. Neither is a superset, which is why
@@ -7342,24 +7371,20 @@ function validateWorld() {
   // …and, once, everything standing inside something else (settleFootprints
   // above). Indices are into the same un-spliced list; the retire loop below
   // walks them from the top so each splice leaves the lower ones valid.
-  if (!_validated) {
-    for (const i of settleFootprints()) if (!cull.includes(i)) cull.push(i);
-    cull.sort((a, b) => a - b);
-  }
-  // retire the unfixable entirely — out of the scene AND the mass ledger, so
-  // %devoured stays honest
-  for (let k = cull.length - 1; k >= 0; k--) {
-    const e = edibles[cull[k]];
-    // This sweep re-runs 8 and 22 seconds INTO the match, and a bare remove()
-    // meant a prop at full scale, in plain view, blinked out of the world
-    // mid-play — an instrumented run caught a 5.6-unit ferris wheel doing
-    // exactly that at t=258s. If the player can see it go, it has to go the
-    // way everything else goes.
-    if (started && e.mesh.visible) { spawnPuff(e.mesh.position.x, 0.6, e.mesh.position.z, 5); }
-    setShadowInstance((e.mesh.userData.shIdx as number) ?? -1, false);   // and its shadow
-    scene.remove(e.mesh);
-    edibles.splice(cull[k], 1);
-  }
+  // ── THE CORRIDOR IS CLEARED BEFORE THE BURIAL SWEEP, NOT AFTER ───────────
+  // This block used to run BELOW the retire loop, which meant it pushed props
+  // sideways AFTER settleFootprints() had already decided what was buried — and
+  // it checks only that the destination is on land and out of deep water, never
+  // that anything is standing there. So it could shove a building on top of a
+  // prop and nothing would ever look again.
+  //
+  // That is exactly what happened on Pirate Bay, and it is why the sweep was
+  // not idempotent: the tower measured at (55.0,234.0) when the sweep ran and
+  // sat at (57.5,231.5) once the corridor pass had moved it 3.5 units — onto a
+  // shell at (57.5,230.5). qa/settle.mjs reported that shell on every run
+  // because a SECOND pass sees the tower where it actually ended up. Three
+  // readings of this code guessed wrong before a trace said which container the
+  // shell had been offered: at boot, not that one, because it was not yet there.
   // ── AND NOTHING MAY STAND IN FRONT OF THE HERO AT SPAWN ───────────────────
   // The opening is hand-authored and identical every load, so whatever sits in
   // the first frame sits there forever, for every player, in the screenshot the
@@ -7412,6 +7437,25 @@ function validateWorld() {
         }
       }
     }
+  }
+
+  if (!_validated) {
+    for (const i of settleFootprints()) if (!cull.includes(i)) cull.push(i);
+    cull.sort((a, b) => a - b);
+  }
+  // retire the unfixable entirely — out of the scene AND the mass ledger, so
+  // %devoured stays honest
+  for (let k = cull.length - 1; k >= 0; k--) {
+    const e = edibles[cull[k]];
+    // This sweep re-runs 8 and 22 seconds INTO the match, and a bare remove()
+    // meant a prop at full scale, in plain view, blinked out of the world
+    // mid-play — an instrumented run caught a 5.6-unit ferris wheel doing
+    // exactly that at t=258s. If the player can see it go, it has to go the
+    // way everything else goes.
+    if (started && e.mesh.visible) { spawnPuff(e.mesh.position.x, 0.6, e.mesh.position.z, 5); }
+    setShadowInstance((e.mesh.userData.shIdx as number) ?? -1, false);   // and its shadow
+    scene.remove(e.mesh);
+    edibles.splice(cull[k], 1);
   }
   if ((moved || cull.length || cleared) && !_validated) console.info(`[world] placement sweep: ${moved} nudged off roads, ${cull.length} retired (${settleStat.inside} inside a solid, ${settleStat.through} through another, ${settleStat.doorstep} on a doorstep; settle ${settleStat.ms}ms over ${settleStat.feet} footprints), ${cleared} cleared from the spawn shot`);
   _validated = true;

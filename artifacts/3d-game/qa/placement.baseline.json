@@ -29,7 +29,7 @@
     "Lower a number whenever you fix something. Never raise one without the owner."
   ],
   "maple":   { "water": 1, "inside": 7, "overlap": 119, "bench": 4 },
-  "pirate":  { "road": 15, "offisland": 8, "inside": 1, "overlap": 62, "roadend": 1 },
+  "pirate":  { "road": 15, "offisland": 8, "inside": 0, "overlap": 62, "roadend": 1 },
   "gameday": { "offisland": 2, "inside": 1, "overlap": 163 },
   "lantern": { "water": 3, "offisland": 3, "overlap": 13 },
   "powder":  { "road": 1, "offisland": 1, "overlap": 29 }

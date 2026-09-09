@@ -327,14 +327,15 @@ const SUITE = [
   // things rather than burying them. Anything a second pass finds is proof the
   // first walked past that exact pair.
   //
-  // NOT IN PUSH, AND SAYING WHY RATHER THAN QUIETLY PARKING IT. It fails today,
-  // on one prop: Pirate's shell #3460 at (57.5,230.5), inside a tower. Five of
-  // six worlds are clean. Putting it in push would hold every release on that
-  // one shell; giving it a frozen ceiling on the day it was written would be
-  // raising a number to fit a known defect, which qa/placement.baseline.json is
-  // explicit is the owner's call and not mine. So it reports here, loudly, and
-  // moving it into push is a decision to take once the shell is gone.
-  { id: 'settle', tier: 'quality', profiles: ['live', 'quality'], timeout: 1200,
+  // IN PUSH NOW, BECAUSE THE SHELL IS GONE. This was registered reporting-only
+  // while it failed on one prop — Pirate's shell at (57.5,230.5), inside a
+  // tower — rather than given a ceiling to fit the defect. The cause turned out
+  // to be an ORDERING bug worth the trouble of finding: the spawn-corridor pass
+  // shoved that tower 3.5 units sideways AFTER the burial sweep had run, and it
+  // checks only that the destination is on land, never that anything is
+  // standing there. Clearing the corridor before the sweep fixed it, and all
+  // six worlds now retire nothing on a second pass. It blocks from here.
+  { id: 'settle', tier: 'quality', profiles: ['push', 'live', 'quality'], timeout: 1200,
     cmd: ['node', 'qa/settle.mjs', 'all', PORT], env: { SEED: '7' }, verdict: exitCode,
     why: 'the sweep that retires buried props leaves nothing behind for a second pass to find — a prop standing inside a wall is not something a child should be able to meet' },
 
