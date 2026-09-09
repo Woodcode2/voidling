@@ -28,6 +28,7 @@ import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid, makeVoidBody, applySkinToBody, type Mood } from './proto3d/void3d';
 import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, onIce3, setWorld, setMeshFade, fadeStats, installPropShader, part, mergedProp, type WorldId } from './proto3d/island';
+import { groundFootprint } from './proto3d/footprint';
 import { createLife, pickFresh, type Life } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { HATS, HAT_BY_ID, hatLine, HAT_MAX_W, applyHatLod, type Hat } from './proto3d/hats';
@@ -7040,7 +7041,16 @@ const DOORSTEP = 1.6;   // qa/placement.mjs DOOR_CLEAR: a person needs this much
 /** what the last settle pass did, for the auditor (_dbg.__settle): counts by reason and its own clock */
 const settleStat = { inside: 0, through: 0, doorstep: 0, feet: 0, ms: 0 };
 function settleFootprints(): number[] {
-  interface Foot { i: number; px: number; pz: number; c: number; s: number; lx0: number; lx1: number; lz0: number; lz1: number; cx: number; cz: number; rOut: number; solid: boolean; }
+  // TWO RECTANGLES, AND THEY ANSWER DIFFERENT QUESTIONS. lx0..lz1 is the FULL
+  // bounding box — canopy, eaves, crane jib and all — which is the right shape
+  // for "do these two masses pass through each other". gx/gz/ghx/ghz is the
+  // GROUND SLICE, the geometry at or below GROUND_H, which is the right shape
+  // for "has this prop vanished into that one": what a player sees standing in
+  // a wall is where the prop MEETS THE GROUND, not where its parasol reaches.
+  // proto3d/footprint.ts computes it and qa/placement.mjs measures the same
+  // slice the same way, so the sweep and the auditor now ask one question.
+  interface Foot { i: number; px: number; pz: number; c: number; s: number; lx0: number; lx1: number; lz0: number; lz1: number; cx: number; cz: number; rOut: number; solid: boolean;
+    gx: number; gz: number; ghx: number; ghz: number; gcx: number; gcz: number; gArea: number; ground: boolean; container: boolean; }
   const t0 = performance.now();
   const feet: Foot[] = [];
   const box = new THREE.Box3();
@@ -7063,9 +7073,24 @@ function settleFootprints(): number[] {
     const c = Math.cos(ry), s = Math.sin(ry);
     const mx = (lx0 + lx1) / 2, mz = (lz0 + lz1) / 2;
     const h = box.max.y - Math.min(0, box.min.y);
+    // cached per (geometry, transform-within-prop), so a thousand identical
+    // palms walk their vertices once between them
+    const g = groundFootprint(m);
     feet.push({ i, px, pz, c, s, lx0, lx1, lz0, lz1, cx: px + mx * c + mz * s, cz: pz - mx * s + mz * c,
       rOut: Math.hypot(lx1 - lx0, lz1 - lz0) / 2,
-      solid: e.radius >= 2 && !ud.spin && h >= 2 && Math.min(lx1 - lx0, lz1 - lz0) >= 2.4 });
+      solid: e.radius >= 2 && !ud.spin && h >= 2 && Math.min(lx1 - lx0, lz1 - lz0) >= 2.4,
+      gx: g ? g.cx : 0, gz: g ? g.cz : 0, ghx: g ? g.hx : 0, ghz: g ? g.hz : 0,
+      gcx: g ? px + g.cx * c + g.cz * s : px, gcz: g ? pz - g.cx * s + g.cz * c : pz,
+      gArea: g ? g.hx * g.hz : 0, ground: !!g,
+      // A CONTAINER IS WHAT THE AUDITOR CALLS ONE (qa/placement.mjs:389):
+      // building-class and 2.5 tall. `solid` cannot serve here — it excludes
+      // userData.spin, which is set on scaled rock stacks and tree clumps, and
+      // that exclusion is why two props standing inside a boulder pile on
+      // Pirate Bay survived every sweep. The spin flag was standing in for
+      // "its width is canopy, not mass", and measuring the ground slice
+      // answers that directly: a tree's slice is its trunk, so a canopy stops
+      // being a container without needing the proxy at all.
+      container: !!ud.building && h >= 2.5 && !!g });
   }
   const CELL = 12, grid = new Map<number, Foot[]>();
   const key = (ix: number, iz: number) => ix * 100003 + iz;
@@ -7073,11 +7098,18 @@ function settleFootprints(): number[] {
     for (let ix = Math.floor((f.cx - f.rOut) / CELL); ix <= Math.floor((f.cx + f.rOut) / CELL); ix++)
       for (let iz = Math.floor((f.cz - f.rOut) / CELL); iz <= Math.floor((f.cz + f.rOut) / CELL); iz++) fn(key(ix, iz));
   };
-  for (const f of feet) if (f.solid) cells(f, (k) => { const b = grid.get(k); if (b) b.push(f); else grid.set(k, [f]); });
+  for (const f of feet) if (f.solid || f.container) cells(f, (k) => { const b = grid.get(k); if (b) b.push(f); else grid.set(k, [f]); });
   // world point -> inside q's own-frame footprint, shrunk by m
   const inRect = (q: Foot, x: number, z: number, m: number): boolean => {
     const dx = x - q.px, dz = z - q.pz, lx = dx * q.c - dz * q.s, lz = dx * q.s + dz * q.c;
     return lx > q.lx0 + m && lx < q.lx1 - m && lz > q.lz0 + m && lz < q.lz1 - m;
+  };
+  // …and the same question against the GROUND slice, written the way
+  // qa/placement.mjs writes it so the two cannot drift apart: half-extents
+  // about the slice centre, `m` negative to shrink.
+  const inGround = (q: Foot, x: number, z: number, m: number): boolean => {
+    const dx = x - q.px, dz = z - q.pz, lx = dx * q.c - dz * q.s, lz = dx * q.s + dz * q.c;
+    return Math.abs(lx - q.gx) < q.ghx + m && Math.abs(lz - q.gz) < q.ghz + m;
   };
   const corners = (q: Foot): [number, number][] => {
     const W = (x: number, z: number): [number, number] => [q.px + x * q.c + z * q.s, q.pz - x * q.s + z * q.c];
@@ -7130,11 +7162,40 @@ function settleFootprints(): number[] {
       if (dead.has(f.i)) return;
       for (const q of grid.get(k) || []) {
         if (q === f || seen.has(q) || dead.has(q.i)) continue; seen.add(q);
-        if (Math.hypot(q.cx - f.cx, q.cz - f.cz) > q.rOut + f.rOut) continue;
-        if (inRect(q, f.cx, f.cz, 0.15) && (solidAt(q, f.cx, f.cz, 0.6) || solidAt(q, f.cx, f.cz, 1.4))) {
+        // the cull has to clear BOTH shapes, or an asymmetric prop whose ground
+        // slice sits far from its bounding-box centre is skipped before it is asked about
+        const far = q.rOut + f.rOut;
+        if (Math.hypot(q.cx - f.cx, q.cz - f.cz) > far && Math.hypot(q.gcx - f.gcx, q.gcz - f.gcz) > far) continue;
+        // ── BURIED, ASKED TWICE ───────────────────────────────────────────
+        // Both questions are "has this prop vanished into that one", and each
+        // sees a burial the other cannot. Neither is a superset, which is why
+        // this is a union and not a replacement: swapping the box test for the
+        // slice test alone was measured on all six worlds and let 30 props back
+        // into Maple that the box test had been retiring, taking `inside` there
+        // from 5 to 17.
+        //
+        //  BOX  — bounding-box centre inside the container's bounding box. The
+        //   long-standing test. Catches a prop whose MASS is in the building
+        //   even when its ground contact is not.
+        //  SLICE — ground contact against ground contact, the shape
+        //   proto3d/footprint.ts builds and qa/placement.mjs grades on. Catches
+        //   what the box misses at both ends: a parasol whose POLE is inside a
+        //   warehouse wall while its 4-unit canopy reaches out past the eaves,
+        //   and props standing inside a scaled boulder stack, which the box
+        //   test never even considered because `solid` excludes userData.spin.
+        //
+        // The ray at knee and chest height is the arbiter either way, so a prop
+        // merely resting against a wall is left alone by both.
+        if (q.solid && inRect(q, f.cx, f.cz, 0.15)
+            && (solidAt(q, f.cx, f.cz, 0.6) || solidAt(q, f.cx, f.cz, 1.4))) {
           dead.add(f.solid ? later(f, q) : f.i); settleStat.inside++; if (dead.has(f.i)) return; continue;
         }
-        if (f.solid && satDepth(f, q) > SOLID_LIP) { dead.add(later(f, q)); settleStat.through++; if (dead.has(f.i)) return; }
+        if (q.container && f.ground && q.gArea > 3 * f.gArea
+            && inGround(q, f.gcx, f.gcz, -0.15)
+            && (solidAt(q, f.gcx, f.gcz, 0.6) || solidAt(q, f.gcx, f.gcz, 1.4))) {
+          dead.add(f.solid ? later(f, q) : f.i); settleStat.inside++; if (dead.has(f.i)) return; continue;
+        }
+        if (f.solid && q.solid && satDepth(f, q) > SOLID_LIP) { dead.add(later(f, q)); settleStat.through++; if (dead.has(f.i)) return; }
       }
     });
   }
