@@ -10,11 +10,20 @@
 // shape change rests on the two agreeing. So this measures them against each
 // other on every prop in the game rather than assuming.
 //
-// THE BAR. The two walks differ only in WHERE they measure height — the audit
-// in world space, the game within the prop — so they should agree exactly for
-// any prop standing on the ground and turned only about Y, which is how
-// place() sets every prop down. A disagreement means a prop that is tilted or
-// lifted, and the game would be reserving the wrong rectangle for it.
+// IT CALLS THE REAL FUNCTION. The first version of this probe re-implemented
+// src/proto3d/footprint.ts inside the page and graded that against a
+// re-implementation of the audit — two of my own copies, agreeing with each
+// other and proving nothing. Worse, the copy of the AUDIT was wrong: it took
+// the prop's local frame via worldToLocal, which divides scale out, where
+// qa/placement.mjs:277 builds rotation-Y-plus-translation and keeps it. On
+// Powder, where props are scaled, that fake disagreement reported 3,011 props
+// as faulty when the module was correct.
+//
+// So: the game side calls window.__groundFootprint, which is the shipped
+// function. The audit side is a line-for-line replica of qa/placement.mjs's
+// own walk. Anything they disagree about is real.
+//
+// THE BAR is asymmetric on purpose.
 //   F1  no prop's rectangle is SMALLER than the audit's on either axis by more
 //       than 1mm — that would mean the game reserves less ground than the prop
 //       occupies, which is the bug this is meant to remove.
@@ -42,9 +51,9 @@ for (const wid of WORLDS) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.waitForTimeout(3000);
   const r = await p.evaluate((GH) => {
-    // THREE is not on window, so borrow a Vector3 constructor from a live
-    // object and use Object3D's own localToWorld / worldToLocal.
     const rows = [];
+    const foot = window.__groundFootprint;
+    if (!foot) return rows;
     const any = window.__edibles.find((e) => e.mesh);
     if (!any) return rows;
     const V = any.mesh.position.constructor;
@@ -52,49 +61,33 @@ for (const wid of WORLDS) {
     for (const e of window.__edibles) {
       const m = e.mesh; if (!m || m.userData.mover) continue;
       m.updateWorldMatrix(false, true);
+      // ── the AUDIT, line for line (qa/placement.mjs:277-297): a frame of
+      //    rotation-about-Y plus translation and nothing else, so vertices land
+      //    in WORLD units with scale baked in, filtered on true world height.
       const cy = Math.cos(m.rotation.y), sy = Math.sin(m.rotation.y);
-      // ── the AUDIT's way: every vertex, filtered on world y ──────────────
       let ax0 = Infinity, ax1 = -Infinity, az0 = Infinity, az1 = -Infinity, nv = 0;
-      // ── the GAME's way: each child's bounding box, in the prop's frame ───
-      let gx0 = Infinity, gx1 = -Infinity, gz0 = Infinity, gz1 = -Infinity;
       m.traverse((o) => {
         if (!o.isMesh || !o.geometry) return;
         const pos = o.geometry.attributes && o.geometry.attributes.position;
-        if (pos) for (let i = 0; i < pos.count; i++) {
+        if (!pos) return;
+        for (let i = 0; i < pos.count; i++) {
           v.fromBufferAttribute(pos, i);
           o.localToWorld(v);
           nv++;
           if (v.y > GH) continue;
-          m.worldToLocal(v);
-          if (v.x < ax0) ax0 = v.x; if (v.x > ax1) ax1 = v.x;
-          if (v.z < az0) az0 = v.z; if (v.z > az1) az1 = v.z;
-        }
-        // ── the GAME's way (src/proto3d/footprint.ts): the same vertex walk,
-        //    but filtered on height WITHIN THE PROP rather than in the world,
-        //    which is what lets the result be cached per part. Identical while
-        //    a prop sits on the ground turned only about Y — and that is the
-        //    assumption this probe exists to check.
-        let bx0 = Infinity, bx1 = -Infinity, by0 = Infinity, bz0 = Infinity, bz1 = -Infinity;
-        if (pos) for (let i = 0; i < pos.count; i++) {
-          v.fromBufferAttribute(pos, i);
-          o.localToWorld(v);
-          if (v.y > GH) continue;
-          by0 = 0;
-          // the game's frame: rotate-Y + translate, exactly as the audit builds
-          // it, so extents come out in world units with scale baked in
           const dx = v.x - m.position.x, dz = v.z - m.position.z;
           const lx = dx * cy - dz * sy, lz = dx * sy + dz * cy;
-          if (lx < bx0) bx0 = lx; if (lx > bx1) bx1 = lx;
-          if (lz < bz0) bz0 = lz; if (lz > bz1) bz1 = lz;
+          if (lx < ax0) ax0 = lx; if (lx > ax1) ax1 = lx;
+          if (lz < az0) az0 = lz; if (lz > az1) az1 = lz;
         }
-        if (by0 > GH) return;
-        if (bx0 < gx0) gx0 = bx0; if (bx1 > gx1) gx1 = bx1;
-        if (bz0 < gz0) gz0 = bz0; if (bz1 > gz1) gz1 = bz1;
       });
-      if (!nv || ax0 === Infinity || gx0 === Infinity) continue;
+      if (!nv) continue;
+      // ── the GAME: the shipped function, called for real
+      const f = foot(m);
+      if (ax0 === Infinity) { if (f) rows.push({ r: e.radius, qk: m.userData.qk || '', ahx: 0, ahz: 0, ghx: f.hx, ghz: f.hz }); continue; }
+      if (!f) { rows.push({ r: e.radius, qk: m.userData.qk || '', ahx: (ax1 - ax0) / 2, ahz: (az1 - az0) / 2, ghx: 0, ghz: 0 }); continue; }
       rows.push({ r: e.radius, qk: m.userData.qk || '',
-        ahx: (ax1 - ax0) / 2, ahz: (az1 - az0) / 2,
-        ghx: (gx1 - gx0) / 2, ghz: (gz1 - gz0) / 2 });
+        ahx: (ax1 - ax0) / 2, ahz: (az1 - az0) / 2, ghx: f.hx, ghz: f.hz });
     }
     return rows;
   }, GROUND_H);

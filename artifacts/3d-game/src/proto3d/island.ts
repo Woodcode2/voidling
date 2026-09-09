@@ -6,6 +6,7 @@
 // grid. Moving life is added separately (./life).
 import * as THREE from 'three';
 import * as RNG from './rng';
+import * as FP from './footprint';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { glossOf, registerGloss } from './gloss';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -1278,6 +1279,12 @@ const QUIET_LEDGER: number[][] = [];
       .__scatterAsks = () => RNG.ASKS;
     (window as unknown as { __rngStats: () => typeof RNG.RNG_STATS })
       .__rngStats = () => RNG.RNG_STATS;
+    // THE REAL FUNCTION, not a copy of it. qa/footprint.mjs grades the game's
+    // ground rectangle against the audit's, and it can only do that honestly if
+    // it calls what the game actually uses — an earlier version re-implemented
+    // it in the probe and graded one of my re-implementations against another.
+    (window as unknown as { __groundFootprint: (o: THREE.Object3D) => FP.Foot | null })
+      .__groundFootprint = (o: THREE.Object3D) => FP.groundFootprint(o);
 
     // ── baked ground texture ───────────────────────────────────────────────────
   const TEX = 3072;   // high-res bake so roads/crosswalks stay crisp up close
