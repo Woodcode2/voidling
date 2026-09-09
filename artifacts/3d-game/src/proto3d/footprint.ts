@@ -39,11 +39,20 @@
 // is paid once per distinct part instead of once per prop: on Powder, hundreds
 // of pines cost one walk between them.
 //
-// THE ONE ASSUMPTION, and it is checked rather than trusted. The audit filters
-// on WORLD height; this filters on height within the prop. Those agree while a
-// prop sits on the ground and is turned only about Y, which is how place() sets
-// every prop down. If that ever stops being true qa/footprint.mjs will say so,
-// because it compares against the audit's own world-space numbers.
+// THE FRAME IS THE AUDIT'S FRAME, and getting that wrong was the second thing
+// qa/footprint.mjs caught. The obvious move is to work in the prop's own local
+// space — invert its matrixWorld — and it is wrong, because that divides the
+// scale out. The audit builds its frame as rotation-about-Y plus translation
+// and NOTHING ELSE (qa/placement.mjs:277), so a vertex lands there in WORLD
+// units with any scale already baked in, and its height is its true world
+// height. Props scaled by glb() (island.ts:3833) are the ones that expose the
+// difference: on the local-space version a scaled model reported 7.25 x 2.77
+// where the truth was 14.88 x 3.20 — the game would have reserved half the
+// ground the prop stands on. Nine props on Maple, sixteen on Pirate.
+//
+// Building the frame the same way makes the height filter correct for free:
+// rotation about Y does not change height, and the frame's origin is at y = 0,
+// so a transformed vertex's y IS its world y.
 
 import * as THREE from 'three';
 
@@ -79,7 +88,11 @@ export function resetFootprints(): void { SLICES.clear(); }
  *  wire — which reserves no ground and should not be given a rectangle. */
 export function groundFootprint(root: THREE.Object3D, groundH = GROUND_H): Foot | null {
   root.updateWorldMatrix(false, true);
-  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  // the audit's frame, element for element — see the note above
+  const inv = new THREE.Matrix4()
+    .makeRotationY(root.rotation.y)
+    .setPosition(root.position.x, 0, root.position.z)
+    .invert();
   let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;

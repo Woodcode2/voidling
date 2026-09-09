@@ -52,6 +52,7 @@ for (const wid of WORLDS) {
     for (const e of window.__edibles) {
       const m = e.mesh; if (!m || m.userData.mover) continue;
       m.updateWorldMatrix(false, true);
+      const cy = Math.cos(m.rotation.y), sy = Math.sin(m.rotation.y);
       // ── the AUDIT's way: every vertex, filtered on world y ──────────────
       let ax0 = Infinity, ax1 = -Infinity, az0 = Infinity, az1 = -Infinity, nv = 0;
       // ── the GAME's way: each child's bounding box, in the prop's frame ───
@@ -76,11 +77,15 @@ for (const wid of WORLDS) {
         let bx0 = Infinity, bx1 = -Infinity, by0 = Infinity, bz0 = Infinity, bz1 = -Infinity;
         if (pos) for (let i = 0; i < pos.count; i++) {
           v.fromBufferAttribute(pos, i);
-          o.localToWorld(v); m.worldToLocal(v);
+          o.localToWorld(v);
           if (v.y > GH) continue;
           by0 = 0;
-          if (v.x < bx0) bx0 = v.x; if (v.x > bx1) bx1 = v.x;
-          if (v.z < bz0) bz0 = v.z; if (v.z > bz1) bz1 = v.z;
+          // the game's frame: rotate-Y + translate, exactly as the audit builds
+          // it, so extents come out in world units with scale baked in
+          const dx = v.x - m.position.x, dz = v.z - m.position.z;
+          const lx = dx * cy - dz * sy, lz = dx * sy + dz * cy;
+          if (lx < bx0) bx0 = lx; if (lx > bx1) bx1 = lx;
+          if (lz < bz0) bz0 = lz; if (lz > bz1) bz1 = lz;
         }
         if (by0 > GH) return;
         if (bx0 < gx0) gx0 = bx0; if (bx1 > gx1) gx1 = bx1;
