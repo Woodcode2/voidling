@@ -265,6 +265,87 @@ export function clusterAt(cx: number, cy: number, n: number, radius: number, cle
   return out;
 }
 
+// ── SAMPLING A DISTRICT, NOT THE BOX AROUND IT ──────────────────────────────
+// scatterInRegion used to sample the region's BOUNDING BOX and throw away
+// everything that missed the polygon. For a district shaped like a box that is
+// nearly free; for the shapes this game actually has it is most of the budget.
+// Measured by qa/rng.mjs --rows: Pirate's beach, a thin diagonal strip, misses
+// 79% of the time, and Game Day's frat row 45%. Both of the props gate's
+// remaining misses were made of that waste, and paying for it by raising the
+// try budget doubled Pirate's sampling work — 107k tries to 212k — to place
+// the same props.
+//
+// So the region is triangulated once and sampled by AREA: pick a triangle in
+// proportion to its size, then a uniform point inside it. Every sample lands in
+// the district, the distribution is unchanged (uniform over the polygon either
+// way), and the budget goes DOWN instead of up. Ear clipping handles the
+// concave districts — Pirate's beach and Skylark's launch field are both — and
+// was checked before it was wired: 100% of polygon area covered, 0 of 20,000
+// samples outside, on a concave L, the launch field and a convex hex.
+type Tri = [Pt, Pt, Pt];
+const TRIS = new Map<Pt[], { tris: Tri[]; cum: number[]; total: number }>();
+
+const triArea = (t: Tri): number =>
+  Math.abs((t[1][0] - t[0][0]) * (t[2][1] - t[0][1]) - (t[2][0] - t[0][0]) * (t[1][1] - t[0][1])) / 2;
+
+function triangulate(poly: Pt[]): Tri[] {
+  const n = poly.length;
+  if (n < 3) return [];
+  let area2 = 0;
+  for (let i = 0, j = n - 1; i < n; j = i++) area2 += poly[j][0] * poly[i][1] - poly[i][0] * poly[j][1];
+  const idx = [...Array(n).keys()];
+  if (area2 < 0) idx.reverse();                    // ear clipping wants counter-clockwise
+  const cross = (a: Pt, b: Pt, c: Pt): number =>
+    (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  const inTri = (p: Pt, a: Pt, b: Pt, c: Pt): boolean => {
+    const d1 = cross(a, b, p), d2 = cross(b, c, p), d3 = cross(c, a, p);
+    return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+  };
+  const out: Tri[] = [];
+  let guard = n * n;
+  while (idx.length > 3 && guard-- > 0) {
+    let clipped = false;
+    for (let i = 0; i < idx.length; i++) {
+      const a = poly[idx[(i + idx.length - 1) % idx.length]];
+      const b = poly[idx[i]];
+      const c = poly[idx[(i + 1) % idx.length]];
+      if (cross(a, b, c) <= 0) continue;            // reflex corner: not an ear
+      let ok = true;
+      for (let k = 0; k < idx.length; k++) {
+        if (k === i || k === (i + idx.length - 1) % idx.length || k === (i + 1) % idx.length) continue;
+        if (inTri(poly[idx[k]], a, b, c)) { ok = false; break; }
+      }
+      if (!ok) continue;
+      out.push([a, b, c]); idx.splice(i, 1); clipped = true; break;
+    }
+    if (!clipped) break;   // self-intersecting or degenerate: keep what we have
+  }
+  if (idx.length === 3) out.push([poly[idx[0]], poly[idx[1]], poly[idx[2]]]);
+  return out;
+}
+
+/** A uniform point inside a polygon, or null if it could not be triangulated —
+ *  in which case the caller falls back to its bounding box, which is what it
+ *  did before this existed. Triangulated once per polygon, for the world's life. */
+export function pointInRegion(poly: Pt[], rnd: () => number): Pt | null {
+  let t = TRIS.get(poly);
+  if (!t) {
+    const tris = triangulate(poly);
+    const cum: number[] = []; let total = 0;
+    for (const tr of tris) { total += triArea(tr); cum.push(total); }
+    t = { tris, cum, total };
+    TRIS.set(poly, t);
+  }
+  if (!t.tris.length || t.total <= 0) return null;
+  const r = rnd() * t.total;
+  let lo = 0; while (lo < t.cum.length - 1 && t.cum[lo] < r) lo++;
+  const tr = t.tris[lo];
+  let u = rnd(), v = rnd();
+  if (u + v > 1) { u = 1 - u; v = 1 - v; }          // fold into the triangle
+  return [tr[0][0] + u * (tr[1][0] - tr[0][0]) + v * (tr[2][0] - tr[0][0]),
+    tr[0][1] + u * (tr[1][1] - tr[0][1]) + v * (tr[2][1] - tr[0][1])];
+}
+
 // ── prop separation ────────────────────────────────────────────────────────
 // Nothing used to stop two scatter passes landing a cabana inside a palm, or
 // four thatch huts inside each other: bayPlaceable only knew about the
@@ -476,7 +557,11 @@ export function scatterInRegion(r: BayRegion, n: number, clear = 40, o?: Scatter
   // WHY a scatter came up short, not just that it did — see ./rng's ledger.
   let outside = 0, blocked = 0, busy = 0, tries = 0, miss = 0;
   for (; tries < CAP(n, 60) && out.length < n && (tries < n * 60 || miss < STALL); tries++) {
-    const x = minX + rnd() * (maxX - minX), y = minY + rnd() * (maxY - minY);
+    // straight into the district when it can be triangulated; the bounding box
+    // is the fallback for a polygon ear clipping could not resolve
+    const p = pointInRegion(r.poly, rnd);
+    const x = p ? p[0] : minX + rnd() * (maxX - minX);
+    const y = p ? p[1] : minY + rnd() * (maxY - minY);
     // A SAMPLE OUTSIDE THE POLYGON IS NOT EVIDENCE THE REGION IS FULL. It says
     // the bounding box is a poor fit for the shape, and nothing else — so it
     // must not count toward the stall, whose whole meaning is "this ground is

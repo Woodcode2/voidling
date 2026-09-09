@@ -43,6 +43,7 @@ import {
 } from './bay';
 
 import { stream, tally, STALL, CAP } from './rng';
+import { pointInRegion } from './bay';
 
 export { pointInPoly, smoothPoly, distToPath, pathPointAt, spotFree, spotOpen, claimSpot, resetPlacement };
 
@@ -305,7 +306,11 @@ export function scatterInRegion(r: PwRegion, n: number, clear = 40, o?: PwScatte
   // WHY a scatter came up short, not just that it did — see ./rng's ledger.
   let outside = 0, blocked = 0, busy = 0, tries = 0, miss = 0;
   for (; tries < CAP(n, 60) && out.length < n && (tries < n * 60 || miss < STALL); tries++) {
-    const x = minX + rnd() * (maxX - minX), y = minY + rnd() * (maxY - minY);
+    // straight into the district when it can be triangulated; the bounding box
+    // is the fallback for a polygon ear clipping could not resolve
+    const p = pointInRegion(r.poly, rnd);
+    const x = p ? p[0] : minX + rnd() * (maxX - minX);
+    const y = p ? p[1] : minY + rnd() * (maxY - minY);
     // A SAMPLE OUTSIDE THE POLYGON IS NOT EVIDENCE THE REGION IS FULL. It says
     // the bounding box is a poor fit for the shape, and nothing else — so it
     // must not count toward the stall, whose whole meaning is "this ground is
