@@ -6686,13 +6686,16 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     const P3 = (p2: LN.Pt): [number, number] => [w(p2[0]), w(p2[1])];
     LN.resetPlacement();
     const drop = (mesh: THREE.Object3D, p2: LN.Pt, r: number, rotY?: number, force = false, qk?: string) => {
-      if (!force && !LN.spotOpen(p2[0], p2[1], r * 20)) return;
+      // the prop's real ground rectangle — turned first, so the rectangle is
+      // the one it will actually stand on. See bay.ts's note on Rect.
+      if (rotY !== undefined) mesh.rotation.y = rotY;
+      const foot = footOf(mesh, p2[0], p2[1]);
+      if (!force && !LN.spotOpen(p2[0], p2[1], r * 20, foot)) return;
       if (force) mesh.userData.authored = true;   // a landmark: the settle pass may never retire it
       const [x3, z3] = P3(p2);
-      if (rotY !== undefined) mesh.rotation.y = rotY;
       if (qk) mesh.userData.qk = qk;
       place(mesh, x3, z3, r);
-      LN.claimSpot(p2[0], p2[1], r * 20);
+      LN.claimSpot(p2[0], p2[1], r * 20, foot);
     };
     const REG = (id: LN.LnBiome) => LN.LN_REGIONS.find((r) => r.id === id)!;
     /** ONE radius for the scatter's overlap rejection AND the drop's burial
@@ -7026,13 +7029,16 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // could be handed "eat 6 cars" on a world whose live prop census showed
     // zero tagged cars and zero tagged houses.
     const drop = (mesh: THREE.Object3D, p2: GD.Pt, r: number, rotY?: number, force = false, qk?: string) => {
-      if (!force && !GD.spotOpen(p2[0], p2[1], r * 20)) return;
+      // the prop's real ground rectangle — turned first, so the rectangle is
+      // the one it will actually stand on. See bay.ts's note on Rect.
+      if (rotY !== undefined) mesh.rotation.y = rotY;
+      const foot = footOf(mesh, p2[0], p2[1]);
+      if (!force && !GD.spotOpen(p2[0], p2[1], r * 20, foot)) return;
       if (force) mesh.userData.authored = true;   // a landmark: the settle pass may never retire it
       const [x3, z3] = P3(p2);
-      if (rotY !== undefined) mesh.rotation.y = rotY;
       if (qk) mesh.userData.qk = qk;
       place(mesh, x3, z3, r);
-      GD.claimSpot(p2[0], p2[1], r * 20);
+      GD.claimSpot(p2[0], p2[1], r * 20, foot);
     };
     const REG = (id: GD.GdBiome) => GD.GD_REGIONS.find((r) => r.id === id)!;
     const spread = (id: GD.GdBiome, n: number, clear = 60, sep?: number) =>
@@ -7304,12 +7310,13 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // it claimed ground but never CHECKED it — the source of all 58 of the
     // bay's prop intersections. A drop onto occupied ground is now refused.
     const drop = (mesh: THREE.Object3D, p2: [number, number], r: number, rotY?: number, force = false) => {
-      if (!force && !BAY.spotOpen(p2[0], p2[1], r * 20)) return;
+      if (rotY !== undefined) mesh.rotation.y = rotY;
+      const foot = footOf(mesh, p2[0], p2[1]);
+      if (!force && !BAY.spotOpen(p2[0], p2[1], r * 20, foot)) return;
       if (force) mesh.userData.authored = true;   // a landmark: the settle pass may never retire it
       const [x3, z3] = P3(p2);
-      if (rotY !== undefined) mesh.rotation.y = rotY;
       place(mesh, x3, z3, r);
-      BAY.claimSpot(p2[0], p2[1], r * 20);
+      BAY.claimSpot(p2[0], p2[1], r * 20, foot);
     };
     const dropGlb = (name: string, p2: [number, number], r: number, h: number, fb?: () => THREE.Object3D, rotY?: number) => {
       const [x3, z3] = P3(p2);
