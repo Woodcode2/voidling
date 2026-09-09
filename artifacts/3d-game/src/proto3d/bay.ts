@@ -273,7 +273,7 @@ export function clusterAt(cx: number, cy: number, n: number, radius: number, cle
 // the ground it uses in a coarse spatial hash and refuses to sample on top of
 // something already there.
 const CELL = 400;                       // world units; a 3D radius of 10 is 200 world
-interface Claim { x: number; y: number; r: number; }
+interface Claim { x: number; y: number; r: number; f?: Rect }
 const claims = new Map<string, Claim[]>();
 const cellKey = (x: number, y: number) => `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
 
@@ -299,6 +299,60 @@ const cellKey = (x: number, y: number) => `${Math.floor(x / CELL)},${Math.floor(
 let maxClaimR = 0;
 const blockFor = (reachWorld: number): number => Math.ceil(reachWorld / CELL) + 1;
 
+// ── AND WHAT SHAPE A CLAIM IS ───────────────────────────────────────────────
+// A claim was a circle, and for anything long and thin a circle is a bad
+// description of the ground a prop stands on. A market shed is 12.2 x 3.6; the
+// smallest circle covering its corners has radius 6.36 and reserves 127 square
+// units to protect a prop standing on 44. So sizing claims to satisfy the audit
+// costs density everywhere, and density is what this game is being tuned for.
+//
+// qa/placement.mjs never had that problem: it builds each prop's real ORIENTED
+// RECTANGLE and runs a separating-axis test (qa/placement.mjs:48, :322-328).
+// The audit was right and the hash was wrong, so the hash learns the audit's
+// shape — and src/proto3d/footprint.ts computes it identically, checked against
+// the audit on all 28,519 props in the game by qa/footprint.mjs.
+//
+// THE ASYMMETRY IS DELIBERATE, and it is what makes this land without a rewrite.
+// A scatter asks "is this point free?" BEFORE the prop exists, so the asking
+// prop has no rectangle and keeps its circle. The prop already on the ground
+// does have one — drop() holds the built mesh — so the claim carries it. Every
+// overlap the audit reports is the same shape, a big thing whose circle is
+// wrong against a small prop, and it is the big thing that gets the rectangle.
+// A claim with no rectangle behaves exactly as it does today.
+export interface Rect { cx: number; cz: number; hx: number; hz: number; c: number; s: number }
+
+/** How deep two oriented rectangles are into each other, 0 when they are apart.
+ *  A separating-axis test on the four face normals, which is exact for
+ *  rectangles — and the same test qa/placement.mjs grades with
+ *  (qa/placement.mjs:322-328), so what this admits the audit accepts. */
+export function rectPenetration(a: Rect, b: Rect): number {
+  // a rect's own axes in world: local +x runs along (c, -s), local +z along (s, c)
+  const axes: [number, number][] = [[a.c, -a.s], [a.s, a.c], [b.c, -b.s], [b.s, b.c]];
+  const dx = b.cx - a.cx, dz = b.cz - a.cz;
+  let min = Infinity;
+  for (const [nx, nz] of axes) {
+    const ra = a.hx * Math.abs(nx * a.c + nz * -a.s) + a.hz * Math.abs(nx * a.s + nz * a.c);
+    const rb = b.hx * Math.abs(nx * b.c + nz * -b.s) + b.hz * Math.abs(nx * b.s + nz * b.c);
+    const sep = Math.abs(dx * nx + dz * nz);
+    const over = ra + rb - sep;
+    if (over <= 0) return 0;          // one axis separates them: they are apart
+    if (over < min) min = over;
+  }
+  return min;
+}
+
+/** How far two footprints may interlock before the audit calls them one object.
+ *  qa/placement.mjs's own OVERLAP_TOL is 0.35 of a 3D unit; world is 3D x 20. */
+const PEN_TOL = 0.35 * 20;
+
+/** Distance from a point to an oriented rectangle; 0 when the point is inside. */
+const distToRect = (px: number, py: number, f: Rect): number => {
+  const dx = px - f.cx, dy = py - f.cz;
+  const lx = dx * f.c - dy * f.s, lz = dx * f.s + dy * f.c;
+  const qx = Math.max(Math.abs(lx) - f.hx, 0), qz = Math.max(Math.abs(lz) - f.hz, 0);
+  return Math.sqrt(qx * qx + qz * qz);
+};
+
 export function resetPlacement(): void { claims.clear(); maxClaimR = 0; }
 
 /** rWorld is the prop's footprint in WORLD units (3D radius × 20). */
@@ -309,6 +363,9 @@ export function spotFree(x: number, y: number, rWorld: number): boolean {
     const bucket = claims.get(`${cx + i},${cy + j}`);
     if (!bucket) continue;
     for (const c of bucket) {
+      // A claim that knows its own shape is asked about its own shape. The
+      // 0.82 is the same allowance either way — see the note on Rect.
+      if (c.f) { if (distToRect(x, y, c.f) < rWorld * 0.82) return false; continue; }
       const need = (c.r + rWorld) * 0.82;   // allow a little interlock; forbid burial
       const dx = c.x - x, dy = c.y - y;
       if (dx * dx + dy * dy < need * need) return false;
@@ -322,7 +379,7 @@ export function spotFree(x: number, y: number, rWorld: number): boolean {
  *  villa's claim circle is 120 units wide and the loungers belong against it.
  *  This refuses only what would be swallowed: a torch inside the galleon's
  *  hull, a fountain inside a tiki bar. Touching is fine. Vanishing is not. */
-export function spotOpen(x: number, y: number, rWorld: number): boolean {
+export function spotOpen(x: number, y: number, rWorld: number, f?: Rect): boolean {
   const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
   // spotOpen's own threshold — the 0.45/0.62 rule below — against the biggest
   // claim on the island. See the note at maxClaimR.
@@ -340,16 +397,41 @@ export function spotOpen(x: number, y: number, rWorld: number): boolean {
       // to exist, which is why round 5's crew forced its drops past this test —
       // and lost the burial check with it (Powder: 12 more props inside chalets).
       if (dx === 0 && dy === 0) continue;
+      // A SHAPED CLAIM MAKES THIS TEST SAY WHAT IT MEANS. The rule above is a
+      // circle standing in for a building, and against a chalet 9.4 x 5.9 that
+      // circle is either too small at the ends or too fat at the sides — which
+      // is how qa/placement.mjs came to find props 1.83 units INSIDE chalet #10
+      // while this test was passing them. With the real rectangle the burial
+      // test needs no proxy at all: a prop resting against a wall is outside
+      // the rectangle, a prop that has vanished into the building is inside it.
+      // Which is exactly what the paragraph above this function has always
+      // said — "Touching is fine. Vanishing is not."
+      if (c.f) {
+        // Both shapes known — drop() holds the built mesh, so the prop being
+        // set down has a rectangle too and the test is exact. This is the case
+        // a centre-only test cannot see: a prop whose middle clears the wall
+        // while its body is a foot inside it.
+        if (f) { if (rectPenetration(c.f, f) > PEN_TOL) return false; continue; }
+        if (distToRect(x, y, c.f) <= 0) return false;
+        continue;
+      }
       const need = Math.max((c.r + rWorld) * 0.45, Math.max(c.r, rWorld) * 0.62);
       if (dx * dx + dy * dy < need * need) return false;
     }
   }
   return true;
 }
-export function claimSpot(x: number, y: number, rWorld: number): void {
+export function claimSpot(x: number, y: number, rWorld: number, f?: Rect): void {
   const k = cellKey(x, y);
+  const c: Claim = f ? { x, y, r: rWorld, f } : { x, y, r: rWorld };
   const bucket = claims.get(k);
-  if (bucket) bucket.push({ x, y, r: rWorld }); else claims.set(k, [{ x, y, r: rWorld }]);
+  if (bucket) bucket.push(c); else claims.set(k, [c]);
+  // A rectangle reaches as far as its furthest corner from the claim point.
+  if (f) {
+    const ex = Math.abs(f.cx - x) + f.hx, ez = Math.abs(f.cz - y) + f.hz;
+    const far = Math.sqrt(ex * ex + ez * ez);
+    if (far > maxClaimR) maxClaimR = far;
+  }
   // The search block above is sized from this — a claim nobody can reach is a
   // claim that does nothing.
   if (rWorld > maxClaimR) maxClaimR = rWorld;

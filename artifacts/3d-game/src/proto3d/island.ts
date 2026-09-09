@@ -473,6 +473,14 @@ export function coastClear(x3: number, z3: number, d = 12): boolean {
 // the caller owns the loading cover. `onStage` is awaited at the build's seams
 // so the cover can paint a stage label between chunks — see bootStage in
 // prototype3d.ts, and the note there on why this buys responsiveness, not speed.
+/** The ground rectangle a prop reserves, in the hash's world units, or
+ *  undefined for a prop with nothing at ground level — a hanging lantern, a
+ *  banner on a wire — which keeps its circle. See ./footprint and bay.ts:Rect. */
+function footOf(mesh: THREE.Object3D, wx: number, wy: number): BAY.Rect | undefined {
+  const f = FP.groundFootprint(mesh);
+  return f ? FP.worldRect(f, wx, wy, mesh.rotation.y) : undefined;
+}
+
 export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
                                    onStage?: (label: string) => Promise<void>): Promise<Island> {
   const breathe = async (l: string) => { if (onStage) await onStage(l); };
@@ -5834,13 +5842,21 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     };
     const drop = (mesh: THREE.Object3D, p2: PW.Pt, r: number, rotY?: number, force = false, qk?: string) => {
       if (qk === 'pine' && onIce(p2, r)) return;
-      if (!force && !PW.spotOpen(p2[0], p2[1], r * 20)) return;
+      // the prop's own rectangle, so the burial test can be exact on both sides
+      if (rotY !== undefined) mesh.rotation.y = rotY;
+      const foot = footOf(mesh, p2[0], p2[1]);
+      if (!force && !PW.spotOpen(p2[0], p2[1], r * 20, foot)) return;
       if (force) mesh.userData.authored = true;   // a landmark: the settle pass may never retire it
       const [x3, z3] = P3(p2);
-      if (rotY !== undefined) mesh.rotation.y = rotY;
       if (qk) mesh.userData.qk = qk;
       place(mesh, x3, z3, r);
-      PW.claimSpot(p2[0], p2[1], r * 20);
+      // ── THE CLAIM IS THE PROP'S OWN GROUND ────────────────────────────────
+      // The mesh exists here, so the hash can be told the rectangle it stands
+      // on instead of a circle around it. A chalet is 9.4 x 5.9; its circle had
+      // to reach 5.55 to cover the corners and reserved three times the ground.
+      // See bay.ts's note on Rect for why only the CLAIM carries a shape and
+      // the asking prop keeps its circle.
+      PW.claimSpot(p2[0], p2[1], r * 20, foot);
     };
     const REG = (id: PW.PwBiome) => PW.PW_REGIONS.find((r2) => r2.id === id)!;
     // ── ITS OWN STREAM, LIKE EVERY OTHER WORLD ────────────────────────────

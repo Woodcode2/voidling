@@ -134,3 +134,17 @@ export function footCorners(f: Foot, x: number, z: number, ry: number): [number,
   return [w(f.cx - f.hx, f.cz - f.hz), w(f.cx + f.hx, f.cz - f.hz),
     w(f.cx + f.hx, f.cz + f.hz), w(f.cx - f.hx, f.cz + f.hz)];
 }
+
+/** The prop's ground rectangle expressed the way the placement hash wants it:
+ *  WORLD units, centred on the claim point, with the prop's own rotation.
+ *  `wx, wy` is the claim point in world units and `ry` the prop's rotation.y —
+ *  the same pair drop() already passes to claimSpot. Scale is world = 3D x 20,
+ *  the constant every world module already uses. */
+export function worldRect(f: Foot, wx: number, wy: number, ry: number):
+{ cx: number; cz: number; hx: number; hz: number; c: number; s: number } {
+  const c = Math.cos(ry), s = Math.sin(ry);
+  // the footprint's centre is offset from the mesh origin, and that offset is
+  // stated in the prop's own turned frame — so it turns with the prop
+  return { cx: wx + (f.cx * c + f.cz * s) * 20, cz: wy + (-f.cx * s + f.cz * c) * 20,
+    hx: f.hx * 20, hz: f.hz * 20, c, s };
+}
