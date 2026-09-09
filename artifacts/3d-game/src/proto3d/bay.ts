@@ -277,12 +277,34 @@ interface Claim { x: number; y: number; r: number; }
 const claims = new Map<string, Claim[]>();
 const cellKey = (x: number, y: number) => `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
 
-export function resetPlacement(): void { claims.clear(); }
+// ── HOW FAR THE SEARCH HAS TO LOOK ──────────────────────────────────────────
+// Both tests below walk a square block of cells around the point, and the size
+// of that block used to be `(rWorld + 260) / CELL`. The 260 was a guess at the
+// largest claim anywhere in the world, and it is wrong: Lantern's bathhouse
+// reserves 900 world units of ground (island.ts) and Game Day's stadium 780 —
+// both precincts claimed on purpose, before anything scatters, so that the
+// market does not land on top of the finale.
+//
+// A claim of radius R conflicts with a prop of radius r out to (R + r) x 0.82,
+// which for the bathhouse is 753 units. A small prop's block was ONE cell, and
+// one cell guarantees only 400 units of cover. Demonstrated against a faithful
+// replica of this function: of 216 positions sampled inside a 900-unit claim,
+// 40 came back FREE — every one of them past 425 units, which is exactly where
+// the guaranteed cover runs out. Live, 73 props stand inside the bathhouse's
+// claim and 37 inside the stadium's.
+//
+// So the block is sized from the largest claim that has actually been made,
+// tracked as it is made. `+ 1` because the point sits somewhere inside its own
+// cell rather than at the corner, which costs up to one more cell of reach.
+let maxClaimR = 0;
+const blockFor = (reachWorld: number): number => Math.ceil(reachWorld / CELL) + 1;
+
+export function resetPlacement(): void { claims.clear(); maxClaimR = 0; }
 
 /** rWorld is the prop's footprint in WORLD units (3D radius × 20). */
 export function spotFree(x: number, y: number, rWorld: number): boolean {
   const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
-  const reach = Math.ceil((rWorld + 260) / CELL);
+  const reach = blockFor((maxClaimR + rWorld) * 0.82);
   for (let i = -reach; i <= reach; i++) for (let j = -reach; j <= reach; j++) {
     const bucket = claims.get(`${cx + i},${cy + j}`);
     if (!bucket) continue;
@@ -302,7 +324,10 @@ export function spotFree(x: number, y: number, rWorld: number): boolean {
  *  hull, a fountain inside a tiki bar. Touching is fine. Vanishing is not. */
 export function spotOpen(x: number, y: number, rWorld: number): boolean {
   const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
-  const reach = Math.ceil((rWorld + 260) / CELL);
+  // spotOpen's own threshold — the 0.45/0.62 rule below — against the biggest
+  // claim on the island. See the note at maxClaimR.
+  const reach = blockFor(Math.max((maxClaimR + rWorld) * 0.45,
+    Math.max(maxClaimR, rWorld) * 0.62));
   for (let i = -reach; i <= reach; i++) for (let j = -reach; j <= reach; j++) {
     const bucket = claims.get(`${cx + i},${cy + j}`);
     if (!bucket) continue;
@@ -325,6 +350,9 @@ export function claimSpot(x: number, y: number, rWorld: number): void {
   const k = cellKey(x, y);
   const bucket = claims.get(k);
   if (bucket) bucket.push({ x, y, r: rWorld }); else claims.set(k, [{ x, y, r: rWorld }]);
+  // The search block above is sized from this — a claim nobody can reach is a
+  // claim that does nothing.
+  if (rWorld > maxClaimR) maxClaimR = rWorld;
 }
 
 export interface ScatterOpts {
