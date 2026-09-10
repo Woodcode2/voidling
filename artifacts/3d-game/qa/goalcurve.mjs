@@ -212,7 +212,28 @@ const runOnce = async (world) => {
             for (const e of window.__edibles) {
               if (e.eaten || !e.mesh?.visible || e.mesh.userData.tethered) continue;
               if (e.radius <= lim && e.radius > m) m = e.radius;
-            } return +m.toFixed(2); })() },
+            } return +m.toFixed(2); })(),
+          // ── THE BOSS ARC, WATCHED RATHER THAN ASSUMED ───────────────────
+          // rivals.ts authors NIBBLES (arch BULLY) as two acts: a predator
+          // looming at 1.5x the player for the first 55% of the match, then
+          // STUFFED — growth stops and her ceiling sags 0.3%/s until the
+          // player's finale surge overtakes her and she becomes, in the
+          // file's own words, "the marquee meal — the whole payoff of the
+          // arc". Nothing has ever measured whether that lands: qa/rivalnotice
+          // is ON PROBATION in the gate, "last read 0.0/min in maple, gate
+          // open 0%". So this records her radius against the player's swallow
+          // line every second, and rivalEv counts what actually happened.
+          boss: (() => {
+            const n = ms.rivals.find((x) => (x.arch || '') === 'BULLY');
+            if (!n) return null;
+            return { r: +n.r.toFixed(2), joined: !!n.joined, hunt: !!n.hunt,
+              // the eat rule, the game's own: edible when r <= R * EAT_RATIO
+              edible: n.r <= ms.r * 1.11, ratio: +(n.r / Math.max(0.01, ms.r)).toFixed(2),
+              d: Math.round(Math.hypot(n.x - window.__voidState().x, n.z - window.__voidState().z)) };
+          })(),
+          ev: { eaten: ms.ev?.eaten ?? 0, marquee: ms.ev?.marquee ?? 0,
+            charges: ms.ev?.charges ?? 0, hunterBites: ms.ev?.hunterBites ?? 0,
+            notices: ms.ev?.notices ?? 0 } },
       };
     }, [FPS, STEP]);
     if (r.broke) { note(`${world}: the rAF chain broke — animate() threw mid-crank`); break; }
@@ -223,6 +244,7 @@ const runOnce = async (world) => {
     const ms = window.__matchState();
     return { t: ms.t, score: Math.round(ms.score), r: +ms.r.toFixed(2), pct: +(ms.devouredPct ?? 0).toFixed(2),
       you: +(ms.ate?.you ?? 0).toFixed(2), fam: +(ms.ate?.family ?? 0).toFixed(2), rank: ms.rank,
+      ev: { ...ms.ev },
       k: { ...window.__kindTally() },
       rivals: ms.rivals.map((x) => ({ n: x.name, s: Math.round(x.score), j: x.joined })) };
   });
@@ -286,6 +308,13 @@ for (const world of worlds) {
   const atF = (r, f) => { const T = r.gc[r.gc.length - 1].t; return r.gc.reduce((a, x) => Math.abs(x.t - T * f) < Math.abs(a.t - T * f) ? x : a, r.gc[0]); };
   console.log(`     SIZE      radius at 25% of the clock ${span(runs, (r) => atF(r, 0.25).r)} · 50% ${span(runs, (r) => atF(r, 0.5).r)} · 75% ${span(runs, (r) => atF(r, 0.75).r)} · buzzer ${span(runs, (r) => r.final.r)}`);
   console.log(`               biggest prop she could EAT then: 25% ${span(runs, (r) => atF(r, 0.25).big)} · 50% ${span(runs, (r) => atF(r, 0.5).big)} · 75% ${span(runs, (r) => atF(r, 0.75).big)}`);
+  const bossOf = (r) => r.gc.filter((x) => x.boss);
+  if (bossOf(runs[0]).length) {
+    const firstEdible = (r) => { const h = bossOf(r).find((x) => x.boss.edible && x.boss.joined); return h ? Math.round(h.t) : null; };
+    const peakRatio = (r) => Math.max(...bossOf(r).map((x) => x.boss.ratio));
+    console.log(`     BOSS      NIBBLES peaks at ${span(runs, peakRatio)}x the player's radius · becomes edible at ${span(runs, firstEdible)}s of ${END}`);
+    console.log(`               charges ${span(runs, (r) => r.final.ev?.charges ?? 0)} · bites taken off you ${span(runs, (r) => r.final.ev?.hunterBites ?? 0)} · rivals eaten ${span(runs, (r) => r.final.ev?.eaten ?? 0)} · MARQUEE meals ${span(runs, (r) => r.final.ev?.marquee ?? 0)}`);
+  } else console.log(`     BOSS      no BULLY archetype in this world's cast`);
   console.log(`     CLEAR     world devoured ${span(runs, (r) => r.final.pct)}% · of which HERS ${span(runs, (r) => r.final.you)}% and the family's ${span(runs, (r) => r.final.fam)}%`);
   const kinds = Object.keys(runs[0].final.k).filter((k) => !['devourer', 'combo', 'rival', 'gulp', 'collapse', 'solo40'].includes(k)).sort();
   console.log(`     SET       ate  ${kinds.map((k) => `${k} ${span(runs, (r) => r.final.k[k] || 0)}`).join(' · ')}`);
