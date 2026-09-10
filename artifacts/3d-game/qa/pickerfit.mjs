@@ -284,6 +284,25 @@ for (const c of cards) {
 }
 console.log('');
 if (!cards.length) { console.log('FAIL — no world cards found; the picker did not open'); process.exit(1); }
+// ── A SHORT PICKER IS NOT A PASSING PICKER ────────────────────────────────
+// The zero-card case above has been guarded since d952532. The case that is
+// still open is the one worldlists.mjs exists to prevent one level up: SOME of
+// the cards. Every line below iterates `cards`, so a picker that rendered four
+// of six is measured on four, finds nothing wrong with them, and prints "all 4
+// world cards" — a sentence a reader takes as coverage. This probe is the only
+// thing in the push profile that looks at the picker's type, and the day the
+// menu rebuild re-points it (§6 day 10) is exactly the day a card can go
+// missing without anyone noticing.
+//
+// ALL_WORLDS is parsed from island.ts's WorldId union, so this counts against
+// what the renderer can actually draw, never against a number typed here.
+if (cards.length !== ALL_WORLDS.length) {
+  console.log(`FAIL — the picker rendered ${cards.length} of ${ALL_WORLDS.length} world cards `
+    + `(${ALL_WORLDS.filter((w) => !cards.some((c) => c.world === w)).join(', ') || 'unknown'} missing). `
+    + `Everything this probe measures, it measures per card — so a short picker is a green run on `
+    + `the cards that happen to be there, and the world that is missing is the one nobody looks at`);
+  process.exit(1);
+}
 if (fails.length) {
   for (const x of fails) console.log(`  · ${x}`);
   console.log(`\nFAIL — a child cannot read the world picker (${fails.length} finding(s))`);

@@ -133,6 +133,7 @@ const shotPair = async (p, name, ms) => {
 };
 
 let fails = 0;
+let missingReq = 0;   // required #menu selectors that were not on the page at all
 const RUNS = SPLASH_ONLY ? VIEWS.map((v) => ({ WORLD: WORLDS[0], v })) : WORLDS.map((WORLD) => ({ WORLD, v: VIEWS[0] }));
 for (const { WORLD, v } of RUNS) {
   VP = v; VTAG = v.tag;
@@ -213,11 +214,23 @@ for (const { WORLD, v } of RUNS) {
   await p.waitForTimeout(800);
   await p.screenshot({ path: `${OUT}/${WORLD}_menu${VTAG}.png` });
   await freeze(p, '#menu');
-  rec.contrast.push(await contrast(p, '#menu .logo i', 'menu THE CUTE'));
-  rec.contrast.push(await contrast(p, '#menu .logo', 'menu logo'));
-  rec.contrast.push(await contrast(p, '#menu .tag', 'menu tag'));
+  // ── THESE THREE ARE REQUIRED, and that is a change ──────────────────────
+  // contrast() returns { missing: true } for a selector that is not on the
+  // page, and both verdict loops below step straight over it. That is right
+  // for the loader's lines, which legitimately come and go between viewports —
+  // and wrong for these, which are the menu's own type. The menu rebuild
+  // (docs/MENU-BRIEF.md §1.2) re-parents .logo and re-purposes .tag, and under
+  // the old shape the splash step would have gone green on a menu with no
+  // readable type on it at all, having measured nothing. A probe that cannot
+  // find what it measures must FAIL, never skip (GOVERNOR.md rule 4).
+  for (const [sel, label] of [['#menu .logo i', 'menu THE CUTE'],
+    ['#menu .logo', 'menu logo'], ['#menu .tag', 'menu tag']]) {
+    const c = await contrast(p, sel, label);
+    c.required = sel;
+    rec.contrast.push(c);
+  }
   await thaw(p);
-  if (SPLASH_ONLY) { await b.close(); writeFileSync(`${OUT}/${WORLD}${VTAG}.json`, JSON.stringify(rec, null, 1)); for (const c of rec.contrast) { if (c.missing) continue; if (!c.glyphPx) { fails++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: no glyph pixels found — the measurement did not run`); continue; } const large = parseFloat(c.size) >= 18.66; const bar = large ? 3 : 4.5; if (c.p10 < bar) { fails++; console.log(`  FAIL-LINE ${WORLD} ${VP.width}x${VP.height} ${c.label}: p10 ${c.p10}:1 under the ${bar}:1 bar`); } } continue; }
+  if (SPLASH_ONLY) { await b.close(); writeFileSync(`${OUT}/${WORLD}${VTAG}.json`, JSON.stringify(rec, null, 1)); for (const c of rec.contrast) { if (c.missing) { if (c.required) { fails++; missingReq++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: ${c.required} is not on the page — the splash step measured nothing where the menu's own type should be`); } continue; } if (!c.glyphPx) { fails++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: no glyph pixels found — the measurement did not run`); continue; } const large = parseFloat(c.size) >= 18.66; const bar = large ? 3 : 4.5; if (c.p10 < bar) { fails++; console.log(`  FAIL-LINE ${WORLD} ${VP.width}x${VP.height} ${c.label}: p10 ${c.p10}:1 under the ${bar}:1 bar`); } } continue; }
   // 3. PLAY → the picker → the world card → the intro. Loaded with ?w=<world>
   //    so the card click starts the match in THIS document: the plain path
   //    reloads the page on the card (the tap-gate note in the brief) and the
@@ -273,7 +286,7 @@ for (const { WORLD, v } of RUNS) {
   }
   await b.close();
   writeFileSync(`${OUT}/${WORLD}${FTAG}.json`, JSON.stringify(rec, null, 1));
-  for (const c of rec.contrast) { if (c.missing) continue; if (!c.glyphPx) { fails++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: no glyph pixels found — the measurement did not run`); continue; } const large = parseFloat(c.size) >= 18.66 || (/CUTE|ENDER/.test(c.text) && parseFloat(c.size) >= 14); const bar = large ? 3 : 4.5; if (c.p10 < bar) { fails++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: p10 ${c.p10}:1 under the ${bar}:1 bar (${large ? 'large' : 'body'} text)`); } }
+  for (const c of rec.contrast) { if (c.missing) { if (c.required) { fails++; missingReq++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: ${c.required} is not on the page — the splash step measured nothing where the menu's own type should be`); } continue; } if (!c.glyphPx) { fails++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: no glyph pixels found — the measurement did not run`); continue; } const large = parseFloat(c.size) >= 18.66 || (/CUTE|ENDER/.test(c.text) && parseFloat(c.size) >= 14); const bar = large ? 3 : 4.5; if (c.p10 < bar) { fails++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: p10 ${c.p10}:1 under the ${bar}:1 bar (${large ? 'large' : 'body'} text)`); } }
 }
 if (fails) process.exitCode = 1;
-console.log(fails ? `FAIL — firstframe: ${fails} splash line(s) under their WCAG bar against the real pixels behind the glyphs` : `PASS — firstframe: every splash line clears its WCAG bar against the real pixels behind the glyphs; frames in ${OUT}/`);
+console.log(fails ? `FAIL — firstframe: ${missingReq ? `${missingReq} required #menu selector(s) missing from the page` + (fails > missingReq ? ` and ${fails - missingReq} splash line(s) under their WCAG bar` : '') : `${fails} splash line(s) under their WCAG bar against the real pixels behind the glyphs`}` : `PASS — firstframe: every splash line clears its WCAG bar against the real pixels behind the glyphs; frames in ${OUT}/`);
