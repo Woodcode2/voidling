@@ -2041,6 +2041,9 @@ const _dbg = new Proxy(_dbgStore, {
   __menuCam: (c: { x: number; z: number; az: number; dist?: number; h?: number;
     lookX?: number; lookZ?: number; lookY?: number } | null) => void;
   __heroPoint: () => { x: number; z: number } | null;
+  __kindTally: () => Record<string, number>;
+  __landmarkProbe: () => { biggest: { x: number; z: number; radius: number; needR: number; qk: string } | null;
+    nearHero: { x: number; z: number; radius: number; needR: number; qk: string } | null; eatRatio: number };
   __renderBloom: () => void;
   __composer: () => unknown;
   __juiceState: () => { fov: number; fovKick: number; stop: number; puffs: number; buzzes: number };
@@ -2377,6 +2380,35 @@ _dbg.__menuCam = (c) => {
 // QA: the world's authored hero landmark, read off the copy table rather than
 // transcribed into a probe. Maple's is null — it has no hero landmark.
 _dbg.__heroPoint = () => (COPY.hero ? { x: COPY.hero[0], z: COPY.hero[1] } : null);
+// QA (day 2): this match's eats by kind, from the eat handler's own
+// classification. Cleared at beginMatch, so it is per match, not per session.
+_dbg.__kindTally = () => ({ ...kindTally });
+// QA (day 2): what LANDMARK would actually be asking for. `biggest` is the
+// island's largest edible — what heroProp resolves to (`:6229`) and therefore
+// what the finale cue fires on. `nearHero` is the largest edible within 60
+// units of the world's AUTHORED hero point, which is the prop §3.4 means when
+// it names the Town Hall or the Royal Mariner, and is not always the largest
+// thing on the island (Skylark's largest is the tethered whale, which is the
+// bug §3.4 records). needR is the radius the void has to reach before the prop
+// is edible, on the game's own rule: the cue is `radius <= voidling.radius *
+// EAT_RATIO` (`:10900`), so needR = radius / EAT_RATIO.
+_dbg.__landmarkProbe = () => {
+  const one = (e: Edible | null) => e && {
+    x: e.mesh.position.x, z: e.mesh.position.z, radius: +e.radius.toFixed(2),
+    needR: +(e.radius / EAT_RATIO).toFixed(2), qk: String(e.mesh.userData.qk ?? ''),
+  };
+  let biggest: Edible | null = null, nearHero: Edible | null = null;
+  const h = COPY.hero;
+  for (const e of edibles) {
+    if (e.eaten || !e.mesh.visible) continue;
+    if (!biggest || e.radius > biggest.radius) biggest = e;
+    if (h) {
+      const d = Math.hypot(e.mesh.position.x - h[0], e.mesh.position.z - h[1]);
+      if (d <= 60 && (!nearHero || e.radius > nearHero.radius)) nearHero = e;
+    }
+  }
+  return { biggest: one(biggest), nearHero: one(nearHero), eatRatio: EAT_RATIO };
+};
 _dbg.__warpVoid = (x: number, z: number) => {
   voidState.x = x; voidState.z = z;
   voidling.group.position.set(x, voidling.group.position.y, z);
@@ -2428,6 +2460,9 @@ _dbg.__matchState = () => ({
   // intro. qa/edgespeed.mjs reconstructed it from the radius and got a cap four
   // times too low, which inflated every ratio it reported.
   camDist,
+  // QA day 2: the board's own rank (place among JOINED rivals), not a rank a
+  // probe re-derived from the score list — see lastRank.
+  rank: lastRank,
   ate: { you: devPlayerPct, family: devFamilyPct },
   rivals: rivals.list.map((r) => ({ name: r.name, score: r.score, r: r.r, x: r.x, z: r.z,
     joined: !!r.joined, arch: r.arch ?? '', hunt: !!r.hunting,
@@ -4129,7 +4164,18 @@ function questComplete(q: Quest) {
   }
   renderQuests(); saveQuests();
 }
+/** QA (menu stream, day 2): what the match has eaten, BY KIND, counted where
+ *  the game itself decides the kind. The five level goals are per-kind counts
+ *  (SET) or thresholds on them, and the one thing a probe must not do is
+ *  re-implement "what is a house" — qa/questable.mjs's header records that
+ *  exact bug, where a probe knew chalets were houses while the game did not and
+ *  passed a world whose chip was dead. Every kind the eat handler recognises
+ *  passes through questEvent (`:5939-5953`), so this is one counter at the
+ *  funnel. It survives the quest board's removal on day 6: the board is the
+ *  `quests` loop below, the classification is the call sites. */
+const kindTally: Record<string, number> = {};
 function questEvent(kind: string, n = 1) {
+  kindTally[kind] = (kindTally[kind] ?? 0) + n;
   for (const q of quests) {
     if (q.done || q.kind !== kind) continue;
     q.count += n;
@@ -4479,6 +4525,11 @@ let devMineN = 0, devAllN = 0;
 // whatever world is loaded, so nothing about it was ever Game Day-specific
 // except the copy.
 let heroProp: Edible | null = null;
+/** QA: the rank the board computed, exposed through __matchState. Rank is the
+ *  player's place among the rivals that have JOINED — not among the whole cast
+ *  — and a probe that re-derives it from the score list gets that wrong on
+ *  every match before the last rival walks in. */
+let lastRank = 0;
 let heroCued = false, heroAte = false;
 // reactive one-shots: big beats the player just caused jump the queue
 const newsQueue: string[] = [];
@@ -4849,6 +4900,7 @@ function refreshHud() {
     .sort((a, b) => b.score - a.score);
   // overtaking is DRAMA — celebrate every rank gained (hole.io's rank swings)
   const myRank = rows.findIndex((r) => r.me) + 1;
+  lastRank = myRank;   // QA day 2: RIVALS' goal IS this number; a probe reads it, never re-derives it
   // settle first: 1.4s at the 5Hz sample rate the HUD already runs at
   if (myRank === shownRank) rankHold += 0.2; else { rankHold = 0; shownRank = myRank; }
   const settled = rankHold >= 1.4 && shownRank !== announcedRank;
@@ -5490,6 +5542,7 @@ function endMatch() {
       .map((r) => ({ name: r.name, color: r.color, score: r.score, me: false }))]
     .sort((a, b) => b.score - a.score);
   const myRank = rows.findIndex((r) => r.me) + 1;
+  lastRank = myRank;   // QA day 2: the rank at the buzzer, which is what RIVALS resolves on
   // first place OWNS the cheer — with eyes closed a child can tell whether
   // they won, which is what makes them want the cheer back next match. The
   // loss sting is two soft falling notes, gentle by the no-dread rule.
@@ -6220,6 +6273,7 @@ function beginMatch(solo = false) {
   // the hero is whatever the biggest thing on this world is — resolved per
   // match, so a re-rolled or re-scaled landmark needs no second list
   heroCued = false; heroAte = false; heroProp = null;
+  for (const k of Object.keys(kindTally)) delete kindTally[k];   // QA day 2: per-MATCH counts
   // GATED ON THE CUE, NOT ON `hero`. `hero` is a camera waypoint — the fly-by
   // coordinates for the intro — and Maple deliberately has none, which also
   // switched off its finale as a side effect. The other three declare both, so

@@ -381,7 +381,7 @@ export interface Life {
   /** QA only: how many movers fall inside a given gate. The ones inside run
    *  every frame with or without it, so this is the honest answer to "does
    *  gating change what the player sees". */
-  moverStats(gate: number): { near: number; total: number };
+  moverStats(gate: number): { near: number; total: number; panicked: number; peds: number; calm: number };
   /** How bad has it got, 0..1. Drives what the crowd says and how often.
    *  Fed from the match loop off the same devoured/form signal the newsroom
    *  uses for its tier, so the street and the broadcast escalate together. */
@@ -6925,7 +6925,18 @@ export function createLife(
         const dx = o.position.x - lastVX, dz = o.position.z - lastVZ;
         if (dx * dx + dz * dz <= gate * gate) near++;
       }
-      return { near, total: movers.length };
+      // QA (menu stream, day 2): the crowd's FEAR, not just its size. `calmT`
+      // is the hold that suppresses panic contagion — endMatch sets it to
+      // Infinity so the town settles behind the results card, and the pause
+      // sheet's quit never did, so a menu entered by leaving a match sat
+      // inside a crowd that was still running. That is invisible to every
+      // instrument in qa/ without a count, which is why the bug has survived:
+      // nothing could see it. `calm` is the seconds of hold left (Infinity =
+      // held indefinitely), `panicked` is how many people are currently
+      // fleeing.
+      let panicked = 0;
+      for (const pd of peds) if (pd.panic > 0) panicked++;
+      return { near, total: movers.length, panicked, peds: peds.length, calm: calmT };
     },
     // SET, not max — Infinity has to be clearable. The AMBIENT chatter waits
     // too: chatCd starts at 2 s, so the first crowd line landed at 2.0 match-s
