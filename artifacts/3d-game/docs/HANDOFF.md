@@ -1,11 +1,31 @@
 # THE CUTE WORLD ENDER — engineering handoff
 
 Written to survive a context reset. If you are picking this up cold: read this
-file top to bottom, then `docs/FABLE-BRIEF.md` (instruments + traps), then
-`docs/AAA-BRIEF.md` §7 (the ledger — every change with its measurement).
-**Measure before you change anything.**
+file top to bottom, then **`docs/MENU-BRIEF.md`** (the stream you are most likely
+here to build), then `docs/GOVERNOR.md` rules 1–7, then `docs/FABLE-BRIEF.md`
+(instruments + traps). **Measure before you change anything.**
 
-Last updated: 2026-08-23, at commit `0dd4fb6` on `main`.
+Last updated: **2026-09-10**, at commit `17246d8` on `claude/holeio-recon`;
+`main` (production) is at `3cf26dc`, deployed and READY.
+
+---
+
+## 0. START HERE — the menu and the ladder
+
+The owner's current ask (2026-09-10): *"the menu is still the same looking … plan
+an exceptional menu … each level had different goals … making our splash image
+alive … 3 choices."* The plan exists and is grounded: **`docs/MENU-BRIEF.md`**,
+with the round's verbatim evidence in `docs/crews/round-8/`. It is one stream,
+sixteen crew-days, each day ending with the push gate green.
+
+**How the work is done here (the operating model that produced the last nine
+commits):** the governor writes the brief with numbered bars and file:line
+pointers; the crew (Opus, high effort) builds and runs the probes; the governor
+gives the skeptic verdict; nothing merges to `main` without
+`node qa/gate.mjs --profile=push` green. Every fix is preceded by a probe that
+**fails on the old build** — the failing run is the evidence.
+
+**The first message to give a fresh session is at the end of this file (§11).**
 
 ---
 
@@ -14,11 +34,11 @@ Last updated: 2026-08-23, at commit `0dd4fb6` on `main`.
 A hole.io-style 3D game for children aged roughly 6–11. You are a small purple
 void with a face. You roll around a world swallowing things; everything you
 swallow makes you bigger; in three minutes you eat a whole town while an
-in-world newsroom reports your progress and four family members race you.
+in-world newsroom reports your progress and five family members race you.
 
 The owner's stated goal: **a top-10 game in the Apple App Store.** He playtests
 on a real iPhone with his young daughter — her reactions are the highest-value
-signal in the project.
+signal in the project. He reads numbers and plain language, not code.
 
 ### The name (settled 2026-08-23, do not relitigate)
 
@@ -29,11 +49,8 @@ signal in the project.
 | The creature | **voidling** | species, first form, family lore — unchanged everywhere in-game |
 | Bundle id | `com.voidling.game` | invisible to users, painful to move. Stays. |
 
-**Why the rename happened:** "Voidling" is a *live App Store arcade game*
-(Douglas Johnson, updated 2026-03) about a hatching, evolving void creature —
-same store, adjacent theme, and Apple app names are unique. Rejected alternates
-with collisions: "Nomling" (live virtual-pet product), "Voidy" (Google Play
-developer). "The Cute World Ender" had zero collisions anywhere.
+"Voidling" alone collides with a live App Store game; the alternates were
+checked and rejected. Do not reopen.
 
 ---
 
@@ -41,82 +58,101 @@ developer). "The Cute World Ender" had zero collisions anywhere.
 
 These persist across sessions. They are not suggestions.
 
-- **Ship via git push only. NEVER deploy manually to Vercel.** Push to `main` =
-  production deploy. The owner has given standing permission to push `main`
-  ("Yes always"). This session worked directly on `main`; if a session
-  directive names a feature branch, mirror to `main` regardless and say so in
-  your first reply rather than silently picking one.
-- **Never bypass CDN egress blocks.** Asset requests 403 in the sandbox. That
-  is expected and correct. Never disable TLS verification, never unset
-  `HTTPS_PROXY`.
-- **Keep the model identifier out of anything pushed** — code comments, PR
-  bodies, docs. Chat replies only. (The commit trailer is mandated by the
-  session harness; use whatever it specifies verbatim, plus the
-  `Claude-Session:` line.)
+- **Ship via git push only. NEVER deploy manually to Vercel.** Push to `main`
+  = production deploy. The owner has given standing permission to push `main`.
+- **Nothing reaches `main` without `node qa/gate.mjs --profile=push` green** (35
+  steps, ~40 minutes; run it from `artifacts/3d-game` with the preview server
+  up). Read the last lines for `GATE PASS`. Docs-only commits are the one
+  exception. *One of 34 steps was once run and called "the push check"; it let a
+  world-picker card a child could not read reach production. Run the profile.*
+- **Work on the branch the session names**, then fast-forward `main` after the
+  gate: `git checkout main && git merge --ff-only <branch> && git push`. Never
+  rewrite history on `main`.
+- **Never bypass CDN egress blocks.** Asset requests 403 in the sandbox; the
+  production domain cannot be curled from here. That is expected and correct.
+  Never disable TLS verification, never unset `HTTPS_PROXY`.
+- **Keep every model identifier out of anything pushed** — code comments,
+  commit bodies, docs, PR bodies. Chat replies only. Use the attribution trailer
+  the session harness specifies, verbatim, plus its `Claude-Session:` line.
 - **Do not open a pull request** unless explicitly asked.
-- **`node qa/smoke.mjs` before every push.** READ the output for PASS.
+- **The void is a creature and is refined, never replaced by a hole.** Owner:
+  "You're not replacing our void with a hole correct. If anything he should be
+  further refined into higher quality as well."
+- **No ads, no ad-skip currency, no timers that pressure, 4+ stays 4+**, a
+  parental gate on any spend.
+- **Camera shake is ZERO by owner order** (`fx.kick`/`fx.shake`/`camPunch` are
+  no-ops at the source). `hitStop` stays.
+- **Spawn and the opening are hand-authored and identical every load**
+  ("consistency is key here"). Match 1 of a fresh profile is always the shipped
+  baseline (`src/game/matchdeck.ts`).
 - **Powers stay OFF** (`POWERS_ON = false`).
-- **Spawn and the opening are hand-authored and identical every load** — the
-  owner's call: "consistency is key here."
-- Flow is **PLAY → world picker → match**.
-- **Verify with screenshots or measurements before claiming anything is done.**
 - Music/SFX licence rule: CC0 / Public Domain / Pixabay / Kenney / Mixkit /
   Sonniss only. Never invent a source URL. The owner supplies tracks.
+- **Verify with screenshots or measurements before claiming anything is done.**
+  A number in a commit message is evidence to every later reader; every number
+  you write down must be one you actually ran (`GOVERNOR.md` rule 3).
+- **Corrections are recorded, never hidden.** When a claim turns out wrong, say
+  so in the next reply and in the file that carried it.
 
 ### Owner communication style (learned the hard way)
 
-- **Plain language, no jargon.** He is not an engineer. "The camera was kicking
-  141 times a minute" lands; "the bite-ratio gate lacked a refractory" does not.
-- **Baby steps with numbered ownership** when he asks about process — he asked
-  explicitly for "Step 1, Step 2" with who does what.
+- **Plain language, no jargon.** "The camera was kicking 141 times a minute"
+  lands; "the bite-ratio gate lacked a refractory" does not.
+- **Numbered steps with who does what** when he asks about process.
 - **When he reports a feel problem, he is right about the symptom even when the
-  instruments disagree.** Three times this session the instruments said "fine"
-  and the cause was real (shake amplitude, the fading-menu music block, the
-  synth swallow reading as drums). Suspect your instrument, then widen it.
-- Lead replies with what changed and the measured before→after. He reads
-  numbers happily; he does not read code.
+  instruments disagree.** Suspect the instrument, then widen it.
+- Lead replies with what changed and the measured before → after. He asks for
+  TLDRs; give them.
 
 ---
 
 ## 3. Tech stack
 
 - **Three.js 0.185.1**, TypeScript, Vite. No game engine, no React in the game
-  (`index.html` holds all HUD markup + CSS; a retired React shell exists in
-  `src/App.tsx` etc. and is not the game).
+  (`index.html` holds all HUD + menu markup and CSS; the retired React shell in
+  `src/App.tsx` etc. is not the game).
 - **Capacitor 8** for the iOS shell (`ios/`, `capacitor.config.ts`).
 - **Supabase** edge function for telemetry; every harness stubs
-  `**/functions/v1/ingest-events`.
+  `**/functions/v1/ingest-events`. Store build collects nothing identifying by
+  default (kids-privacy audit done).
 - **Playwright + Chromium** at `/opt/pw-browsers/chromium` for all QA.
-  Flags: `--no-sandbox --use-gl=angle --use-angle=swiftshader`.
+  Flags: `--no-sandbox --use-gl=angle --use-angle=swiftshader`. The sandbox
+  renders at ~1 fps; **never quote harness frame timing as the game's** — sample
+  against `__matchState().t` (match seconds).
 - **Vercel** deploy, project `voidling-3d-game`
   (`prj_ze1DPbXacEkmrZfk3x5ZckmzMwr0`, team `team_ByRJQ00dRUtDHwQcg6YSELTz`),
   production alias `voidling-3d-game-ruby.vercel.app`. Push to `main` → build →
-  READY in ~2 min. Verify with the Vercel MCP `list_deployments`; the sandbox
-  cannot curl the production domain (egress).
+  READY in ~40 s. Verify with the Vercel MCP `get_deployment`; the sandbox
+  cannot curl the production domain.
 - Repo `woodcode2/voidling`; **the game is `artifacts/3d-game/`** — every
   command below runs from there.
 
 ### Commands
 
 ```bash
-npx vite build                     # RUN FROM artifacts/3d-game
-npx tsc --noEmit -p tsconfig.json
-node qa/smoke.mjs                  # the pre-push gate
-node qa/<probe>.mjs 4177 [args]
-pnpm build:ios                     # vendor-assets && build && cap sync (needs network)
-npm run shoot:store                # App Store screenshots
+cd /home/user/voidling/artifacts/3d-game
+npx tsc --noEmit -p tsconfig.json          # typecheck (3 s)
+npm run build                              # vite build (~4 s) — the preview serves dist/
+node qa/gate.mjs --list                    # what the push profile runs
+node qa/gate.mjs --profile=push            # THE pre-merge gate, 35 steps, ~40 min
+node qa/<probe>.mjs [world|all] 4177       # most probes take world then port
+SEED=7 node qa/placement.mjs all 4177 --ceiling=qa/placement.baseline.json
 ```
 
 **The preview server dies constantly.** Keep it alive as a background task:
 
 ```bash
-while true; do npx vite preview --port 4177 --strictPort >/tmp/claude-0/preview.log 2>&1; sleep 2; done
+cd /home/user/voidling/artifacts/3d-game && while true; do npx vite preview --port 4177 --strictPort >/tmp/claude-0/preview.log 2>&1; sleep 2; done
 ```
 
-Run it with `run_in_background: true` from the Bash tool. A plain `&` gets
-reaped with the tool call. Probes fail with `ERR_CONNECTION_REFUSED` when it is
-down — check `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4177/`
-before diagnosing anything else.
+Run it with `run_in_background: true`. Check
+`curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4177/` before
+diagnosing anything else. **Rebuild `dist/` after every source change** — the
+gate's preflight refuses a `dist/` older than `src/`.
+
+**Never run a second Chromium while the gate runs.** It contends for the
+software GPU and either probe can die with "GPU process isn't usable"; a
+reproduction attempted alongside a gate run is not evidence of anything.
 
 ---
 
@@ -124,48 +160,41 @@ before diagnosing anything else.
 
 | file | what |
 |---|---|
-| `src/prototype3d.ts` (~8.9k lines) | Match loop, HUD, camera, growth law, beats, forms, trophies, economy, shop, daily, rivals wiring, debug hooks |
-| `src/proto3d/island.ts` (~6.6k) | Ground bake, sky, coastline, and the populate block per world. **Each world's block ends in an explicit `return`** — the Maple grid pass at the foot is unguarded and leaks otherwise |
-| `src/proto3d/life.ts` (~5.5k) | Crowds: people, movers, flee/greet behaviour, all spoken lines, per-world set pieces |
-| `src/proto3d/audio3d.ts` (~4.2k) | Five synth scores + the recorded-track player, channels, crossfades, the cover pad |
-| `src/proto3d/void3d.ts` | The hero: body, face rig, moods, rings, skins |
+| `src/prototype3d.ts` (~11k lines) | Boot (`createIsland` is a top-level await at `:1733`), render loop `animate()` (`:9467`–`:10957`, renders every frame, **also behind the menu**), match loop, HUD, camera (`:10488`), growth law, beats, forms, trophies, economy, shop, daily, `validateWorld()` + `settleFootprints()` (`:7042`), debug hooks (`_dbg.__*`, `:1969`–`:2100`) |
+| `src/proto3d/island.ts` (~8.8k) | Ground bake, sky, coastline, water shaders, and the populate block per world (`WORLD_ID === '<id>'`). Placement gates `drop()`/`dropGlb()` per world |
+| `src/proto3d/bay.ts` | **The shared placement hash** for all worlds: `spotFree` (scatter), `spotOpen` (burial), `claimSpot`, `scatterInRegion`, `pointInRegion` (ear-clip + area sampling) |
+| `src/proto3d/footprint.ts` | `groundFootprint(root)` — the ground slice below `GROUND_H`, measured the way `qa/placement.mjs` measures it. **One definition of "the ground a prop covers"**, shared by the placement gate, the settle pass, and the auditor |
+| `src/proto3d/rng.ts` | `mulberry32`, per-scatter streams, `STALL`/`CAP`, the ask ledger (`window.__scatterAsks`) |
+| `src/proto3d/life.ts` (~6.9k) | Crowds: people, movers, flee/greet, all spoken lines, per-world set pieces |
+| `src/proto3d/audio3d.ts` (~4.4k) | Six recorded tracks + synth fallback, channels, crossfades, the cover pad, the first-gesture unlock |
+| `src/proto3d/void3d.ts` | The hero: body, face rig, moods, rings, skins (`setMood`, `chomp`, `setRadius`) |
 | `src/proto3d/rivals.ts` | The family: archetypes, lanes, join times |
-| `mainstreet.ts` `bay.ts` `gameday.ts` `lantern.ts` `powder.ts` | Per-world land + region polygons |
-| `luxe.ts` `nightmarket.ts` `alpine.ts` | Per-world prop kits |
+| `mainstreet.ts` `bay.ts` `gameday.ts` `lantern.ts` `powder.ts` `skyfield.ts` | Per-world land + region polygons |
+| `luxe.ts` `nightmarket.ts` `alpine.ts` `tailgate.ts` `skylark.ts` | Per-world prop kits |
 | `newsroom_*.ts` | Per-world headline pools; `newsroom_react.ts` = reactions |
-| `src/game/matchdeck.ts` | Per-match variation deal (middle beats + hour) |
-| `src/game/{unlocks,seasons,stickers}.ts` | World unlock ladder, seasonal events, sticker book |
-| `src/proto3d/store3d.ts` | StoreKit bridge (17 products) |
-| `index.html` | All CSS + HUD markup |
+| `src/game/matchdeck.ts` | Per-match variation deal (middle beats + hour); match 0 = baseline |
+| `src/game/{unlocks,seasons,stickers}.ts` | World unlock ladder (finish-to-open, never a wall, grandfathering), seasonal events + the menu ribbon, sticker book |
+| `src/proto3d/store3d.ts` | StoreKit bridge |
+| `index.html` | All CSS + HUD + menu markup (`#menu` at `:1942`, its CSS at `:846`) |
 
 ### The coordinate system
 
 `SCALE = 0.05`, world centre `(6000, 6000)`, so `w(v) = (v - 6000) * 0.05`.
-Level files author in world units; the renderer works in 3D units.
-
-**Screen-up is not north.** `camOffset = (0.62, 0.92, 0.62)`, so the ground
-direction away from camera is `(-1,-1)/√2` — x and y decrease *equally*. To put
-something *d* units straight up-screen, offset by `d/√2` in **both** axes.
+Level files author in **world units** (0..12000); the renderer works in 3D
+units (world = 3D × 20). **Screen-up is not north**: `camOffset = (0.62, 0.92,
+0.62)`, so to put something *d* units straight up-screen, offset by `d/√2` in
+**both** axes.
 
 ### Growth
 
 `growRadius(R, eR) = min(12, sqrt(R² + 0.5·eR²·rookie·diminish))` — area-based,
-so **R² is the correct progress axis**. `R_CAP = 12`, `START_R = 0.9`.
-Edible when radius `< voidR * 0.92`.
-
-`FORM_MIN = [0, 1.6, 2.5, 3.6, 5.5, 8.0, 13.5]` — and `formProgress()` measures
-each rung from `max(FORM_MIN[st], START_R)`, not from 0. (It measured from 0
-until 2026-08-23 and showed 39% full at spawn.)
-
-### Containment
-
-`solid(x,z)` = `biomeAt()` truthy AND `!inDeepWater3()` AND eight
-`insideIsland3()` probes at margin `m = min(R*0.75, 4+R*0.15) + 1.2`.
-`qa/traverse.mjs` proves every size can still cross every island (≥97% reach).
+so **R² is the correct progress axis**. `R_CAP = 12`, `START_R = 0.9`, growth is
+clock-bound (`lawCap`). Edible when radius `< voidR * 0.92`.
+`FORM_MIN = [0, 1.6, 2.5, 3.6, 5.5, 8.0, 13.5]`.
 
 ---
 
-## 5. The five worlds
+## 5. The six worlds
 
 | # | world | theme | par | hero landmark |
 |---|---|---|---|---|
@@ -174,222 +203,179 @@ until 2026-08-23 and showed 39% full at spawn.)
 | 3 | **GAME DAY** 🏈 | college football Saturday | 175,000 | the stadium |
 | 4 | **LANTERN NIGHT** 🏮 | spirit night market | 150,000 | the bathhouse |
 | 5 | **POWDER PASS** ❄️ | mountain village on a snow day | 45,000 | The Lodge |
+| 6 | **SKYLARK FIELD** 🎈 | a balloon meet before they all go up | 35,000 | the hangar (the whale is tethered; see MENU-BRIEF §8.2) |
 
-Worlds unlock by *finishing* the one before. Maple is the first-ever launch
-(no menu on run one — deliberate).
+Worlds unlock by *finishing* the one before (`src/game/unlocks.ts`). Maple is
+the first-ever launch (no menu on run one — deliberate). **Lantern has one
+authored hour** (the night is that world); every other world has three.
 
-**Lantern's one idea:** the spirits think the void is a guest — act one they
-walk *toward* it, act two they freeze and stare, act three they flee. The owner
-reported this as "a weird pull"; it was explained as designed and **he has not
-yet said whether to keep it. Open question.**
-
-**Powder's three verbs:** ICE (momentum on the lake, `iceK 0.26`), SNOW SHELL
-(6s ×1.45 eat-ratio from drift props), AVALANCHE (22 snowballs down the piste
-at beat four). It shipped scenic at 843 edibles and starved the child driver
-(403–3,253 vs ~100k); the "hoover economy" density pass took it to 4,536.
+**Every per-world table must have six rows keyed by `WorldId`.** A five-world
+table is how world 6 shipped unreachable, un-timed in a probe, and without a
+baseline in another. `qa/worldlists.mjs` (push) now catches arrays, unlock
+strings **and objects** keyed by world; `qa/worldreg.mjs` reads the picker
+markup. Read authored values off the page (`_dbg.__introLen()`,
+`_dbg.__authored()`) — never keep a second copy in a probe.
 
 ---
 
 ## 6. Systems that exist (and their rules)
 
-**Match variation** (`matchdeck.ts`): every match deals two MIDDLE beats from a
-pool of four per world, plus an HOUR (3 lighting variants per world; Lantern
-has exactly one — the night *is* that world). **Match 1 of a fresh profile
-always deals the shipped baseline** — the tuned first impression, and what
-every probe measures. The deal is a *cycle*, not a roll: consecutive matches
-change both middle slots. Gate: `qa/vary.mjs`.
+**Placement** (stream A1, closed 2026-09-10): every prop claims the **ground it
+covers** (an oriented rectangle from `footprint.ts`), not its eat radius; the
+settle pass at boot asks "buried?" with **both** the bounding box and the
+ground slice; the off-island cull tests the ground centre, not the origin; the
+spawn-corridor clearing runs **before** the burial sweep. `qa/placement.mjs`
+(frozen ceilings in `qa/placement.baseline.json` — lower a number when you fix
+something, never raise one without the owner), `qa/rng.mjs` (every scatter
+places what it asked, seeded), `qa/settle.mjs` (a second sweep retires nothing)
+are all in the push profile and all green on six worlds.
 
-**The economy** (owner-designed, 2026-08-22):
-- **No bundle SKU.** One shipped for a single commit and the owner vetoed it
-  ("I don't like the idea of everything free forever"). `APPSTORE.md` carries a
-  do-not-create line for the id.
-- **Coins (✦)** = everyday. Ladder paced against a modelled ~990✦/day regular
-  kid: first skin day 1, then ~weekly, top rung ~day 240.
-- **Gems (💎)** = rare, earned only in play: deep trophies (10 total across the
-  catalogue), the day-7 chest (+1), the day's first win (+1) ≈ 8/week. Spend on
-  3 premium colourways (25/25/40) and **6 earnable hats** (25–50) whose
-  StoreKit registrations are *parked, not deleted*.
-- **Gem spends never touch the parental gate, and a shortfall never routes
-  toward a payment sheet.** `qa/econ.mjs` asserts this.
-- The daily streak **cliff is dead**: a missed day steps the week ladder down
-  one rung, never to the bottom; day numbers are monotone (`voidDailyLife`).
-- Trophies pay bounties exactly once (`voidTrophyPaid`, keyed by name — renaming
-  a trophy re-awards it once, which is acceptable and reads as a gift).
+**Match variation** (`matchdeck.ts`): match n deals two middle beats + an hour;
+match 0 is the shipped baseline every probe measures. Gate: `qa/vary.mjs`.
 
-**Forms ladder** (renamed 2026-08-23):
-`VOIDLING → MUNCHKIN → GOBBLIN → CHOMPOSAURUS → COLOSSUS → WORLD ENDER → VOID TITAN`
-— a ladder of *pictures* (baby → munchkin → monster → dinosaur → giant →
-planet-eater → cosmos), not thesaurus entries for "eater".
+**The economy** (owner-designed): coins (✦) everyday, gems (💎) rare and earned
+only in play; no bundle SKU; gem spends never touch the parental gate. Daily
+streak has no cliff. Trophies pay once. `qa/econ.mjs` asserts all of it.
 
-**The family** (renamed 2026-08-23) — every name says its game, all ≤7 chars so
-the leaderboard doesn't truncate:
-NIBBLES (Auntie, BULLY — hunts you; sweetest name on the scariest void),
-BIGSHOT (Uncle, SHOWOFF), JELLY (Cousin, COWARD), ECHO (Baby, COPYCAT),
-GRUMPS (Grandpa, HOARDER).
+**Forms ladder:** `VOIDLING → MUNCHKIN → GOBBLIN → CHOMPOSAURUS → COLOSSUS →
+WORLD ENDER → VOID TITAN`. **The family:** NIBBLES (bully), BIGSHOT (showoff),
+JELLY (coward), ECHO (copycat), GRUMPS (hoarder).
 
-**Camera motion is ZERO by owner order** (2026-08-23, absolute: "I don't want
-any shake. 0."). `fx.kick`, `fx.shake` and `camPunch` are all no-ops at the
-source; call sites remain, so one line each restores them. `hitStop` stays (a
-time-freeze moves nothing). `qa/juice.mjs` therefore reads 3/4 by design.
+**Audio:** six recorded tracks (menu + 5 worlds) mastered to house spec; a
+drumless cover pad bridges decoding; the synth score is only the 404 fallback.
+No sound before the first trusted gesture (browser rule).
 
-**Audio**: six recorded tracks ship (menu + 5 worlds), all mastered to the house
-spec (−16 LUFS ±1, ≤−1 dBTP, 128kbps/44.1k) — `qa/trackprofile.mjs --gate`.
-Presence of `public/assets/music/<world>.mp3` is the entire switch; absent = the
-world's synth score. While a track decodes, a **drumless cover pad** bridges
-(one root-and-fifth swell). The full synth score is now *only* the 404 fallback
-— it used to be the cover, which is what the owner heard as unsynced drums.
-
-**FTUE**: on the very first match, Auntie NIBBLES greets the child ("ooooh…
-this planet looks DELICIOUS!") then "eat everything SMALLER than you", then the
-existing drag lesson. Banner cards on the existing queue; never blocks play.
+**The daily quest board is RETIRED by owner decision** (2026-09-06); its kinds
+become the SET level's counters. `QUEST_POOL` and `#quests` are removed on day 6
+of the menu stream, not hidden.
 
 ---
 
 ## 7. The QA kit
 
-`artifacts/3d-game/qa/` — 107 named probes plus ~340 `_`-prefixed
-investigation scripts (throwaways, kept as evidence). The ones that matter now:
+`artifacts/3d-game/qa/` — ~110 named probes plus ~340 `_`-prefixed
+investigation scripts (kept as evidence; not run by any profile). The gate:
+
+| profile | when | what |
+|---|---|---|
+| `push` | before every merge to `main` | 35 steps: typecheck, smoke:maple, econ, placement, rng, settle, pickerfit, splash, worldlists, worldreg, deadpaint, opening, faceparity, newsfeed, … |
+| `live` | before anything reaches production after a big change | everything, six worlds |
+
+**Silence is failure.** A probe that prints no `PASS —`/`FAIL —` line is a FAIL
+("the probe did not reach its own conclusion"). Two probes were red for this
+reason and nobody knew, because nobody ran the whole profile.
+
+The ones that matter most now:
 
 | probe | answers |
 |---|---|
-| `smoke.mjs` | boots, loads, grows, eats, makes sound. **Pre-push gate.** |
-| `ab.mjs [n] [world] [driver] [port]` | N matches, mean + sd — the only trustworthy difficulty read |
-| `traverse.mjs [port] [worlds…]` | can every size cross every island (≥97% reach) |
-| `postpipe.mjs <world> --gate` | colour pipeline: composed ≡ direct, hero survives glow, sky is a dome. **World is argv[2]** — `--gate` alone boots a world literally named "--gate" |
-| `uisystem.mjs` | computed font weights/sizes (catches TS-painted markup) |
-| `juice.mjs` | feel channels answering a forced bite (≥3 of 4; lens is dead by order) |
-| `vary.mjs [port] [worlds…]` | match 2 ≠ match 1, and match 0 is the baseline |
-| `econ.mjs` | cliff dead, bounties pay once, gem shelf, gem hat, no gate on soft spend |
-| `iapdoc.mjs` | APPSTORE.md and the client agree on every product id/price |
-| `trackprofile.mjs --gate` | every track in spec (needs `FFMPEG_BIN=…`) |
-| `moverbands.mjs` | who sits in the choppy half-rate band per world |
-| `aftermatch.mjs` | the menu theme comes home after TIME!, both exits |
-| `switch.mjs <world> <port>` | world-switch reload → gate → scored match |
-| `shippedlook.mjs <port> <world> <tag>` | what the CANVAS shows (screenshot) |
-| `_kickrate.mjs <world> <secs>` | camera-kit firings per minute |
-| `_startlag.mjs` | tap → score latency across repeated starts |
-| `_twoscores.mjs` | two scores playing at once? |
-| `_edcount.mjs` | edibles per size class per world (the hoover economy) |
-| `_pwtrack.mjs` | browser-side track ruler for sandboxes without ffmpeg |
-
-**ffmpeg is not installed.** Install it into the scratchpad when needed:
-`npm i ffmpeg-static` there, then
-`FFMPEG_BIN=<scratchpad>/node_modules/ffmpeg-static/ffmpeg node qa/trackprofile.mjs --gate`.
+| `gate.mjs --profile=push` | **the pre-merge gate** |
+| `placement.mjs <world|all> <port> --ceiling=…` | no prop on a road, in the sea, inside a wall; frozen ceilings |
+| `rng.mjs all <port>` (SEED=7) | every scatter placed what it asked; no pass placed zero |
+| `settle.mjs all <port>` | the burial sweep is idempotent |
+| `pickerfit.mjs <port>` | every line on the world cards clears 4.5:1 |
+| `firstframe.mjs <port> [worlds]` | the boot, splash, menu and establishing shot as evidence; `--splash` is the gate step |
+| `smoke.mjs <world> <port>` | boots, loads, grows, eats, makes sound |
+| `vary.mjs <port> [worlds]` | match 2 ≠ match 1; reads the authored truth off the page |
+| `worldlists.mjs` | no probe believes in fewer worlds than exist (three shapes) |
+| `shippedlook.mjs <port> <world> <tag>` | what the CANVAS shows — the only probe that can see a pipeline swap |
+| `lookbook.mjs` | the studio's evidence pack — teams may not review a surface they have not seen rendered |
 
 ### Traps — every one of these has cost a session
 
 1. **The cwd trap.** Background Bash resets to `/home/user/voidling`. Every
-   backgrounded probe needs an explicit
-   `cd /home/user/voidling/artifacts/3d-game && …`. Symptom: `Cannot find
-   module '/home/user/voidling/qa/smoke.mjs'`.
-2. **Self-matching pgrep.** `until ! pgrep -f 'qa/econ'; do …` never exits — the
-   pattern matches the wait loop's own command line. Bracket a character
-   (`qa/[e]con`) and read the probe's verdict from its **log file**, never from
-   process existence.
-3. **Probes must seed `voidUnlocked`** with all five worlds, or a locked card
-   refuses the tap BY DESIGN and the probe hangs forever. Four probes have hit
-   this.
-4. **Python `replace()` edits that print "done" unconditionally are not
+   backgrounded command needs `cd /home/user/voidling/artifacts/3d-game && …`.
+2. **Background sleeps return immediately.** A `sleep 900` launched in the
+   background and then read is *not* fifteen minutes of waiting. Use a
+   `Monitor` on the output file, or `until` loops, and read the verdict from
+   the log.
+3. **Self-matching pgrep.** Bracket a character (`qa/[e]con`).
+4. **Probes must seed `voidUnlocked`** with all six worlds, or a locked card
+   refuses the tap by design and the probe hangs.
+5. **Python `replace()` edits that print "done" unconditionally are not
    edits.** `assert s.count(OLD) == 1` before every replace, then grep after.
-5. **Zombie Chromium** at 189% CPU starves later probes into 400s timeouts.
-   `pgrep -f 'chrome-linux/chrome'` and kill before diagnosing a hang.
-6. **The sandbox renders ~1 fps under swiftshader.** NEVER quote harness frame
-   timing as the game's. Sample against `__matchState().t`.
-7. `preserveDrawingBuffer` is off — reading the live canvas returns black.
-   Screenshot, then decode the PNG in-page.
-8. `glb()` registers props asynchronously — anything fingerprinting the world
-   early counts a different one each run.
-9. Do not rebuild while a determinism or replay probe is running.
-10. **Suspect the instrument when it disagrees with the owner.** Two instrument
-    bugs were found *this session alone* (postpipe's val denominator; the
-    kick-rate census measuring firings but not amplitude).
+6. **Zombie Chromium** starves later probes into timeouts. `pgrep -f
+   'chrome-linux/chrome'` and kill before diagnosing a hang.
+7. **The sandbox renders ~1 fps.** Sample against `__matchState().t`.
+8. `preserveDrawingBuffer` is off — screenshot, then decode the PNG in-page.
+9. **A single-world probe run and that world inside an `all` run can differ
+   even at SEED=7.** Compare like with like. The placement baseline's own header
+   records which categories drift and by how much.
+10. **Suspect the instrument when it disagrees with the owner.** Then widen it.
+11. **A monitor that only emits on success is silent on failure**, and silence
+    looks like "still running". Cover the failure signatures too.
+12. **Guessing the cause three times is slower than tracing once.** The last
+    placement bug was solved only when the loop was made to say what it did
+    (`window.__settleTrace`). When two readings of the code disagree, instrument.
 
 ---
 
-## 8. Where the launch stands
+## 8. Where things stand (2026-09-10)
 
-**Consensus reached with the owner: go live now, keep building after.** Nothing
-structural is missing.
+**Live on `main` (`3cf26dc`)**, all measured, gate 35/35:
 
-| step | owner | status |
-|---|---|---|
-| 1 | Apple Developer enrollment ($99/yr, **as an individual**, 1–3 days) | **owner — not started** |
-| 2 | Borrow a Mac (2–3 hrs first time) | owner — not started |
-| 3 | Finish the iOS shell so the Mac session is open-Xcode-and-build | **next agent** |
-| 4 | First build to his iPhone via cable | owner + Mac |
-| 5 | App Store Connect listing (agent writes every word; owner pastes + banking) | agent then owner |
-| 6 | Refresh `store/*.png` screenshots under the new name | **next agent** |
-| 7 | Archive, upload, age rating, submit | owner + Mac |
+| | |
+|---|---|
+| placement audit | green on all six worlds for the first time; Pirate `inside` 4 → 0 |
+| props in the sea | four retired across six worlds (the cull tested origins, not footprints) |
+| Pirate's beach | six lifeguard towers sometimes placed **zero**; now first; 98.5 → 99.3% placed |
+| the world picker | Skylark's tagline was 4.24:1 (a card a child cannot read); now 5.6:1, every card up |
+| the gate itself | `deadpaint` could not say PASS; `rng` had no seed; `worldlists` missed object tables; `fresh` mislabelled its FAIL |
+| probes reading the game | `firstframe` and `vary` kept five-world copies of authored data; both read it off the page now |
 
-**Enrollment decision, reasoned through with him:** individual now (fast, no
-D-U-N-S), *not* his federal Canadian corp SolarLead Inc. (D-U-N-S adds ~2
-weeks; the seller line would publicly read "SolarLead Inc." on a kids' game;
-provincial registration still open). Apps transfer between accounts later if
-revenue justifies a corporate wrapper.
+**Next: the menu and the ladder** — `docs/MENU-BRIEF.md`, sixteen crew-days,
+§6 is the order. Day 1 is a measurement, not a pixel.
 
-**Still owed by the agent before submission:**
-- **Kids-privacy telemetry audit** — make the store build collect nothing
-  identifying by default. Promised to the owner; the one exposure worth
-  respecting.
-- Trademark sanity check on "The Cute World Ender" (searches found nothing;
-  a registry check would firm it up).
-- Store copy: description, subtitle, keywords, privacy-policy page.
-
-**Owner's open decision:** Kids Category vs regular 4+ listing. Kids Category
-= curated shelf but permanently bars nearly all ad networks; regular 4+ keeps
-the ad door open (his stated long-term plan) — the recommendation given was
-**regular 4+**, and he has not confirmed.
+**Open small items** (task list): `firstframe`'s title-card check asserts a
+contract the game deliberately dropped (fails on all six; needs a design
+decision, not a patch); 13 stale world-keyed tables in probes the gate does
+not run (reported every run, blocking the day anything runs them); the visual
+first-glance review of all six worlds' establishing shots; the art pass.
 
 ---
 
-## 9. Open items
+## 9. Open decisions — the owner's
 
-**Owed by the owner:**
-- **Pixabay page URLs for all six music tracks.** `CREDITS.txt` says "owner
-  states Pixabay" six times with no links. Blocks submission paperwork only,
-  not the build.
-- **SFX picks** — the three files `eaten_deep.wav` / `evolve_epic.wav` /
-  `win_warm.wav` (Kenney packs: Music Jingles, Impact Sounds, Digital Audio; or
-  Pixabay "gulp"/"power up"/"win jingle"). He tried and disliked the first
-  batch — "let's figure this out later". Until then the synth fallbacks play
-  (the swallow one is now a soft whoosh, not a thud).
-  RETRACTED 2026-09-02 (refute-drum): "the swallow one is now a soft whoosh" was
-  false from the day it was written — eaten_deep.wav was present, decoded on the
-  first gesture, and `sample()` returned before the whoosh line; measured on the
-  pre-702a3e4 build: one 1.8 s buffer at −20.4 dBFS, +14.1 dB over the Lantern
-  recording. The whoosh plays for the first time as of 702a3e4.
+- The twelve in `docs/MENU-BRIEF.md` §8 (unlock strictness, Skylark's landmark,
+  what 100% means, BY MYSELF on the RIVALS level, prices on the SHOP tab, menu
+  sound, chrome-first boot, ground brightness, the child's three numbers, EAT
+  numbers, water on Maple, the fallback if the phone misses 16.7 ms).
+- Kids Category vs regular 4+ listing (recommendation given: regular 4+; not
+  confirmed).
 - Whether Lantern's greeting act stays.
-- Kids Category vs 4+.
-
-**Tracker items still open** (see the task list): #9 store submission, #26
-palette sweep at real screen sizes, #37/#38 shader stalls, #39 frame-rate
-dependent constants at 120Hz ProMotion, #45 rival-eats-landmark news, #46 music
-provenance, #47 decoded-PCM memory (~50–80 MB per loaded track).
-
-**AAA-BRIEF work not done:** the second endless coin sink (recolours — deferred
-because it touches the owner-approved purple identity), earn-rate rebalance
-pending real telemetry, economy-as-JSON extraction, and the Capacitor-shell
-items (notifications, Game Center, ratings prompt, cloud save) which wire up
-when the shell assembles. Phase 2 remainder: clay-system landing, destinations
-animate in/out, HUD layout owner, kill backdrop-filter blurs over canvas, stop
-rendering behind opaque overlays, menu→match choreography.
+- Pixabay page URLs for the six tracks (blocks submission paperwork only).
 
 ---
 
 ## 10. How to work on this
 
 **Measure, change, re-measure, and believe the number over the intuition** —
-with the one amendment this session added: **when the owner's phone disagrees
-with the instrument, widen the instrument.** The shake round is the case study:
-the census counted *firings* and said 19/min was fine; the owner still felt it,
-because amplitude and the lens channel were never in the count. Two rounds of
-honest measurement still landed on the wrong answer until he said "zero", which
-was the right answer all along.
-
-Write the ledger entry (`docs/AAA-BRIEF.md` §7) as you go: MEASURED / CHANGED /
-NOW / GATE, plus retractions, loudly. Six retractions live in these briefs
-because the wrong version is always persuasive.
+with the amendment every session re-learns: **when the owner's phone disagrees
+with the instrument, widen the instrument.**
 
 Every fix this project has shipped went: build the instrument first, fail it on
 the old build, then fix. If a change cannot be measured, the probe is the first
-deliverable.
+deliverable. Write the ledger entry as you go: MEASURED / CHANGED / NOW / GATE,
+plus retractions, loudly. The wrong version is always persuasive.
+
+---
+
+## 11. The first message for a fresh session
+
+Paste this, verbatim, as the first message of the build session:
+
+> You are the crew for THE CUTE WORLD ENDER (repo `woodcode2/voidling`, the game
+> is `artifacts/3d-game/`). Read `docs/HANDOFF.md` top to bottom, then
+> `docs/MENU-BRIEF.md` in full, then `docs/GOVERNOR.md` rules 1–7. Create the
+> branch `claude/menu-ladder` from `origin/main`, start the preview server as a
+> background task, and run `node qa/gate.mjs --profile=push` once on the
+> untouched build so you have seen it green. Then start **MENU-BRIEF §6, day 1**:
+> build `qa/menuframe.mjs` and print the baseline table. Do not author a single
+> menu pixel before that table exists. For every step after: the probe fails on
+> the old build first → fix → probe passes → push gate green → commit with the
+> attribution trailer the harness gives you (no model identifiers anywhere in
+> the repo) → report the numbers, before → after, in plain language. When you
+> reach any of the twelve §8 decisions, stop and put it to the owner with the
+> governor's recommendation; do not choose for him. Never merge to `main`
+> without the push profile green. If a number you wrote turns out wrong, say so
+> in your next reply and in the file that carried it.

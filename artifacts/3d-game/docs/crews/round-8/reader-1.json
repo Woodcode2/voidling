@@ -1,0 +1,175 @@
+{
+ "topic": "What already moves for free in a world at rest (per world), how void3d idles, and the cheapest route to a live menu diorama with moving water",
+ "findings": [
+  {
+   "claim": "The whole 3D scene is built at boot and the render loop runs unconditionally behind the opaque #menu: createIsland is awaited at module top level, createVoid follows, and animate() starts at the end of the module; nothing in animate() checks body.menu.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10974,
+   "evidence": "`animate();` at :10974; `const island = await createIsland(...)` :1733; `const voidling = createVoid(scene, camera)` :3063; per frame `island.update(dt, tClock, camera)` :9485, `voidling.update(dtw, ...)` :10246, `life.update(dtw, ...)` :10281, `fx.update(dtw, camDist)` :10938, `c.render()`/`renderer.render(scene, camera)` :10950-10956. The only menu check in the loop is audio (`onMenu` :10865). life.ts:2579-2580 states it outright: 'life.update() runs unconditionally — before the match, on the title card, and behind the results panel'.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "island.update ticks five things every frame regardless of gameplay: the star-field twinkle uniform, the celestial bodies re-centred on the camera, the bay water shader uniform (pirate only), the waterfall texture scroll + spray opacity pulse, and the hot-air balloon transform (maple only). All are uniform/transform writes — cost class FREE.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 4011,
+   "evidence": "update(dt, t, cam) :4011-4024: `starMatRef.uniforms.uTime.value = t` :4012; `starField.position.copy(cam.position)` + skyBodies loop :4014-4017; `bayWater...uniforms.uTime.value = t` :4018; `wfTex.offset.y = (wfTex.offset.y - dt * 1.6) % 1` :4019; `spray.material.opacity = 0.42 + Math.sin(t*3)*0.08` :4020; balloon orbit `Math.cos(a)*125, 42 + Math.sin(t*0.4)*2.2` :4021-4025.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The star field is a single THREE.Points of 5000 vertices with per-star phase twinkle in the vertex shader, built in an unconditional block for every world; one draw call, free per frame.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 801,
+   "evidence": "bare block `{ const N = 5000;` :733-734; ShaderMaterial with `uTime`/`uPix` :801-832, twinkle `0.72 + 0.28*(0.6*sin(uTime*1.7+aPhase) + 0.4*sin(uTime*2.61803+aPhase*1.7))` :813-814; `starField = new THREE.Points(g, starMatRef)` :834. No WORLD_ID guard between :716 and :836. Whether it is visible against each world's daytime sky canvas: unsure.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "PIRATE BAY is the only world with live moving water: one transparent ShapeGeometry sheet over the baked bay (BAY.WATER_SMOOTH outline) with a domain-warped swell + crest fragment shader driven by uTime; one draw call, no vertex animation.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 3880,
+   "evidence": "`let bayWater = null; if (WORLD_ID === 'pirate') {` :3880-3881; shape from `BAY.WATER_SMOOTH` :3886-3889; ShaderMaterial `uniforms: { uTime }` :3894, fragment swell/crest :3908-3923; `bayWater.position.y = 0.07; renderOrder = 1` :3928-3929. Header comment :3873-3879: 'one draw call ... Nothing else on the island moves at this scale'.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The other five worlds have NO live water: Maple's pond, river and lagoon are painted into the ground bake (static); Lantern's canal is 'ankle-deep' and painted; Powder's lake is ICE painted as water; Skylark and Game Day have no water at all.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 397,
+   "evidence": "inWater3 doc :397-460: 'LANTERN NIGHT has no standing water at all. Its canal is ankle-deep' :410, 'POWDER PASS: the lake is ICE — walkable ground painted as water' :430, 'SKYLARK FIELD has no water of any kind' :434, gameday 'no water on the plateau' :458. Maple river/pond drawn into the bake canvas: `// ── RIVER, drawn as a real waterway` :3119, `riverStroke(hex(WORLD.riverMid), 118)` :3167, pond fill :3249. Lantern canal boats are static populate props: `NM.makeCanalBoat(); boat.userData.afloat = true` :6903-6904 (life.ts never references makeCanalBoat). Lantern CANAL polyline + CANAL_HALF=150 at lantern.ts:98-107; Powder LAKE ellipse at powder.ts:103.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The waterfall plane (scrolling canvas texture) and its additive spray disc are created UNconditionally at createIsland scope, at Maple's WATERFALL coordinate, so they tick on all six worlds; whether they are visible/on-island on non-Maple worlds is not established.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 3812,
+   "evidence": "`if (WORLD_ID === 'maple') {` block :3759 closes at :3811; waterfall block starts :3812 with no guard: `const wfX = w(WATERFALL[0])` :3813 (WATERFALL = [9800,10150] :278), PlaneGeometry(wLen(700), 26) :3825, spray CircleGeometry :3834-3837. No `waterfall.visible` write anywhere (grep). Pirate's jungle waterfall in life.ts:4243-4250 is a separate mover ('sheets falling on a loop').",
+   "confidence": "likely"
+  },
+  {
+   "claim": "The drifting hot-air balloon exists only on MAPLE: spawnBalloon is called in the Maple tail of populate(), which the five other world branches exit before reaching.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 8857,
+   "evidence": "`spawnBalloon(scene);` :8857 under `[maple]` warnings :8854-8855; early returns: powder :6069, skylark :6696, lantern :7050, gameday :7347, pirate :7925 ('the Maple grid pass never runs'). Hook: assets3d.ts:151-152 setBalloonHook, :191 onReady; island.ts:3936 `setBalloonHook((grp) => { balloon = grp; })`.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The scrapbook curios spin/glint every frame on every world (one transform per visible curio) — cheap.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 9487,
+   "evidence": "`for (const c of curios) if (c.mesh.visible) animateCurio(c.mesh, tClock, c.seed);` :9487; animateCurio at src/proto3d/curio.ts:79.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "life.update runs a distance-staggered mover loop (full rate inside the gate, half rate to 2x gate, quarter rate beyond) plus crowd chatter and vignette events; at rest with introT=0 the gate is camDist*2.2+90 (camDist 50 at boot -> 200 units; pirate x2). Cost class: CPU per-object transforms, cheap each, hundreds of objects (Lantern ~966 walkers).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/life.ts",
+   "line": 6808,
+   "evidence": "update :6808-6866 (bands :6852-6864, fast movers exempt :369-374); 'Lantern Night spawns ~966 walkers' :6813-6816; crowdGate `(introT > 0 ? Infinity : camDist * 2.2 + 90) * (pickedWorld === 'pirate' ? 2 : 1)` prototype3d.ts:10276-10277; `let camDist = 50` prototype3d.ts:664.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "MAPLE FALLS at rest: grid-lane cars, wanderers/townsfolk, commuter train, parade (waits for its beat), school bus, tractor, jogger circuit, bike gang, dog walkers, fair goat, boat parade on the lake (afloat), trail walk, mail round, and rooted vignettes (ribbon cutting, parking meter, pie contest, football practice, town hall, lawn signs, diner, campsite, lake fishers) — plus the balloon and the waterfall from island.ts. Cost: cheap movers (transforms + limb poses), no skinning.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/life.ts",
+   "line": 5962,
+   "evidence": "cars :2809/:3013; wanderer :3033/:3154; train :5632, `if (worldId() === 'maple') buildTrain()` :5651; parade :5962 (beat-gated :6017); bus :6071; tractor :6076; joggers :6094; bikes :6109; dogs :6143; goat :6162; boat parade :6245 (`b.userData.afloat = true` :6275); trail :6294; mail :6310; vignettes :6340-6713 (lake :6674).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "PIRATE BAY at rest: on the water a tender circuit, tow boat + parasail, jet ski, paddleboard lesson and swimmers (all afloat movers over the live shader sheet); on land the guided walk, monkeys, zipline, jungle waterfall mover, old-town nets/well/kids, conga line, waiters, DJ, volleyball, shuttle buggies, strollers, wildlife, sunbathers, dance floor. Cheap movers.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/life.ts",
+   "line": 4013,
+   "evidence": "`if (worldId() === 'pirate') {` :3850; ON THE WATER :4013 (`mesh.userData.afloat = true` :4031), tender :4058, tow boat :4068, jet ski :4087; jungle :4095-4243 (waterfall :4243); old town :4279; dance cove :4341; south shore :4456 (volleyball :4462, paddleboard :4518, swimmers :4542 `afloat` :4551); buggies :3954; dance floor :3902.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "LANTERN NIGHT at rest: only the spirit crowd (three tension acts; ~966 walkers) moves; canal boats are static props; no live water. GAME DAY at rest: crowd only (tailgate cooks, queues, concourse ring, walk-up), the band only on its beat cue. Neither has water.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/life.ts",
+   "line": 4603,
+   "evidence": "lantern `if (worldId() === 'lantern')` :4603-4685 (acts :3162-3219); gameday `if (worldId() === 'gameday')` :5384-5521 (band beat-gated :5521); island.ts:6903-6909 places canal boats statically; island.ts:410/:458 no water.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "POWDER PASS at rest: skaters loop on the frozen lake, Old Bess the gritter on her route, lift chairs riding the cable, sledders on the Home Run (skaters/chairs/sledders are `fast: true` movers, exempt from the stagger); the avalanche is cue-only. The lake is ice, so 'moving water' is off-lore here.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/life.ts",
+   "line": 4718,
+   "evidence": "`if (worldId() === 'powder')` :4691; skaters :4718 (`movers.push({ mesh: p, fast: true` :4732); Old Bess :4744/:4754; lift :4767 (`fast: true` :4777); sledders :4789 (`fast: true` :4800); avalanche :4812/:4834 cue-driven. Ice: island.ts:430.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "SKYLARK FIELD at rest: ~500 job-driven walkers (crew, marshals, cleaners, tea ladies, guides, tourists, photographers, shepherds, dog walkers), soap bubbles (one THREE.Points, 64 discs) and camera flashes (4 sprites) — both lazily built; the balloon ascension only fires on the 'lift'/'telegraph' cue. Windsock/flag props are authored limp and static. No water.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/life.ts",
+   "line": 4864,
+   "evidence": "`if (worldId() === 'skylark')` :4864; cast :4866-5122; ascension cue :5128-5301; soap bubbles :2433-2440 ('One THREE.Points ... single draw call'); flash :2515-2521 (`FLASH_N = 4`); `bubbles.update(dt); flashes.update(dt)` :6812; skyfield.ts:450-462 'A flagpole with a limp flag, and a windsock hanging straight down'.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The void's free idle at rest (velocity 0): body-shader time uniform (surface pattern drift/scintillation), a breathing squash of +/-1.6% at 2.2 rad/s, and an authored blink cadence (0.16 s blink every 2.5 s + [1.7,3.4,0.9,2.6,4.1] s pattern). No hover/bob at rest (lift term is multiplied by moveAmt), no gaze wander except in 'sleepy'. Rings/orbit rotate every frame but are opacity 0 unless ringBurst.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/void3d.ts",
+   "line": 1992,
+   "evidence": "update :1992; `bodyMat.uniforms.uTime.value = s.t` :1993 (shader uses uTime :112-117, :263, :306-335, :385-386, :422); lift `dispR*(RADIUS_SINK + |sin(...)|*moveAmt*...)` :2046-2047; `breathe = Math.sin(s.t*2.2*slow)*0.016` :2050, applied :2055/:2099-2101; blink :2297-2310; wander only if sleepy :2315-2316; pupils track lookX/lookY :2340-2347; rings `ringMats[0].opacity = ringBurst > 0 ? ... : 0` :2021-2022, `rings.rotation.y += dt*0.5; orbit.rotation.z += ...` :2018-2019.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Mood and mouth are exposed both on the rig API and as QA hooks: setMood(m) with 8 moods ('cruise','hungry','frenzy','scared','hurt','smug','sleepy','victory'), pinMouth(shut), faceState(), chomp(k); _dbg.__setMood(m) pins the mood over the state machine (moodPin), _dbg.__pinMouth(shut) forwards to pinMouth, _dbg.__voidGroup() returns the group. 'sleepy' is only entered by the state machine when `started` and 8 s without input, so at the menu the void sits in 'cruise' unless pinned.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 2175,
+   "evidence": "`_dbg.__setMood = (m) => { moodPin = m; if (m) voidling.setMood(m as never); }` :2175; `_dbg.__pinMouth = (shut) => voidling.pinMouth(shut)` :2194; `_dbg.__voidGroup` :2139; mood machine :10195-10210 (`else if (started && !ended && tClock - lastInput > 8) mood = 'sleepy'` :10208; `if (moodPin) mood = moodPin` :10209). void3d.ts: `type Mood` :19, `setMood` :54/:1719, `pinMouth` :70/:1725, `faceState` :63/:1724, `chomp` :75, MOODS table :1348-1408 (sleepy :1398 includes gaze wander + Zs :1296).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "fx.ts contributes nothing at rest: a 12-ring pool that is invisible until fx.ring() is called; shake/kick are stubbed to zero. Camera-shake vector is (0,0,0) at rest.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/fx.ts",
+   "line": 36,
+   "evidence": "RING_POOL=12, `mesh.visible = false` :36-43; `shake(amt) { void amt; }` (OFF) and `kick` no-op :76-79; update loop skips invisible rings :80-90 and sets `shakeVec.set(0,0,0)` when shakeAmt<=0.001 :97.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "bubbles.ts is DOM speech bubbles (injected styles), not 3D; crowd chatter in life.update can fire at rest when a ped is within 68 units of the void, because calm(Infinity) deliberately does not write into chatCd.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/life.ts",
+   "line": 6870,
+   "evidence": "chatter :6870-6905 (`near = peds.filter(... < 68)` :6874, `say(cpos, ...)` :6903); `calm(sec) { calmT = sec; if (Number.isFinite(sec)) chatCd = Math.max(chatCd, sec); }` :6934; calmT starts at Infinity :2579-2586 ('Starts at Infinity'). bubbles.ts:97 `createBubbles(camera, max = 2)` '// inject styles once' :98. Whether an ambient line actually appears under the opaque menu is unsure (would be hidden by #menu anyway).",
+   "confidence": "likely"
+  },
+  {
+   "claim": "Cheapest 'moving water' pattern already in the codebase is the pirate bay sheet: one ShapeGeometry (or a ribbon along a polyline) + the existing uTime fragment shader, laid at y~0.07 over the painted water; the water outlines needed already exist as data (Maple LAGOON ellipse and river/pond bake path, Lantern CANAL polyline with CANAL_HALF=150, Powder LAKE ellipse).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 3882,
+   "evidence": "pattern :3882-3930; Maple LAGOON via inLagoon3 :392-395 and riverPath/pond :3125-3250; Lantern `CANAL` lantern.ts:98-107 and `canalPoint(t)` :300; Powder `LAKE = { cx: 5450, cy: 6600, rx: 1450, ry: 1100 }` powder.ts:103; coordinate mapping `w()`/`wLen()` used at :3813 and :3886-3888.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The owner's target and acceptance are already written down: a live 3D diorama of the selected level at 49% of frame height with a slow orbit, and 'Menu frame time <= 16.7 ms on the reference device; the diorama costs nothing after' — so the menu frame time behind today's opaque menu is the baseline that must be measured first (perfFrame/fpsSummary exist).",
+   "file": "/home/user/voidling/artifacts/3d-game/docs/crews/round-7/holeio.polish-plan.md",
+   "line": 120,
+   "evidence": "polish-plan :31 (row 'Menu'), :93 ('The hero is a live 3D diorama of the selected level'), :120 (frame-time bar); recon :552 ('slow 3D camera orbit of the diorama'), :629 ('The menu world moves; the menu UI does not. ~0.3 px/frame'). Perf instruments: prototype3d.ts:411 `perfFrame(dtRaw)`, fpsSummary used at :6176.",
+   "confidence": "certain"
+  }
+ ],
+ "constraints_for_the_build": [
+  "Do not build a second scene/renderer for the diorama: the live scene already renders every frame behind the opaque #menu (prototype3d.ts:9485/:10246/:10281/:10950-10956, :10974). The cheapest diorama is a menu camera framing of the existing scene with #menu's ground made translucent or windowed over the canvas; any new renderer doubles GPU cost against the <=16.7 ms menu bar (polish-plan :120).",
+  "Measure before changing: capture menu-state frame time (perfFrame :411 / fpsSummary) on each world with the menu up TODAY, since the whole scene + bloom is already being paid for unseen; the diorama must not add to it.",
+  "Only PIRATE has live water (island.ts:3880-3931). Lantern's canal is ankle-deep (:410), Powder's lake is ICE (:430), Skylark/Game Day have none (:434/:458). 'Moving water' on Maple (lagoon/pond/river) and Lantern (canal) means adding a sheet on the pirate pattern; on Powder it should be an ice glint, not water, or the lore breaks.",
+  "Any new water sheet must be one draw call, uTime-only (no vertex animation), transparent with depthWrite:false, renderOrder 1, y ~0.07 above the bake, authored mirrored like the ground slab (:3882-3889) — and must not alter inWater3/inLagoon3 walkability (:392-460) or edibles.",
+  "The void at the menu is in 'cruise' (sleepy is gated on `started` :10208); if a menu pose is wanted, drive it via voidling.setMood()/pinMouth() from the menu code, not via the QA _dbg hooks, and keep the blink (:2297-2310) and breathe (:2050) untouched — the void is refined, never replaced.",
+  "The menu diorama can only show the CURRENT world: createIsland builds one world per page load (:1733, world reload on change). Showing the other five worlds live would need a second island build (18 breathe stages, island.ts:493) — out of scope for the cheapest path.",
+  "life.update runs at rest with crowdGate = camDist*2.2+90 (:10276); a pulled-back menu camera raises camDist and therefore the full-rate mover population — measure mover counts with life.moverStats(gate) (life.ts:6906) at the chosen menu camDist.",
+  "Balloon (Maple only, island.ts:8857) and the unconditional waterfall/spray (:3812-3838) are the only 'set-piece' idles island.ts owns; adding spawnBalloon() to another world's populate branch is a one-line free idle, but confirm the waterfall's visibility on non-Maple worlds first.",
+  "Nothing lands without a failing-first probe and a skeptic verdict; qa/gate.mjs --profile=push stays green; no ads, parental gate on spend, rated 4+."
+ ],
+ "cheapest_path": "Keep one scene. (1) Probe first: with the menu up, record frame time per world via perfFrame/fpsSummary and life.moverStats — this is the free baseline because animate() already renders everything behind the opaque #menu (prototype3d.ts:10974, :9485-:10956). (2) Menu framing: on body.menu, drive the existing camera to a slow orbit around the spawn/hero landmark (recon :552/:629 wants ~0.3 px/frame) and make #menu's ground layer translucent/windowed over the canvas at the diorama band (index.html :846-935), leaving the UI static. (3) Water: pirate is done (island.ts:3880-3931). For Maple and Lantern, add one ShapeGeometry/ribbon sheet using the SAME ShaderMaterial as bayWater (uTime only, one draw): Maple over the LAGOON ellipse (:392-395) and pond, Lantern along CANAL with CANAL_HALF (lantern.ts:98-107) using canalPoint(t) to build the ribbon; tick their uTime in island.update (:4011-4024). Powder: reuse the shader with the crest term only as an ice glint over LAKE (powder.ts:103), or skip. (4) Non-water idle for Game Day and Skylark: nothing new is required — the crowd (life.ts:5384/:4864), curios (:9487) and star twinkle (:801-834) already move; the one-line optional add is spawnBalloon(scene) in their populate branch (island.ts:8857 pattern). (5) Hero: leave 'cruise' with blink/breathe (void3d.ts:2050, :2297); optionally setMood('smug') on a timer for a menu wink — via the rig API, not _dbg.",
+ "risks": [
+  "Menu frame time is unmeasured: the whole scene plus bloom already renders unseen behind the opaque #menu, so the current baseline may already exceed 16.7 ms on rung 0 — unlocking the diorama makes an existing cost visible rather than adding one, but the owner reads numbers and there are none yet.",
+  "The unconditional waterfall/spray (island.ts:3812-3838) sits at Maple's SE-edge coordinate on every world; a menu orbit may reveal it floating off a non-Maple island.",
+  "Lantern's canal is authored as ankle-deep (island.ts:410) and its boats are static props (:6903-6909): a moving-water sheet there may contradict the placement/QA tags (qa/placement.mjs reads `afloat`).",
+  "Powder's lake is ice (island.ts:430) with skaters looping on it (life.ts:4718): a water shader there reads as skaters on water.",
+  "Pulling the menu camera back raises camDist and the full-rate crowd band (prototype3d.ts:10276; pirate x2) — the Lantern crowd (~966 walkers, life.ts:6813) is the likely hotspot.",
+  "Ambient crowd chatter can fire at rest (life.ts:6870-6905; calm(Infinity) leaves chatCd finite :6934) — DOM bubbles may appear over the menu once the ground is translucent.",
+  "Changing worlds reloads the page (given), so a Hole.io-style 'diorama of the level you are about to play' for a NON-current world is not achievable on this path."
+ ],
+ "open_questions": [
+  "Does the owner expect the diorama to show only the current world, or to switch live between the six (which requires a second island build)?",
+  "Is the waterfall mesh visible on non-Maple worlds today (needs a render, not a static read)?",
+  "Should Powder's frozen lake stay ice (glint) or become water for the menu?",
+  "Should Lantern's canal get moving water despite being 'ankle-deep' in lore and holding static boats?",
+  "What is the menu-state frame time per world and quality rung right now (perfFrame/fpsSummary), and what is life.moverStats at the intended menu camDist?",
+  "Is the star field actually visible against each world's sky canvas (SKY_MOOD :679, background :715) or only on the night worlds?",
+  "Does the quality-ladder adapter (applyQuality :1313) run and adapt while the menu is up, or is it pinned/parked before the first match?"
+ ]
+}

@@ -1,0 +1,259 @@
+{
+ "topic": "End-of-match ceremony (#end) and the audio constraints a live 3D menu must respect; plus the menu's existing surfaces (#eventRibbon, #gift, #btnSettings, #daily)",
+ "findings": [
+  {
+   "claim": "#end DOM order (top to bottom): #endScroll{ .hd#endHd, .sub#endSub, .list#endList, #endFinds, #endStats, #drop, #endNext, #endQuests } then .endGo{ #btnAgain, #btnHome } outside the scrollport.",
+   "file": "/home/user/voidling/artifacts/3d-game/index.html",
+   "line": 2229,
+   "evidence": "index.html:2229-2274; .endGo is a sibling of #endScroll (not sticky) per comment :2220-2228",
+   "confidence": "certain"
+  },
+  {
+   "claim": "#end is position:fixed inset:0 z-index:9, background rgba(13,8,33,0.82) + backdrop-filter blur(8px) — i.e. the end card already overlays the dimmed live world; the shop (11), scrapbook (12) and #coins (11) sit above it by design.",
+   "file": "/home/user/voidling/artifacts/3d-game/index.html",
+   "line": 708,
+   "evidence": "index.html:708-710 (#end), :714-722 (why 9 stays below coins/shop/book), :654 (#book z12), :1588 (#shop z11), :1819 (#coins z11)",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Timeline of endMatch (rivals branch): t=0 endEl.classList.add('show') at :5570 after the DOM has been filled; the whistle sound is audio.win()/audio.lose() at :5387 chosen by myRank; match music fades out 1.2s via audio.stopMusic() at :5331.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5324,
+   "evidence": "prototype3d.ts:5324-5581; audio3d.ts:4215-4224 stopLoop(themeCh, 1.2) and synth stops at 1.2",
+   "confidence": "certain"
+  },
+  {
+   "claim": "celebrateEnd() is the 'tally ceremony' of LADDER action #2: coin count-up in .endCnt eased over 900ms with 8 rising audio.pop() ticks; optional 24 confetti spans (3.2s) when won; it also calls offerDrop() first.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5290,
+   "evidence": "prototype3d.ts:5290-5323 (k = (now-t0)/900, chunk = floor(k*8), audio.pop(3+chunk)); docs/LADDER.md:130 marks action #2 BUILT",
+   "confidence": "certain"
+  },
+  {
+   "claim": "CSS stagger timings on the end card: #endStats .es tiles cascade at 0.15/0.32/0.49/0.66/0.83/0.98s (esIn 0.34s); rival rows .er at 0.15+0.12*i s (erIn 0.4s); sticker finds .stk at 0.12+0.16*i s (stkIn 0.44s); #drop.show fades in at 1.0s delay (esIn 0.4s); #btnAgain pulses from 1.2s; .es.rk.up level-up pop at 0.5s delay.",
+   "file": "/home/user/voidling/artifacts/3d-game/index.html",
+   "line": 768,
+   "evidence": "index.html:768-782 (#endStats delays), :846-847 (.er erIn), :652-653 (.stk stkIn), :787 (#drop.show delay 1s), :825-826 (lvlPop 0.5s), :861 (againPulse 1.2s); JS delays at prototype3d.ts:5568 (rows) and :7008 (finds)",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The VOID DROP (#drop) is a press-and-hold ceremony: charge fills at 1/1.1 s per second held (~1.1s to open), pops at quarter marks, openDrop pays DROP_VAL[n] of [40,60,100] (3/day), audio.ready(), 14 confetti, then the block folds away after 2600ms + 550ms.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5206,
+   "evidence": "prototype3d.ts:5206-5289 (dropCharge += dt/1.1; setTimeout 2600 then 550)",
+   "confidence": "certain"
+  },
+  {
+   "claim": "#endNext is the single 'next thing' slot: on a world unlock it shows the NEW WORLD .unlockCard with TAKE ME THERE (reloads page with voidWorld+voidAutoPlay) plus audio.win() and 16 confetti; otherwise the next-skin coin progress bar (.nb) with an OPEN SHOP button when affordable. This is where 'the next reward as a locked illustration' would replace/extend the text card.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5503,
+   "evidence": "prototype3d.ts:5503-5567; CSS #endNext :829-833, .unlockCard :1424-1431",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The 'level pip lights first (≤400ms)' has no existing home: nothing on #end shows the ladder; the closest is the rank tile .es.rk with its XP bar (LEVEL UP! beat) inside #endStats which lands at the 0.83s cascade slot. The spec's slot is above #endSub/celebrateEnd, i.e. between #endHd and #endSub, before celebrateEnd's t0 at :5306.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5493,
+   "evidence": "prototype3d.ts:5493-5497 (rank tile), :5290 (celebrateEnd starts the count-up as soon as it is called, inside endMatch before endEl.show at :5570); plan bar docs/crews/round-7/holeio.polish-plan.md:164 and :288",
+   "confidence": "likely"
+  },
+  {
+   "claim": "#endQuests (TODAY quests block) is rendered on every end card at :5461-5476 from the day-seeded `quests` array; the owner retired the daily quest board, so this block (and CSS index.html:487-497) is the surface the redesign removes.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5461,
+   "evidence": "prototype3d.ts:5461-5476; docs/crews/round-7/holeio.polish-plan.md:167-168 ('The daily quest board is retired … removed, not hidden')",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Solo branch of endMatch: headline `${devouredPct}% DEVOURED`, audio.win() only on new voidBestPct else audio.ready(); no rival rows; same celebrateEnd count-up; stats/quests/next blocks are NOT rendered in the solo branch (early return at :5372).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5336,
+   "evidence": "prototype3d.ts:5336-5373",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Per-world poster art exists for 5 of 6 worlds and is vendored on disk: maple hf_20260801_130607…, pirate hf_20260801_130624…, gameday hf_20260801_053403…, lantern hf_20260802_020636…, powder/frost hf_20260730_000329… (all in public/assets/hf). skylark's poster hf_20260904_175218_7e696395… is referenced but NOT on disk (CDN-only via vercel.json rewrite).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 6613,
+   "evidence": "CARD_ART prototype3d.ts:6613-6666; `ls public/assets/hf` shows 14 files including the five above; skylark file absent from the listing",
+   "confidence": "certain"
+  },
+  {
+   "claim": "paintWorldCard(host,id) paints CARD_FALLBACK[id] (a per-world radial gradient) first and swaps to CARD_ART[id] only on Image.onload — so a 'locked next island' illustration on the end card can reuse this function and is never blank. It only sets background-image/size/position; the locked look is CSS: #worlds .wCard.locked .wArt { filter: saturate(0.62) brightness(0.85) }.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 6689,
+   "evidence": "prototype3d.ts:6689-6699; CARD_FALLBACK :6672-6688; index.html:1416-1419",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The posters are painted 'the world itself as a small floating island against the cosmos, no void in frame' — i.e. already the shape of 'the next island as a jewel'; the other 9 hf files are skin textures (palette.ts), sky/nebula textures (island.ts:683, void3d.ts:702,1769) and the app icon (index.html:8-9), not posters.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 6621,
+   "evidence": "prototype3d.ts:6621-6623 brief; palette.ts:257-277 tex; island.ts:683; void3d.ts:702,1769; index.html:8",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The world after the current one is computable from WORLD_ORDER (unlocks.ts:36) and completeWorld()/gateFor(); completeWorld(pickedWorld) at :5503 returns the newly opened world or null (already open / last world). There is no 'next reward' concept beyond the next world and the next skin (nextGoal()).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/game/unlocks.ts",
+   "line": 89,
+   "evidence": "unlocks.ts:36,80-98,100; prototype3d.ts:5503,5537",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Audio channels: themeCh = mkChan(0.4) (match track), menuCh = mkChan(0.34) plays MENU_URL '/assets/music/menu.mp3' (file exists, 2.2MB per comment). Menu theme has no synth fallback of its own but synthCover() raises the world's bed after 400ms if the file has not decoded.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/audio3d.ts",
+   "line": 438,
+   "evidence": "audio3d.ts:432-440, :3963-3976 (startMenuMusic), :767-790 (synthCover); `ls public/assets/music` shows menu.mp3 + 5 world mp3s, no skylark.mp3",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Unlock mechanism: capture-phase window listeners on pointerdown/touchstart/touchend/mousedown/click/keydown call unlock(), which ensure()s the context, primeOutput() (silent 1-frame buffer inside the gesture), promoteSession() (looping silent <audio> to defeat the iOS ring/silent switch), then repairMusic() synchronously. Also visibilitychange->unlock(). ctx.statechange->repairMusic() and the resume promise are the real repair paths.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/audio3d.ts",
+   "line": 282,
+   "evidence": "audio3d.ts:152-324 (unlock at :282-312, listeners :317-324, statechange :237-241, resume promise :266-274)",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Nothing can sound before the first gesture: startLoop() REFUSES to schedule when ctx.state!=='running' and no gesture in the last 1500ms (marks channel cold); repairMusic() bails on the same condition. So a menu that renders 3D before any tap is still silent until the first touch; the 3D render itself is not a gesture and changes nothing about unlock.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/audio3d.ts",
+   "line": 459,
+   "evidence": "audio3d.ts:459-461 (startLoop refuse), :793-803 (repairMusic gate), :3959-3962 ('AUTOPLAY: a browser will not start audio before a gesture… however it is called')",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Menu theme is driven by state, not wiring: every frame in animate(), onMenu = body.menu || #end.show; on edge it calls audio.startMenuMusic()/stopMenuMusic(), and a 2s watchdog restates startMenuMusic() while onMenu. A live 3D menu must keep body.menu set (or extend `onMenu`) or the theme will not play there.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10866,
+   "evidence": "prototype3d.ts:10830-10889 (onMenu :10866, watchdog :10867-10884, edge :10886-10889)",
+   "confidence": "certain"
+  },
+  {
+   "claim": "On match start (audio.startMusic at audio3d.ts:3919-3946): menuCh.wanted=false; stopLoop(menuCh, 0.6) fades the menu theme 0.6s; if menuCh.starts>0 its PCM is released (releaseBuf at :3931); themeUrls/themeSynth armed; playTrack(themeCh, urls) and a synthCover() after 400ms grace. Cross-fade is menu 0.6s out over the theme's near-instant start (30ms ramp; 0.25s only if the synth bed was up).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/audio3d.ts",
+   "line": 3919,
+   "evidence": "audio3d.ts:3919-3946; startLoop envelope :505-511; releaseBuf :563-568",
+   "confidence": "certain"
+  },
+  {
+   "claim": "startMusic is invoked from startMatch() on the FIRST TOUCH of the armed world (sfx('music', () => audio.startMusic())), not at menu PLAY; the comment says this is why the reload-path TAP TO PLAY gate 'can go'. The clock and music both start on the same first touch.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 6329,
+   "evidence": "prototype3d.ts:6297 (function startMatch), :6329-6331; sfx() :6042-6045 only logs then calls",
+   "confidence": "certain"
+  },
+  {
+   "claim": "TAP TO PLAY history: fresh-load gate removed (owner: 'two to begin'); reload path (voidAutoPlay) shows #tapGate as GETTING READY… over the idling island with #menu hidden, then on pack-ready (≤12s) it removes the gate WITHOUT a tap and launches (or defers to the daily card via pendingLaunch). The comment block at :6919-6927 claiming 'the RELOAD path keeps its gate' is stale; code at :6913-6914 removes it.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 6840,
+   "evidence": "prototype3d.ts:6840-6931 (menu hidden :6869-6870, gate unarmed :6889-6895, removal :6913-6914, daily deferral :6923-6928, stale comment :6919-6927); CSS #tapGate z55 index.html:1275",
+   "confidence": "certain"
+  },
+  {
+   "claim": "preloadMusic() at boot orders downloads by path: if voidAutoPlay (world switch reload) the world track first then menu.mp3; else menu first then world. ensure() is called at boot so the AudioContext is constructed without activation (the case iOS treats worst — hence primeOutput).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/audio3d.ts",
+   "line": 4058,
+   "evidence": "audio3d.ts:4040-4062; :160-163 comment on preloadMusic calling ensure() at boot",
+   "confidence": "certain"
+  },
+  {
+   "claim": "After the whistle: audio.stopMusic() releases the theme PCM (releaseBuf themeCh at :4232) so PLAY AGAIN re-fetches/decodes (measured 314-3061ms, bed covers); the end card is 'front-of-house' so the menu theme restarts under the score via onMenu.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/audio3d.ts",
+   "line": 4232,
+   "evidence": "audio3d.ts:4225-4238; prototype3d.ts:10840-10848 comment",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Menu markup order inside #menu: .logo, .tag, .spacer, #menuOrb (display:none), #btnPlay, #eventRibbon, .navRow (btnBook/btnShop/btnTrophies/btnTop), #btnSettings, #gift. #menu z-index 10; children z-index 1 over ::after key art z0; #btnSettings absolute top-left z3.",
+   "file": "/home/user/voidling/artifacts/3d-game/index.html",
+   "line": 1949,
+   "evidence": "index.html:1949-1990; CSS :885 (#menu z10), :920 (children z1), :899 (::after z0), :1507-1508 (#btnSettings)",
+   "confidence": "certain"
+  },
+  {
+   "claim": "#gift is dead: CSS `display:none !important` and its JS is wrapped in `if (false)` ('menu gift box RETIRED — the daily calendar owns login rewards now'). A redesign drops nothing by removing it.",
+   "file": "/home/user/voidling/artifacts/3d-game/index.html",
+   "line": 1501,
+   "evidence": "index.html:1501; prototype3d.ts:7925-7944",
+   "confidence": "certain"
+  },
+  {
+   "claim": "#eventRibbon: display:none unless .show; shown only when liveEvents() has an event whose world isUnlocked(); tap launches that world (launchWorld() if it is the built world, else reload with voidWorld+voidAutoPlay). It is a one-tap-to-play path that already bypasses the picker.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 6778,
+   "evidence": "prototype3d.ts:6778-6796; CSS index.html:1381-1394; markup :1978",
+   "confidence": "certain"
+  },
+  {
+   "claim": "#daily (z-index 45, full-screen modal) is raised at module init when voidDailyLast !== today AND menuEl.style.display !== 'none' (so never on the autoplay/first-launch path); CLAIM pays DAILY[day]*mult, day-7 +1 gem, audio.evolve(), closes after 750ms; backdrop tap closes; closeDaily() resumes a pendingLaunch.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 7967,
+   "evidence": "prototype3d.ts:7967 (condition), :8007 (modal), :8041-8046 (closeDaily), :8051-8078 (claim), :8083-8084 (backdrop/show); CSS index.html:1136-1139",
+   "confidence": "certain"
+  },
+  {
+   "claim": "#btnSettings opens #settings (z-index 46): sound, rumble, big-motion, stats rows; it lives inside #menu so it measures 0x0 during a match (pause sheet covers in-match).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 8114,
+   "evidence": "prototype3d.ts:8114, :7708-7712 comment; index.html:1511 (#settings z46), :1998-2004 markup",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Overlay z-order that a redesigned menu sits under: #menu 10 < #coins/#quests 11, #shop/.metaScr 11 < #book 12 < #skinPrev 40 < #daily 45 < #settings 46 < #tapGate 55 < #loadScr 60 < #pause 66 < #policy 68 < #gate 70. #end is 9 (below the menu) and HOME re-raises the menu by setting menuEl.style.display='' + body.menu.",
+   "file": "/home/user/voidling/artifacts/3d-game/index.html",
+   "line": 885,
+   "evidence": "index.html:885,1819,1826,1588,1551,654,1205,1136,1511,1275,1311,1656,1680,1695,708; prototype3d.ts:7696-7702 (btnHome)",
+   "confidence": "certain"
+  },
+  {
+   "claim": "body.menu is added at endShop door (:5553), btnHome (:7699), pause-quit (:7776); removed in beginMatch (:6185) and the reload gate (:6870). OVERLAYS list at :2347 toggles body.ovl while any of worlds/shop/daily/settings/trophies/skinPrev/topvoids/pause/policy/gate is shown.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 2347,
+   "evidence": "prototype3d.ts:2347-2360, :5553, :6185, :6870, :7699, :7776",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The existing goal card (#titlecard, .lvl/.name/.sub) rolls in at GOAL_CARD_AT=0.5s after arm for GOAL_CARD_LEN=0.6s (goalRoll animation) — the in-match surface where a level's one-line goal would be stated.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 6029,
+   "evidence": "prototype3d.ts:6029-6030, :9512-9517; index.html:581-591, :1938-1941",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The polish-plan's own note says the win/lose sting must own the first beat of the end card and the menu theme 'fades in over 1.2s from near silence' under it — but startLoop() ramps the channel instantly (30ms) unless a synth bed was up (0.25s). Which is true on the end card is UNSURE from static reads.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10849,
+   "evidence": "prototype3d.ts:10849-10850 vs audio3d.ts:505-511",
+   "confidence": "unsure"
+  }
+ ],
+ "constraints_for_the_build": [
+  "No sound before the first trusted gesture, whatever the menu renders: startLoop refuses without a gesture in the last 1.5s (audio3d.ts:459) and the unlock is a capture-phase window listener (:317-324). A 3D menu must not add a tap 'for audio' — the first real tap (PLAY, a pip, a tab) is the gesture; the owner already rejected a second 'begin' tap (prototype3d.ts:6919-6931).",
+  "Keep body.menu set (or extend `onMenu` at prototype3d.ts:10866) while the live menu is up, otherwise the menu theme never starts; the watchdog restates it every 2s only while onMenu.",
+  "The end card must keep counting as front-of-house (endEl.show is in onMenu) so the theme returns under the score; if the end card becomes a non-#end surface, extend onMenu.",
+  "Match music starts on the first touch of the armed world inside startMatch() (prototype3d.ts:6329-6331), and audio.startMusic() fades the menu theme 0.6s and releases its buffer if it ever played (audio3d.ts:3922-3931). One-tap-from-menu must route through launchWorld()/withWorldReady()/startFresh so this hand-off is unchanged.",
+  "Reload path: menuEl is hidden at prototype3d.ts:6869 and the match starts with no tap; the daily card (#daily z45) defers launch via pendingLaunch (:6923-6928). A live menu that persists across worlds without reloading removes this whole path — or must reproduce the deferral.",
+  "End-card DOM: the pip row must be inserted before celebrateEnd() runs (:5290, called at :5364 solo / :5439 rivals) so it lights ≤400ms before the 900ms count-up; #endStats tiles already occupy 0.15-0.98s and #drop fades in at 1.0s (index.html:768-787).",
+  "#endQuests (prototype3d.ts:5461-5476; CSS index.html:487-497) is the retired quest board — remove, not hide (plan :167-168). Also delete the dead #gift (index.html:1501, prototype3d.ts:7925-7944).",
+  "Keep #endNext's two doors: TAKE ME THERE (world unlock, reload) and OPEN SHOP (sets body.menu + menuEl.display='' + #shop.show + __shopTab paint at :5549-5563) — any 'locked next reward' illustration replaces the text, not the buttons.",
+  "Locked-reward art: use paintWorldCard(host, nextWorld) (prototype3d.ts:6689) + the .locked filter (index.html:1416); 5 of 6 posters are on disk under public/assets/hf, skylark's is CDN-only (CARD_FALLBACK covers the miss).",
+  "#end stays z-index 9 (below #coins 11, #shop 11, #book 12) per index.html:714-722; the 54px top padding reserves the coin chip strip.",
+  "The mute-switch defeat (promoteSession silent <audio>, audio3d.ts:180-206) and primeOutput (:208-222) run inside unlock(); do not add any menu code path that calls ensure()/play() outside a gesture.",
+  "No skylark.mp3 exists (public/assets/music) — that world's score is synth; a menu diorama of skylark has no recorded track to preview."
+ ],
+ "cheapest_path": "Audio: change nothing — keep body.menu true while the live 3D menu is up and let the existing unlock listeners + onMenu sync carry the theme; one tap from the menu = call launchWorld() (or a level-aware wrapper) directly from the pip/PLAY, so startMatch()'s first-touch hand-off (menu 0.6s out, world in) is untouched. End card: (1) insert a `#endPips` element between #endHd and #endSub (index.html:2230-2231) and paint it in endMatch before celebrateEnd() is called (:5364/:5439) with a CSS animation delay ≤0.3s; (2) delete #endQuests and its render block (:5461-5476) and #gift; (3) in the non-unlock branch of #endNext (:5537-5567) render a `.wArt`-style box painted by paintWorldCard(host, WORLD_ORDER[i+1]) with the .locked filter and a padlock, keeping the OPEN SHOP / TAKE ME THERE doors; (4) leave celebrateEnd's 900ms count-up and the #endStats cascade as they are. Probe: a qa script that opens #end and asserts pip opacity==1 within 400ms of endEl.classList.contains('show') and that the count-up starts after it.",
+ "risks": [
+  "Stale comments in prototype3d.ts:6919-6931 and :6934-6945 describe a reload-path gate that the code no longer shows; a builder reading comments will design for a tap that does not exist.",
+  "If the live menu renders WebGL under a semi-transparent #menu, the end card's blur(8px) backdrop and z-order (9 < 10) mean #end would sit UNDER the menu; today HOME sets menuEl.display='' only after removing #end.show, so any concurrent state breaks.",
+  "releaseBuf(menuCh) at audio3d.ts:3931 drops the menu PCM once it has played; a menu the child returns to after every match re-fetches menu.mp3 (2.2MB) from HTTP cache each time — acceptable today, but a menu that also previews world tracks would multiply decodes on a slow device (measured 314-3061ms).",
+  "The daily card fires at module init based on menuEl.style.display (prototype3d.ts:7967); a menu that no longer uses display:none on #menu to mean 'in a match' will raise the daily modal over a running match unless the condition is rewritten.",
+  "completeWorld() unlocks on FINISHING any match (unlocks.ts:89-98); the five-level ladder's sequential pips need a separate `voidLevels` key (plan :156) and must not regress grandfathered voidUnlocked users.",
+  "The polish-plan's claim that the menu theme fades in 1.2s under the sting (prototype3d.ts:10849) conflicts with startLoop's instant ramp (audio3d.ts:505-511); unverified without a browser."
+ ],
+ "open_questions": [
+  "Does the WebGL canvas render while #menu is up (reader 1's question)? If not, the end card's 'dimmed world' blur only works because #end shows over a live match, and a 3D diorama for the menu needs its own render path or camera.",
+  "Does the owner want the end card to keep the VOID DROP hold-to-open (LADDER action #4) and the sticker finds block, given the measured 430x932 overflow (index.html:2263-2269)? Adding a pip row plus a locked illustration re-opens that overflow.",
+  "Which illustration stands in for 'the next reward' on a non-unlock match: the next world's poster (only changes 5 times per profile) or the next level's pip state? The plan (:288-290) says 'island art per world', which is silent on levels within a world.",
+  "Is the menu theme supposed to start before any tap on iOS via the promoted media session? Static reads say no (needs a gesture); confirm on device.",
+  "Should a goal level that WINS ON THE SPOT reuse endMatch() (which computes myRank from rivals and pays placement coins) or a new path? endMatch has no 'goal met' input today."
+ ]
+}

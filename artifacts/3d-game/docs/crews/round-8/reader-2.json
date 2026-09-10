@@ -1,0 +1,179 @@
+{
+ "topic": "Ladder state model and migration: voidLevels schema, unlock reconciliation, grandfathering, current-level semantics, write/read boundaries",
+ "findings": [
+  {
+   "claim": "Existing progression key voidUnlocked is a CSV of world ids; read() always injects 'maple', write() is try/catch-wrapped for private mode.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/game/unlocks.ts",
+   "line": 44,
+   "evidence": "const KEY = 'voidUnlocked'; read() splits on ',' and s.add('maple') (:46-52); write() joins with ',' (:53-55).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Grandfathering precedent: migrate() runs on EVERY read path and adds any world with voidBest_<w> > 0 or voidWorld === w, then persists if it grew.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/game/unlocks.ts",
+   "line": 61,
+   "evidence": "for (const w of WORLD_ORDER) { if (s.has(w)) continue; played = Number(localStorage.getItem(`voidBest_${w}`)||0) > 0 || localStorage.getItem('voidWorld') === w; ... } if (grew) write(s); — called from isUnlocked (:76), completeWorld (:93), unlockedCount (:101).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The binding unlock rule is FINISH (not win) any match on the previous world; the file states 'never a wall' and 'NOBODY IS EVER RE-LOCKED' as design invariants.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/game/unlocks.ts",
+   "line": 5,
+   "evidence": "Header comment :5-26; completeWorld(world) adds WORLD_ORDER[i+1] unconditionally on finish (:89-97).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "voidMatchN is a JSON object {world: count} written via JSON.stringify — the per-world JSON-object convention the new key should follow (not the CSV of voidUnlocked).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/game/matchdeck.ts",
+   "line": 25,
+   "evidence": "const KEY = 'voidMatchN'; readAll() JSON.parse(... || '{}'); bumpMatch writes JSON.stringify(all) (:27-44). Match index 0 is the shipped baseline (:11-18).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "stickers.ts does NOT version its save; it relies on stable ids and 'unknown ids are kept rather than dropped' as its migration strategy (a forward-compatible additive set).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/game/stickers.ts",
+   "line": 442,
+   "evidence": "const KEY = 'voidStickers'; load() keeps every id in the CSV (:449-451 comment: 'a build that renames a sticker by accident must not silently throw away a child's collection').",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The only explicit save-version precedent is voidSaveVer (SAVE_VER = 2) in the skins section: read ver, if ver < SAVE_VER run a guarded migration, track('save_migrated'), then write SAVE_VER.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 8213,
+   "evidence": "const SAVE_VER = 2; const ver = Number(localStorage.getItem('voidSaveVer')||0); if (ver < SAVE_VER) {...; localStorage.setItem('voidSaveVer', String(SAVE_VER));} (:8213-8230).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "voidStats is a JSON object with defaulted fields and ??= backfill for later-added fields — the in-file precedent for additive schema growth without a version bump.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 7805,
+   "evidence": "const stats: Stats = JSON.parse(localStorage.getItem('voidStats') || '{...}'); stats.rivals ??= 0; stats.combo ??= 0; saveStats() (:7805-7807).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "pickedWorld is resolved once at boot from ?w= or voidWorld (default 'maple') and is a const for the page lifetime; changing world means reload.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 355,
+   "evidence": "const _wantWorld = new URLSearchParams(location.search).get('w') ?? localStorage.getItem('voidWorld') ?? 'maple'; const pickedWorld: WorldId = ... (:355-358). Picker card click for another world sets voidWorld + voidAutoPlay then location.href = location.pathname (:6768-6770).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "endMatch() is the single write boundary for match results; the per-world best voidBest_<world> is written ONLY in the rivals branch (:5449-5452), and completeWorld() is called ONLY in the rivals branch (:5503).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5324,
+   "evidence": "solo branch (:5337-5365) writes voidBestPct, voidXP, stats, then `return;` before reaching voidBest_ (:5449) and completeWorld (:5503). Consequence: a solo-only player never unlocks the next world and never gets voidBest_<w> for migrate() to grandfather from.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "voidBestPct is a single GLOBAL key, not per-world — solo % devoured is not attributed to a world today, so a per-world CLEAR level cannot be back-filled from it.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5339,
+   "evidence": "const best = Number(localStorage.getItem('voidBestPct') || 0); if (newBest) localStorage.setItem('voidBestPct', String(devouredPct)); (:5339-5344).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "devouredPct is the share of ALL alive mass consumed by anyone (player + rivals), rounded, capped at 100 — so '100% devoured' as a CLEAR criterion counts rivals' eating unless redefined.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 4886,
+   "evidence": "devouredPct = Math.min(100, Math.round((consumed / aliveMass) * 100)); consumed increments for any e.eaten (:4883); devMineN/devAllN tracks the player's share separately (:5460 endStats).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "myRank at the crown banner and at endMatch are computed identically from rows sorted by score, filtered to joined rivals — the RIVALS level result is already available at :5375.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 4737,
+   "evidence": "const myRank = rows.findIndex((r) => r.me) + 1; (:4737 live, :5375 endMatch).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The picker paint block reads voidBest_<id> via worldBest() and gateFor(id) per card; the lock text overrides the best badge; the click handler consults gateFor again and refuses locked cards.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 6701,
+   "evidence": "const worldBest = (id) => Number(localStorage.getItem(`voidBest_${id}`)||0); (:6701); document.querySelectorAll('#worldRow .wCard[data-world]').forEach (:6704); gateFor(id) (:6741-6743); click handler gateFor(id) refuse path (:6750-6763); launch or reload (:6765-6770).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The season ribbon also reads isUnlocked() to avoid advertising a locked world — a second read site of the unlock state.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 6784,
+   "evidence": "const ev = liveEvents().find((e) => isUnlocked(e.world)) ?? null;",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The NEW WORLD card at endMatch writes voidWorld + voidAutoPlay and reloads on TAKE ME THERE; on boot voidAutoPlay is consumed and the match launches without the menu.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5518,
+   "evidence": "localStorage.setItem('voidWorld', opened); localStorage.setItem('voidAutoPlay','1'); location.href = location.pathname; (:5518-5520). Boot: if (voidAutoPlay === '1') { removeItem; ... } (:6840-6841).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Complete list of localStorage keys in prototype3d.ts with meaning: voidWorld (:356 selected world), voidPlayed (:1687,:5330,:6329 'has ever finished'), voidAutoPlay (:1688,:5519,:6769,:6841 reload-into-match flag), voidHaptics (:3594), voidCoins (:3777), voidGems (:3799), voidQuestDay/voidQuestState/voidQuestEncoreIds/voidQuestEncoreN (:3954-4003, daily quest board — slated for retirement), voidXP (:4965), voidStreak (:4966), voidStreakDay/voidDailyLast/voidLastDay/voidDailyStreak (:4983-4992,:5131-5146 streaks), voidSkinsOwned/voidSkinsNew/voidSkin (:5083,:5170-5173,:6171,:8219-8257 skins), voidDropDay/voidDropN (:5211-5251 drops), voidBestPct (:5339 global solo best %), voidFirstWinDay/voidFirstMatchDay (:5395,:5403 daily bonuses), weekKey() (:5427 weekly best, dynamic key), voidBest_<world> (:5449 per-world best score), voidBestScore (:5454 global best), voidBookSeen (:5734), voidFirstNom (:5776), voidSolo (:6547 solo toggle), voidStats (:7805 lifetime stats JSON), voidTrophyPaid (:7848), anchor aKey (:7901 weekly anchor, dynamic), voidGiftAt/voidGiftDay/voidGiftN (:7928-7939), voidDailyDay/voidDailyWeek/voidDailyLife (:7969-8057), voidSaveVer (:8216), voidHatsOwned/voidHat (:8738-8746), voidShopTab (:9420). Outside: voidMatchN (matchdeck.ts:25), voidUnlocked (unlocks.ts:44), voidStickers (stickers.ts:442), voidMotion (proto3d/fx.ts:51), voidling_meta_v1 (game/meta.ts:76 — legacy engine, versioned by name), voidling_music/voidling_sfx (audio.ts:236), voidling_events (services.ts:11), vd_notif_asked (notifications.ts:47).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 356,
+   "evidence": "grep -n 'localStorage.(getItem|setItem|removeItem)' src/prototype3d.ts and src/**/*.ts (this session). voidTut is referenced only by QA seeds (qa/unlocks.mjs:53) — no getItem in src today; unsure whether any src path still reads it.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The polish plan bar C.1 says 'unlock is strictly sequential; state persists (new key voidLevels, versioned)' and C.5 says difficulty is tuned so the median tester clears level 1 in one run and level 3 in <= 3 runs — the plan never states what happens to a child who cannot clear level 5 (CLEAR 100%).",
+   "file": "/home/user/voidling/artifacts/3d-game/docs/crews/round-7/holeio.polish-plan.md",
+   "line": 155,
+   "evidence": "Bars 1 and 5 at :155-166; owner decision #1 at :346 ('reaching a goal inside the clock wins the level on the spot').",
+   "confidence": "certain"
+  },
+  {
+   "claim": "QA convention: nearly every probe seeds a profile via addInitScript with localStorage.setItem('voidUnlocked','maple,pirate,gameday,lantern,powder,skylark') — a new voidLevels gate must treat that seed as 'all worlds open' or ~40 probes (and gate.mjs --profile=push) go red.",
+   "file": "/home/user/voidling/artifacts/3d-game/qa/unlocks.mjs",
+   "line": 53,
+   "evidence": "grep across qa/*.mjs shows voidUnlocked seeded in _bigprops, _broadphase, _cardprobe, ..., ab.mjs:43, aftermatch.mjs:42, ascension.mjs:64, autoplay.mjs:100 (40+ files); qa/_lockab.mjs:12-13 and _lockshot.mjs:15-17 seed voidBest_maple for the grandfather case; qa/unlocks.mjs D asserts 'nobody is re-locked'.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The match number written by bumpMatch is bumped in beginMatch, which is the shared entry for menu PLAY, solo, TAKE ME THERE, PLAY AGAIN (resetMatch) — the natural place to also stamp 'which level this match is playing'.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 6139,
+   "evidence": "const hand = deal(bumpMatch(pickedWorld), HOURS[pickedWorld].length); inside beginMatch (:6081); startFresh routes resetMatch or beginMatch (:6486-6489).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The goal card timing constants exist (GOAL_CARD_AT = 0.5 s, GOAL_CARD_LEN = 0.6 s) and #titlecard is reused; the level's one-line goal would be painted there.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 6029,
+   "evidence": "const GOAL_CARD_AT = 0.5; const GOAL_CARD_LEN = 0.6; used at :9512-9517.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "questEvent(kind, n) is the existing per-eat signal (kinds snack/car/house/cabana/gild/rival/big) the SET level counter can subscribe to; it currently only feeds the day-seeded quests slated for retirement.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 4018,
+   "evidence": "function questEvent(kind: string, n = 1) { for (const q of quests) {...} } (:4018-4024); quest keys voidQuestDay/State/EncoreIds/EncoreN (:3954-4003).",
+   "confidence": "certain"
+  }
+ ],
+ "constraints_for_the_build": [
+  "(a) SCHEMA — one key 'voidLevels', JSON object (matchdeck/voidStats convention, not unlocks' CSV): { v: 1, cur: { world: WorldKey, goal: 1..5 }, w: { [world]: { [goal 1..5]: { st: 'locked'|'open'|'done'|'clear', best: number /*score or pct or seconds, per goal kind*/, pct: number /*best devouredPct on that run*/, first: 'YYYY-MM-DD' /*first-clear date, toDateString() convention used by voidFirstWinDay*/, n: number /*attempts*/ } } } }. 'clear' = 100%-devoured pip (magenta); 'done' = goal met (grey); 'open' = playable; 'locked' = padlock. Missing world/goal entries mean locked (except maple/1 which is always open — same 'read() adds maple' invariant as unlocks.ts:50). Every read/write try/catch-wrapped (unlocks.ts:48,54 precedent). Unknown fields kept, never dropped (stickers.ts:449 precedent). Version gate: if (data.v ?? 0) < LEVELS_VER run migrate, track('save_migrated', {key:'voidLevels', from}) (prototype3d.ts:8216-8229 precedent).",
+  "(b) RECONCILIATION — Reading 1 (unlocks.ts, binding): world W+1 opens when ANY match on W FINISHES; level pips are goals WITHIN a world and a world's pip 1 is open whenever the world is open. Reading 2 (polish plan C bar 1 literal): 30 levels in one strict sequence, world W+1 level 1 opens only after W level 5 (100% clear). Cost of reading 2 to a six-year-old who cannot 100%-clear Maple: 25 of 30 levels and 5 of 6 worlds are a wall — exactly the case unlocks.ts:8-16 forbids and qa/unlocks.mjs D asserts against; devouredPct also counts rivals' eating (:4886) so a 100% clear is partly luck. Recommended reconciliation (state to the skeptic as a decision, not assumed): sequential WITHIN a world (goal k+1 opens when goal k is done), and BETWEEN worlds keep the finish rule — world W+1 goal 1 opens when any match on W finishes (completeWorld unchanged). 'Strictly sequential' then describes the pip row, and 'never a wall' still holds. If the owner insists on reading 2, the fallback that avoids a wall is a fail-forward: a goal level that fails 3 times (n>=3) auto-opens the next pip, cleared later for the magenta.",
+  "(c) GRANDFATHERING — On first boot after the update, migrateLevels(): for each w in WORLD_ORDER: if isUnlocked(w) (which itself grandfathers from voidBest_w > 0 and voidWorld === w, unlocks.ts:61-74) then w/1 is at least 'open'. If voidBest_w > 0 (a finished rivals match, prototype3d.ts:5449) mark w/1 'done' with best = voidBest_w (the EAT goal is 'reach N points' and they reached some N; unsure whether N should be compared — safest is mark done regardless so nobody regresses) and open w/2. If voidUnlocked contains WORLD_ORDER[i+1], then w/1..w/4 are NOT auto-done (no evidence they met those goals) but w+1/1 is 'open' — so a returning player with voidUnlocked='maple,pirate' and voidBest_pirate>0 boots with maple/1 open-or-done, maple/2 open, pirate/1 done, pirate/2 open, gameday/1 locked (unless in voidUnlocked). Never write 'locked' over an existing 'open'/'done'/'clear' — migration only raises states (unlocks.ts migrate() only adds, never removes). Run it on every read path like migrate() so a profile seeded by QA (voidUnlocked CSV only, qa/*.mjs) reads as all-worlds-open with goal 1 open in each — this is what keeps ~40 probes and gate --profile=push green without touching them. Do not remove voidUnlocked or voidBest_<w>: unlocks.ts, the picker badge (:6720) and QA seeds read them.",
+  "(d) CURRENT LEVEL — 'cur' is the player's frontier (the lowest non-done level in the lowest world with an open level), NOT the last played. Replaying an old level sets a transient 'playing' = {world, goal} at beginMatch (:6081, beside bumpMatch :6139) without moving 'cur'; endMatch writes the result to w/goal, may raise st to 'clear' if devouredPct === 100 (a replay can upgrade grey to magenta), and recomputes 'cur' only if the frontier moved. Because pickedWorld is a boot-time const (:355-358), the level picker must pass the goal via localStorage (a 'voidPlayGoal' hint, consumed like voidAutoPlay at :6840) or ?g= on the reload URL, mirroring voidWorld/?w=.",
+  "(e) BOUNDARIES — WRITE: one function recordLevelResult({world, goal, won, score, pct, rank}) called from endMatch immediately after `ended = true; localStorage.setItem('voidPlayed','1')` (:5329-5330) and BEFORE the solo early-return (:5364), so both branches record; keep voidBest_<w> write (:5449-5452) and completeWorld (:5503) where they are, and also call completeWorld in the solo branch or the solo-only child never opens world 2 (finding at :5324). Early win: a goal level that meets its goal calls endMatch() on that frame (owner decision #1); RIVALS (goal 4) and CLEAR (goal 5) run the clock. READ: picker paint block (:6704-6771) — add the five pips per card from voidLevels next to the .wBest badge (:6717-6737), replace gateFor's lock text only when the WORLD is locked; the ribbon read at :6784 stays on isUnlocked(). The NEW WORLD card (:5503-5533) becomes the 'next reward' card and reads the next locked pip/world from voidLevels.",
+  "Keep matchdeck untouched: bumpMatch counts matches STARTED per world (matchdeck.ts:38) and match 0 must remain the shipped baseline; level attempts belong in voidLevels.n, not voidMatchN.",
+  "Do not derive a world's CLEAR pip from the global voidBestPct (:5339) — it is not per-world; migrate it only as a hint (unsure which world it came from), never as a 'clear' state.",
+  "Probe first: qa/ladder.mjs (plan C probe) must seed (i) fresh, (ii) voidUnlocked='maple,pirate' + voidBest_pirate=8420, (iii) the all-worlds CSV the other probes use, and assert no state is lower after migration than before — mirror qa/unlocks.mjs D."
+ ],
+ "cheapest_path": "Add src/game/levels.ts (~120 lines) beside unlocks.ts: export type Goal = 1|2|3|4|5; LEVELS_VER = 1; read()/write() JSON with try/catch; migrateLevels() that only raises states, seeded from isUnlocked(w) and voidBest_<w>; levelState(w,g), currentLevel(), recordLevelResult(...). Wire two call sites in prototype3d.ts: beginMatch (:6081, stamp the goal being played next to bumpMatch :6139) and endMatch (:5329, before the solo return; also move completeWorld out of the rivals-only block). Paint pips in the existing picker forEach (:6704) reading levelState. Leave voidUnlocked, voidBest_<w>, voidMatchN and every QA seed untouched; unlocks.ts stays the between-worlds authority. Write qa/ladder.mjs first (three seeds above, assert monotone migration and pip states), watch it fail, then land.",
+ "risks": [
+  "Reading 2 of 'strictly sequential' re-locks 25/30 levels behind a 100% clear that depends on rivals' eating (:4886) — a wall by unlocks.ts's own definition; needs an explicit owner call before code.",
+  "Solo branch of endMatch returns at :5364 before voidBest_<w> (:5449) and completeWorld (:5503): solo-only children never unlock world 2 today and would not be grandfathered by migrate() unless voidWorld happens to equal that world. Any ladder that writes only in the rivals branch inherits this.",
+  "~40 QA probes seed voidUnlocked CSV directly; a voidLevels gate that does not derive from isUnlocked() turns the picker locked in every probe and reds gate --profile=push.",
+  "pickedWorld is a boot const; a level picker that changes world must reload (:6768-6770) — one-tap-to-play from the menu only holds for the currently built world; a replay of another world's level costs a reload.",
+  "voidBestPct is global; migrating it into a per-world 'clear' flag would fabricate a clear on the wrong world.",
+  "The daily quest board keys (voidQuestDay/State/EncoreIds/EncoreN, :3954-4003) are slated for removal; questEvent (:4018) is the hook the SET level needs — remove the board but keep the signal."
+ ],
+ "open_questions": [
+  "Owner: is 'strictly sequential' per world (pips within a world) or across all 30 (world 2 locked until Maple 100%)? unlocks.ts is binding today and contradicts the latter.",
+  "Does a level completed on a replay upgrade its pip (grey -> magenta on a later 100%)? Proposed yes; unconfirmed.",
+  "Should EAT goal 1 be auto-marked 'done' for any grandfathered world with voidBest_<w> > 0 regardless of N, or only when voidBest_<w> >= N? Marking done regardless is the no-regression reading.",
+  "Does CLEAR (goal 5) mean 100% of aliveMass by anyone (devouredPct as coded, :4886) or 100% by the player (devMineN/devAllN, :5460)? In solo they coincide; in rivals they do not.",
+  "Is voidTut still read anywhere in src (only QA seeds reference it)? unsure.",
+  "Where does the level being played travel across the reload — localStorage hint (voidAutoPlay pattern, :6840) or ?g= URL param (?w= pattern, :355)?"
+ ]
+}

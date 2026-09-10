@@ -1,0 +1,194 @@
+{
+ "topic": "Can the current world be rendered LIVE behind a menu, cheaply? (boot order, render-loop gating, per-frame idle work, menu camera, menu quality rung, world-switch reload)",
+ "findings": [
+  {
+   "claim": "(a) The island is fully built BEFORE the menu is usable, not after PLAY: createIsland is a module top-level await in the boot path; the menu sits under the boot cover during the build.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 1733,
+   "evidence": "`const island = await createIsland(scene, addEdible, (l) => bootStage(...))` at module top level (:1728-1734); #menu is `display:flex` by default with no inline hide (index.html:885) and #loadScr.boot (`z-index:60`, index.html:1311/:1326) covers it while the build runs.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(a) Only two paths hide the menu before the world is shown: first launch (no voidPlayed) and the voidAutoPlay reload. On every other launch the built world is behind an opaque #menu.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 6559,
+   "evidence": ":6559-6562 `if (!DEBUG_HARNESS && ... && !localStorage.getItem('voidPlayed')) { menuEl.style.display='none'; withWorldReady(() => beginMatch()); }`; :6840-6841 `if (localStorage.getItem('voidAutoPlay') === '1') { localStorage.removeItem(...)` then launches.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(b) The canvas renders EVERY frame behind the opaque menu today — wasted frames. renderer.render / composer.render in animate() has no gate on started, paused, or body.menu.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10948,
+   "evidence": ":10948-10957 `if (bloomOn) { const c = ensureComposer(); c.setPixelRatio(...); c.setSize(...); c.render(); } else { renderer.render(scene, camera); } requestAnimationFrame(animate);` — unconditional. Corroborated by docs/AUDIT-2026-08-23.md:316 ('animate() renders unconditionally — so the world renders with shadows on, behind the menu') and docs/AAA-BRIEF.md:333 ('already rendering behind the menu; use it').",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(b) On the top rung the menu-idle frame is the MOST expensive pipeline: bloom composer (full-screen pass + mip chain) plus a half-rate shadow pass, both unconditional.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10946,
+   "evidence": ":10946 `if ((shadowFrame++ & 1) === 0) renderer.shadowMap.needsUpdate = true;` (autoUpdate=false at :144); `let bloomOn = QUALITY[0].bloom` (:1303) with QUALITY[0].bloom=true (:1265); nothing calls applyQuality at startup (:1276-1281).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(b) The adaptive quality ladder is inert while no match is started, so nothing lowers cost on the menu; and the first rendered frame is what drops the 'boot' cover hold.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10912,
+   "evidence": ":10912 `if (qPinned === null && started && qCd <= 0 && qAccT > 0)`; :10931-10935 `if (!_booted) { _booted = true; coverRelease('boot'); }`.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(c) `started` is a since-page-load latch (endMatch never clears it), so a menu gate must key on body.menu / menuEl, NOT on !started. The only per-frame menu signal today is `onMenu`, computed LATE in the frame after all sim work.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10865,
+   "evidence": ":10865 `const onMenu = document.body.classList.contains('menu') || endEl.classList.contains('show');` used only for music (:10886). endMatch :5324 does not clear started; `started = false; armed = false; ended = true;` only in the quit path :7776. docs/crews/round-7/streamA.started-census.md:244 states the latch.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(c) island.update runs every frame regardless of state and is cheap (uniform/offset writes), but it re-centres the star field and sky bodies on the CAMERA — so it must keep running under a menu camera, not be frozen.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 4011,
+   "evidence": "island.ts:4011-4028 `update(dt,t,cam){ starMatRef.uniforms.uTime...; if (cam) { starField.position.copy(cam.position); for (sb of skyBodies) sb.o.position.copy(cam.position).addScaledVector(...) } bayWater uniforms uTime; wfTex.offset.y; spray opacity; balloon orbit }`; called at prototype3d.ts:9486 `island.update(dt, tClock, camera);` before any started gate.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(c) life.update (crowd) runs every frame with no match gate; its cost is bounded by crowdGate, which is derived from camDist (Infinity during intro).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10277,
+   "evidence": ":10277-10281 `const crowdGate = (introT > 0 ? Infinity : camDist * 2.2 + 90) * (pickedWorld === 'pirate' ? 2 : 1); ... life.update(dtw, tClock, voidState.x, voidState.z, R, crowdGate);` with the comment 'the ambient town (life.update, above) deliberately keeps running' (:10286-10289). life.ts:376-378 documents `gate` as world-units past which movers update on a stagger.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(c) rivals.update runs pre-match and on the boot menu (gated only on !ended && !paused) with t=0; rivals.ts treats t<=0 as not hunting and no trail, but the family still moves. On the post-HOME menu (ended=true) it is already frozen — two menus behave differently.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10290,
+   "evidence": ":10290-10293 `if (!ended && !paused) { perfBeat('rivals'); rivals.update(dtw, started && !soloMode ? matchElapsed() : 0, ...)`; rivals.ts:852-863 `const hunting = _t > 0 && _t < huntEnd; if (_t > 0) { trail... }`.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(c) Other unconditional per-frame work on the menu: curios spin (:9488), voidling.update (:10246), bubbles.update (:10364), fx.update (:10939), fadeOccluders — a full walk of `edibles` every frame (:10896, :1184-1200), updateLodBias/fitShadow (:10894-10895), refreshHud at 5 Hz (:10810-10812), growthEl classList toggle (:10826), audio.ensureMusic every 2 s (:10866). The eat loop is the one thing already broken on !started (:10367-10368).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10367,
+   "evidence": ":10367-10368 `for (const e of edibles) { if (!started || ended || paused) break;   // menu attract mode, the results screen, AND pause`; :10896 `fadeOccluders(dt);` which loops `for (const e of edibles)` at :1198; :10364 `bubbles.update(dt, {...})`; :10246 `voidling.update(dtw, ...)`.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(c) Attract mode self-drives the void behind the menu after 4 s idle (scans every edible every 0.9-1.8 s) — a menu diorama would inherit a wandering hero unless frozen or intentionally kept.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 9849,
+   "evidence": ":9849-9860 `} else if ((!armed || DEBUG_HARNESS) && tClock - lastInput > 4) { // attract mode: menu backdrop + demo harness ONLY ... for (const e of edibles) {...nearest...}`.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(d) The camera block is a three-way branch (ASSETVIEW / TOPDOWN / match). A fourth `else if (menuCam)` branch that writes camera.position + lookAt directly (as ASSETVIEW does at :10488-10490) parks a menu orbit without touching camOffset, camDist, targetDist or camFollow, which are all local to the match branch.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10488,
+   "evidence": ":10488-10498 `if (ASSETVIEW) { camera.position.set(0,716,138); camera.lookAt(0,588,-6); } else if (TOPDOWN) {...} else { let targetDist = Math.min(340, Math.max(26, PLAY_DIST * Math.pow(R/0.9, 0.82))); ...` and :10611-10631 camFollow.lerp → camera.position.copy(camFollow); camera.lookAt(...). Shake is added after the block at :10939-10940 (`fx.update` returns an offset added to camera.position).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(d) Leaving the menu camera cannot swoop: beginMatch snaps camDist to DESCENT_START and the follow spring takes the authored position exactly (lerp factor 1) while armed, so a stale camFollow is discarded on the first armed frame.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10629,
+   "evidence": ":10629 `camFollow.lerp(tmpV, (introT > 0 || (armed && !started)) ? 1 : 1 - Math.exp(-5.0 * dt));`; beginMatch :6151 `camDist = DESCENT_START;` with the comment 'The idle camera is parked, so it is snapped, not sprung'. The `__warpVoid` QA hook (:2262-2270) shows the same snap pattern (`camFollow.copy(camera.position)`).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(d) Three consumers read camDist, not the camera, so a parked menu camera must either set camDist to its orbit distance or pass its own distance: fitShadow(camDist), updateLodBias(camDist), crowdGate, and fog near/far.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10894,
+   "evidence": ":10894-10895 `updateLodBias(camDist); fitShadow(camDist);`; :10277 crowdGate from camDist; :10647 `scene.fog.near = 60 + camDist*1.4; far = 260 + camDist*4`. camDist initial value 50 (:664).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(d) A WIDE menu orbit is the expensive frame, not the cheap one: the intro's high establishing shot measured 4,694 draw calls / 1.40M tris vs 1,241 / 355k in settled play, and the intro already switches shadows off for that shot via the cheap toggle (renderer.shadowMap.enabled + sun.castShadow, no material invalidation).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10505,
+   "evidence": ":10496-10509 comment 'the opening frame renders 4,694 draw calls and 1.40M triangles against 1,241 and 355k in settled play' and `if (introShadow === null) { introShadow = renderer.shadowMap.enabled; renderer.shadowMap.enabled = false; sun.castShadow = false; }` ... restored when `introT <= 0`.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(e) applyQuality can be driven with a pinned rung from menu code — __pinQuality(n) sets qPinned + qLevel and calls applyQuality — and the adapter is inert on the menu anyway. But applyQuality's shadow branch is a ONE-WAY LATCH: any rung with shadows:false sets qShadowLatch=true and every later match renders shadowless for the session, plus a ~45-program rebuild measured at 1,677 ms.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 1354,
+   "evidence": ":1313-1360 `const wantShadows = q.shadows && !qShadowLatch; if (renderer.shadowMap.enabled !== wantShadows) { ... renderer.shadowMap.enabled = wantShadows; sun.castShadow = wantShadows; if (!wantShadows) qShadowLatch = true; ... seen.forEach((mm) => { mm.needsUpdate = true; }); }` with the measured '1,677 ms frame and 3,190 ms of extra work' comment (:1340-1341). `_dbg.__pinQuality` :2255-2258.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(e) Pixel ratio and bloom for a menu rung can be set without applyQuality: renderer.setPixelRatio(min(DPR, x)) is the only DPR control (PR_TOP=2 at boot; rungs 2.0/1.6/1.35/1.15, prSmall 2.0/1.6/1.3/1.0 on IS_SMALL_SCREEN), and bloomOn is a module-scoped `let` read directly by the render branch.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 1315,
+   "evidence": ":142-143 `const PR_TOP = 2; renderer.setPixelRatio(Math.min(window.devicePixelRatio, PR_TOP));`; :1315 `renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_SMALL_SCREEN ? q.prSmall : q.pr)); bloomOn = q.bloom;`; :141 `IS_SMALL_SCREEN = matchMedia('(pointer: coarse)').matches || innerWidth < 900`; :10948 `if (bloomOn)`. Shadow map size change only disposes the map (:1362-1366).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(f) A world switch is a full page reload: the picker card and the season ribbon write voidWorld + voidAutoPlay to localStorage and set location.href; pickedWorld is a module `const` resolved once from ?w= / voidWorld and pushed into island.ts via setWorld().",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 6766,
+   "evidence": ":6765-6770 `if (id === pickedWorld) { launchWorld(); return; } localStorage.setItem('voidWorld', id); localStorage.setItem('voidAutoPlay', '1'); location.href = location.pathname;`; ribbon :6791-6795 same; :354-358 `const _wantWorld = new URLSearchParams(location.search).get('w') ?? localStorage.getItem('voidWorld') ?? 'maple'; const pickedWorld: WorldId = ...; setWorld(pickedWorld);`.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "(f) Rebuild-in-place is large: pickedWorld has 56 references in prototype3d.ts, island is a top-level const with 44 `island.` call sites, and edibles/curios/stickers/life/rivals are all built against it once; the build itself is 18 breathe stages measured at 17 s in the sandbox / 'a handful of seconds on a phone' (30-45 s cited elsewhere).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 1698,
+   "evidence": "grep counts: `pickedWorld` 56, `island.` 44 (static count). :1698-1700 'The world build was ONE unbroken main-thread block — 17 s in the sandbox, a handful of seconds on a phone'; :10924-10926 'The world build is a 30-45 s stretch of heavy JavaScript'; island.ts:493 `export async function createIsland(scene, addEdible, onStage)`; placeStickers :1745+ uses island.biomeAt.",
+   "confidence": "likely"
+  },
+  {
+   "claim": "(f) The built world already IS the 'current level' world on the next launch: completeWorld's NEW WORLD card writes voidWorld=opened (and voidAutoPlay) so the page reloads into the newly opened world; a live menu showing the built world therefore shows the world the level ladder is on, except in the reload moment itself.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5518,
+   "evidence": ":5518-5519 `localStorage.setItem('voidWorld', opened); localStorage.setItem('voidAutoPlay', '1');`; loader names the world only when goingStraightIn (:1687-1688 `!voidPlayed || voidAutoPlay === '1'`).",
+   "confidence": "likely"
+  },
+  {
+   "claim": "Menu opacity is pure CSS: #menu paints three radial gradients + ::before star dots + ::after key art; making it a 45% violet band over a live canvas is an index.html-only change, and body.menu already hides the match HUD (#timer, #growth, #hunger, #powers, #banner, #guide, #hand, #news, #btnQuit).",
+   "file": "/home/user/voidling/artifacts/3d-game/index.html",
+   "line": 885,
+   "evidence": "index.html:885-899 `#menu { position: fixed; inset: 0; z-index: 10; display: flex; ... background: radial-gradient(...), radial-gradient(...), radial-gradient(ellipse at 50% 34%, #33175e 0%, #1c0f3d 46%, #0d0821 100%); }` `#menu::before {...dots}` `#menu::after {...key art}`; body.menu rules at :234, :246, :349, :1132, :1810-1811.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "No measured ms/frame or draw-call number for the MENU-idle frame exists in docs or probes; the only per-frame draw-call series (qa/_refute_perframe.mjs) is taken in-match at r=12.",
+   "file": "/home/user/voidling/artifacts/3d-game/qa/_refute_perframe.mjs",
+   "line": 1,
+   "evidence": "qa/_refute_perframe.mjs:1-4 header ('shadow pass runs at HALF RATE ... Print the raw per-frame series') and its flow clicks #btnPlay then the world card before sampling; grep of docs for menu fps/ms returns only audio findings.",
+   "confidence": "certain"
+  }
+ ],
+ "constraints_for_the_build": [
+  "Gate on body.menu / menuEl.style.display (hoist a `const onMenu` to the TOP of animate(), :9467), never on !started — `started` is a since-load latch (:5324 never clears it; only :7776 does), and the boot menu (started=false, ended=false) and post-HOME menu (started=true, ended=true) already differ (rivals frozen only on the second, :10290).",
+  "Do NOT route a shadows-off menu rung through applyQuality(): its shadow branch sets qShadowLatch=true (:1354) — one-way for the whole session — and invalidates every material (1,677 ms measured, :1340). Use the intro's toggle instead (:10505-10509: renderer.shadowMap.enabled=false; sun.castShadow=false; restore on leaving), which the game already pays every match.",
+  "Keep island.update(dt, tClock, camera) running on the menu (:9486) — it re-centres the star field and sky bodies on the camera (island.ts:4014-4017); freezing it under a moved menu camera breaks the sky.",
+  "A menu camera branch goes beside ASSETVIEW/TOPDOWN (:10488-10494) and writes camera.position/lookAt directly; it must not write camOffset/camDist/camFollow/targetDist. But it must feed the orbit distance to fitShadow/updateLodBias (:10894-10895), crowdGate (:10277) and fog (:10647), which read camDist, or shadows/LOD/crowd cost are fit to the last match distance (initial 50, :664).",
+  "Skip fadeOccluders (:10896, walks all edibles :1198) and attract mode (:9849) on the menu unless the diorama wants a wandering hero; skip rivals.update/bubbles.update (:10290, :10364) if the scene should hold still; life.update (:10281) is the one the code deliberately keeps alive behind cards (:10286-10289).",
+  "A wide/high menu orbit is the EXPENSIVE frame (4,694 draw calls / 1.40M tris at the intro height vs 1,241 / 355k in play, :10496-10500) — the 49%-of-frame diorama should be framed close, or shadows off + bloom off + lower DPR is mandatory.",
+  "Bloom off for the menu is a one-line `bloomOn = false` (module `let`, :1303, read at :10948); pixel ratio is renderer.setPixelRatio(Math.min(devicePixelRatio, x)) (:1315 pattern; PR_TOP=2 :142). Both must be restored to QUALITY[qLevel] on leaving the menu (applyQuality() with shadows unchanged is safe: the branch is a no-op when renderer.shadowMap.enabled already equals wantShadows, :1333).",
+  "The first rendered frame drops the 'boot' cover hold (:10931-10935) — a menu rung applied before animate() runs (module top level after :10974 `animate()`) is invisible to the boot sequence; applying it after risks the first frame being the full-cost one.",
+  "Keep body.menu set on every menu entry (:5553, :7699, :7776, :6185 remove) — the menu theme (:10865-10888) and nine HUD hide rules (index.html:234-1811) key on it.",
+  "Push gate (35 steps) includes pickerfit (:132) and lockedcards (:187), which drive the #worlds .wCard grid — a one-tap menu that removes or hides the picker must keep those probes' selectors or retire them with the picker; qa/menushot.mjs, qa/firstframe.mjs and qa/shippedlook.mjs screenshot the menu/first frame and will change (unsure what each asserts).",
+  "World switch stays a reload (:6766-6770); the live menu renders the BUILT world only. Do not attempt rebuild-in-place (56 pickedWorld sites, 44 island.* sites, top-level const island :1733).",
+  "Standing: the void stays a creature in the diorama (voidling.update :10246 keeps his idle/blink running — leave it on); no probe-less change; measure the menu frame before touching it (no baseline exists — see findings)."
+ ],
+ "cheapest_path": "The world is already built and already rendering every frame behind the opaque #menu on every non-first launch (createIsland :1733 top-level await; render :10948-10957 unconditional), so a live 3D menu costs NO extra rendering — it costs a CSS change plus a freeze list. Steps: (1) baseline probe first: sample dtRaw/draw-calls (renderer.info) for ~120 frames while #menu is shown, on rung 0 and rung 3 via __pinQuality, and again after the change (nothing measured exists today). (2) index.html:885-899 — replace #menu's opaque radial ground + ::after key art with a violet band (#4c3cbe-ish) over the top ~45% and a transparent window where the diorama sits; keep body.menu. (3) prototype3d.ts animate(): hoist `onMenu` (:10865) to the top of the frame; add a fourth camera branch beside ASSETVIEW (:10488) that parks a slow orbit around the hero landmark (COPY.hero, :10560 uses it) at a CLOSE distance, and pass that distance to fitShadow/updateLodBias/crowdGate; while onMenu skip fadeOccluders, attract mode, rivals.update, bubbles.update (keep island.update, voidling.update, life.update). (4) Menu rung without applyQuality: on menu entry `bloomOn=false; renderer.setPixelRatio(min(DPR, 1.3)); renderer.shadowMap.enabled=false; sun.castShadow=false` (intro pattern :10505); on exit restore shadows the intro way and call applyQuality() (safe when shadow state already matches). (5) One tap: #btnPlay → withWorldReady(() => startFresh(soloOn())) for the built world (launchWorld :6503 minus the picker), leaving the picker reachable from a tile for world switching via the existing reload path. (6) Probes: menu-frame ms/draw-calls before/after, a menushot diff, and re-run gate --profile=push; retire/adjust pickerfit+lockedcards only if the picker moves.",
+ "risks": [
+  "qShadowLatch: one call of applyQuality with a shadows:false rung on the menu strands the session shadowless for every match after (:1354) — easy to do by accident via __pinQuality(3).",
+  "Shader recompile on the first shadows toggle: the intro path's cheap toggle still changes three's lights hash the first time; the 1,677 ms stall may land on the menu's first frame instead of the intro (docs/AUDIT-2026-08-23.md:316 says the shadowless set compiles at the intro today). Unmeasured on the menu path.",
+  "A wide diorama orbit renders the whole plateau (4,694 draw calls at intro height, :10496) — on a low-rung phone a live menu could run hotter than the match, and there is no adaptive ladder on the menu (:10912 gated on started).",
+  "Battery/thermal: today's wasted frames are already spent, so this is not a regression, but a menu a child leaves open for minutes now has a REASON to keep rendering; a visibilitychange/idle throttle does not exist (no gate on the rAF at :10957).",
+  "Post-HOME menu vs boot menu differ in state (started latch, ended=true) — a menu freeze list written against one will misbehave on the other; census :244 warns exactly this.",
+  "Overlays at higher z (daily card z-45 :6497 comment, #loadScr z-60, #worlds .show, #shop) will now sit over a live canvas rather than a static poster; any of them that assumed an opaque menu behind them (blur, contrast) may read wrong — art direction review needed (studio skill).",
+  "Push-gate probes that select the picker (pickerfit :132, lockedcards :187) or screenshot the menu (menushot, firstframe, shippedlook, opening :176) may fail or silently pass against the old contract; qa/firstframe already has a stale assertion (task #29).",
+  "Camera parked on the menu leaves camDist at 50/last value; if the menu branch forgets to feed fitShadow/updateLodBias/crowdGate/fog, shadows are fit to the wrong frustum and the crowd gate is wrong — visible as shadow acne or empty streets in the diorama.",
+  "Attract mode (:9849) keeps eating-adjacent logic alive (edibles scan) and moves the hero; if left on, the diorama's hero wanders off the landmark; if turned off, the DEBUG_HARNESS demo path shares the branch."
+ ],
+ "open_questions": [
+  "What does a menu-idle frame cost today in ms and draw calls on rung 0 vs rung 3 at 430x932 @ DPR2 (no number exists; qa/_refute_perframe.mjs measures in-match only)?",
+  "Does toggling renderer.shadowMap.enabled + sun.castShadow without material invalidation (the intro pattern) trigger a program recompile in three 0.185 on the FIRST toggle, and is that stall acceptable on the menu's first frame, or should renderer.compile() be pre-warmed as docs/AUDIT-2026-08-23.md:316 proposed?",
+  "Should the diorama be framed on the hero landmark (COPY.hero) or on the void himself, and at what distance — the answer sets the draw-call budget (close = ~1,241, wide = ~4,694).",
+  "What exactly do qa/menushot.mjs, qa/firstframe.mjs, qa/shippedlook.mjs and the push-gate 'opening' step assert about the menu/first frame (not read in full here)?",
+  "Is the world picker retired (one-tap PLAY) or demoted to a tile — pickerfit and lockedcards in the push gate depend on the answer?",
+  "Should rivals (the family) be visible and moving in the menu diorama (rivals.update runs on the boot menu with t=0 today but is frozen on the post-HOME menu)?",
+  "On the reload moment after completeWorld (voidWorld=opened + voidAutoPlay), the menu is never shown — is a 'NEXT reward locked island' illustration (the measured Hole.io end card) drawn from the poster art rather than a live render acceptable, given rebuild-in-place is out?"
+ ]
+}

@@ -1,0 +1,215 @@
+{
+ "topic": "The five goal types as match-loop code: counter sources, HUD render points, and where 'win on the spot' ends a match",
+ "findings": [
+  {
+   "claim": "EAT counter: the live score is the module-level `playerScore` (declared with matchClock/matchLen/ended/curStage). It is added to at eat (:5692), rival-eat (:2848), sticker tier (:5716), and REDUCED by a hunter's steal (:2945 `playerScore = Math.max(0, playerScore - hit.steal)`), so an EAT goal must be checked as a threshold each frame or after every write, not as a monotone event.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 3704,
+   "evidence": ":3704 `let matchClock = MATCH_LEN, matchLen = MATCH_LEN, ended = false, playerScore = 0, curStage = 0;`; writes at :2848, :2945, :5692, :5716; reset at :7677 `playerScore = 0`.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The score is NOT drawn anywhere in the in-match HUD today. The HUD is #timer (:1884), #coins (:1885), #quests (:1886) and #growth (:1888-1891: form name .gNow, metres .gM, NEXT form .gNext, a .gTrack/.gFill bar with .gPip marks). playerScore appears only in telemetry, the newsroom headline (:4494), refreshHud's rank rows (:4732) and the end card. A points-target line for EAT has no existing element to sit on.",
+   "file": "/home/user/voidling/artifacts/3d-game/index.html",
+   "line": 1888,
+   "evidence": "index.html:1884-1891 markup; prototype3d.ts grep of playerScore shows no textContent/innerHTML write for it outside endMatch (:5476) and fillHeadline (:4494).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The growth bar is painted by paintGrowth(r) — it is a FORM-progress bar (radius between FORM_MIN rungs), change-gated, with pips appended to .gTrack. A target marker for EAT could be drawn the same way (a positioned child of gTrackEl like .gPip at :4941-4947), but the bar's fill is radius-driven, not score-driven, so a score bar needs its own track or a re-purposed fill.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 4929,
+   "evidence": ":4929 `function paintGrowth(r: number)`; :4941-4947 pips `pip.style.left = (i/left)*100%`; :4957-4959 `gFillEl.style.width = gw` from formProgress(r) (:4915-4926). CSS index.html:168-215.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Per-world score par already exists (WORLD_PAR) and is the honest source for an EAT target N: maple 80000, pirate 105000, gameday 175000, lantern 150000, powder 45000, skylark (0.75 of 46,123 mean).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 550,
+   "evidence": ":550-565 WORLD_PAR table with measured means and win rates in comments; used by the growth law at :9725 `pace = clamp(playerScore / par, 0, 1.2)`.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "SET counter source: questEvent(kind, n=1) only iterates the day-drawn `quests` array and bumps q.count for matching kind; it has no per-match tally of its own. A SET level needs its own three counters fed from the same call sites (or a second listener inside questEvent) — the daily quest board being retired removes the only consumer.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 4018,
+   "evidence": ":4018-4024 `function questEvent(kind, n=1) { for (const q of quests) { if (q.done || q.kind !== kind) continue; q.count += n; ... } }`.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The kind taxonomy fired at eat time (eatEdible, :5825-5839): 'snack' (radius<1), 'big' (radius>=6), 'gild' (userData.gild), 'cabana' (2.6<=radius<=3.4), then the prop's own qk tag verbatim, then 'house' aliased from HOUSE_LIKE = ['house','rv','chalet','lodge','hut'] (:3927), 'combo' (comboMult>=2). Elsewhere: 'rival' on eating a rival (:2850), 'gulp' (:5887), 'collapse' (:5902), 'devourer' on reaching stage 3 (:10685), 'solo40' at solo end (:5351).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5825,
+   "evidence": ":5825 `if (e.radius < 1) questEvent('snack');` :5826 `if (e.radius >= 6) questEvent('big');` :5827 gild, :5828 cabana band, :5829 `if (qk) questEvent(qk);` :5838 house alias; HOUSE_LIKE at :3927.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "qk tags are assigned at placement in island.ts via per-world drop()/plant() helpers (`if (qk) mesh.userData.qk = qk` at :5875 powder, :6140 skylark, :6733 lantern, :7076 gameday), by name in assets3d.ts (:121 `name.startsWith('house') ? 'house'`), and by life.ts movers (car :2933/:3975/:5917, goat :6178, gritter/lift/sledkid/snowball :4748-4826). Static literal counts per file: island.ts car 3, bridge 1, roadworks 2, pine 1; life.ts car 3; rivals.ts reads house only.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 5875,
+   "evidence": "grep of qk assignment sites; island.ts:5875, :6140, :6733, :7076; assets3d.ts:121-122; life.ts:2933,3975,4748,4775,4798,4826,5917,6178.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Per-world tag supply, as far as static reading can establish (live counts require qa/questable.mjs, which I did not run). MAPLE: house via assets3d name tag + cars from life.ts (contract records 67 car / 70 house measured). PIRATE: cabana via radius band (22 cabanas r=3 at :7679), 7 buggies tagged car (comment :3821), 'big' hotel. GAME DAY: car = tailgate trucks + food trucks (:7175, :7189, :7215, :7276), rv (:7174, :7240 x52), house = frat houses r7 x24 (:7253) + brick halls r8 x22 (:7275) — these also count as 'big'. LANTERN: house = market sheds/kura/stalls/food carts (:6831-6976, hundreds), 'big' = bathhouse r11 (:6777) + drum tower rungs; ZERO cars (:3855). POWDER: lodge r10.5 (:5919, only 'big'), chalet r3.6 (:5939), hut (:5981), car (:6219), house only via alias. SKYLARK: 'big' tag on whale r18 (:6197), hangars (:6499), balloons (:6389,:6432 x57,:6560), tower (:6448); car x~74+ (:6431 x29, :6503 x27, :6563 x18, :6387, :6454, :6555, :6663); house only 2 (:6393, :6451; contract 'two house-tagged props').",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 6197,
+   "evidence": "island.ts placement lines cited inline; prototype3d.ts:3821 (Pirate 7 buggies), :3855 (Lantern zero cars), :3869-3871 (Powder one big), :3884-3886 (Skylark 70 cars), :3899-3902 (Skylark two houses); docs/crews/round-6/world6.contract.md:103.",
+   "confidence": "likely"
+  },
+  {
+   "claim": "Honest three-kind SETs per world (only kinds already measured or clearly abundant): MAPLE snack/car/house; PIRATE snack/cabana/gild (or big); GAME DAY snack/car/house; LANTERN snack/house/big (no cars); POWDER snack/house(alias chalet/hut)/car — never big (one Lodge); SKYLARK snack/car/big — never house (two). 'gild' is 20 gilded props per match on any world (:GILD_PER_MATCH in questable.mjs:57) and is the safe third kind anywhere.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 3906,
+   "evidence": "MED_BY_WORLD :3906-3915 and HARD_BY_WORLD :3916-3928 are the owner-era record of what each world can serve; questable.mjs:57 GILD_PER_MATCH=20; Powder 'big' removed at :3869-3871; Skylark 'houses' removed at :3899-3902.",
+   "confidence": "likely"
+  },
+  {
+   "claim": "qa/questable.mjs counts supply live from window.__edibles using the eat handler's exact rules (r<1 snack, r>=6 big, gild, 2.6-3.4 cabana, qk, house alias from __questPools().houseLike) and replays 365 day-seeds; it is in gate profile 'live' only, NOT 'push' (:406 profiles: ['live']). A SET-level probe can reuse its supply block verbatim.",
+   "file": "/home/user/voidling/artifacts/3d-game/qa/questable.mjs",
+   "line": 74,
+   "evidence": "questable.mjs:74-90 supply loop; :57 GILD_PER_MATCH; gate.mjs:406-407 `{ id: 'questable', tier: 'money', profiles: ['live'], ... }`.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "LANDMARK identification: heroProp is NOT a tag — it is resolved per match in beginMatch as the largest-radius edible, gated on COPY.heroCue being non-null (all six worlds have heroCue, :1543-1665, so all six have a hero). Per world: Maple town hall, Pirate Royal Mariner, Game Day stadium, Lantern bathhouse (r11 :6777), Powder Lodge (r10.5 :5919), Skylark whale (r18 :6197).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 6114,
+   "evidence": ":6108 `heroCued = false; heroAte = false; heroProp = null;` :6114-6116 `if (COPY.heroCue) { for (const e of edibles) if (!heroProp || e.radius > heroProp.radius) heroProp = e; }`; heroCue strings :1543,:1565,:1596,:1620,:1642,:1664; heroName :1667 etc.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "There is no 'heroEaten' event; the hero-gone moment is a per-frame POLL in the animate loop: `heroProp.mesh.userData.eaten` && `userData.byPlayer` sets heroAte and announces COPY.heroGone. A LANDMARK win check goes exactly there (:10775) — byPlayer already distinguishes the player's bite from a rival's. A rival eating the hero would leave the level unwinnable (heroProp.eaten true, byPlayer false); the code at :10770-10774 documents that rivals do eat it.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10768,
+   "evidence": ":10768 `if (heroProp && COPY.heroGone && !heroAte && heroProp.mesh.userData.eaten) { heroAte = true; if (heroProp.mesh.userData.byPlayer) { announce(COPY.heroGone); ... townReacts({kind:'landmark'...}) } }`; the in-range cue at :10753-10766.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "RIVALS: myRank is computed twice from the same `rows` shape (You + rivals.list.filter(joined), sorted by score desc): live at refreshHud :4732-4737 (5Hz, feeds crown/brag), and again inside endMatch :5374-5378 for the final standing. endMatch derives WIN from `myRank === 1` (:5382 audio, :5415 stats.wins, :5434 headline, :5442 celebrateEnd won flag). No standings are stored elsewhere.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5378,
+   "evidence": ":5374-5378 rows + `const myRank = rows.findIndex((r) => r.me) + 1;`; :4732-4737 live copy; :5434 `endHd.textContent = myRank === 1 ? WIN_TITLES[...] : \\`#${myRank} · ${LOSE_TITLES[...]}\\``.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "CLEAR: devouredPct is recomputed in refreshHud as round(consumed/aliveMass*100) over ALL edibles (rivals' meals included), clamped to 100; aliveMass = initialMass - departed (balloons). devPlayerPct/devMineN track the player's own share. voidBestPct is only written in the SOLO branch of endMatch (:5339-5344); the multiplayer branch stores voidBestScore/voidBest_<world> (points) instead.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 4886,
+   "evidence": ":4873-4886 consumed/total/mine/departed loop, `devouredPct = Math.min(100, Math.round((consumed / aliveMass) * 100));` :4897-4899 minePct/devMineN; :5339-5344 voidBestPct solo-only; :5450-5456 voidBest_<world>/voidBestScore.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "A 100% CLEAR is arithmetically reachable only if every non-departed edible is eaten by anyone (the rivals' bites count toward consumed). Whether the growth law lets a void reach the hero-size items before the clock ends on every world is UNKNOWN from static reading (R_CAP / growth law :9691-9770 caps radius by pace); the comment at :5462-5466 records real matches landing at single-digit devouredPct on Maple (3,297 props).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5462,
+   "evidence": ":5462-5466 'a real match lands in single digits — the headline number on the results screen was 1%'; solo matchLen is 120s (:6131 `matchLen = solo ? 120 : MATCH_LEN`).",
+   "confidence": "likely"
+  },
+  {
+   "claim": "The clock: matchClock counts down only inside `if (started && !ended && !paused)` at :9524 (`matchClock -= dtw * clockSpeed`, dtw slowed by hit-stop and the outro). matchLen is 180 (MATCH_LEN, ?len=) or 120 solo (:6131), set in beginMatch (:6132 `matchClock = matchLen`). clockSpeed=6 with ?fast (:3702). The timer chip is rewritten change-gated at :9540-9541; red at <=35s (:9650-9651) with a banner; a countdown numeral for the last 10s (:9669-9679).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 9524,
+   "evidence": ":9523-9524; :3702-3704; :6131-6132; :9540-9541 `timerEl.textContent = ts`; :9650, :9669.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The clock starts on the first touch: startMatch() (:6297) is called from the pointerdown handler (:3397), keydown (:3456) and AUTO_START (:6146); it flips `started = true` at :6303. beginMatch (:6081) arms the world (`armed = true` :6144, `goalCardT = 0` :6161) without starting the clock — this already matches the owner's 'clock starts on the first touch' decision.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 6303,
+   "evidence": ":6297-6303 `function startMatch(): void { if (started || !armed || ended) return; ... started = true; startT = tClock;`; :3397 `startMatch();   // armed -> live: the match begins on the player's first touch`.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "TIME'S UP path today: at :9681 `if (matchClock <= 0 && !ended && outroT <= 0) { outroT = 2.0; rings; audio.evolve(); }` then the frame head at :9480 `if (outroT > 0) { outroT -= dt; if (outroT <= 0) endMatch(); else dtw = dt * 0.3; }` — a 2s slow-mo push-in (camera :10562, music mood :10203) and then endMatch(). A 'goal met' check belongs beside :9681 inside the same `started && !ended && !paused` block (after the counters are current), setting outroT = 2.0 the same way so the existing slow-mo ceremony fires; endMatch is then reached through :9480 unchanged.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 9681,
+   "evidence": ":9681-9686 buzzer branch; :9480 outro-to-endMatch; :10203 `else if (outroT > 0) mood = playerScore >= max(rivals) ? 'victory' : 'cruise'`.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "endMatch() takes NO parameters. Outcome is inferred: solo -> newBest vs voidBestPct (:5338-5360, headline `${devouredPct}% DEVOURED`); otherwise myRank===1 (:5434). To show WIN vs TIME'S UP for a goal level it needs a result argument (or a module flag set by the goal check) because for EAT/SET/LANDMARK/CLEAR the rank is irrelevant and for RIVALS the rank only counts if the clock ran out. endHd's markup default 'TIME!' (index.html:2230) is always overwritten.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5324,
+   "evidence": ":5324 `function endMatch() {`; :5352 solo headline; :5434-5435 rank headline; index.html:2230 `<div class=\"hd\" id=\"endHd\">TIME!</div>`.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "What the end card already has (index.html:2219-2274; endMatch :5324-5577): #endHd title, #endSub lead line + coin count-up (.endCnt, 900ms ease-out with 8 pops, celebrateEnd :5290-5322) + gems + XP, #endList standings rows (:5566-5568), #endFinds stickers, #endStats tiles (YOU ATE %, BITES, BIGGEST form, YOUR BEST/NEW BEST, rank row with XP bar :5470-5486), #drop (void drop, offerDrop :5208), #endNext (NEW WORLD! unlockCard with TAKE ME THERE -> reload with voidAutoPlay :5509-5537, else skin nudge/OPEN SHOP :5539-5563), #endQuests TODAY board (:5488-5501, to be retired), and the pinned .endGo footer #btnAgain (resetMatch :7695) / #btnHome (menu :7696-7702). Win confetti at :5294-5304; unlock confetti :5528-5536.",
+   "file": "/home/user/voidling/artifacts/3d-game/index.html",
+   "line": 2219,
+   "evidence": "index.html:2219-2274; prototype3d.ts:5290-5322 celebrateEnd, :5470-5486 endStats, :5488-5501 endQuests, :5503-5537 NEW WORLD, :5566-5570 endList, :7695-7702 buttons.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Nothing on the end card is a 'level bar 1/N' or a 'next level' illustration; the closest existing pieces are the rank row's XP bar (.xpb :5482-5484), the unlockCard (:5512-5513) and the skin nudge's .nb bar (:5548-5550). completeWorld(pickedWorld) (unlocks.ts:98-106) fires on every finish regardless of result and is called only from the multiplayer branch (:5509), never from the solo branch (returns at :5370).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5509,
+   "evidence": ":5509 `const opened = completeWorld(pickedWorld);` inside the non-solo path after the `return` at :5370; unlocks.ts:98-106 completeWorld.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Goal card today: #titlecard has three lines (.lvl, .name, .sub, index.html:1932-1939) filled ONCE at module init from WORLD_COPY: .lvl = `LEVEL ${COPY.n}` (world number 1-6), .name = world name, .sub = COPY.sub (e.g. 'the little void is hungry · eat the town', :1501; 'get them before they go up', :1648). It is shown by the animate loop when goalCardT reaches GOAL_CARD_AT=0.5s after arming (:9512-9518), animationDuration = GOAL_CARD_LEN 0.6s (CSS goalRoll index.html:588), hidden by resetMatch :7657. The <=6-word goal line belongs in .sub (or .lvl re-labelled to the level number 1-5), set in beginMatch (:6081) before `armed = true` (:6144) — today's :1674-1677 write is not per match.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 1677,
+   "evidence": ":1674-1677 titlecard fill at module init; :6029-6031 GOAL_CARD_AT/LEN/goalCardT; :6161 `goalCardT = 0`; :9512-9518 show; :7657 hide; index.html:581-611 CSS; COPY.sub lines :1501,:1549,:1571,:1602,:1626,:1648.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The evolve card yields to the title card via `titleUntil` (:9517 set, :10683 `if (tClock > titleUntil)`), and announce()/holdBanner own the #banner; the hero in-range cue uses holdBanner(2.4) (:10761). A goal-progress banner should not use announce() during the 35s warning window (:9651) — the file records banner collisions eating the TREASURE FEAST beat.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10683,
+   "evidence": ":9517, :10683-10689, :10753-10766, :9650-9651 comment about the 30s/35s collision.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "QA hooks that already expose the goal counters without a HUD scrape: _dbg.__matchState() returns devouredPct, initialMass, t, clock, score, r, armed, goalCardT, tClock (:2289-2310); _dbg.__questPools() publishes easy/med/hard/houseLike/spec (:3934-3936); _dbg.__rushClock(to) sets matchClock (:2171); __edibles is read by questable.mjs. A probe for 'win on the spot' can rush the counters and assert endEl.classList 'show' before matchClock <= 0.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 2289,
+   "evidence": ":2171 `_dbg.__rushClock = (to) => { matchClock = to; }`; :2289-2310 __matchState; :3934-3936 __questPools.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Quit path (⌂ then LEAVE) sets `started = false; armed = false; ended = true` without calling endMatch (:7774) — a goal level abandoned mid-run must be counted as not-won by whatever persists level progress, and the goal check must be gated on `started && !ended` as the buzzer is.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 7774,
+   "evidence": ":7765-7778 quit handler: track('match_quit'), `started = false; armed = false; ended = true;` then back to menu.",
+   "confidence": "certain"
+  }
+ ],
+ "constraints_for_the_build": [
+  "EAT: read playerScore (prototype3d.ts:3704); it can go DOWN on a hunter steal (:2945), so check a threshold in the per-frame block, not on an eat event. Target N per world should be derived from WORLD_PAR (:550) which is already measured; do not invent numbers.",
+  "EAT HUD: there is no score element in the match HUD (index.html:1884-1891). A target bar needs its own element or a second track under #growth; do not repurpose .gFill (radius-driven, paintGrowth :4929, owner-signed visual per comment :4949-4955).",
+  "SET: hook the three per-match counters at the exact eat-handler lines (:5825-5839) or inside questEvent (:4018) — keep the kind rules identical to qa/questable.mjs:74-90 so the probe and the game cannot disagree. Retiring the daily board removes questEvent's only consumer; the call sites stay.",
+  "SET kinds per world must be drawn from measured supply: never 'car' on Lantern (:3855), never 'big' on Powder (:3869), never 'house' on Skylark (:3899). Run qa/questable.mjs-style supply counting for the chosen triples before shipping; questable is 'live'-profile only (gate.mjs:406), so a SET probe must be registered in the push profile explicitly.",
+  "LANDMARK: heroProp is the largest edible resolved in beginMatch (:6114-6116), gated on COPY.heroCue (non-null on all six worlds). Win check goes at :10768-10775 on `userData.eaten && userData.byPlayer`. Decide what happens if a RIVAL eats the hero (:10770-10774 says they can) — exclude heroProp from rival eating, or fail/redeal, but decide.",
+  "RIVALS: winner = myRank === 1 from rows built at :5374-5378; this is the ONE goal type that resolves at the buzzer, so the goal check for it is the existing :9681 path and endMatch's existing myRank logic.",
+  "CLEAR: devouredPct (:4886) counts everyone's meals against aliveMass; 100 is the clamp. voidBestPct is written only in the solo branch (:5339-5344). Reachability of 100% inside 180s is unmeasured — measure with __rushClock/__matchState before setting CLEAR as level 5 on any world.",
+  "WIN ON THE SPOT: put the check inside `if (started && !ended && !paused)` beside :9681, set outroT = 2.0 exactly as the buzzer does (:9682-9686) so the slow-mo/rings/music ceremony (:9480, :10203, :10562) is reused; do not call endMatch() directly from the check.",
+  "endMatch() has no parameters (:5324); it must receive (or read a module flag for) the result so WIN vs TIME'S UP is not inferred from myRank (:5434) or solo newBest (:5352). Keep the existing celebrateEnd count-up (:5290), endStats (:5470), NEW WORLD card (:5503-5537) and .endGo buttons (:7695-7702).",
+  "Goal card: set the <=6-word goal into #titlecard .sub (index.html:1938; today filled once at :1677 from COPY.sub) inside beginMatch (:6081) before `armed = true` (:6144); the card fires itself at goalCardT >= 0.5 (:9512). Do not touch GOAL_CARD_AT/LEN (:6029-6030) — they were measured against Hole.io (recon 11.5).",
+  "Quit (:7774) bypasses endMatch; goal progress persistence must treat it as not won. Gate every new check on `started && !ended`.",
+  "Banner budget: goal progress callouts must not use announce() inside the 35s window (:9650-9651) or over the title card (titleUntil :10683); holdBanner is reserved for EVOLVED and the hero cue (:4744-4748 comment).",
+  "No file edits, builds or browsers were used for this read; live supply counts (car/house/big per world) are 'likely' from placement code and prior measured comments, not re-measured tonight."
+ ],
+ "cheapest_path": "Add one module-level `goal: {type, target, count[3], kinds[3], met:boolean, result:'win'|'time'|null}` set in beginMatch (:6081) from a 5-entry per-world table keyed on the level index; write its one-line text into #titlecard .sub before `armed = true` (:6144). Feed counters from the four existing signal points: playerScore threshold (checked per frame), the eat handler's kind lines (:5825-5839, same rules as questable.mjs:74-90), the hero poll at :10775 (`byPlayer`), devouredPct (:4886). Put a single `goalMet()` check inside the clock block next to :9681 that sets `goal.result='win'; outroT = 2.0` (reusing the buzzer's slow-mo ceremony and :9480's endMatch call); the buzzer branch sets `goal.result='time'` for goal levels and keeps myRank for RIVALS. Give endMatch a result argument (or read goal.result) to choose headline/sound/won-flag at :5382/:5434/:5442 and to gate level progress. Probe: seed the level, use __rushClock/__matchState (:2171, :2289) to drive the counters, assert #end shows with matchClock > 0 and the headline reads WIN; assert the buzzer path reads TIME'S UP; register it in gate.mjs push profile; run a questable-style supply count for each world's SET triple.",
+ "risks": [
+  "SET kinds chosen without a live supply count will repeat the three-times-shipped unclearable-quest bug (prototype3d.ts:3841-3905 history; docs/GOVERNOR.md:148). Static reading gives counts only for Skylark cars (~74 placements) and the documented Maple 67/70; the rest need qa/questable.mjs.",
+  "LANDMARK can be stolen by a rival: rivals eat by the same rule with no hero exclusion (:10770-10774), leaving an unwinnable level with the hero gone.",
+  "CLEAR at 100% may be unreachable in 180s on dense worlds (Maple 3,297+ props, comment :5462; devouredPct measured in single digits in real matches). The growth law caps radius by pace (:9725-9766); a level that cannot be won by a child violates 'never a wall'.",
+  "EAT via playerScore can regress after a hunter bite (:2945) — a bar that goes backwards may read as a bug to a six-year-old; the goal check must be a threshold that latches on first crossing.",
+  "endMatch's multiplayer branch calls completeWorld on every finish (:5509) and the solo branch never does; if world unlocks are tied to level completion the two paths must be reconciled or a world opens on a failed level.",
+  "Banner collisions: any new goal callout through announce() competes with beats, the 35s warning, the hero cue and EVOLVED (:9650, :10683, :10761); the file records these collisions silencing the biggest moment of a match before.",
+  "The daily quest board is drawn at module init (:3937-3965) and rendered to #quests/#endQuests; retiring it touches renderQuests (:3969), questComplete (:4004), addEncoreQuest (:3991), endMatch :5488-5501 and the endQuests CSS — and qa/questable.mjs plus the gate step at gate.mjs:406 would then be dead.",
+  "qa/questable.mjs and __questPools (:3934) are the only supply instrument; if the board is retired before a SET probe replaces it, the gate loses its only 'can this world serve this kind' check."
+ ],
+ "open_questions": [
+  "Does a rival eating the hero landmark fail the LANDMARK level, get prevented (exclude heroProp from rivals' eat rule), or trigger a redeal? Code today lets it happen (:10770-10774).",
+  "For RIVALS (level 4) and CLEAR (level 5) 'wins on the spot' has no meaning for RIVALS — is the buzzer the win condition for that level alone, and does 'biggest' mean score rank (myRank) or radius? Today rank is by score (:4732-4736).",
+  "Is CLEAR measured on devouredPct (everyone's meals, :4886) or the player's own share (devMineN/devPlayerPct, :4897-4899)? The end card already shows 'YOU ATE n% OF IT' as the player's share.",
+  "Which per-world EAT targets? WORLD_PAR (:550) is 0.75 of the measured child mean on four worlds; is level 1 par, or a fraction (level 1 is the first thing a 6-year-old sees on each world).",
+  "Does level progress persist per world (a new key like voidLevel_<world>) and does the NEW WORLD unlock move from 'finish any match' (unlocks.ts:98) to 'finish level N'? Owner's plan says a world opens by finishing a match; the five-pip menu needs a per-world level index.",
+  "Live supply counts per world for the chosen SET kinds — must be measured with qa/questable.mjs (or its supply block) on the current build; not re-derivable statically.",
+  "Solo mode (matchLen 120, no rivals, :6131) — do the five levels apply to solo, and if so what is level 4 (RIVALS) with no rivals?"
+ ]
+}

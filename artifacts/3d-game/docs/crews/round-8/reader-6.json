@@ -1,0 +1,182 @@
+{
+ "topic": "Per-world diorama subject and the five-goal material (EAT/SET/LANDMARK/RIVALS/CLEAR) for maple, pirate, gameday, lantern, powder, skylark",
+ "findings": [
+  {
+   "claim": "World->3D transform is (v - 6000) * 0.05 on both axes; every spawn/hero coordinate below is derived with it.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 87,
+   "evidence": "const w = (v: number) => (v - CX) * SCALE; WORLD_COPY writes hero as (8540 - 6000) * 0.05 at prototype3d.ts:1558",
+   "confidence": "certain"
+  },
+  {
+   "claim": "MAPLE: landmark = The Town Hall, eat radius 6.5 at world (6855,4640) = 3D (42.75,-68); heroCue '🏛️ YOU CAN EAT THE TOWN HALL NOW — GO!'; par 80,000; hero waypoint null so the intro opens on the void (no establishing-shot subject exists for a diorama); spawn world (6469,5240) = 3D (23.45,-38.0); districts = 6x6 grid forest/farm/fair/strip/cozy/downtown/plaza/park/campus/beach; water = pond (8565,5337 r304), river (118 world units wide), lagoon; poster /assets/hf/hf_20260801_130607_c92a52e5-8c1c-4a60-a566-ba19583fd532.png",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 1501,
+   "evidence": "hero: null, introLen: 2.2 (:1501); heroCue :1543; WORLD_PAR maple 80000 (:551); town hall landmark(MS.makeTownHall(), SQ_CX, SQ_HALL_Y, 6.5 ...) island.ts:8065, SQ_CX=6855 :219, SQ_HALL_Y=4640 :220; MAPLE_SPAWN island.ts:236; MAPLE_PLAN island.ts:122-129; POND :265 riverXAtWorld :267 LAGOON :277 inWater3 :408-424; CARD_ART maple :6604",
+   "confidence": "certain"
+  },
+  {
+   "claim": "MAPLE kinds it can serve (measured on a live build): 67 props tagged car, 70 tagged house, 2,605 snack-class (<1 radius) of 5,790 edibles; 'big' (radius>=6) = 1 (the town hall — every other Maple landmark() call is <=5); gild = 20 per match on every world.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 3841,
+   "evidence": "'Game Day carries 0 props tagged car and 0 tagged house, against Maple's 67 and 70' (:3841-3842); docs/AAA-BRIEF.md:1057-1059 'Maple's 5,790 (2,605 small)'; barn r5 island.ts:8341, scoreboard 3 :8374; qa/questable.mjs GILD_PER_MATCH = 20",
+   "confidence": "likely"
+  },
+  {
+   "claim": "PIRATE: landmark = The Royal Mariner (grand hotel), eat radius 10 at world (8540,3700) = 3D (127,-115); heroCue '🏨 YOU CAN EAT THE ROYAL MARINER NOW — GO!'; par 105,000; intro pulls back from the hotel to the void over 2.2 s; spawn world (6950,10560) = 3D (47.5,228) i.e. ~350 units from the hero; districts port/resort/party/market/jungle/cove/beach/oldtown; water = the sea bay handled by the coastline (inWater3 returns false), plus two infinity pools and a moored galleon as props; poster hf_20260801_130624_b1d4e117-1a45-4447-9bb8-e7f764565975.png",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 1558,
+   "evidence": "hero [(8540-6000)*0.05,(3700-6000)*0.05] :1558; landmark(makeGrandHotel(), [8540, 3700], 10, ...) island.ts:7703; spawn island.ts:245-246; BayBiome bay.ts:38; inWater3 pirate false island.ts:409; infinity pools :7631,:7685; galleon afloat r8 :7582; CARD_ART :6605; WORLD_PAR :552",
+   "confidence": "certain"
+  },
+  {
+   "claim": "PIRATE kinds: car = 7 (the shuttle buggies, movers in life.ts); house = 0; cabana (radius band 2.6-3.4) = 22 requested cabanas at r3; big (radius>=6) = 12 authored props (lighthouse 6.5, warehouse 7.5, fort 9, hotel 10, spa 7, yacht club 7.5 x2, main stage 8, bazaar tower 7, temple 9, wreck 7, galleon 8 afloat); ~2,137 edibles total (older figure, before a density pass).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 7679,
+   "evidence": "cabanas: spread('resort', 22, 62, 3) dropGlb('cabana', p2, 3 ...) :7679; landmark radii :7651,:7652,:7669,:7703,:7706,:7707,:7722,:7735,:7774,:7803,:7842; galleon :7582; 'Pirate Bay's entire car population is seven shuttle buggies' prototype3d.ts:3823-3824; addEncoreQuest bans cars/houses on pirate :3998-3999; '2,137 things on this island against GAME DAY's 6,537' :7378-7379",
+   "confidence": "likely"
+  },
+  {
+   "claim": "GAMEDAY: landmark = The Stadium, eat radius 11.0 at world (5930,3200) = 3D (-3.5,-140); heroCue '🏟️ YOU CAN EAT THE STADIUM NOW — GO!'; par 175,000; intro 3.4 s from the bowl back to the void; spawn world (5950,8810) = 3D (-2.5,140.5), 281 units south of the bowl; districts bowl/plaza/lot/rvpark/greek/campus/practice/woods (polygon regions); water = none; poster hf_20260801_053403_0dc79112-b8fd-4304-9d15-8630620b2218.png",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 1584,
+   "evidence": "hero :1584, introLen 3.4 :1589; drop(TG.makeStadium(), STAD, 11.0, 0, true, 'big') island.ts:7150; GD_SPAWN gameday.ts:302; GdBiome gameday.ts:108; inWater3 gameday false island.ts:429; CARD_ART :6616; WORLD_PAR :553; '281 units away ... NDC y 1.28 to 1.78' :1425-1428",
+   "confidence": "certain"
+  },
+  {
+   "claim": "GAMEDAY kinds (requested counts, placement may drop some): car = 28 food trucks (12 lot + 10 plaza + 6 campus, r4.0); house-like = 24 frat houses (tag house, r7.0) + 52 motorhomes (tag rv, r4.2) = 76; big (radius>=6 or tag big) = 24 frat houses + 2 helmet tunnels (6.5) + stadium 11 + clock tower 4.5 (tagged) = 28 props; total ~6,537 edibles (heaviest world).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 7253,
+   "evidence": "plant('greek', 24, 140, 7.0, TG.makeFratHouse, true, 'house', 11) :7253; plant('rvpark', 52, 100, 4.2, TG.makeRV, true, 'rv', 8.5) :7240; food trucks :7189,:7215,:7276; helmet tunnel 6.5 x2 :7214; clock tower :7151; plant signature (id, n, clear, r, make, face, qk, sep) :7106-7110; 6,537 :7379",
+   "confidence": "likely"
+  },
+  {
+   "claim": "LANTERN: landmark = The Bathhouse, eat radius 11.0 at world (6280,2500) = 3D (14,-175); heroCue '🏮 YOU CAN EAT THE BATHHOUSE NOW — GO!'; par 150,000; intro 3.6 s corridor shot down the lantern line; spawn world (6620,10150) = 3D (31,207.5); districts gate/stalls/canal/teahouse/shrine/bridge/garden/bathhouse/onsen/bamboo; water = an ankle-deep walkable canal (CANAL polyline, half-width 150 world units) and onsen hot pools as props — no standing water; poster hf_20260802_020636_0bc97a9d-a168-4667-bf5d-76ac9418bff1.png",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 1608,
+   "evidence": "hero :1608, introLen 3.6 :1612; drop(NM.makeBathhouse(), BH, 11.0, 0, true, 'big') island.ts:6777; LN_SPAWN lantern.ts:221; LnBiome lantern.ts:121-122; CANAL lantern.ts:98, CANAL_HALF :106; inWater3 lantern false island.ts:413; hot pools :7019; CARD_ART :6621; WORLD_PAR :554",
+   "confidence": "certain"
+  },
+  {
+   "claim": "LANTERN kinds: car = 0 (an honest absence, pool removed); house-tagged = 16 teahouses (r4.2) + 180 market sheds (r3.4) + 44 kura (r4.6) + 36 food carts (r2.0) = 276 requested; big: 5 tagged (bathhouse 11, torii 5.0, moon bridge 4.2, drum tower 6.0, shrine hall 7.0), only 3 of which are radius>=6; the 180 sheds at r3.4 also fall inside the 'cabana' radius band.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 6831,
+   "evidence": "plant('stalls', 76, 130, 3.4, NM.makeMarketShed, false, 'house', 7.5) :6831-6839; food carts :6889,:6949; teahouses :6976; big drops :6777-6779,:6794,:6801; 'LANTERN NIGHT 149/365 days carry cars — the level has ZERO cars' prototype3d.ts:3861",
+   "confidence": "likely"
+  },
+  {
+   "claim": "POWDER: landmark = The Lodge, eat radius 10.5 at world (6100,2350) = 3D (5,-182.5); heroCue '🏔️ YOU CAN EAT THE LODGE NOW — GO!'; par 45,000; intro 3.5 s holds the lodge and pulls down the Home Run to the lake; spawn world (6300,7900) = 3D (15,95); districts village/lake/pinewood/piste/lodge/rim; water = a frozen LAKE ellipse (5450,6600 rx1450 ry1100), walkable ice; poster = the FROST PEAKS teaser hf_20260730_000329_762b5f44-3c3d-4030-8429-099f02691b5e.png (shared with the 'frost' key)",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 1631,
+   "evidence": "hero :1631, introLen 3.5 :1634; drop(lodge, [PW.LODGE.cx, PW.LODGE.cy], 10.5, ..., true, 'lodge') island.ts:5919; PW_SPAWN powder.ts:244; PwBiome powder.ts:168; LAKE powder.ts:103; inWater3 powder false island.ts:433; CARD_ART :6629; WORLD_PAR :562",
+   "confidence": "certain"
+  },
+  {
+   "claim": "POWDER kinds: car = 0 (the gritter is tagged 'gritter', not car); house-like = 24 chalets (tag chalet, r3.6) + the Lodge (tag lodge) + 1 ice hut (tag hut, r2.0) = 26; big (radius>=6) = exactly 1 (the Lodge); 4,536 edibles (3,588 small / 922 mid) on the dense bake.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 5937,
+   "evidence": "scatterInRegion(REG('village'), 24, 150, { sep: 6.9 }) ... drop(AL.makeChalet(), p2, 3.6, face, false, 'chalet') :5937-5940; hut :5981; gritter life.ts:4748; 'big ... the level has exactly one, the Lodge at 10.5' prototype3d.ts:3864-3866; HOUSE_LIKE = ['house','rv','chalet','lodge','hut'] :3919; docs/AAA-BRIEF.md:1068",
+   "confidence": "certain"
+  },
+  {
+   "claim": "SKYLARK: landmark = The Whale, eat radius 18.0 force-placed on the launch circle at world (6107,4349) = 3D (5.35,-82.55), TETHERED (uneatable by player and rivals) until life.ts's ascension beat pulls the pegs for twelve seconds; heroCue '🐋 YOU CAN EAT THE WHALE NOW — GO!'; par 35,000; intro 3.4 s holds the whale and pulls back down runway 03; spawn world (7800,5750) = 3D (90,-12.5); districts circle/runway/slab/perimeter/launchfield/arrivals/tower/hangars/breakfast/meadow; water = none; poster hf_20260904_175218_7e696395-fbec-4ba2-a7a2-9b02e2b5bdf5.png (remote CDN; CARD_FALLBACK gradient if it 404s)",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 6197,
+   "evidence": "whale.userData.tethered = true; drop(whale, [SK.LAUNCH.cx, SK.LAUNCH.cy], 18.0, layoutYaw(), true, 'big') :6196-6197; eat gate skips tethered prototype3d.ts:5597,:5879; pegs out life.ts:5282; hero :1653, introLen 3.4 :1657; SK_SPAWN skylark.ts:234; SkBiome skylark.ts:145-146; inWater3 skylark false island.ts:438; CARD_ART :6656; WORLD_PAR skylark 35000 :611",
+   "confidence": "certain"
+  },
+  {
+   "claim": "SKYLARK kinds (measured by qa/questable.mjs at world-6 verdict): 3,716 snack, 192 big, 72 car, 2 house; car tags are the retrieve vehicles and arrivals trailers/vans; big is dominated by balloon envelopes plus tower 4.2 and two hangars 5.5 tagged 'big'.",
+   "file": "/home/user/voidling/artifacts/3d-game/docs/crews/round-6/world6.verdict.md",
+   "line": 99,
+   "evidence": "'Supply: 3,716 small, 192 big, 72 car, 2 house'; 'SKYLARK FIELD has 70 car-tagged props' prototype3d.ts:3878; tower drop :6448, hangars :6499, vans 'car' :6555; HARD_BY_WORLD skylark ['rival','big'] :3906",
+   "confidence": "likely"
+  },
+  {
+   "claim": "The hero cue fires the first frame heroProp.radius <= voidling.radius * EAT_RATIO (1.11), heroProp being the single largest edible in the world resolved at match start. Thresholds: Maple 6.5 -> R 5.86; Pirate 10 -> 9.01; Game Day 11 -> 9.91; Lantern 11 -> 9.91; Powder 10.5 -> 9.46; Skylark 18 -> 16.22.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10753,
+   "evidence": "if (heroProp && COPY.heroCue && !heroCued && !heroProp.mesh.userData.eaten && heroProp.radius <= voidling.radius * EAT_RATIO) (:10753-10754); heroProp = largest edible :6114-6116; EAT_RATIO = 1.11 :3673",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Growth is clock-bound, not eat-bound: lawCap = min(12, 0.9 + (0.022*min(t,30) + 0.025*t)*paceK + surgeT^2*(2.8+2.6*pace)) + feastR, feastR = +1.25 per rival eaten (max +6). Without the finale surge the clock alone buys r 6.06 at 180 s ('the old 6.06 plateau'); the surge/pace term reaches ~14.5 on a strong run. So a radius-10/11 landmark is reachable only inside the finale surge — by design 'the last half-minute' — and Maple's 5.86 crosses at ~132 s of 180 on an optimal run (measured, qa/pace.mjs). No measured cue time exists for the other five worlds.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 9745,
+   "evidence": "LAW_TOP = 12 :9745; lawCap :9746-9748; FEAST_PER_RIVAL 1.25 :3689; 'Maple's radius is 4.85 at 120s and 6.09 at 140s, so it crosses at about t=132s' :1517-1520; 'topped out at 6.06 on a 3:00 clock' :9693; '~14.5 on a strong run' :9733; 'a radius-10 hotel that only becomes edible in the last half-minute' :1553-1555",
+   "confidence": "certain"
+  },
+  {
+   "claim": "SKYLARK's LANDMARK goal is impossibly late as authored: the whale needs R >= 16.22, and lawCap tops at 12 + feastR, so it requires at least 4 rivals eaten (12+5.0 >= 16.22; 12+3.75 does not) — plus the tether window. island.ts:6183-6186 claims 'an idle child at r7 can take an r18 meal', which contradicts the EAT_RATIO gate at :5879; which is true is unsure and must be measured, not argued.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/proto3d/island.ts",
+   "line": 6186,
+   "evidence": "'an idle child at r7 can take an r18 meal, and the rivals hunt big' :6185-6186 vs e.radius > R * EAT_RATIO continue :5879 and LAW_TOP 12 :9745",
+   "confidence": "unsure"
+  },
+  {
+   "claim": "questEvent('big') double-fires for any prop that is both tagged 'big' and radius >= 6 (stadium, bathhouse, drum tower, shrine hall, frat houses are not tagged so they fire once): line 5826 fires on radius, line 5829 fires on the tag. A SET counter keyed on 'big' would count one bite as two on Game Day (stadium) and Lantern (3 of 5).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5826,
+   "evidence": "if (e.radius >= 6) questEvent('big'); ... if (qk) questEvent(qk); (:5826,:5829); tagged-big drops with r>=6 at island.ts:7150,:6777,:6794,:6801",
+   "confidence": "certain"
+  },
+  {
+   "claim": "'cabana' is a radius band (2.6 <= r <= 3.4), not a tag: on Maple every GLB sedan/taxi at r2.8 counts as a cabana, on Lantern the 180 market sheds at r3.4 do; only Pirate has actual cabanas. A SET kind named 'cabana' is honest only on Pirate.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 5828,
+   "evidence": "if (e.radius >= 2.6 && e.radius <= 3.4) questEvent('cabana'); Maple glb car_sedan r2.8 island.ts:8213; Lantern sheds r3.4 :6831-6838",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The intro camera already computes a hero-to-void pull-back from COPY.hero (introHX/introHZ), and paintWorldCard swaps a CARD_FALLBACK gradient for the poster only on probe.onload — the diorama has an authored subject on five of six worlds and none on Maple.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 10549,
+   "evidence": "if (introT > 0 && COPY.hero) { ... introHX = (COPY.hero[0] - voidState.x) * e; (:10549-10560); paintWorldCard :6689-6699; CARD_FALLBACK :6667-6685",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Proposed EAT (level 1) = 0.6 x par, since par is 0.75 of the measured child mean so a median child scores ~1.33 par and 0.6 par is ~45% of a typical run: Maple 48,000; Pirate 63,000; Game Day 105,000; Lantern 90,000; Powder 27,000; Skylark 21,000.",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 550,
+   "evidence": "WORLD_PAR :550-611; '0.75 of the mean, as Maple and Lantern sit' :558; polish plan bar 5 'median tester clears level 1 of a world in one run' docs/crews/round-7/holeio.polish-plan.md:~178",
+   "confidence": "likely"
+  },
+  {
+   "claim": "Proposed SET (level 2), three kinds x N with supply >= 3N and the family eating half the board: Maple snack 40 / car 8 / house 5; Pirate snack 40 / cabana 5 / gild 4 (big 12 and car 7 are too thin or too late); Game Day snack 40 / car 6 / house 8; Lantern snack 40 / house 10 / gild 4 (big = 5 props, 3 by radius); Powder snack 40 / house 5 / gild 4 (big = 1); Skylark snack 40 / car 8 / gild 4 (house = 2, big envelopes are r>=6 so late).",
+   "file": "/home/user/voidling/artifacts/3d-game/src/prototype3d.ts",
+   "line": 3896,
+   "evidence": "supply counts in the per-world findings above; gild 20/match qa/questable.mjs GILD_PER_MATCH; MED_BY_WORLD/HARD_BY_WORLD :3896-3907 already encode which kinds each world can serve",
+   "confidence": "likely"
+  }
+ ],
+ "constraints_for_the_build": [
+  "The heroCue threshold is derived, not a separate constant: heroProp = largest edible, cue at heroProp.radius <= R * EAT_RATIO (prototype3d.ts:6114-6116, :10753). A LANDMARK level must reuse heroProp and heroAte/byPlayer (:10768-10775), not a second list.",
+  "Growth is clock-bound (lawCap :9746-9748, LAW_TOP 12). A LANDMARK level that 'wins on the spot' on a 10-11 radius landmark is decided by the finale surge timing, not by eating; do not tune N against it without qa/pace.mjs radius-vs-time per world (only Maple is measured: 5.86 at ~132 s).",
+  "Skylark's whale is tethered (island.ts:6196; eat gate :5597,:5879) and needs R >= 16.22 (> LAW_TOP 12 without >= 4 rivals eaten). Either the goal names a different Skylark landmark (tower 4.2 :6448, hangars 5.5 :6499) or the whale's edible radius/tether changes; measure first.",
+  "questEvent('big') double-fires on tagged-big props with r >= 6 (:5826 + :5829); a SET counter must dedupe per bite before any N is honest.",
+  "'cabana' is a radius band 2.6-3.4 (:5828) — on Maple it counts sedans, on Lantern sheds. Use it as a SET kind on Pirate only, or retag.",
+  "Supply is shared with up to five rivals (family share of bites measured 40-50%, :523-525); keep 3N <= supply, and prefer N where 6N <= supply for cars/houses.",
+  "Powder has exactly one r>=6 prop (:3864-3866) and Skylark two house-tagged props (world6.verdict.md:99-100): 'big' on Powder and 'house' on Skylark are dead kinds.",
+  "Every per-world table must have six rows keyed by WorldId (the Record<WorldId,...> pattern at :1492) — the ternary fallthrough bug is recorded three times (:3843-3870, :3899-3906).",
+  "Maple has hero: null (:1501); a diorama needs an authored subject there — the town hall at 3D (42.75,-68) is the only r>=6 prop.",
+  "Static counts here are REQUESTED scatter counts (plant/scatterInRegion n); placement drops some (Game Day once placed 861 of 2,364 :6740-6744). Live counts come from qa/questable.mjs supply, which the gate already runs per world.",
+  "Skylark's poster path is remote-only (CDN refused from this container, :6636-6659); paintWorldCard keeps CARD_FALLBACK if it 404s."
+ ],
+ "cheapest_path": "Level table as one Record<WorldId, LevelSpec[5]> next to WORLD_COPY (:1492) with EAT = 0.6*WORLD_PAR, SET kinds drawn from the existing MED/HARD_BY_WORLD-serviceable set (:3896-3907) with N from the questable supply, LANDMARK = existing heroProp/heroAte path (:6114, :10768), RIVALS = myRank at endMatch (:4737), CLEAR = devouredPct (:5339-5344). Before choosing any LANDMARK N or SET N, run qa/pace.mjs for all six worlds to get radius-vs-time and qa/questable.mjs supply per world (both already exist, no new probe needed for measurement); extend questable's supply dump to dedupe the 'big' double-fire. Diorama subject per world = COPY.hero (five worlds) and the town hall for Maple.",
+ "risks": [
+  "LANDMARK on worlds 2-5 lands in the last ~30 s by growth-law design (:1553-1555); with 'clock runs out = fail' a slower child may never see the cue (Maple weak-run note :1529-1531) — a level that fails on pace rather than play.",
+  "Skylark LANDMARK as the whale is likely unreachable (R 16.22 vs LAW_TOP 12); the island.ts:6185 claim to the contrary is unverified.",
+  "Requested prop counts overstate live supply; Pirate's car (7) and big (12) and Lantern's big (5) are thin enough that rivals can eat the SET out.",
+  "'big' double-count and the 'cabana' radius band make two of the shipped kinds dishonest as SET counters.",
+  "Poster art is the diorama's competitor: five posters were painted 'no void in frame', a live diorama with the void in it changes the picker's visual contract (:6597-6612).",
+  "EAT = 0.6 par is a proposal from par arithmetic, not a measured clear-rate; polish plan bar 5 requires playtest measurement."
+ ],
+ "open_questions": [
+  "Radius-vs-time per world (qa/pace.mjs) — at what match second does each landmark cross R*1.11? Only Maple (~132 s) is on record.",
+  "Is the whale actually eatable at r7 as island.ts:6185 claims, or does :5879 gate it at R >= 16.22? Which is the eat radius passed to place() for the standing whale?",
+  "Live questable supply per world for snack/car/house/big/gild/cabana after the round-5/7 placement passes (the numbers here are requested counts or older measurements).",
+  "Should heroProp on Skylark be the whale at all, given the tether, or the tower/hangars?",
+  "Does the WebGL canvas render behind the opaque #menu today (reader 1's question) — the diorama cost line depends on it.",
+  "Score accrual curve: at what second does a typical child pass 0.6 par, so EAT's win-on-the-spot lands mid-match and not at the buzzer?"
+ ]
+}

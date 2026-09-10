@@ -1,0 +1,157 @@
+{
+ "topic": "Menu redesign: every qa probe it breaks, push-profile exposure, and the machine-failable contracts for qa/menu.mjs and the level-ladder probe (qa/ladder.mjs name is TAKEN)",
+ "findings": [
+  {
+   "claim": "The dominant entry idiom across qa/ is two DOM clicks: document.getElementById('btnPlay').click() then '#worldRow .wCard[data-world=\"<w>\"]' — 124 occurrences of the .wCard[data-world= selector and 82 of #btnPlay in ~110 non-underscore probes (ab, acclift, aftermatch, artaudit, ascension, autoplay, bannergag, bloomtruth, bubbleclear, compare, contrast2, crowdface, crowdgate, dailyrace, difficulty, econ, edgespeed, endclear, endfit2, endlayout, evolveonce, faceparity, facewrap, fallback, finale, finds, firstframe, firsttouch, food, funnel, gapesheet, glossab, glosscov, glossgap, ground, groundgrain, grounding, groundsurf, heap, hero, heroclear, heroface, heroswatch, hud, hud3, invert, jobs, journey, joyedge, joyrelease, juice, keyart, ladder, laneshort, lightdrift, lnperf, lnsound, loadpct, lockedcards, lookpair, mapleteach, moodsheet, moverface, music, newsfeed, occlusion, onboard, opening, pace, personsheet, pickerfit, placement, playgate, portrait, postpipe, purpose, qualcost, rematch, replay, rigexposure, ringcount, ringmeaning, rivalnotice, rivalshader, rivalswing, shading, shadowcost, shippedlook, shopdoors, shot, sizerank, skycut, skypop, smoke, solotog, stickers, store, streakdrift, switch, titan, tutstrand, unlocks, vary, voidab, voidgrid, worldswitch). Any redesign that removes/renames #btnPlay, #worldRow, .wCard or data-world breaks all of them at once.",
+   "file": "qa/smoke.mjs",
+   "line": 80,
+   "evidence": "smoke.mjs:80-81 `await p.click('#btnPlay'); ... await p.click(`#worldRow .wCard[data-world=\"${WORLD}\"]`)`; identical shape in econ.mjs:85-86, faceparity.mjs:135-138, opening.mjs:258-259, purpose.mjs:64-66, placement.mjs:516-518, newsfeed.mjs:52-54, pickerfit.mjs:87-89, lockedcards.mjs:63-65. Playwright `p.click(sel)` (smoke, econ, faceparity, opening, solotog) throws on a missing/hidden element; the `?.click()` evaluate variants (purpose, placement, newsfeed) silently no-op.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Twelve of the 35 push-profile steps depend on menu DOM: smoke:maple, econ, faceparity, pickerfit, opening, lockedcards, purpose, splash (firstframe --splash), placement, newsfeed, uisystem, worldreg. rng and settle are in push but have zero #btnPlay/.wCard hits (they rely on ?w= + AUTO_START) and survive.",
+   "file": "qa/gate.mjs",
+   "line": 89,
+   "evidence": "`node qa/gate.mjs --list --profile=push` printed 35 steps; SUITE registrations at gate.mjs:89 (smoke), :101 (econ), :119 (faceparity), :132 (pickerfit), :176 (opening, exitCode), :187 (lockedcards), :228 (purpose), :233 (splash -> qa/firstframe.mjs --splash), :301 (placement), :320 (rng), :339 (settle), :419 (uisystem), :371 (worldreg), :445 (newsfeed). grep of rng.mjs/settle.mjs for btnPlay|wCard = 0 hits.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "pickerfit (push) asserts, on '#worldRow .wCard[data-world]' cards with children b/span/.wBest: .wBest never wraps (Range line-box count), and rendered ink contrast >= 4.5:1 where ink = P95 luminance and ground = P30 luminance inside each text box on the LIT screenshot (plus a diagnostic backdrop pass with type hidden via a #worldRow-scoped style). It seeds voidUnlocked as the comma-joined ALL_WORLDS string. Removing the poster grid makes `cards` empty and the probe passes vacuously (no FAIL, PASS printed) — a silent hole, not a red step.",
+   "file": "qa/pickerfit.mjs",
+   "line": 211,
+   "evidence": "pickerfit.mjs:69 MIN_CONTRAST=4.5; :104 querySelectorAll('#worldRow .wCard[data-world]'); :120-127 Range getClientRects line count; :159 hide-type style; :193 COVERAGE=0.95; :211-225 inkContrast P95/P30; :245-253 loop over cards; :257-260 fails only pushed per card.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "lockedcards (push) seeds voidUnlocked='maple,pirate', opens the picker via #btnPlay, reads '#worldRow .wCard[data-world]' + .wArt boxes + .locked class at DPR2, and asserts min pairwise squint deltaE (CIE Lab, 4x5 mosaic) between locked posters >= 10; it FAILs outright if fewer than two locked cards are on screen.",
+   "file": "qa/lockedcards.mjs",
+   "line": 39,
+   "evidence": "lockedcards.mjs:39 MIN_LOCKED_DE=10; :41-49 lab(); :59 voidUnlocked='maple,pirate'; :63-65 btnPlay + wCard wait; :68-73 card boxes/locked; :118 FAIL when <2 locked; :136 PASS line.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "opening (push, exitCode verdict) loads '/?manual=1' so AUTO_START does not pre-start the match, then p.click('#btnPlay'), waits 1400 ms, p.click('#worldRow .wCard[data-world=W]'), waits for window.__matchState, and measures 19 bars (A1 clock ticks before touch = 0, A4 <= 8 frames, A5 1100-1300 ms descent, A6/A6c quarter points, A7 5.5-6.5x, A8 = 0, A9 0.30-0.60, A11 450-750 ms, A12 0.3-0.9 s, A13 = 0, A14 <= 12 px, A15 24-26 %, A15b = 0, A20 >= 3, A21 <= 100 ms) on the MATCH clock (__matchState().tClock / .t), not wall time. Its two p.click calls are hard failures under a menu with no #btnPlay or no visible .wCard.",
+   "file": "qa/opening.mjs",
+   "line": 258,
+   "evidence": "opening.mjs:255 goto `/?manual=1`; :258-260 the two clicks + __matchState wait; :41-84 BARS; :280-281 waits on tClock; :490 process.exit(fails ? 1 : 0); prototype3d.ts:3631-3632 AUTO_START = DEBUG_HARNESS || (navigator.webdriver && !_qd.has('manual')).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "splash step (push) = qa/firstframe.mjs --splash: it freezes every body child except #menu (visibility:hidden), then measures contrast of '#menu .logo i', '#menu .logo', '#menu .tag' by A/B screenshots (glyph core = |A-B| >= 24 and Y > 140; bar p10 >= 4.5:1 body / 3:1 for >= 18.66px), at six viewports. A renamed/removed .logo or .tag returns {missing:true} and is SKIPPED (no FAIL) — the step goes green on nothing, the exact GOVERNOR rule-4 'throw if the call site moved' failure. The freeze() also hides the WebGL canvas, so a live 3D menu would be measured against a blank ground rather than the diorama behind the type. The non-splash path also clicks #btnPlay/.wCard (:232,:235).",
+   "file": "qa/firstframe.mjs",
+   "line": 215,
+   "evidence": "firstframe.mjs:76-83 freeze()/thaw(); :88-105 contrast() A/B; :215-218 freeze('#menu') + three #menu selectors; :220 `if (c.missing) continue` then p10 < bar check; :230-235 onMenu detection via getComputedStyle(#menu).display and btnPlay/wCard clicks; gate.mjs:233-236 registers it as 'splash' with --views=430x932@2,... .",
+   "confidence": "certain"
+  },
+  {
+   "claim": "worldreg (push, static) parses index.html for data-world=\"...\" attributes and reports '#worldRow cards' missing if any ALL_WORLDS id is absent from the markup; a menu that drops the six poster divs fails this step unless the new world-switcher elements carry data-world for every world.",
+   "file": "qa/worldreg.mjs",
+   "line": 195,
+   "evidence": "worldreg.mjs:192 HTML='index.html'; :195 matchAll(/data-world=\"([a-z0-9]+)\"/g); :197 findings.push({f: HTML, name:'#worldRow cards', missing}); :228 FAIL line. Current markup: index.html:2061 id=\"worlds\", :2066 id=\"worldRow\", :2106 id=\"soloTog\".",
+   "confidence": "certain"
+  },
+  {
+   "claim": "uisystem (push) steps through named screens including ['picker', () => btnPlay.click()] and references btnShop; econ (push) clicks #btnPlay/.wCard and btnShop twice; the four nav tiles' ids (btnBook :1976, btnShop :1977, btnTrophies :1978, btnTop :1979) are read by bookshot.mjs:49 (#btnBook must be in DOM or FAIL exit 1), econ, framing, funnel, journey, shopdoors, streakunlock, uisystem; navfit.mjs:19 reads '.navRow .navCard' boxes and reports clipping.",
+   "file": "qa/uisystem.mjs",
+   "line": 35,
+   "evidence": "uisystem.mjs:35 ['picker', ...btnPlay]; econ.mjs:85-86 + 2 btnShop hits; bookshot.mjs:49-50 `p.locator('#btnBook')` FAIL if count()==0; navfit.mjs:19 '.navRow .navCard'; index.html:1971-1982 ids; :1454 .navRow grid of 4.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "qa/ladder.mjs ALREADY EXISTS and is the QUALITY-ladder probe (menu-gate / recovery / demote of QUALITY[] rungs), not a level ladder. Its scenario 1 asserts that 500 hand-cranked frames at 40 ms (25 fps virtual) AT THE MENU demote nobody (rung stays 0) — a live 3D menu that lets the adapter sample (prototype3d.ts:10912 gates on `started`) or that changes __quality() at the menu will flip it; scenarios 2-3 use #btnPlay/.wCard (:124-125). Naming the new level probe qa/ladder.mjs overwrites it.",
+   "file": "qa/ladder.mjs",
+   "line": 106,
+   "evidence": "ladder.mjs:1-38 header; :65-76 virtualise() captures rAF and performance.now, stubs __renderer.render; :106-114 MENU GATE crank(500,40) and fail if after.level !== 0; :124-126 btnPlay/.wCard clicks then wait __matchState().t > 2.5; prototype3d.ts:10911-10913 `qAccT += dtRaw ... if (qPinned === null && started && qCd <= 0 ...)`.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "The menu today is an opaque fixed layer (#menu z-index 10, three radial gradients ending at #0d0821, key art on ::after) — but the render loop keeps running behind it: attract-mode autopilot is explicitly 'menu backdrop + demo harness ONLY', the per-edible sim breaks on !started, and firstframe.mjs observed canvas foliage bleeding through at 393x700. So the canvas most likely renders (and costs) behind the menu today; reader 1 confirms.",
+   "file": "src/prototype3d.ts",
+   "line": 9850,
+   "evidence": "index.html:885-891 #menu fixed inset:0 z-index:10 radial-gradient ground; :899 #menu::after key art; :926 #menuOrb display:none; prototype3d.ts:9849-9851 'attract mode: menu backdrop + demo harness ONLY'; :10368 `if (!started || ended || paused) break; // menu attract mode`; :10955 renderer.render(scene, camera) unconditional in animate(); firstframe.mjs:78-79 'the attract-mode void wanders: at 393x700 the behind mean came back 111,140,83 — foliage green from the canvas'.",
+   "confidence": "likely"
+  },
+  {
+   "claim": "?w=<world> does NOT skip the menu; it only selects the built world (localStorage voidWorld fallback). What starts the match for probes is AUTO_START: navigator.webdriver && !?manual -> queueMicrotask(startMatch()) once the world is armed. Hence the probes' menu clicks are mostly redundant today except for choosing a non-default world through the picker and for opening.mjs (manual=1).",
+   "file": "src/prototype3d.ts",
+   "line": 355,
+   "evidence": "prototype3d.ts:355-358 _wantWorld from ?w / voidWorld / 'maple' -> setWorld; :3618-3632 _qd, DEBUG_HARNESS, AUTO_START; :6144-6146 `armed = true; if (AUTO_START) queueMicrotask(() => startMatch());`; hud2.mjs:1 'real menu (no ?w= auto-launch)'.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Hooks a menu probe can read today: window.__voidState (:2164), __matchState() with t (0 until started), tClock (runs during armed idle), clock, score, r, armed, goalCardT, arriveLanded, introT, camDist, devouredPct, rivals[] (:2289-2318); __quality() {level,pinned,shadows,shSize,pr} (:2259); __pinQuality(n) (:2255); __renderer (:2048); __introLen (:2091). There is NO menu-camera hook (azimuth/orbit) and no level-index hook — both must be added for the new probes to read the thing itself.",
+   "file": "src/prototype3d.ts",
+   "line": 2289,
+   "evidence": "grep of `__matchState\\s*=|__pinQuality|__quality\\s*=|__voidState\\s*=|__renderer\\s*=|__introLen` in src/prototype3d.ts; lines listed. No `__menu` symbol exists (grep 'attract|menu' hooks returned only DOM toggles at :5553, :6185, :7699, :7776).",
+   "confidence": "certain"
+  },
+  {
+   "claim": "HUD element ids available for the t=5/88/163 presence bars: #timer (:1884), #coins (:1885), #quests (:1886 — the retired daily board), #growth (:1888), #banner (:1893), #count (:1894), #hunger (:1897), #titlecard (:1932 goal card), #end (:2219). body.menu hides #guide/#hand/#news (index.html:234,:246,:349). MATCH_LEN = 180 s (?len=N override).",
+   "file": "index.html",
+   "line": 1884,
+   "evidence": "grep of id=\"...\" in index.html; prototype3d.ts:3701 `const MATCH_LEN = Number(_q.get('len')) || 180`; :6029-6030 GOAL_CARD_AT=0.5, GOAL_CARD_LEN=0.6; :4018 questEvent(kind,n); :5324 endMatch(); :1543-1664 heroCue per world.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "GOVERNOR rules that bind the two new probes: rule 2 (probe must FAIL before the fix), rule 3 (only numbers actually run), rule 4 (read the thing itself, on its own clock — no transcribed geometry, throw if the call site moved; under swiftshader the match clock runs ~14x slower than wall, and __matchState comments measure 0.043 game-s per wall-s; gate.mjs says 'roughly a ninth'), rule 5 (verify from the front). Never quote harness frame time as the game's — ladder.mjs's virtualised rAF (16.667 ms/frame) is the house technique for rate-invariant measurements.",
+   "file": "docs/GOVERNOR.md",
+   "line": 41,
+   "evidence": "GOVERNOR.md:18-28 rules 1-2; :30-33 rule 3; :41-61 rule 4 incl. '14x slower than wall time (qa/_clockrate.mjs)' and 'wait on __matchState().t and sample across MATCH seconds'; :63-66 rule 5; prototype3d.ts:2303-2309 'Measured: 0.043 game-seconds per wall-second'; gate.mjs:225-227 'roughly a ninth of real time'; ladder.mjs:20-27 virtualised clock rationale.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "Owner-decided targets the bars derive from: five levels per world (EAT/SET/LANDMARK/RIVALS/CLEAR, win on the spot, buzzer fails), 30 at launch, daily quest board retired, live 3D menu (originally 'first update'); measured Hole.io reference: ground #4c3cbe, diorama 49% of frame height, five pips (done grey #596793, cleared magenta #8f2599, current green gradient with white ring 29% wider, locked blue #98affd + padlock), Continue #38db03 with cream rim 17.9:1, end card 1/14 bar + locked island illustration.",
+   "file": "docs/crews/round-7/holeio.polish-plan.md",
+   "line": 142,
+   "evidence": "polish-plan.md:142-152 the five goals, 30 levels; :168 quest board retired; :326,:350 live menu 'first update'; :346 win-on-the-spot; recon.md:25-27 #4c3cbe and 49%; :29-30,:249-252,:311-312 pip states and 29%; :230-232,:238 end card + Continue rim; :370,:374,:381 the numbered targets.",
+   "confidence": "certain"
+  },
+  {
+   "claim": "menushot.mjs is not a probe: it only screenshots the menu to qa-out/menu.png after removing .show from #daily/#gift, prints 'ok', and touches no selectors — it cannot break, but it also cannot see a regression.",
+   "file": "qa/menushot.mjs",
+   "line": 12,
+   "evidence": "menushot.mjs:1-17 whole file; :12-13 remove 'show' from daily/gift; :15 screenshot; :16 console.log('ok').",
+   "confidence": "certain"
+  },
+  {
+   "claim": "solotog.mjs asserts the BY MYSELF chip (#soloTog .on) flips and persists across #btnPlay -> picker -> .wCard launch; tutstrand.mjs walks #btnPlay + '#worldRow .wCard[data-world]' and documents launchWorld() (prototype3d.ts:6503) returning on a missing voidTut; hud3.mjs:67 dispatches a synthetic click on the maple .wCard; loadpct.mjs:27-29 and hud2.mjs:73 wrap their clicks in .catch (survive). None of these four are in the gate.",
+   "file": "qa/solotog.mjs",
+   "line": 38,
+   "evidence": "solotog.mjs:36-41, :84-85; tutstrand.mjs:13-15, :84, :88; hud3.mjs:61, :67; loadpct.mjs:27-29; hud2.mjs:73; gate --list push output does not include them.",
+   "confidence": "certain"
+  }
+ ],
+ "constraints_for_the_build": [
+  "Keep the id #btnPlay on the new full-width PLAY, or every p.click('#btnPlay') probe in the push profile (smoke.mjs:80, econ.mjs:85, faceparity.mjs:136, opening.mjs:258, pickerfit.mjs:87-88, lockedcards.mjs:63-64) throws before it measures anything.",
+  "Keep data-world=\"<id>\" attributes on whatever element selects a world in the new menu, for all six ALL_WORLDS ids, or worldreg.mjs:195-197 (push) goes red on '#worldRow cards'.",
+  "Do not create qa/ladder.mjs for the level ladder — the file exists (quality ladder, MENU GATE scenario at :106-114). Use qa/levels.mjs (or rename with the parent's consent) and leave qa/ladder.mjs's rung-0-at-the-menu assertion intact: a live menu must not let the adapter demote (prototype3d.ts:10912 gates on `started`) — if the menu starts sampling, ladder.mjs's MENU GATE is the probe that fails first.",
+  "opening.mjs's A1 (clock ticks before touch = 0) and its ?manual=1 path must survive: the one-tap PLAY must land in the ARMED idle (armed=true, started=false, __matchState().t === 0) and start on the first touch, exactly as today's launchWorld -> withWorldReady -> startFresh does (prototype3d.ts:6144-6146).",
+  "firstframe --splash (push) measures '#menu .logo i', '#menu .logo', '#menu .tag' and SKIPS a missing selector (firstframe.mjs:220 `if (c.missing) continue`). If the logo/tag move, update those three selectors AND make a missing one FAIL (governor rule 4); and note its freeze() hides the canvas, so a diorama behind type will not be in the measured backdrop unless freeze() is taught to keep the canvas.",
+  "pickerfit.mjs and lockedcards.mjs assert on the poster grid; if the grid stays reachable (e.g. from the home tab) they must be re-pointed at the new route (their clicks are #btnPlay then wait for '#worldRow .wCard[data-world=\"maple\"]' visible); if the grid is removed, both steps must be retired from gate.mjs explicitly, not left to pass vacuously (pickerfit prints PASS on zero cards).",
+  "Every new bar samples on the match/menu clock, never wall time: wait on __matchState().t / .tClock for in-match bars (GOVERNOR.md:54-61) and hand-crank rAF with a virtualised performance.now (ladder.mjs:65-76) for per-frame menu bars, so the sandbox's ~1 fps cannot be read as the game's.",
+  "Add two read-only hooks alongside __matchState: a __menuState() returning {azimuth or camera pos, camDist, world, level, orbiting:boolean, frame} and a __levels() returning the 30-entry state array {world, n, kind, state: done|cleared|current|locked} derived from the same localStorage keys the pips read — the probes must read the game's own state, not re-derive it from voidUnlocked strings (GOVERNOR rule 4).",
+  "The ~110 probes with the two-click idiom should be migrated once, mechanically, to a shared `enterWorld(p, world)` helper (pattern of qa/worlds.mjs) that clicks #btnPlay when visible, selects the world through the new selector when present, else relies on AUTO_START, then waits on __matchState — and a static guard (worldlists.mjs-style) that fails if any probe still hard-codes '#worldRow .wCard[data-world='."
+ ],
+ "cheapest_path": "Keep #btnPlay (one tap -> launchWorld() of the current world, landing ARMED not started) and keep the poster grid alive as a secondary world switcher reachable from the home tab with the same '#worlds/#worldRow .wCard[data-world]' markup, so pickerfit, lockedcards, worldreg and the 110 idiom probes keep a valid route while the gate is green; then land one shared qa/_enter helper + a static idiom guard and migrate probes by sed. Add __menuState()/__levels() hooks in prototype3d.ts next to __matchState (:2289). Name the level probe qa/levels.mjs, NOT qa/ladder.mjs. qa/menu.mjs contract (each a bar, exit code + 'PASS —'/'FAIL —' line): (1) HERO SHARE — bounding box of pixels that change between two hand-cranked frames 30 frames apart (virtualised rAF, 16.667 ms/frame, __pinQuality(0), viewport 430x932@2) must span 45-53% of viewport height (target 49%, recon.md:27) and the same box must NOT overlap #btnPlay or the pip row; (2) ORBIT — read __menuState().azimuth per cranked frame over 60 frames: monotonic in one direction, rate between 0.05 and 0.25 deg/frame (i.e. a full turn in 24-120 s at 60 fps) and its px-equivalent (centroid shift of the changed-pixel mask) median 0.5-4 px/frame with no frame > 8 px; (3) UI STILL AFTER SETTLE — after 120 cranked frames, screenshot pairs 1 frame apart: changed-pixel count inside the boxes of #btnPlay, the pip row, the tab bar and the coin counter == 0 (any deliberate pulse must be declared as an exception with its own amplitude bar); (4) PLAY CONTRAST — pickerfit's inkContrast (P95 vs P30 luminance inside #btnPlay's box on the lit frame, pickerfit.mjs:211-225) >= 4.2:1 as the parent states it, sampled at three orbit phases (0, 20, 40 frames) so the diorama behind cannot rescue it, plus the PLAY label glyph p10 >= 4.5:1 by firstframe's A/B method; (5) TAPS TO PLAY — load '/?manual=1' (AUTO_START off), count Playwright clicks until __matchState().armed === true and #menu computed display === 'none': must be exactly 1, and #worlds must never gain .show on that path; then one pointer-down must set started (opening.mjs A1 stays 0); (6) FRAME TIME — in-page rAF performance.now deltas over 120 real frames at the menu vs 120 real frames in-match on the same page, same rung under __pinQuality(0): report both medians and p95 as sandbox-relative only; bar is a RATIO menu/match median <= 1.15 (a menu may not cost more than the game), never an absolute ms, and the printed line must say 'sandbox, not device'; (7) PIP CONTRAST PAIRS — lockedcards' Lab deltaE (lockedcards.mjs:41-49) between every adjacent pip pair and between each pip state and the ground colour behind it >= 10, the current pip's width / neighbour width >= 1.25 (target 1.29), and the padlock glyph on a locked pip has p10 contrast >= 3:1 by firstframe's A/B glyph method; (8) TABS — each of the three tab backgrounds must differ pairwise by deltaE >= 15 and the active tab's label >= 4.5:1. qa/levels.mjs contract: (a) STATE MACHINE — for each of the 30 (world, n) seeds in localStorage (voidUnlocked, per-level keys the build defines), __levels() and the DOM pip states must agree exactly (throw if __levels is missing); seed 'level 3 of pirate current' and assert exactly one 'current', all earlier 'done' or 'cleared', all later 'locked', and pip 5 is 'cleared' magenta only when voidBestPct === 100 for that world; (b) ADVANCE — enter level n via the one tap, force the goal by the game's own path (questEvent kinds per kind: EAT via score reaching N, SET via three counted kinds, LANDMARK via the heroCue prop, RIVALS via myRank at buzzer, CLEAR via devouredPct) and assert endMatch fires with a win and the current index advances by exactly 1; let the clock run out (?len=8) and assert it does NOT advance; do this across all six worlds' level 1 and at least one of each kind (5 kinds) so 30 states are exercised; (c) HUD PRESENCE — wait on __matchState().t (not wall) at t=5, 88, 163 match-seconds and assert #timer visible with a value that decreases, the level's goal counter (#growth for EAT/CLEAR, the SET three-kind countdown element, LANDMARK hero cue, RIVALS rank) visible and numerically monotone in the right direction, #quests absent or display:none (board retired), and #titlecard shown once inside GOAL_CARD_AT..+GOAL_CARD_LEN of arming and never again; (d) NEXT-WORLD CARD — completing level 5 of a world produces the NEW WORLD/next-reward card (#end) with the locked island illustration element present and a level-bar text matching /\\\\d+\\\\/30/.",
+ "risks": [
+  "Vacuous passes: pickerfit.mjs iterates whatever cards it finds and prints PASS on zero cards (:245-260); firstframe.mjs skips missing #menu .logo/.tag selectors (:220). A redesign can turn two push steps green by deleting what they measure — both need a 'throw if absent' guard before the menu changes (GOVERNOR rule 4).",
+  "Playwright p.click on a hidden element hangs to its timeout: smoke:maple, econ, faceparity and opening (all push) would each burn their full 420-900 s budget before failing if #btnPlay or the world card is hidden rather than removed.",
+  "qa/ladder.mjs's MENU GATE (rung 0 after 20 virtual s at 25 fps at the menu) assumes the adapter ignores the menu; a live 3D menu that lifts the `started` gate, or that changes pixel ratio for the diorama, will fail it — that is a correct failure, and it is also the reason a menu that renders the island must be measured for cost on real hardware (the sandbox cannot say what a 1.15x/2.0x pr menu costs a phone).",
+  "Renderer already draws the scene behind the opaque menu today (prototype3d.ts:10955 unconditional; attract mode :9850), so 'the menu now renders 3D' may add less GPU cost than expected but ALSO means today's menu is already paying it — measure before/after or the number is meaningless (GOVERNOR 'measure before you change anything').",
+  "Name collision: the parent's 'qa/ladder.mjs' would overwrite the shipped quality-ladder probe; the level probe must be a different file.",
+  "The parent's PLAY contrast bar is 4.2:1; the house bar in pickerfit.mjs:69 is 4.5:1 with an explicit refusal of the large-text relaxation for six-year-olds. A 4.2 bar is below the house standard and needs the owner's or the skeptic's sign-off, or it will be retracted.",
+  "An orbiting diorama behind semi-transparent UI makes every A/B contrast screenshot non-deterministic (firstframe.mjs:76-79 already hit this with the attract-mode void); contrast probes must freeze the orbit (crank to a fixed frame under the virtualised clock) before shooting, and sample more than one phase.",
+  "Retiring the poster grid retires lockedcards' 'the art keeps selling the next one' bar with no replacement; the locked-island illustration on the end card is the natural successor and needs its own deltaE bar before the grid goes.",
+  "~110 probes to migrate; a partial migration leaves the gate green while the un-migrated majority silently hang or no-op (the `?.click()` variants pass without the picker, so a wrong world can be tested as the right one — the exact failure worlds.mjs was written against)."
+ ],
+ "open_questions": [
+  "Does the WebGL canvas actually composite behind #menu today (it is drawn, :10955), and at what frame cost — reader 1's measurement; the answer sets the 'before' number for the frame-time ratio bar.",
+  "Will the poster grid (#worlds/#worldRow) survive as a secondary world switcher, or is the world chosen only by finishing level 5? unlocks.ts says a world opens by finishing ANY match on the previous one; the five-level decision may supersede that, and both qa/levels.mjs state (a) and lockedcards depend on the answer.",
+  "What is the level-state storage: new keys (e.g. voidLevel_<world>) or derived from voidBest_<world>/voidBestPct/voidMatchN? __levels() must be defined before the probe can read the thing itself.",
+  "Is PLAY allowed a deliberate pulse/breathe (as Hole.io's does)? If yes, bar (3) needs an amplitude and period, not zero.",
+  "Does the 30-level ladder show 5 pips per world (numbered 1-5) or a global 1-30 index (Hole.io shows 4-8 with a separate 1/14 bar)? Recon.md:434,:460-461 leaves this open and the pip-count bar depends on it.",
+  "Does 'taps-to-play = 1' hold for the FIRST session too (today session 1 auto-plays Maple with no menu, lockedcards.mjs:25-28) and after a world change, which currently reloads the page (launchWorld path) — a reload between tap and play would still be one tap but breaks opening.mjs's sampler unless the world is pre-selected.",
+  "Which world does the one-tap PLAY start when voidWorld and the current level's world disagree (prototype3d.ts:355-358 reads ?w / voidWorld / 'maple'); probes that pass ?w= expect it to win.",
+  "Where is the level's diorama camera authored — reusing the match camera rig (camDist/introT) or a separate menu camera? __menuState()'s fields depend on it, and reusing the match rig risks opening.mjs A7 (ground scale 5.5-6.5x) reading the orbit as the descent."
+ ]
+}
