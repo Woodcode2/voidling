@@ -54,6 +54,7 @@
 //
 //   node qa/goalcurve.mjs [world|all] [port] [--samples=200]
 import { chromium } from 'playwright';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { ALL_WORLDS, initScript } from './worlds.mjs';
 import { DRIVE_NEAREST } from './_drive.mjs';
 
@@ -200,7 +201,18 @@ const runOnce = async (world) => {
           // which one CLEAR's goal is made of is §8.3's decision and they are
           // very different numbers.
           you: +(ms.ate?.you ?? 0).toFixed(2), fam: +(ms.ate?.family ?? 0).toFixed(2),
-          rank: ms.rank ?? 0, k: { ...window.__kindTally() } },
+          rank: ms.rank ?? 0, k: { ...window.__kindTally() },
+          // THE NUMBER THAT RE-SPECIFIES LANDMARK. Not "did she reach the
+          // landmark" but "what was the biggest thing she COULD eat, at this
+          // moment" — the largest uneaten prop inside the eat rule
+          // (radius <= R * EAT_RATIO). A landmark a child can win is one whose
+          // radius sits under this curve well before the buzzer, and without
+          // it dot 3 can only be re-specified by guessing.
+          big: (() => { let m = 0; const lim = ms.r * 1.11;
+            for (const e of window.__edibles) {
+              if (e.eaten || !e.mesh?.visible || e.mesh.userData.tethered) continue;
+              if (e.radius <= lim && e.radius > m) m = e.radius;
+            } return +m.toFixed(2); })() },
       };
     }, [FPS, STEP]);
     if (r.broke) { note(`${world}: the rAF chain broke — animate() threw mid-crank`); break; }
@@ -271,12 +283,32 @@ for (const world of worlds) {
       console.log(`               the island's LARGEST edible is a DIFFERENT prop (${big.qk || 'untagged'} r ${big.radius}, needs R ${big.needR}) — heroProp resolves to that, which is §3.4's trap`);
   } else console.log(`     LANDMARK  no landmark found`);
   console.log(`     RIVALS    rank at the buzzer ${span(runs, (r) => r.final.rank)} · joined ${runs[0].final.rivals.filter((x) => x.j).length}/${runs[0].final.rivals.length} · best rival ${span(runs, (r) => Math.max(...r.final.rivals.filter((x) => x.j).map((x) => x.s), 0))}`);
+  const atF = (r, f) => { const T = r.gc[r.gc.length - 1].t; return r.gc.reduce((a, x) => Math.abs(x.t - T * f) < Math.abs(a.t - T * f) ? x : a, r.gc[0]); };
+  console.log(`     SIZE      radius at 25% of the clock ${span(runs, (r) => atF(r, 0.25).r)} · 50% ${span(runs, (r) => atF(r, 0.5).r)} · 75% ${span(runs, (r) => atF(r, 0.75).r)} · buzzer ${span(runs, (r) => r.final.r)}`);
+  console.log(`               biggest prop she could EAT then: 25% ${span(runs, (r) => atF(r, 0.25).big)} · 50% ${span(runs, (r) => atF(r, 0.5).big)} · 75% ${span(runs, (r) => atF(r, 0.75).big)}`);
   console.log(`     CLEAR     world devoured ${span(runs, (r) => r.final.pct)}% · of which HERS ${span(runs, (r) => r.final.you)}% and the family's ${span(runs, (r) => r.final.fam)}%`);
   const kinds = Object.keys(runs[0].final.k).filter((k) => !['devourer', 'combo', 'rival', 'gulp', 'collapse', 'solo40'].includes(k)).sort();
   console.log(`     SET       ate  ${kinds.map((k) => `${k} ${span(runs, (r) => r.final.k[k] || 0)}`).join(' · ')}`);
   console.log(`               have ${kinds.map((k) => `${k} ${runs[0].supply[k] ?? 0}`).join(' · ')}`);
   console.log('');
 }
+
+// ── KEEP THE SERIES, so the next question does not cost another hour ──────
+// Every run of this probe is about fifty minutes of wall time, and the first
+// pass answered five questions and raised a sixth it had no data for. The raw
+// samples are written out so any later question — what radius at what second,
+// what was edible when — is a file read rather than a re-run.
+try {
+  mkdirSync('qa/out/goalcurve', { recursive: true });
+  for (const [w, runs] of Object.entries(out)) {
+    writeFileSync(`qa/out/goalcurve/${w}.json`, JSON.stringify({
+      world: w, seed: SEED, runs: runs.length,
+      supply: runs[0].supply, landmark: runs[0].landmark,
+      series: runs.map((r) => ({ final: r.final, gc: r.gc })),
+    }, null, 1));
+  }
+  console.log(`  series written to qa/out/goalcurve/`);
+} catch (e) { console.log(`  [could not write the series: ${e.message}]`); }
 
 await b.close();
 const secs = ((Date.now() - t0) / 1000).toFixed(0);
