@@ -97,10 +97,16 @@ you change anything. Keep every model identifier out of anything pushed.
    (stickers, trophies and top voids live inside the scrapbook). The shop never shows her
    a price until a grown-up has opened the gate this session.
 6. Thirty levels: five per world in the owner's order — EAT, SET, LANDMARK, RIVALS,
-   CLEAR. **Finishing a dot opens the next dot; meeting the goal inside the clock wins on
-   the spot and earns the tick.** The clock running out is "NOT YET" on that dot (no
-   tick, earnable on replay) and never a wall: coins are kept, the green ring moves on.
-   The last-ten-seconds ritual is never a countdown to losing (§4.3).
+   CLEAR. **MEETING THE GOAL opens the next dot** — the owner's decision of 2026-09-10,
+   §8.1: *"they should be hitting the goals to move on … Maple starts easy … as you tick
+   up it gets harder."* The Angry Birds shape. The clock running out is "NOT YET" on that
+   dot: coins are kept, nothing is taken away, and she plays it again.
+   **The gate is only safe because the GOALS carry the difficulty, not the gate** — every
+   one of the thirty is set on day 2 from what a real run actually reaches, Maple dot 1
+   winnable first try and each dot and each world stepping up (§3.2, §3.4). A goal that
+   cannot be met is a wall, and three of the five are unmeetable as first drafted; that is
+   day 2's whole job now. The last-ten-seconds ritual is still never a countdown to
+   losing (§4.3).
 7. A world never walls the next one: finishing any match on a world still opens the next
    world, as today. That is a decision (§3, §8.1); the alternative is named.
 8. The end card lights the dot first — the pip itself, big, before any word — then counts
@@ -748,7 +754,8 @@ New file `src/game/levels.ts` (~140 lines beside `unlocks.ts`). One key, JSON ob
 { v: 1,
   w: { [world]: { [goal]: {
         st: 'locked'|'open'|'fin'|'done'|'clear',
-              // fin   = finished, goal not met (grey, thin green outline, no mark; earnable)
+              // fin   = attempted, goal not met — STILL THE CURRENT DOT under the
+              //          owner's win gate (§3.2); coins kept, nothing taken away
               // done  = goal met inside the clock (tick)
               // clear = goal met AND the world's CLEAR number reached in that run (star)
         best: number,   // EAT score | SET seconds | LANDMARK seconds | RIVALS rank | CLEAR pct
@@ -762,8 +769,9 @@ disagreeing with the pip row on any profile whose `voidWorld` is not the frontie
 (`pickedWorld` is a boot const, `:355-358`), and the gate skeptic showed PLAY reloading a
 `?w=pirate` page into Maple for ~110 probes. Now: **`current(world)`** is a pure function
 of that world's row — the lowest goal with `st === 'open'`; if none, the lowest `'fin'`
-(earn its tick); if none, goal 5. Because goal k+1 opens only when goal k ≥ `'fin'`, there
-is at most one `'open'` per world and exactly one current. PLAY launches
+(attempted, not met — play it again); if none, goal 5. Because goal k+1 opens only when
+goal k is `'done'`, there is at most one `'open'` per world and exactly one current, and a
+`'fin'` dot is the current one until its goal is met. PLAY launches
 `current(pickedWorld)`; the end card's "N OF 30" is the level's ordinal
 (`WORLD_ORDER.indexOf(world)·5 + goal`), not a frontier.
 
@@ -811,18 +819,55 @@ replacing `__questPools` (`:3924-3925`) in the same commit that deletes the boar
 
 ### 3.2 Unlock reconciliation — a DECISION
 
-**Decided (governor, for the owner to confirm in §8.1): FINISH advances, WIN decorates.**
-Within a world, goals are sequential — goal k+1 opens when goal k is `≥ 'fin'`, i.e. when
-any match on it has **finished** (the buzzer, or the on-the-spot win). Meeting the goal
-inside the clock is the win: the ceremony fires on the spot and the pip earns its tick
-(`'done'`); clearing the world's number in the same run earns the star (`'clear'`). The
-clock running out on a goal level is still a miss for that level — "NOT YET", no tick,
-earnable on replay — exactly as the owner decided on 2026-09-06 (decision 1); it just does
-not stop the ladder. Between worlds, `unlocks.ts` stays the authority unchanged: world
-W+1 goal 1 is `'open'` whenever `isUnlocked(W+1)`, i.e. when any match on W has finished
+**DECIDED BY THE OWNER, 2026-09-10: WIN advances.** Put to him with the governor's
+recommendation (finish advances) and the child skeptic's kill attached; he read both and
+chose the other way, for stated reasons: *"I do like your first recommendation but let's
+think long term. We'd like this to get more challenging like Angry Birds right. I think
+they should be hitting the goals to move on. Maple starts easy. As you tick up maple and
+other levels it gets harder etc. we want to focus on retention."* That is the decision and
+this brief is built on it. The governor's own recommendation, and why it lost, are kept
+below and at §9.1 #1 so nobody has to reconstruct the argument.
+
+Within a world, goals are sequential and **goal k+1 opens when goal k is `'done'`** — the
+goal met inside the clock. The ceremony fires on the spot; clearing the world's CLEAR
+number in the same run earns the star (`'clear'`). The clock running out is `'fin'`:
+attempted, not met, coins kept, nothing taken away, the dot stays where it is and she
+plays it again. Between worlds `unlocks.ts` stays the authority unchanged — world W+1
+goal 1 is `'open'` whenever `isUnlocked(W+1)`, i.e. when any match on W has **finished**
 (`completeWorld`, `:5503`, now also called from the solo branch before its return at
-`:5372`). "Strictly sequential" in the polish plan (C bar 1, `:155-166`) is read as the
-pip row.
+`:5372`). **The world ladder is deliberately NOT win-gated**: a child who stalls on
+Maple dot 3 can still travel to Pirate and play there. That is the release valve, and
+without it §9.1 #1's kill lands in full.
+
+**WHAT THIS DECISION COSTS, AND WHERE IT IS PAID.** Angry Birds is win-gated because
+every level is winnable; the ramp lives in the levels, not in the gate. Ours are not
+winnable as first drafted, and these are the code's own words, not an opinion:
+
+- **LANDMARK** — the in-range cue "never fires" for a weaker player (`:1529-1531`), and
+  on worlds 2–5 the landmark only comes into reach in the finale surge (`:1553-1555`).
+- **RIVALS** — needs `myRank === 1`, and the rubber band floors the family at "never
+  below 3rd" (`rivals.ts:256`, `:701`, `:788`), not at first.
+- **CLEAR** — 100% `devouredPct` is measured in single digits on a real run (`:5462-5466`).
+
+Win-gate those as drafted and a small six-year-old stops at Maple dot 3, permanently.
+So the decision converts §3.4 from a provisional table into the load-bearing one:
+**day 2 measures what a real run reaches (`qa/pace.mjs`, radius-vs-time and
+score-vs-time, six worlds) and every one of the thirty goals is set from that curve** —
+Maple dot 1 winnable on the first try, each dot and each world stepping up, LANDMARK
+re-specified against a reachable prop, RIVALS against a rank the band actually allows,
+CLEAR against the world's CLEAR number rather than 100%. The owner chose this shape on
+2026-09-11 as well (§8.1, second question): measure first, then set every goal from the
+curve. **Bar 3.5.4 is rewritten to match: an average run must reach dot 5 of every world,
+and no dot may be unwinnable by construction.** If day 2's numbers cannot make a goal
+winnable, that goal is re-specified or it does not gate — and the governor says so at the
+time rather than shipping a wall.
+
+**The governor's recommendation, for the record.** FINISH advances, WIN decorates: goal
+k+1 opens on any finished match, the tick and the star are what the goal earns. It was
+recommended because it cannot produce a wall under any tuning, and it lost to a long-term
+progression argument the governor does not dispute. The two shapes differ only when a
+child misses; under a correctly-tuned §3.4 that case is rarer, which is exactly what day
+2 has to establish rather than assume.
 
 **Why the gate moved** (the child skeptic's kill, §9.1, verified by the governor at the
 lines): draft 1 moved the green ring only on a WIN, with a third miss as the escape.
@@ -918,10 +963,17 @@ the goal-3 poll reads that prop; the level's cue/gone strings live in `LEVEL_SPE
    pairwise luminance contrast ≥ 3:1 (the polish plan's C bar 2, which draft 1 had
    silently replaced with ΔE alone — code skeptic; `pickerfit`'s ratio helper); each pip
    vs ground ≥ 10 ΔE (`lockedcards.mjs:41-49`); padlock sprite p10 ≥ 3:1.
-4. Finish advances: any finished match on goal k (buzzer or on-the-spot) → goal k
-   ≥ `'fin'` and goal k+1 `'open'`; the goal met → `'done'`; a quit (`:7774`) counts as
-   an attempt and never advances. A half-speed autopilot (`__setVoidR` held low) reaches
-   dot 5 of every world in exactly five finishes.
+4. **Win advances, and no dot may be a wall** (the owner's decision, §3.2 — this bar is
+   what makes it safe). The goal met inside the clock → goal k `'done'` and goal k+1
+   `'open'`; the buzzer with the goal unmet → `'fin'`, goal k+1 stays `'locked'`, coins
+   kept, `n + 1`; a quit (`:7774`) counts as an attempt and never advances. **And, on
+   day 2's measured curve, an AVERAGE run must meet the goal on every one of the thirty
+   dots** — the probe drives the autopilot at the median player's own rate (not
+   half-speed: under a win gate a deliberately weak run failing is correct, so the bar is
+   about the median, not the floor) and asserts dot 5 of every world is reached. A dot the
+   average run cannot win is re-specified or does not gate; it never ships as a wall.
+   Between worlds the ladder stays finish-gated (`unlocks.ts` unchanged), so a stalled
+   child can always travel on.
 5. Every SET triple has supply ≥ 3N per kind on a live count (`__goalPools()`); `'big'`
    counts once per bite; cars/houses ≥ 6N.
 6. Difficulty (measured, not asserted — polish plan bar 5): the median tester earns the
@@ -1035,8 +1087,9 @@ the goal unmet sets `goal.result = 'time'` (RIVALS: `'win'` iff `myRank === 1`).
 `endMatch(result)` gains its one argument; the headline is no longer inferred at
 `:5352`/`:5434`. `recordLevelResult({world, goal, result, score, pct, rank, secs})` is
 called right after `ended = true; voidPlayed = '1'` (`:5329-5330`) and **before** the solo
-return (`:5372`); it raises the pip to `'fin'` on any result, `'done'` on a win, `'clear'`
-on a win with the CLEAR number reached, and opens goal k+1 on any of them.
+return (`:5372`); it raises the pip to `'fin'` on a miss, `'done'` on a win, `'clear'`
+on a win with the CLEAR number reached, and **opens goal k+1 only on `'done'` or
+`'clear'`** (§3.2, the owner's win gate).
 `voidBest_<w>` (`:5449-5452`) and `completeWorld` (`:5503`) stay, plus `completeWorld` in
 the solo branch. The quit path (`:7774`) records `n += 1` and nothing else — a quit is
 not a finish.
@@ -1142,7 +1195,7 @@ ring pulses three times **on this reveal only**, PLAY glows once. No words.
 4. Win on the spot: driving the counter with the goal hooks (§3.1) opens `#end` with
    `matchClock > 0` and `#endHd` carrying the tick sprite; `?len=8` with the goal unmet
    opens `#end` with the `fin` pip and "NOT YET" under it, `n` incremented, **goal k+1
-   open**; RIVALS never ends before the buzzer; **a counter driven across the threshold
+   still locked** (§3.2) and the green ring still on this dot; RIVALS never ends before the buzzer; **a counter driven across the threshold
    1 s into a TIME outro (`?len=8` + `__rushClock`) still reads NOT YET** (the
    first-writer guard).
 5. End-card order, from computed style, not timestamps (gate skeptic: the class is set
@@ -1235,9 +1288,9 @@ autopilot. Same output discipline and two halves as §5.1.
   `__setRivalScores` with ≥ 2 forced joins **asserting both a win and a loss**, since
   under `?len=8` the family has not joined and `myRank === 1` trivially — code skeptic;
   `__devourAll`); assert `#end` with the win and goal k+1 open; `?len=8` unmet → pip
-  `fin`, goal k+1 **open**, `n + 1`; a quit → `n + 1` only, nothing opens; the
-  first-writer guard (§4.7 bar 4); a half-speed autopilot reaches dot 5 in five
-  finishes on every world.
+  `fin`, goal k+1 **still locked**, `n + 1`, the ring unmoved; a quit → `n + 1` only,
+  nothing opens; the first-writer guard (§4.7 bar 4); and the winnability bar of §3.5.4 —
+  an autopilot at the median player's measured rate meets the goal on all thirty dots.
 - **(c) HUD presence** at t = 5 / `matchLen·0.49` / `matchLen·0.9` match-seconds (§4.7
   bar 3), and the gold-not-red last ten seconds with the goal unmet.
 - **(d) next-world card** — goal 5 finished → `#endNext` has the locked-island element and
@@ -1346,16 +1399,16 @@ commit. Corrections are recorded in the brief, never hidden.
 
 | # | question | governor recommends |
 |---|---|---|
-| 1 | **The spine: does a dot open the next dot by FINISHING it, or by WINNING it?** On 09-06 you decided "the clock running out fails it". Draft 1 read that as a win gate with a third-miss escape. The child skeptic killed it at the lines (§9.1): LANDMARK "never fires" for a weaker player (`:1529-1531`), RIVALS needs a first place the rubber band does not floor (`rivals.ts:256`), CLEAR at 100% is measured in single digits (`:5462-5466`) — three walls per world, nine minutes of a word she cannot read at each, and `unlocks.ts:9-16` names that as the one thing this build has never done to a child. | **Finish advances, win decorates** (§3.2). Your decision still holds for the *level*: the clock running out is NOT YET, no tick. It just does not stop her. If you want win-gated steps anyway, the honest version is alternative (c): dots 3/4/5 as optional marks beside the row, and a bar that a half-speed autopilot reaches dot 5 in ≤ 5 finishes. Strongly recommended: finish advances. |
+| 1 | **The spine: does a dot open the next dot by FINISHING it, or by WINNING it?** | **ANSWERED 2026-09-10 — the owner chose WINNING.** *"They should be hitting the goals to move on. Maple starts easy. As you tick up maple and other levels it gets harder."* The governor recommended finish-advances and the child skeptic's kill was attached to the question; the owner read both and decided the other way for a long-term progression argument. §3.2 is rewritten to it, §9.1 #1 records the overrule, and the cost is paid in §3.4: **every one of the thirty goals is set on day 2 from a measured run** (the owner also chose "measure first, then set every goal from the curve"), and bar 3.5.4 now asserts an average run wins every dot. The world ladder stays finish-gated so a stalled child can always travel on. |
 | 2 | **Skylark's landmark.** The whale needs a void of radius 16.2; the growth law tops at 12 without eating four rivals (`:9745`, `island.ts:6196`), and it is tethered. There are two hangars. Level 3 on Skylark: `hangar-1`, or untether the whale for that level? | `hangar-1`, unless day 2's numbers show the whale reachable by a median run. The whale stays the world's ascension beat; the landmark is a named prop tag per world, never "the largest thing" (§3.4). |
 | 3 | **What does the star mean?** Hole.io's magenta is a true 100%. Ours is measured in single digits (`:5462-5466`) — a colour she would never see, which the child skeptic calls "a small, permanent not-good-enough" beside a tick she can get. | The star = the world's CLEAR number, set from day 2's p90 of strong runs, reachable by a good run on any dot; dot 5's goal IS that number. A true 100 becomes a hidden sticker. You set the six numbers from the ones we hand you. |
-| 4 | **BY MYSELF on the RIVALS level.** | RIVALS always deals the family; the chip greys on dot 4. Solo applies to dots 1, 2, 3, 5 on the 120 s clock (`:6131`). Under finish-advances a solo child is never stuck on dot 4 even if she never comes first. |
+| 4 | **BY MYSELF on the RIVALS level.** | RIVALS always deals the family; the chip greys on dot 4. Solo applies to dots 1, 2, 3, 5 on the 120 s clock (`:6131`). **Re-opened by §8.1's answer:** under the win gate a solo child who never comes first IS stuck on dot 4, so RIVALS' goal must be a rank day 2 shows the rubber band actually allows (`rivals.ts:256` floors the family at 3rd), not `myRank === 1`. |
 | 5 | **The SHOP tab is one thumb away and shows prices** (`$4.99–$9.99`, `:8345-8347`, `:8442`; the grown-ups gate is on purchase, `:8160-8172`, i.e. after she has seen and tapped the price). | **Decided, not open** (the child skeptic made it a bar, 4.7.10 / 5.1.21): the coin skins she earned stay open; no price text and no LEGENDARY tier render until a grown-up has opened the gate this session — an "ask a grown-up" row stands there; the end card's OPEN SHOP door appears only when a skin is affordable. Tell us if you want the tier visible and we will say why we still think not. |
 | 6 | **Menu sound.** The theme only, plus his chomp on tap — or the world's own ambience (waterfall, bay, crowd) under the window? | Theme + chomp in v1 (no new audio assets); ambience for the first update once day 15 confirms the first chomp is audible on both phones. |
 | 7 | **Chrome-first boot** (day 13): show the menu at once with the painted splash in the window and fade to the live island when it is ready — ship it, or hold it for the first update? | Ship it if its bars pass on day 15 measured from navigation start (not DOMContentLoaded — §6 day 13); it is the literal "make our splash image alive" and cuts the wait to under a second. Otherwise hold. |
 | 8 | **Ground brightness.** Hole.io's frame is a bright violet slab; ours is a night cosmos. We lift the ground under PLAY and the tabs to a brighter violet and keep the night around the island. | Keep our night around the island so it floats; lift only where PLAY needs it (bar 1.3.3, now a real probe bar). Your two frames side by side on day 14. |
 | 9 | **The child's numbers.** A five-minute session with your daughter on day 15: seconds from cover-drop to her first PLAY tap (bar ≤ 10 s), mis-taps in five minutes (≤ 2), whether she can say what the green dot wants without being read to, and whether she earns the tick on dot 1. | This is the only bar that answers "does a six-year-old get it in the first second"; the machine bars cannot. You run it; we write down the four numbers. |
-| 10 | **EAT numbers.** 0.6 × par is arithmetic, not a measurement — and the par is a bot's mean (`:551`), not a child's. | Provisional until day 2 (when in a typical run the number is crossed) and day 15 (whether she earns dot 1's tick in one go). Target: the tick on level 1 of every world in one run for the median child. Under finish-advances a wrong number costs her a tick, not her progress. |
+| 10 | **EAT numbers.** 0.6 × par is arithmetic, not a measurement — and the par is a bot's mean (`:551`), not a child's. | Provisional until day 2 (when in a typical run the number is crossed) and day 15 (whether she earns dot 1's tick in one go). Target: the tick on level 1 of every world in one run for the median child. **Under the win gate a wrong number costs her the dot**, which is why §8.1's answer makes day 2's curve load-bearing rather than provisional. |
 | 11 | **Water on Maple.** The waterfall is in the window on the Maple stage; the pond and river are painted still. Add a live lagoon sheet (one draw call) or leave it? | Leave it unless the lookbook says the Maple window feels dead; day 16 is reserved for it. |
 | 12 | **If the four-year-old iPhone misses 60 fps.** Ship the menu with its own three-step fallback (lower resolution → no shadows → half-rate, still live), or ship a frozen picture? The plan names a tier-B phone now (§2.8.4) because draft 1 only ever measured yours. | Ship live with the fallback; you see the two phones' rows on day 15 — fps, dropped-frame share, p95, resident memory, five-minute idle with no jetsam — and decide. |
 | 13 | **The daily calendar moves off the path to PLAY** (§1.2): its coins are claimed silently on the first finish of the day and count up on the end card; the page lives in the scrapbook. | Yes. On her second day the first thing she meets today is a modal with "CLAIM 90✦" in text; no probe ever saw it because 383 files seed the date. PLAY is one tap or the bar fails. |
@@ -1388,7 +1441,7 @@ ship."*
 
 | # | sev | draft 1 said | refuted because | changed to |
 |---|---|---|---|---|
-| 1 | **blocks** | The green dot moves on a WIN; a third miss opens the next dot (§0.6, §3.2, §4.3) | ✔ `unlocks.ts:9-16` rejects a win gate in words; LANDMARK "never fires" for a weaker player (`:1529-1531`, worlds 2–5 in the finale surge only `:1553-1555`); RIVALS needs `myRank === 1` and `rivals.ts:256/:701/:788` floor the family at 3rd, not 1st; CLEAR at 100% lands in single digits (`:5462-5466`); ✔ WORLD_PAR's "verified mean" is the bot child-driver's (`:551`) | **The spine.** Finish advances, win decorates: five pip states `locked/open/fin/done/clear`, goal k+1 opens at k ≥ fin, the tick and star are earnable on replay (§0.6, §3.1–3.3, §4.3, §8.1). Bar 3.5.4: a half-speed autopilot reaches dot 5 in five finishes |
+| 1 | **blocks** | The green dot moves on a WIN; a third miss opens the next dot (§0.6, §3.2, §4.3) | ✔ `unlocks.ts:9-16` rejects a win gate in words; LANDMARK "never fires" for a weaker player (`:1529-1531`, worlds 2–5 in the finale surge only `:1553-1555`); RIVALS needs `myRank === 1` and `rivals.ts:256/:701/:788` floor the family at 3rd, not 1st; CLEAR at 100% lands in single digits (`:5462-5466`); ✔ WORLD_PAR's "verified mean" is the bot child-driver's (`:551`) | **OVERRULED BY THE OWNER, 2026-09-10 (§3.2, §8.1) — and the kill still stands as a description of the risk.** He chose a win gate for a long-term progression argument ("more challenging like Angry Birds"), having read this verdict. What changed is WHERE the difficulty lives: under his decision the gate stays and **the three unwinnable goals this skeptic identified must be re-specified from day 2's measured curve** — that is now bar 3.5.4 (an AVERAGE run wins every one of the thirty dots, and a dot it cannot win is re-specified or does not gate). The five pip states survive; `'fin'` becomes "attempted, still the current dot" rather than "finished, move on". The world ladder is deliberately left finish-gated so a stalled child can still travel on, which is the release valve this verdict's worst case needs. If day 2 cannot make a goal winnable, the governor says so then rather than shipping the wall |
 | 2 | must-fix | The 35 s red timer, `⏰ EAT FASTER!!` and the hot 3-2-1 stay (§4.2) | ✔ `:9650-9679` + `index.html:364-370` is a party bell for a match where finishing IS progress; under a ladder it is a countdown to losing, and the emoji bar did not cover `#banner` | The last ten seconds key on goal state (§4.2): gold numerals, flat tick, no banner with the goal unmet; the hot countdown only for RIVALS at #1. `levels.mjs` (c); bar 1.3.7 covers `#banner`, `#count` |
 | 3 | must-fix | Taps to play = 1 (bar 4.7.1) | ✔ `#daily` rises at module init when `voidDailyLast !== today` (`:7966-7967`, `:8083`) with a text CLAIM button (`:8049`); 383 probe files seed today so no probe ever met it | The calendar moves off the path: coins claimed silently on the first finish, counted on the end card, page in the scrapbook (§1.2, §8.13). Bar 4.7.1 / 5.1.5 runs with today **and** yesterday |
 | 4 | must-fix | SHOP tab one thumb from PLAY; the cash tier left open in §8.5 | Prices are painted on every cash card (`:8345-8347`) under a LEGENDARY header (`:8396`); the gate fires only at purchase (`:8160-8172`); the end card's OPEN SHOP door is the default next thing | Decided, and a bar: no price text, no LEGENDARY tier until the gate is passed this session; the shop door only when a skin is affordable (§1.1 F, §4.4.5, §4.7.10, §5.1.21, §8.5) |
@@ -1399,7 +1452,7 @@ ship."*
 | 9 | note | EAT chip with a 4 px fill; SET "40 SNACKS · 8 CARS · 5 HOUSES" | A 4 px fill under a thumb is invisible; 40 snacks is a long time before the first tick | The pip sprite itself fills; SET ordered smallest count first (§3.4, §4.1, §4.2) |
 | 10 | note | Magenta reserved for a true 100% | A reward measured in single digits is a colour she never sees — "a permanent not-good-enough" beside a tick | The star = the world's CLEAR number (p90 of strong runs, day 2); a true 100 is a hidden sticker (§3.3, §8.3) |
 | 11 | note | The season pennant hangs inside the window (§1.1 C) | Its tap reloads into another world (`:6791-6795`); a picture in the chomp window that navigates | Moved to band B beside the world chip; nothing in the window may navigate (§1.1 B/C, §1.2, bar 5.1.23) |
-| 12 | note | BY MYSELF greys on dot 4 (§8.4) | Acceptable only under finish-advances | Kept; §8.4 says so |
+| 12 | note | BY MYSELF greys on dot 4 (§8.4) | Acceptable only under finish-advances | **Re-opened by §8.1's answer** (win gate): a solo child who never comes first is stuck on dot 4, so RIVALS' goal has to be a rank the rubber band allows, set on day 2. §8.4 |
 
 ### 9.2 PERFORMANCE — a four-year-old iPhone (tier B) · verdict: **SOUND WITH CORRECTIONS**
 
@@ -1522,7 +1575,18 @@ version of a claim is always the persuasive one (`GOVERNOR.md` rules 3, 3b).
 | 2 | §2.8.1's day-1 sampling: "one cranked frame", and `info.render.frame` as the frame counter | `renderer.info.render.frame` counts `renderer.render()` CALLS, and on any rung carrying bloom the composer makes **fifteen of them per animation frame** (measured, all six worlds). A "120-frame" window on that counter is eight animation frames at a frame rate fifteen times too high. The first version of `menuframe` did exactly this and its numbers looked entirely reasonable | `_dbg.__frameInfo().animFrames` is `animate()`'s own count and is what every window in `menuframe` waits on; the per-frame `passes` column prints the render-call count rather than assuming it |
 | 3 | §2, §7 and `prototype3d.ts:10613`: the opening is the 4,694-call / 1.40M-triangle frame | Re-taken on Game Day at rung 0 with `autoReset` off: the opening is **337 calls / 221k triangles**, because the shadows-off line directly beneath that comment is the fix the comment describes. The frame that costs ~4,694 today is **late play at r 12** (Game Day 4,978, Lantern 6,436) | §2.9.5; §0.1 and §7 annotated; the re-take written into `prototype3d.ts` beside the number it corrects |
 
-A fourth item is not a correction but a gap this brief did not know it had: **Maple has no
-stage to measure.** `WORLD_COPY.maple.hero` is null, so there is nothing for a hero-framed
+A fourth item is not a correction of the reading but a decision that landed on top of it:
+**the owner overruled §3.2's spine on 2026-09-10 and chose a win gate** (§8.1, §3.2,
+§9.1 #1). The brief above is rewritten to it. The governor's recommendation and the child
+skeptic's kill are kept in place rather than deleted, because the risk they describe is
+real and is now managed by a different mechanism — winnable goals set from a measured
+curve (bar 3.5.4) plus a world ladder that stays finish-gated so a stalled child can
+travel on. **The owner also raised advertising** ("we want to focus on retention and ad
+revenue") and, asked whether that changes the standing directive, answered *"Could we skip
+this one until we're ready. It's food for thought."* — so `HANDOFF.md` §2's "no ads, no
+ad-skip currency, 4+ stays 4+" **stands unchanged and nothing about ads is approved**. It
+is recorded here so a later session does not read the phrase as a decision.
+
+A fifth item is a gap this brief did not know it had: **Maple has no stage to measure.** `WORLD_COPY.maple.hero` is null, so there is nothing for a hero-framed
 sweep to stand off, and §2.3's Maple stage (the waterfall lip) is a module-local const in
 `island.ts` that no probe may transcribe. Day 2 exposes it and re-runs Maple (§2.9.7).

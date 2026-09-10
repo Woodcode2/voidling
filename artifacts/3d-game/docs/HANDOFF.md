@@ -383,10 +383,26 @@ first-glance review of all six worlds' establishing shots; the art pass.
 
 ## 9. Open decisions — the owner's
 
-- The thirteen in `docs/MENU-BRIEF.md` §8. The first is the spine — does a dot
-  open the next by FINISHING it (recommended, strongly) or by WINNING it — and
-  the owner's 2026-09-06 "the clock running out fails it" still holds for the
-  level result either way. Then: Skylark's landmark, what the star means,
+- **§8.1 IS ANSWERED (2026-09-10): the owner chose WINNING.** *"They should be
+  hitting the goals to move on. Maple starts easy. As you tick up maple and
+  other levels it gets harder … we want to focus on retention."* He was given
+  the governor's recommendation (finish advances) and the child skeptic's kill,
+  read both, and decided the other way for a long-term progression argument.
+  `MENU-BRIEF.md` §3.2 is rewritten to it, §9.1 #1 records the overrule, and the
+  cost is paid on day 2: **every one of the thirty goals is set from a measured
+  run**, and bar 3.5.4 now asserts an AVERAGE run wins every dot. The world
+  ladder stays finish-gated so a stalled child can always travel on. Three goals
+  are unwinnable as first drafted (LANDMARK `:1529`, RIVALS `rivals.ts:256`,
+  CLEAR `:5462`) and must be re-specified from the curve or not gate.
+- **ADS ARE NOT APPROVED.** The owner mentioned "ad revenue" alongside the
+  ladder decision; asked directly whether that changes the standing directive,
+  he answered *"Could we skip this one until we're ready. It's food for
+  thought."* So §2's **no ads, no ad-skip currency, 4+ stays 4+ stands
+  unchanged.** Recorded here so the phrase is not later read as a decision. If
+  it is reopened, it needs its own brief: App Store Kids Category rules, the
+  regular 4+ listing, the privacy manifest and the kids-privacy audit already
+  cleared all move with it.
+- The remaining twelve in `docs/MENU-BRIEF.md` §8: Skylark's landmark, what the star means,
   BY MYSELF on the RIVALS level, the SHOP shield (decided as a bar, open to
   overrule), menu sound, chrome-first boot, ground brightness, the child's four
   numbers, EAT numbers, water on Maple, the two-phone fallback, and the daily
