@@ -80,7 +80,11 @@ you change anything. Keep every model identifier out of anything pushed.
    camera is parked low. **What that frame costs is not known** (§2, §9.2): today's hidden
    frame is the spawn shot looking 46° down; the stage looks along the plateau, the frame
    class the intro measured at 4,694 draw calls. Day 1 prints the two side by side before
-   anything is authored.
+   anything is authored. **DONE 2026-09-10 — §2.9.** The answer is not what either side
+   was arguing about: 72–92% of today's menu frame is the half-rate shadow pass, the
+   diorama's own scene costs about +120 draw calls, and at the framing §2.3 asks for the
+   menu gets CHEAPER on four of five worlds. The 4,694 figure describes the opening as it
+   was BEFORE the shadows-off line beneath it existed; today's opening is 337.
 2. The child sees her void, at her size, on her island, breathing and blinking; the
    waterfall pours, the bay swells, the crowd walks. Tap him and he chomps.
 3. Under the window: five dots, one per goal on this world — pictures of the goal, not
@@ -566,6 +570,152 @@ a mover is inside the 45-unit shadow box. **Kept:** `island.update(dt, tClock, c
 
 **Probe.** `qa/menuframe.mjs` (bars 1–3, day 1, before anything; a REPORT step until bar
 2 is armed), `qa/menu.mjs` bars 2, 3, 6, 7, 12–16, 22 (§5.1), the device day (bar 4).
+
+### 2.9 The day-1 baseline — measured 2026-09-10
+
+`qa/menuframe.mjs`: six worlds, rungs 0 and 3, **one page per rung**, the rung pinned
+before the first frame and read back on every row, `renderer.info.autoReset = false`,
+two consecutive animation frames per sample (both shadow parities), max of the pair,
+120 frames discarded after the pin. 276 menu frames + 18 match frames. Verbatim runs in
+`docs/crews/round-8/menuframe-day1-menu.log` and `-match.log`.
+
+**Every number here is swiftshader, not a device.** This box renders 0.44–0.71 animation
+fps at rung 0 and 2.2–2.9 at rung 3, so nothing below is a frame-time bar; §2.8.4's rows
+still come off two phones on day 15. Draw calls and triangles do not depend on how fast
+the box draws them, which is why they are the numbers quoted.
+
+**TODAY** is the shipped menu frame, nothing overridden. **STAGE** is the same point with
+the diorama's camera (22 u out, eye 9, looking 2 u above the ground) swept 0–330° in 30°
+steps. **HERO** is the framing §2.3 asks for — standing 40 u off the world's authored
+hero landmark, looking at it — with the stand point found on the live island by search,
+never transcribed.
+
+| world | rung | TODAY max | STAGE cheapest → dearest | HERO cheapest → dearest | HERO ÷ TODAY |
+|---|---|---|---|---|---|
+| Maple | 0 | 498 | 772 @330° → 991 @90° | *no hero authored* | — |
+| Maple | 3 | 120 | 401 @330° → 629 @120° | *no hero authored* | — |
+| Pirate | 0 | 694 | 680 @180° → 1,858 @60° | 307 @210° → 927 @120° | 0.44–1.34× |
+| Pirate | 3 | 109 | 95 @180° → 1,243 @60° | 46 @210° → 671 @120° | 0.42–6.16× |
+| Game Day | 0 | 1,040 | 1,271 @210° → 1,949 @0° | 394 @180° → 516 @0° | 0.38–0.50× |
+| Game Day | 3 | 108 | 344 @210° → 966 @0° | 159 @180° → 284 @0° | 1.47–2.63× |
+| Lantern | 0 | 737 | 897 @180° → 2,034 @30° | 821 @180° → 941 @0° | 1.11–1.28× |
+| Lantern | 3 | 93 | 112 @210° → 1,289 @30° | 117 @210° → 263 @0° | 1.26–2.83× |
+| Powder | 0 | 546 | 637 @270° → 1,419 @30° | 386 @210° → 511 @0° | 0.71–0.94× |
+| Powder | 3 | 83 | 183 @270° → 966 @30° | 64 @180° → 194 @0° | 0.77–2.34× |
+| Skylark | 0 | 1,649 | 1,785 @300° → 2,692 @120° | 776 @240° → 1,123 @30° | 0.47–0.68× |
+| Skylark | 3 | 137 | 218 @300° → 1,151 @120° | 32 @240° → 381 @30° | 0.23–2.78× |
+
+#### 2.9.1 The finding that reorders the stream: the menu is a shadow pass
+
+Every rung-0 sample is a pair of consecutive frames, and at rung 0 they differ wildly —
+Skylark 137 and 1,649, Lantern 100 and 737, Game Day 137 and 1,040. That is
+`shadowFrame++ & 1` (`prototype3d.ts:10946`) re-rendering the 2048² map on alternate
+frames, and the shadow camera is an orthographic box around the void that draws casters
+the player's own frustum culls away. At rung 3, where shadows are off, the same pairs are
+flat (137/136, 119/120, 109/109) — which is the mechanism confirming itself.
+
+Median of the pair's low frame (scene) against its high frame (scene + shadow map):
+
+| world, rung 0 | scene | with shadow | shadow costs | **shadow share** |
+|---|---|---|---|---|
+| Skylark, today's menu | 137 | 1,649 | 1,512 | **92%** |
+| Game Day, today's menu | 137 | 1,040 | 903 | **87%** |
+| Lantern, today's menu | 100 | 737 | 637 | **86%** |
+| Powder, today's menu | 95 | 546 | 451 | **83%** |
+| Pirate, today's menu | 127 | 694 | 567 | **82%** |
+| Maple, today's menu | 139 | 498 | 359 | **72%** |
+| Skylark, HERO stage | 273 | 1,010 | 736 | 73% |
+| Game Day, HERO stage | 254 | 478 | 224 | 47% |
+
+**So the diorama's own cost is about +120 draw calls of scene** (today 95–139, the HERO
+stage 104–273) **against a shadow pass of 359–1,512 that fires every other frame for a
+scene in which nothing but the crowd moves.** §2.7's "shadow pass every 4th frame on the
+menu" is worth five to twelve times what the diorama costs. It stops being a nice-to-have
+and becomes the first thing day 9 lands; if only one performance change ships, it is that
+one, and the diorama is affordable on its back.
+
+#### 2.9.2 Where the camera LOOKS is the biggest authored decision in the stream
+
+At one fixed point, sweeping azimuth alone swings the bill 2.7× on Pirate at rung 0
+(680 → 1,858) and **11.5× on Lantern at rung 3** (112 → 1,289). Direction, not distance
+and not height, is the draw-call variable — §2's "direction, not distance" was right and
+is now measured. `a0` (§2.4) is therefore not a framing preference; it is the largest
+single performance decision in this stream, and day 8 must author it per world off this
+series rather than pick a pleasing angle.
+
+#### 2.9.3 The expensive place is the SPAWN point, not the low camera
+
+STAGE (at spawn) runs 1.08–2.76× today's frame at rung 0; HERO (40 u off the landmark)
+runs **0.38–0.50× on Game Day, 0.47–0.68× on Skylark, 0.71–0.94× on Powder and
+0.44–1.34× on Pirate** — cheaper than the menu the child gets today. Only Lantern is
+dearer (1.11–1.28×). The void starts in the densest part of every island, which is
+exactly where today's menu parks him. §2.3's stages are not a cost to be justified; on
+four worlds they are a saving.
+
+#### 2.9.4 The ratio is worst on the weakest phones, so no single ratio bar can be true
+
+Rung 3 is where a tier-B device lands, and it is where today's menu frame is smallest
+(83–137 calls, no shadows, one pass) — so the same stage frustum reads 1.20–13.86× there
+against 1.08–2.76× at rung 0. §2.8.2's 1.15 and §2.8.3's 1.3 have to be **per rung** or
+they are false on one of them. The noise floor, meanwhile, is small: Game Day's r=12 pair
+came back 4,966 and 4,978 on two separate runs, a 0.2% spread.
+
+#### 2.9.5 The in-match reference pair, re-taken — and it was not this frame
+
+`prototype3d.ts:10613` has said, in three sentences a reader takes as current, that "the
+opening frame renders 4,694 draw calls and 1.40M triangles against 1,241 and 355k in
+settled play". Re-taken the same way as everything above, rung 0:
+
+| world | INTRO (establishing shot) | PLAY (settled, r 0.9) | R12 (top of the growth law) | R12 triangles | R12 shadow share |
+|---|---|---|---|---|---|
+| Maple | 448 | 495 | 4,411 | 1.67 M | 91% |
+| Pirate | 706 | 664 | 2,280 | 0.72 M | 65% |
+| Game Day | **337** | **1,032** | **4,978** | 1.92 M | 79% |
+| Lantern | 580 | 788 | 6,436 | 1.67 M | 84% |
+| Powder | 247 | 611 | 3,155 | 0.88 M | 76% |
+| Skylark | 420 | 1,644 | 5,441 | 1.61 M | 70% |
+
+Game Day's opening is **337 calls / 221k triangles**, not 4,694 / 1.40M — because the
+line immediately under that comment turns shadows off for the establishing shot, which is
+the fix the comment itself describes. The pair records the problem; the number beside it
+is the problem's, not today's. The frame that costs about 4,694 today is **late play at
+r 12**. The source comment now carries this re-take beside it.
+
+**This changes what §2.8.3's bar is set against.** "≤ 1.3× the max of that world's
+in-match r = 12 pair" is a bar against 2,280–6,436 calls, not against 1,241 — every menu
+frame measured above already clears it by a wide margin on every world. The bar as
+written is not the constraint the brief assumed it was; day 9 should either set it
+against the PLAY pair (611–1,644) or state an absolute, and §2.8.3's "≤ 2,000 absolute"
+is the half of it that actually bites (Skylark's STAGE sweep peaks at 2,692).
+
+#### 2.9.6 Also measured
+
+Boot to a usable world, from `performance.timeOrigin`: Skylark 10.2 s, Powder 13.5 s,
+Pirate 15.7–16.1 s, Lantern 18.3–18.9 s, Maple 18.8–21.1 s, Game Day 35.6–37.5 s.
+Movers inside the 138 u crowd gate: Lantern 351/972 (the hotspot the brief named),
+Skylark 369/550, Game Day 291/504, Powder 236/388, Maple 122/372, Pirate 113/337 (gate
+doubled to 308). Chromium heap: Game Day 440.7 MB, Maple 370, Lantern 330, Skylark 246,
+Pirate 238, Powder 208 — sandbox only; `performance.memory` does not exist in WKWebView
+and day 15 reads Xcode's gauge. Today's menu camera is still EASING when the child looks
+at it: `camDist` sampled at 29.1–40.1 on its way from `resetMatch`'s 50 to `PLAY_DIST` 29.
+
+#### 2.9.7 What day 1 did NOT measure, recorded as missing
+
+- **Maple has no stage.** `WORLD_COPY.maple.hero` is null (`prototype3d.ts:1502`), so the
+  HERO sweep had nothing to stand off and Maple's rows are STAGE-at-spawn only. Its stage
+  is the waterfall lip (§2.3), which lives in a module-local const in `island.ts` and the
+  probe will not transcribe. **Day 2 exposes the lip and re-runs Maple.**
+- **`__pinMenuRung` does not exist.** §6 day 1 lists it, but there is no menu rung to pin
+  until day 9; the rungs pinned here are the shipped quality ladder's. Deferred to day 9
+  with the rung itself.
+- **The INTRO rows are mid-descent, not the peak.** The sample lands at `camDist` 167.8
+  of a `DESCENT_START` that begins higher, because the promise chain costs three frames
+  and the intro advances 0.05 s per frame. The peak establishing frame is dearer than 337
+  by an unmeasured amount; day 9 samples it on the first armed frame if the number is
+  wanted.
+- Frames were sampled as REAL animation frames, not hand-cranked ones. For a draw-call
+  count that is the same measurement; for frame TIMES it means the series is the
+  sandbox's, which every row says.
 
 ## 3 · The ladder
 
@@ -1112,7 +1262,7 @@ autopilot. Same output discipline and two halves as §5.1.
 
 | file | today | change |
 |---|---|---|
-| `qa/pickerfit.mjs` | push; clicks `#btnPlay` then waits for `.wCard` (`:87-89`); PASS on zero cards (`:245-260`) | **day 1:** throw if zero cards; **day 10:** open the grid via `#btnWorlds` |
+| `qa/pickerfit.mjs` | push; clicks `#btnPlay` then waits for `.wCard` (`:87-89`); ~~PASS on zero cards (`:245-260`)~~ **CORRECTED 2026-09-10 — see §9.7:** it has FAILED on zero cards since `d952532` (2026-09-08), two days before this brief, at `:285`; `:245-260` is the contrast loop. What it really does is PASS on a SHORT picker — every bar iterates `cards`, so four of six cards is measured on four and prints "all 4 world cards" | **day 1 (done):** FAIL when `cards.length !== ALL_WORLDS.length`, naming the missing worlds; **day 10:** open the grid via `#btnWorlds` |
 | `qa/lockedcards.mjs` | push; `#btnPlay` + `.wCard` (`:63-65`) | day 10: via `#btnWorlds`; bars unchanged |
 | `qa/firstframe.mjs` | push (`splash`); `#menu .logo`, `.logo i`, `.tag` skipped when missing (`:220`); `freeze()` hides the canvas (`:76-83`); non-splash path clicks `#btnPlay`/`.wCard` (`:232-235`) | **day 1:** a missing selector FAILS. **`freeze()` keeps hiding the canvas** — draft 1 said "keeps the canvas"; both the code and the gate skeptic refuted it: every measured selector sits on opaque ground bands A–B, so the canvas contributes nothing to their backdrop, and a moving diorama re-breaks the A/B pair the header at `:76-83` retired. The pennant, the one canvas-adjacent text, gets bar 5.1.23 under a stopped rAF. Day 10: non-splash path via the `_enter` helper |
 | `qa/opening.mjs` | push; `/?manual=1`, `#btnPlay` then `.wCard` (`:258-260`) | day 10: one click on `#btnPlay`; all 19 bars unchanged; A4 additionally reads `__quality().pr` on the armed idle (bar 4.7.9) |
@@ -1138,7 +1288,7 @@ count goes 35 → 43, each timeout sized from a measured run and printed.
 
 | day | build | gate after |
 |---|---|---|
-| 1 | **Baseline, honestly read.** `_dbg.__frameTimes()`, `__pinMenuRung`, `autoReset=false` sampling in a new `qa/menuframe.mjs`: menu-idle `dtRaw` / draw calls (both shadow parities) / tris / `moverStats(138)` and `(276)` / heap per world, **one page per rung** pinned by `addInitScript`, at the STAGE frustum (0–360° azimuth series at each candidate stage) **and** today's parked spawn frame, labelled; the 1,241 / 4,694 reference pair re-taken the same way; the boot prefix measured from `performance.timeOrigin` per world (`bootStage` timestamps). Guards: `pickerfit` throws on zero cards; `firstframe` fails on a missing `#menu` selector (`freeze()` unchanged). | push 35/35 green on today's menu; the baseline table in the brief with the two frames side by side |
+| 1 | **Baseline, honestly read.** `_dbg.__frameTimes()`, `__pinMenuRung`, `autoReset=false` sampling in a new `qa/menuframe.mjs`: menu-idle `dtRaw` / draw calls (both shadow parities) / tris / `moverStats(138)` and `(276)` / heap per world, **one page per rung** pinned by `addInitScript`, at the STAGE frustum (0–360° azimuth series at each candidate stage) **and** today's parked spawn frame, labelled; the 1,241 / 4,694 reference pair re-taken the same way; the boot prefix measured from `performance.timeOrigin` per world (`bootStage` timestamps). Guards: `pickerfit` FAILS on a short picker — zero cards was already guarded at `:285`, the live hole was four-of-six (§9.7); `firstframe` fails on a missing `#menu` selector (`freeze()` unchanged). | push 35/35 green on today's menu; the baseline table in the brief with the two frames side by side |
 | 2 | **The ladder's ground.** `qa/pace.mjs` on all six worlds (radius- and score-vs-time; autopilot and SET-style); supply per world with the `'big'` dedupe; CLEAR `devouredPct` at the buzzer, p50/p90 of strong runs → the CLEAR number per world; **the first shadowless FRAME's ms** after the `compileAsync` pre-warm (§2.7). Safe code: `restoreIsland()` split (`:7571-7644`), `life.calm`/`tension` on the menu path, delete the stale gate comment (`:6919-6931`). | push green; §3.4 numbers replaced by measured ones; §8.2/8.3 decided from data |
 | 3 | `src/game/levels.ts` (schema with the five states, migrate, `current(world)`, `recordLevelResult`, `__levels`), `level_*` telemetry, `voidPlayGoal`/`?g=`, `playing` set only by PLAY/pip/`voidPlayGoal`. `qa/levels.mjs` (a), (f), (g), (i) written first and failing. | push green; `levels-static` (a)(f)(g) green, (i) green |
 | 4 | `LEVEL_SPEC` table beside `WORLD_COPY` (`:1492`) with `landmark` tags set in the factories, goal object in `beginMatch`, goal card per match (suppressed under the hand), `#goal` HUD chip with the sprite fill and smallest-first SET order, `questEvent` dedupe, the goal hooks of §3.1. `levels.mjs` (c). | push green; `levels` (a)(c)(f)(g)(i) |
@@ -1168,7 +1318,8 @@ commit. Corrections are recorded in the brief, never hidden.
   `:1733`); a world change stays a reload.
 - Route any menu quality change through `applyQuality()` (`qShadowLatch`, `:1354`), or
   let the adaptive ladder sample on the menu (`:10912`).
-- A 360° orbit, a wide/high "whole island" shot (4,694 draw calls, `:10496`), or the
+- A 360° orbit, a wide/high "whole island" shot (4,694 draw calls, `:10496` — re-taken
+  2026-09-10 at 337; the frame that costs 4,694 today is late play at r 12, §2.9.5), or the
   family in the diorama.
 - A PLAY breathe, a pip pulse, a countdown, a coin spinner, an ad, an ad-skip currency,
   a "x2" door, lives, hearts, `audio.lose()` on a goal level, a red 3-2-1 with the goal
@@ -1358,3 +1509,20 @@ in four different ways. It did not re-verify the ~110 two-click probe count, the
 `voidDailyLast` seeds or the 124 `.wCard` hits beyond the skeptics' own greps. And it did
 not read the code that does not exist yet: `levels.ts`, `enterMenu`, the menu branch —
 the skeptic pass of §6 day 14 does that against the shipped diff.
+
+### 9.7 What the BUILD then corrected in this brief — day 1, 2026-09-10
+
+The four skeptics read the code; they did not run it. Building day 1 found three things
+the reading had wrong. They are here rather than quietly patched, because the wrong
+version of a claim is always the persuasive one (`GOVERNOR.md` rules 3, 3b).
+
+| # | what §5.3 / §2 / §6 said | what is actually true | where it is fixed |
+|---|---|---|---|
+| 1 | `qa/pickerfit.mjs` "PASS on zero cards (`:245-260`)", and day 1 should "throw if zero cards" | It has FAILED on zero cards since `d952532` (2026-09-08), **two days before this brief**, at `:285` — and `:245-260` is the contrast measurement loop, not a verdict. The reading was of a file that had already been fixed. The hole that IS live is a picker with SOME of its cards: every bar iterates `cards`, so five of six is measured on five and prints "all 5 world cards". Demonstrated: the pre-day-1 probe run against a build with Skylark's card deleted prints exactly that, green | §5.3 row corrected; §6 day 1 corrected; `pickerfit` now FAILS when `cards.length !== ALL_WORLDS.length` and names the missing worlds |
+| 2 | §2.8.1's day-1 sampling: "one cranked frame", and `info.render.frame` as the frame counter | `renderer.info.render.frame` counts `renderer.render()` CALLS, and on any rung carrying bloom the composer makes **fifteen of them per animation frame** (measured, all six worlds). A "120-frame" window on that counter is eight animation frames at a frame rate fifteen times too high. The first version of `menuframe` did exactly this and its numbers looked entirely reasonable | `_dbg.__frameInfo().animFrames` is `animate()`'s own count and is what every window in `menuframe` waits on; the per-frame `passes` column prints the render-call count rather than assuming it |
+| 3 | §2, §7 and `prototype3d.ts:10613`: the opening is the 4,694-call / 1.40M-triangle frame | Re-taken on Game Day at rung 0 with `autoReset` off: the opening is **337 calls / 221k triangles**, because the shadows-off line directly beneath that comment is the fix the comment describes. The frame that costs ~4,694 today is **late play at r 12** (Game Day 4,978, Lantern 6,436) | §2.9.5; §0.1 and §7 annotated; the re-take written into `prototype3d.ts` beside the number it corrects |
+
+A fourth item is not a correction but a gap this brief did not know it had: **Maple has no
+stage to measure.** `WORLD_COPY.maple.hero` is null, so there is nothing for a hero-framed
+sweep to stand off, and §2.3's Maple stage (the waterfall lip) is a module-local const in
+`island.ts` that no probe may transcribe. Day 2 exposes it and re-runs Maple (§2.9.7).

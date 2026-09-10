@@ -1,0 +1,94 @@
+
+  MENUFRAME — the menu's frame, before any of it is authored
+  worlds maple,pirate,gameday,lantern,powder,skylark · rungs 0 · azimuth step 30deg
+  stage: 22u out, eye 9, look 2u above ground · hero stage 40u back
+  discard 120 frames after the pin · frame-time window 40 frames
+  EVERY NUMBER BELOW IS SANDBOX (swiftshader), NOT A DEVICE.
+
+  ── MAPLE  rung 0 (read back 0, pr 2, shadows true, latch false)
+     boot: world ready 21.6s from navigation start · 120 discard frames took 241s (0.50 animation fps, sandbox)
+     frames (sandbox, n=41): median 1975.3ms  p95 3952.4ms  mean 1997.6ms  min 53.3  max 4029.0
+     movers near 138u 113/377 · near 276u 351/377 · crowdGate 154
+     heap 369.1 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (23.5, -38.0) r 0.90 · spawn (23.5, -38.0) · hero none authored
+
+     INTRO  calls 448/436 (max 448)  tris 265,742  passes 15  bloom true  shadows false  camDist 167.8
+     PLAY   calls 495/109 (max 495)  tris 278,650  passes 15  shadows true  camDist 29  (settled, r 0.90)
+     R12    calls 418/4411 (max 4411)  tris 1,666,590  passes 15  shadows true  camDist 237.1
+
+  ── PIRATE  rung 0 (read back 0, pr 2, shadows true, latch false)
+     boot: world ready 16.1s from navigation start · 120 discard frames took 200s (0.60 animation fps, sandbox)
+     frames (sandbox, n=40): median 1637.9ms  p95 1788.1ms  mean 1649.6ms  min 194.3  max 3192.6
+     movers near 138u 111/334 · near 276u 150/334 · crowdGate 308
+     heap 237.8 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (47.3, 229.0) r 0.90 · spawn (47.5, 228.0) · hero (127.0, -115.0)
+
+     INTRO  calls 706/678 (max 706)  tris 265,874  passes 15  bloom true  shadows false  camDist 167.8
+     PLAY   calls 664/105 (max 664)  tris 254,896  passes 15  shadows true  camDist 29  (settled, r 0.90)
+     R12    calls 794/2280 (max 2280)  tris 719,904  passes 15  shadows true  camDist 234.7
+
+  ── GAMEDAY  rung 0 (read back 0, pr 2, shadows true, latch false)
+     boot: world ready 35.0s from navigation start · 120 discard frames took 204s (0.59 animation fps, sandbox)
+     frames (sandbox, n=40): median 1671.6ms  p95 1777.5ms  mean 1666.5ms  min 33.0  max 3361.1
+     movers near 138u 286/500 · near 276u 451/500 · crowdGate 154
+     heap 438.3 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (-5.5, 144.5) r 0.90 · spawn (-2.5, 140.5) · hero (-3.5, -140.0)
+
+     INTRO  calls 337/322 (max 337)  tris 221,254  passes 15  bloom true  shadows false  camDist 167.8
+     PLAY   calls 1032/104 (max 1032)  tris 398,728  passes 15  shadows true  camDist 29  (settled, r 0.90)
+     R12    calls 1047/4978 (max 4978)  tris 1,915,096  passes 15  shadows true  camDist 239.1
+
+  ── LANTERN  rung 0 (read back 0, pr 2, shadows true, latch false)
+     boot: world ready 17.3s from navigation start · 120 discard frames took 176s (0.68 animation fps, sandbox)
+     frames (sandbox, n=40): median 1460.7ms  p95 1560.0ms  mean 1469.1ms  min 305.5  max 2940.1
+     movers near 138u 348/972 · near 276u 725/972 · crowdGate 154
+     heap 331.8 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (30.1, 214.6) r 0.90 · spawn (31.0, 207.5) · hero (14.0, -175.0)
+
+     INTRO  calls 580/554 (max 580)  tris 220,421  passes 15  bloom true  shadows false  camDist 167.8
+     PLAY   calls 788/123 (max 788)  tris 295,463  passes 15  shadows true  camDist 29  (settled, r 0.90)
+     R12    calls 1057/6436 (max 6436)  tris 1,669,558  passes 15  shadows true  camDist 233.7
+
+  ── POWDER  rung 0 (read back 0, pr 2, shadows true, latch false)
+     boot: world ready 13.4s from navigation start · 120 discard frames took 166s (0.72 animation fps, sandbox)
+     frames (sandbox, n=40): median 1354.2ms  p95 1462.3ms  mean 1353.1ms  min 32.0  max 2653.5
+     movers near 138u 235/388 · near 276u 351/388 · crowdGate 154
+     heap 207.4 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (15.6, 93.8) r 0.90 · spawn (15.0, 95.0) · hero (5.0, -182.5)
+
+     INTRO  calls 247/245 (max 247)  tris 158,592  passes 15  bloom true  shadows false  camDist 169.7
+     PLAY   calls 611/88 (max 611)  tris 252,178  passes 15  shadows true  camDist 29  (settled, r 0.90)
+     R12    calls 750/3155 (max 3155)  tris 877,168  passes 15  shadows true  camDist 226.8
+
+  ── SKYLARK  rung 0 (read back 0, pr 2, shadows true, latch false)
+     boot: world ready 10.1s from navigation start · 120 discard frames took 195s (0.62 animation fps, sandbox)
+     frames (sandbox, n=40): median 1627.1ms  p95 1751.0ms  mean 1613.7ms  min 1430.7  max 1766.5
+     movers near 138u 368/548 · near 276u 537/548 · crowdGate 154
+     heap 245.4 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (91.2, -13.6) r 0.90 · spawn (90.0, -12.5) · hero (5.4, -82.6)
+
+     INTRO  calls 420/402 (max 420)  tris 201,146  passes 15  bloom true  shadows false  camDist 167.8
+     PLAY   calls 119/1644 (max 1644)  tris 572,854  passes 15  shadows true  camDist 29  (settled, r 0.90)
+     R12    calls 1616/5441 (max 5441)  tris 1,610,880  passes 15  shadows true  camDist 248.6
+
+  ── TABLE (world, rung, stage, azimuth, calls A/B, max, tris, bloom, shadows, pr) ──
+  maple    r0 INTRO    —deg   448/ 436  max  448     265742 tris  passes 15  bloom on   shadows off  pr 2
+  maple    r0 PLAY     —deg   495/ 109  max  495     278650 tris  passes 15  bloom on   shadows on   pr 2
+  maple    r0 R12      —deg   418/4411  max 4411    1666590 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 INTRO    —deg   706/ 678  max  706     265874 tris  passes 15  bloom on   shadows off  pr 2
+  pirate   r0 PLAY     —deg   664/ 105  max  664     254896 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 R12      —deg   794/2280  max 2280     719904 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 INTRO    —deg   337/ 322  max  337     221254 tris  passes 15  bloom on   shadows off  pr 2
+  gameday  r0 PLAY     —deg  1032/ 104  max 1032     398728 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 R12      —deg  1047/4978  max 4978    1915096 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 INTRO    —deg   580/ 554  max  580     220421 tris  passes 15  bloom on   shadows off  pr 2
+  lantern  r0 PLAY     —deg   788/ 123  max  788     295463 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 R12      —deg  1057/6436  max 6436    1669558 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 INTRO    —deg   247/ 245  max  247     158592 tris  passes 15  bloom on   shadows off  pr 2
+  powder   r0 PLAY     —deg   611/  88  max  611     252178 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 R12      —deg   750/3155  max 3155     877168 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 INTRO    —deg   420/ 402  max  420     201146 tris  passes 15  bloom on   shadows off  pr 2
+  skylark  r0 PLAY     —deg   119/1644  max 1644     572854 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 R12      —deg  1616/5441  max 5441    1610880 tris  passes 15  bloom on   shadows on   pr 2
+
+PASS — REPORT only: 18 sampled frames, every one a single animation frame with info.autoReset off and the rung read back [4391s]

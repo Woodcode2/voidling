@@ -417,6 +417,27 @@ function perfFrame(dtRaw: number) {
   if (dtRaw > 0.05) perfHitch50++;
   else if (dtRaw > 0.033) perfHitch33++;
 }
+// ── THE FRAME-TIME SERIES, ALWAYS ON ───────────────────────────────────────
+// perfDts above is the overlay's buffer and it only fills under ?perf, which
+// also puts a panel on top of the thing being photographed — so the only
+// frame-time series a probe could read was one it could not read cleanly, and
+// the menu has never had a frame-time number of any kind. This is the series
+// and nothing else: a fixed 600-slot ring written once per frame, allocated
+// once at module scope, no DOM, no flag. Costs one store and one modulo.
+//
+// It is WALL time (dtRaw), not the clamped simulation dt, for the reason the
+// note in animate() gives: a clamp hides exactly the hitch an instrument is
+// for. Under a software renderer these are sandbox numbers and every row that
+// prints them has to say so — a device number comes off a device.
+const FT_N = 600;
+const ftRing = new Float64Array(FT_N);
+let ftAt = 0, ftHave = 0, ftTotal = 0;
+function frameTime(dtRaw: number) {
+  ftRing[ftAt] = dtRaw;
+  ftAt = (ftAt + 1) % FT_N;
+  if (ftHave < FT_N) ftHave++;
+  ftTotal++;   // ANIMATION frames since load — see __frameInfo().animFrames
+}
 if (PERF) (() => {
   const box = document.createElement('div');
   box.style.cssText = 'position:fixed;right:0;top:0;z-index:99999;max-width:62vw;'
@@ -748,6 +769,27 @@ function coastSolid(R0: number): (x: number, z: number) => boolean {
 // steering cap's stand-in during the descent; declared HERE, above every one of
 // them, so none of the three can read it in its temporal dead zone.
 const PLAY_DIST = 29;
+
+/** ── QA ONLY: PARK THE CAMERA WHERE THE MENU'S DIORAMA WOULD PUT IT ────────
+ *  Scaffolding for one measurement, and it is here because that measurement
+ *  has to happen BEFORE the thing it measures is built. What renders behind
+ *  today's menu is the spawn frame: PLAY_DIST along camOffset, pitched about
+ *  46 degrees down, so the frustum ends a few dozen units ahead. The diorama
+ *  the menu wants is a low camera looking along the plateau — a different
+ *  frustum on the same scene, and until it is sampled nobody knows what it
+ *  costs. "It costs nothing, the scene is already drawn" was the assumption,
+ *  and it is not measured, so it does not ship as a fact.
+ *
+ *  When set, this writes the camera transform and the fog, and hands the same
+ *  distance to the LOD band, the shadow box and the crowd gate that the real
+ *  menu will hand them — otherwise the number would be the stage's angle with
+ *  the spawn frame's culling, which is a fourth thing nobody is shipping.
+ *  Nothing reads it unless __menuCam has been called; the shipped path is
+ *  bit-identical while it is null. It is replaced by the real menuMode branch
+ *  when that lands, and this block goes with it. */
+type QaCam = { x: number; z: number; az: number; dist: number; h: number;
+  lookX: number; lookZ: number; lookY: number };
+let qaCam: QaCam | null = null;
 
 /** THE STEERING CAP, in one place. `Math.min(96, 16 * (camDist / 50))` was
  *  written out at three call sites — the input block, the shore recovery and
@@ -1994,6 +2036,11 @@ const _dbg = new Proxy(_dbgStore, {
   __rushClock: (to: number) => void;
   __setVoidR: (r: number) => void;
   __pinQuality: (n: number | null) => void;
+  __frameTimes: () => number[];
+  __frameInfo: () => Record<string, number | boolean | null>;
+  __menuCam: (c: { x: number; z: number; az: number; dist?: number; h?: number;
+    lookX?: number; lookZ?: number; lookY?: number } | null) => void;
+  __heroPoint: () => { x: number; z: number } | null;
   __renderBloom: () => void;
   __composer: () => unknown;
   __juiceState: () => { fov: number; fovKick: number; stop: number; puffs: number; buzzes: number };
@@ -2263,6 +2310,73 @@ _dbg.__quality = () => ({ level: qLevel, pinned: qPinned, shadows: renderer.shad
 // every density and lighting judgement was made from the two or three places a
 // harness could actually get to. Snaps the camera with it so the shot is not a
 // two-second dolly.
+// QA: THE FRAME-TIME SERIES ITSELF, oldest first. The ring above is always
+// running, so this is a read with no side effect and no flag — the caller gets
+// whatever the last 600 frames actually were. Under a software renderer these
+// are the SANDBOX's frames and not the game's; any row printed from them has
+// to say so, and a device bar comes off a device.
+_dbg.__frameTimes = () => {
+  const out: number[] = [];
+  const start = ftHave < FT_N ? 0 : ftAt;
+  for (let i = 0; i < ftHave; i++) out.push(ftRing[(start + i) % FT_N]);
+  return out;
+};
+// QA: the draw-call count AND every condition it is only true under, read from
+// the live renderer in one call. A count quoted without its bloom, shadow and
+// pixel-ratio state has been read wrong here before: the composer's quad
+// passes each call renderer.render, so with info.autoReset ON (the default)
+// the number left behind after a composed frame is the LAST post pass, not the
+// scene. Set info.autoReset = false and reset it yourself around the frame.
+_dbg.__frameInfo = () => ({
+  calls: renderer.info.render.calls,
+  tris: renderer.info.render.triangles,
+  frame: renderer.info.render.frame,
+  // ── COUNT ANIMATION FRAMES, NOT RENDER CALLS ────────────────────────────
+  // renderer.info.render.frame counts renderer.render() CALLS, and on a rung
+  // that carries bloom the composer makes about fifteen of them per animation
+  // frame. Anything that waits on it — "let 120 frames go by" — waits for an
+  // eighth of what it asked for and reports a frame rate fifteen times too
+  // high. animFrames is animate()'s own count and is what a frame budget
+  // means.
+  animFrames: ftTotal,
+  autoReset: renderer.info.autoReset,
+  geometries: renderer.info.memory.geometries,
+  textures: renderer.info.memory.textures,
+  programs: renderer.info.programs ? renderer.info.programs.length : -1,
+  bloom: bloomOn,
+  shadows: renderer.shadowMap.enabled,
+  shadowSize: sun.shadow.mapSize.x,
+  pr: renderer.getPixelRatio(),
+  qLevel, qPinned, qShadowLatch,
+  dist: qaCam ? qaCam.dist : camDist,
+  menuCam: !!qaCam,
+});
+// QA: park the camera at a candidate diorama stage (see qaCam). Angles in
+// degrees, clockwise from +z; dist is from the stage point, h is eye height.
+// __menuCam(null) hands the camera back to the game.
+_dbg.__menuCam = (c) => {
+  qaCam = c ? {
+    x: c.x, z: c.z, az: c.az,
+    dist: c.dist ?? 22, h: c.h ?? 9,
+    lookX: c.lookX ?? c.x, lookZ: c.lookZ ?? c.z, lookY: c.lookY ?? 2,
+  } : null;
+  // PARK THE VOID WITH IT, because the menu will. Attract mode drives him
+  // around the island four seconds after the world appears (the branch that
+  // does it is gated on qaCam for exactly this reason), and the crowd's
+  // near-set, the sun and the shadow box all centre on voidState, not on the
+  // camera. A stage sampled while he wanders is a camera pinned to one place
+  // reading another place's crowd — a confound invisible in the number and
+  // fatal to it.
+  if (qaCam) {
+    voidState.x = qaCam.x; voidState.z = qaCam.z;
+    voidling.group.position.set(qaCam.x, voidling.group.position.y, qaCam.z);
+    velX = 0; velZ = 0;
+    wander.set(qaCam.x, 0, qaCam.z);
+  }
+};
+// QA: the world's authored hero landmark, read off the copy table rather than
+// transcribed into a probe. Maple's is null — it has no hero landmark.
+_dbg.__heroPoint = () => (COPY.hero ? { x: COPY.hero[0], z: COPY.hero[1] } : null);
 _dbg.__warpVoid = (x: number, z: number) => {
   voidState.x = x; voidState.z = z;
   voidling.group.position.set(x, voidling.group.position.y, z);
@@ -9476,6 +9590,7 @@ function animate() {
   const dtRaw = clock.getDelta();
   const dt = Math.min(0.05, dtRaw);
   perfFrame(dtRaw);
+  frameTime(dtRaw);
   let dtw = dt;
   if (outroT > 0) { outroT -= dt; if (outroT <= 0) endMatch(); else dtw = dt * 0.3; }
   stopCd = Math.max(0, stopCd - dt);
@@ -9846,7 +9961,7 @@ function animate() {
     // drove itself away four seconds after the world appeared. Attract mode is
     // for the menu backdrop and the demo harness; an armed, untouched world sits
     // still and waits.
-    } else if ((!armed || DEBUG_HARNESS) && tClock - lastInput > 4) {
+    } else if (!qaCam && (!armed || DEBUG_HARNESS) && tClock - lastInput > 4) {
       // attract mode: menu backdrop + demo harness ONLY — a real match never
       // self-drives; an idle player's void just sits there being cute
       wanderT -= dt;
@@ -10274,7 +10389,7 @@ function animate() {
   // its full-rate population is the LOWEST in the game (119–211), and
   // swallowing the whole visible band lands it at ~280–340 updates a frame —
   // still under the 384 the owner just called dialed on Maple.
-  const crowdGate = (introT > 0 ? Infinity : camDist * 2.2 + 90)
+  const crowdGate = (introT > 0 ? Infinity : (qaCam ? qaCam.dist : camDist) * 2.2 + 90)
     * (pickedWorld === 'pirate' ? 2 : 1);
   _dbg.__crowdGate = crowdGate;
   perfBeat('crowd');
@@ -10492,6 +10607,23 @@ function animate() {
     if (camera.far < 1400) { camera.far = 1400; camera.updateProjectionMatrix(); }   // island sits past the default far plane
     camera.position.set(0, 1120, 0.001);
     camera.lookAt(0, 0, 0);
+  } else if (qaCam) {
+    // The stage frustum, written straight — no camOffset, no camDist, no
+    // follow spring, so nothing here can be mistaken for the shipped camera.
+    // The fog uses the match's own law on the stage's distance, because a
+    // draw-call count taken under a different fog is a count of a different
+    // frustum.
+    const rad = qaCam.az * Math.PI / 180;
+    const rise = qaCam.h - qaCam.lookY;
+    const hd = Math.sqrt(Math.max(1, qaCam.dist * qaCam.dist - rise * rise));
+    camera.position.set(qaCam.x + Math.sin(rad) * hd, qaCam.h, qaCam.z + Math.cos(rad) * hd);
+    camera.lookAt(qaCam.lookX, qaCam.lookY, qaCam.lookZ);
+    if (camera.fov !== 32) { camera.fov = 32; camera.updateProjectionMatrix(); }
+    camera.updateMatrixWorld();
+    if (scene.fog) {
+      (scene.fog as THREE.Fog).near = 60 + qaCam.dist * 1.4;
+      (scene.fog as THREE.Fog).far = 260 + qaCam.dist * 4;
+    }
   } else {
     // CONTINUOUS zoom (hole.io): distance ∝ R^0.78 — the void visibly gains
     // ~20% screen size across a form before the camera catches up, so growth
@@ -10507,6 +10639,21 @@ function animate() {
       // the shadow pass too, and shadow detail is invisible under a 3.4-second
       // pull-back, so the cheapest half of that bill is also the half nobody
       // can see. Restored below the moment the move ends.
+      //
+      // ── RE-TAKEN 2026-09-10, AND THE PAIR ABOVE IS NO LONGER THIS FRAME ───
+      // qa/menuframe.mjs, GAME DAY, rung 0, info.autoReset OFF, one animation
+      // frame per sample: the opening reads 337 draw calls / 221k triangles,
+      // and settled play at r 0.9 reads 1,032 / 399k. The 4,694 / 1.40M pair
+      // describes the shot as it was BEFORE the shadows-off line below existed
+      // — this comment records the problem and its own fix, and the number
+      // sitting next to it is the problem's, not today's.
+      //
+      // The frame that costs about 4,694 today is LATE play, not the opening:
+      // at r 12 Game Day reads 4,978 calls / 1.92M triangles (Lantern 6,436,
+      // Skylark 5,441, Maple 4,411, Powder 3,155, Pirate 2,280). And 65-91% of
+      // that bill is the shadow pass, not the frustum. Sandbox numbers under
+      // swiftshader; draw calls do not depend on how fast the box renders
+      // them, frame times do, and no frame time is quoted here.
       if (introShadow === null) { introShadow = renderer.shadowMap.enabled; renderer.shadowMap.enabled = false; sun.castShadow = false; }
       if (introT <= 0 && introShadow !== null) {
         renderer.shadowMap.enabled = introShadow; sun.castShadow = introShadow; introShadow = null;
@@ -10892,8 +11039,8 @@ function animate() {
 
   if (SHOW_WALLS) paintWalls();
   // LOD band + shadow frustum track the camera
-  updateLodBias(camDist);
-  fitShadow(camDist);
+  updateLodBias(qaCam ? qaCam.dist : camDist);
+  fitShadow(qaCam ? qaCam.dist : camDist);
   fadeOccluders(dt);
 
   // adaptive quality: step down fast when fps dips, climb back slowly.

@@ -1,0 +1,680 @@
+
+  MENUFRAME — the menu's frame, before any of it is authored
+  worlds maple,pirate,gameday,lantern,powder,skylark · rungs 0,3 · azimuth step 30deg
+  stage: 22u out, eye 9, look 2u above ground · hero stage 40u back
+  discard 120 frames after the pin · frame-time window 40 frames
+  EVERY NUMBER BELOW IS SANDBOX (swiftshader), NOT A DEVICE.
+
+  ── MAPLE  rung 0 (read back 0, pr 2, shadows true, latch false)
+     boot: world ready 21.1s from navigation start · 120 discard frames took 273s (0.44 animation fps, sandbox)
+     frames (sandbox, n=40): median 2335.7ms  p95 4478.7ms  mean 2333.4ms  min 25.9  max 4675.7
+     movers near 138u 122/372 · near 276u 323/372 · crowdGate 154
+     heap 370.1 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (21.6, -39.3) r 0.90 · spawn (23.5, -38.0) · hero none authored
+     TODAY  calls 139/498 (max 498)  tris 184,084  passes 15  bloom true  shadows true  pr 2  camDist 29  void (21.6, -39.3) (attract mode is driving)
+     STAGE  az   0deg  calls  892/ 524 (max  892)  tris 267,454
+     STAGE  az  30deg  calls  489/ 868 (max  868)  tris 288,704
+     STAGE  az  60deg  calls  804/ 421 (max  804)  tris 248,998
+     STAGE  az  90deg  calls  604/ 991 (max  991)  tris 283,101
+     STAGE  az 120deg  calls  971/ 589 (max  971)  tris 291,463
+     STAGE  az 150deg  calls  577/ 955 (max  955)  tris 278,196
+     STAGE  az 180deg  calls  979/ 603 (max  979)  tris 276,415
+     STAGE  az 210deg  calls  514/ 889 (max  889)  tris 270,608
+     STAGE  az 240deg  calls  856/ 480 (max  856)  tris 271,424
+     STAGE  az 270deg  calls  425/ 808 (max  808)  tris 265,946
+     STAGE  az 300deg  calls  907/ 516 (max  907)  tris 261,958
+     STAGE  az 330deg  calls  378/ 772 (max  772)  tris 238,914
+     STAGE  SWEEP  cheapest 772 calls at 330deg · dearest 991 calls at 90deg · vs today 498 = 1.99x worst, 1.55x best
+     HERO   skipped — maple authors no hero landmark (WORLD_COPY hero is null)
+
+  ── MAPLE  rung 3 (read back 3, pr 1, shadows false, latch true)
+     boot: world ready 18.8s from navigation start · 120 discard frames took 55s (2.17 animation fps, sandbox)
+     frames (sandbox, n=40): median 421.7ms  p95 822.4ms  mean 432.8ms  min 97.9  max 886.9
+     movers near 138u 126/392 · near 276u 346/392 · crowdGate 154
+     heap 371.3 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (21.6, -39.3) r 0.90 · spawn (23.5, -38.0) · hero none authored
+     TODAY  calls 119/120 (max 120)  tris 53,412  passes 1  bloom false  shadows false  pr 1  camDist 29  void (21.6, -39.3) (attract mode is driving)
+     STAGE  az   0deg  calls  430/ 430 (max  430)  tris 129,570
+     STAGE  az  30deg  calls  449/ 450 (max  450)  tris 159,914
+     STAGE  az  60deg  calls  525/ 527 (max  527)  tris 125,042
+     STAGE  az  90deg  calls  536/ 535 (max  536)  tris 145,297
+     STAGE  az 120deg  calls  629/ 629 (max  629)  tris 166,049
+     STAGE  az 150deg  calls  560/ 561 (max  561)  tris 152,224
+     STAGE  az 180deg  calls  541/ 544 (max  544)  tris 147,783
+     STAGE  az 210deg  calls  481/ 482 (max  482)  tris 141,146
+     STAGE  az 240deg  calls  467/ 468 (max  468)  tris 139,112
+     STAGE  az 270deg  calls  426/ 428 (max  428)  tris 138,214
+     STAGE  az 300deg  calls  522/ 522 (max  522)  tris 135,498
+     STAGE  az 330deg  calls  401/ 401 (max  401)  tris 117,522
+     STAGE  SWEEP  cheapest 401 calls at 330deg · dearest 629 calls at 120deg · vs today 120 = 5.24x worst, 3.34x best
+     HERO   skipped — maple authors no hero landmark (WORLD_COPY hero is null)
+
+  ── PIRATE  rung 0 (read back 0, pr 2, shadows true, latch false)
+     boot: world ready 16.1s from navigation start · 120 discard frames took 192s (0.62 animation fps, sandbox)
+     frames (sandbox, n=40): median 1644.1ms  p95 1723.5ms  mean 1633.6ms  min 354.4  max 2912.0
+     movers near 138u 113/337 · near 276u 156/337 · crowdGate 308
+     heap 238.6 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (47.3, 228.9) r 0.90 · spawn (47.5, 228.0) · hero (127.0, -115.0)
+     TODAY  calls 127/694 (max 694)  tris 161,062  passes 15  bloom true  shadows true  pr 2  camDist 29  void (47.3, 228.9) (attract mode is driving)
+     STAGE  az   0deg  calls  382/ 950 (max  950)  tris 204,940
+     STAGE  az  30deg  calls  823/ 254 (max  823)  tris 197,030
+     STAGE  az  60deg  calls 1290/1858 (max 1858)  tris 301,624
+     STAGE  az  90deg  calls  795/ 228 (max  795)  tris 173,084
+     STAGE  az 120deg  calls  140/ 709 (max  709)  tris 163,632
+     STAGE  az 150deg  calls  688/ 118 (max  688)  tris 159,332
+     STAGE  az 180deg  calls  112/ 680 (max  680)  tris 157,266
+     STAGE  az 210deg  calls  692/ 124 (max  692)  tris 158,158
+     STAGE  az 240deg  calls  261/ 825 (max  825)  tris 182,366
+     STAGE  az 270deg  calls 1212/ 649 (max 1212)  tris 232,018
+     STAGE  az 300deg  calls  454/1015 (max 1015)  tris 207,506
+     STAGE  az 330deg  calls  997/ 463 (max  997)  tris 217,608
+     STAGE  SWEEP  cheapest 680 calls at 180deg · dearest 1858 calls at 60deg · vs today 694 = 2.68x worst, 0.98x best
+     HERO   standing at (127.0, -75.0) on resort, 40u off the landmark
+     HERO   az   0deg  calls  263/ 514 (max  514)  tris 242,464
+     HERO   az  30deg  calls  555/ 304 (max  555)  tris 234,854
+     HERO   az  60deg  calls  488/ 735 (max  735)  tris 252,962
+     HERO   az  90deg  calls  925/ 682 (max  925)  tris 259,700
+     HERO   az 120deg  calls  691/ 927 (max  927)  tris 248,708
+     HERO   az 150deg  calls  739/ 508 (max  739)  tris 222,910
+     HERO   az 180deg  calls   89/ 320 (max  320)  tris 178,502
+     HERO   az 210deg  calls  307/  77 (max  307)  tris 178,824
+     HERO   az 240deg  calls  320/ 100 (max  320)  tris 183,264
+     HERO   az 270deg  calls  128/ 333 (max  333)  tris 196,736
+     HERO   az 300deg  calls  343/ 139 (max  343)  tris 202,810
+     HERO   az 330deg  calls  161/ 364 (max  364)  tris 209,248
+     HERO   SWEEP  cheapest 307 calls at 210deg · dearest 927 calls at 120deg · vs today 694 = 1.34x worst, 0.44x best
+
+  ── PIRATE  rung 3 (read back 3, pr 1, shadows false, latch true)
+     boot: world ready 15.7s from navigation start · 120 discard frames took 48s (2.49 animation fps, sandbox)
+     frames (sandbox, n=40): median 378.2ms  p95 768.4ms  mean 383.4ms  min 28.6  max 772.8
+     movers near 138u 112/336 · near 276u 148/336 · crowdGate 308
+     heap 236.9 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (47.3, 229.0) r 0.90 · spawn (47.5, 228.0) · hero (127.0, -115.0)
+     TODAY  calls 109/109 (max 109)  tris 27,376  passes 1  bloom false  shadows false  pr 1  camDist 29  void (47.3, 229.0) (attract mode is driving)
+     STAGE  az   0deg  calls  384/ 384 (max  384)  tris 75,180
+     STAGE  az  30deg  calls  215/ 215 (max  215)  tris 57,500
+     STAGE  az  60deg  calls 1243/1243 (max 1243)  tris 158,122
+     STAGE  az  90deg  calls  208/ 208 (max  208)  tris 38,990
+     STAGE  az 120deg  calls  121/ 121 (max  121)  tris 27,748
+     STAGE  az 150deg  calls  102/ 102 (max  102)  tris 26,006
+     STAGE  az 180deg  calls   95/  95 (max   95)  tris 23,780
+     STAGE  az 210deg  calls  109/ 109 (max  109)  tris 24,784
+     STAGE  az 240deg  calls  240/ 244 (max  244)  tris 50,928
+     STAGE  az 270deg  calls  697/ 697 (max  697)  tris 113,192
+     STAGE  az 300deg  calls  361/ 361 (max  361)  tris 60,286
+     STAGE  az 330deg  calls  443/ 444 (max  444)  tris 84,028
+     STAGE  SWEEP  cheapest 95 calls at 180deg · dearest 1243 calls at 60deg · vs today 109 = 11.40x worst, 0.87x best
+     HERO   standing at (127.0, -75.0) on resort, 40u off the landmark
+     HERO   az   0deg  calls  224/ 224 (max  224)  tris 84,122
+     HERO   az  30deg  calls  274/ 274 (max  274)  tris 79,136
+     HERO   az  60deg  calls  442/ 442 (max  442)  tris 96,576
+     HERO   az  90deg  calls  647/ 648 (max  648)  tris 102,614
+     HERO   az 120deg  calls  671/ 671 (max  671)  tris 94,068
+     HERO   az 150deg  calls  482/ 482 (max  482)  tris 67,950
+     HERO   az 180deg  calls   60/  60 (max   60)  tris 23,000
+     HERO   az 210deg  calls   46/  46 (max   46)  tris 23,974
+     HERO   az 240deg  calls   63/  63 (max   63)  tris 27,336
+     HERO   az 270deg  calls   84/  84 (max   84)  tris 38,566
+     HERO   az 300deg  calls   97/  97 (max   97)  tris 45,556
+     HERO   az 330deg  calls  113/ 113 (max  113)  tris 49,592
+     HERO   SWEEP  cheapest 46 calls at 210deg · dearest 671 calls at 120deg · vs today 109 = 6.16x worst, 0.42x best
+
+  ── GAMEDAY  rung 0 (read back 0, pr 2, shadows true, latch false)
+     boot: world ready 37.5s from navigation start · 120 discard frames took 209s (0.57 animation fps, sandbox)
+     frames (sandbox, n=40): median 1794.3ms  p95 1867.5ms  mean 1774.1ms  min 45.9  max 3570.1
+     movers near 138u 291/504 · near 276u 449/504 · crowdGate 154
+     heap 440.7 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (-5.5, 144.4) r 0.90 · spawn (-2.5, 140.5) · hero (-3.5, -140.0)
+     TODAY  calls 137/1040 (max 1040)  tris 301,554  passes 15  bloom true  shadows true  pr 2  camDist 29  void (-5.5, 144.4) (attract mode is driving)
+     STAGE  az   0deg  calls 1949/1028 (max 1949)  tris 535,086
+     STAGE  az  30deg  calls  851/1772 (max 1772)  tris 496,138
+     STAGE  az  60deg  calls 1643/ 723 (max 1643)  tris 480,958
+     STAGE  az  90deg  calls  670/1591 (max 1591)  tris 468,064
+     STAGE  az 120deg  calls 1379/ 459 (max 1379)  tris 403,526
+     STAGE  az 150deg  calls  397/1315 (max 1315)  tris 382,516
+     STAGE  az 180deg  calls 1273/ 358 (max 1273)  tris 372,612
+     STAGE  az 210deg  calls  355/1271 (max 1271)  tris 379,512
+     STAGE  az 240deg  calls  528/1443 (max 1443)  tris 421,196
+     STAGE  az 270deg  calls 1656/ 746 (max 1656)  tris 455,250
+     STAGE  az 300deg  calls  688/1596 (max 1596)  tris 443,768
+     STAGE  az 330deg  calls 1797/ 885 (max 1797)  tris 508,596
+     STAGE  SWEEP  cheapest 1271 calls at 210deg · dearest 1949 calls at 0deg · vs today 1040 = 1.87x worst, 1.22x best
+     HERO   standing at (-3.5, -100.0) on bowl, 40u off the landmark
+     HERO   az   0deg  calls  295/ 516 (max  516)  tris 155,556
+     HERO   az  30deg  calls  477/ 254 (max  477)  tris 139,990
+     HERO   az  60deg  calls  260/ 484 (max  484)  tris 141,268
+     HERO   az  90deg  calls  472/ 247 (max  472)  tris 141,674
+     HERO   az 120deg  calls  225/ 450 (max  450)  tris 134,282
+     HERO   az 150deg  calls  438/ 213 (max  438)  tris 128,578
+     HERO   az 180deg  calls  169/ 394 (max  394)  tris 112,228
+     HERO   az 210deg  calls  443/ 218 (max  443)  tris 133,196
+     HERO   az 240deg  calls  254/ 479 (max  479)  tris 143,600
+     HERO   az 270deg  calls  490/ 266 (max  490)  tris 145,034
+     HERO   az 300deg  calls  272/ 494 (max  494)  tris 144,906
+     HERO   az 330deg  calls  489/ 268 (max  489)  tris 144,216
+     HERO   SWEEP  cheapest 394 calls at 180deg · dearest 516 calls at 0deg · vs today 1040 = 0.50x worst, 0.38x best
+
+  ── GAMEDAY  rung 3 (read back 3, pr 1, shadows false, latch true)
+     boot: world ready 35.6s from navigation start · 120 discard frames took 55s (2.19 animation fps, sandbox)
+     frames (sandbox, n=40): median 414.3ms  p95 483.7ms  mean 419.3ms  min 53.1  max 810.7
+     movers near 138u 292/503 · near 276u 451/503 · crowdGate 154
+     heap 437.4 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (-5.6, 144.5) r 0.90 · spawn (-2.5, 140.5) · hero (-3.5, -140.0)
+     TODAY  calls 108/108 (max 108)  tris 31,028  passes 1  bloom false  shadows false  pr 1  camDist 29  void (-5.6, 144.5) (attract mode is driving)
+     STAGE  az   0deg  calls  966/ 966 (max  966)  tris 250,094
+     STAGE  az  30deg  calls  861/ 861 (max  861)  tris 235,058
+     STAGE  az  60deg  calls  672/ 673 (max  673)  tris 201,942
+     STAGE  az  90deg  calls  600/ 601 (max  601)  tris 182,818
+     STAGE  az 120deg  calls  459/ 459 (max  459)  tris 139,898
+     STAGE  az 150deg  calls  395/ 395 (max  395)  tris 118,062
+     STAGE  az 180deg  calls  352/ 352 (max  352)  tris 108,210
+     STAGE  az 210deg  calls  344/ 344 (max  344)  tris 114,488
+     STAGE  az 240deg  calls  506/ 506 (max  506)  tris 153,122
+     STAGE  az 270deg  calls  703/ 703 (max  703)  tris 180,232
+     STAGE  az 300deg  calls  667/ 666 (max  667)  tris 178,698
+     STAGE  az 330deg  calls  876/ 875 (max  876)  tris 242,982
+     STAGE  SWEEP  cheapest 344 calls at 210deg · dearest 966 calls at 0deg · vs today 108 = 8.94x worst, 3.19x best
+     HERO   standing at (-3.5, -100.0) on bowl, 40u off the landmark
+     HERO   az   0deg  calls  284/ 284 (max  284)  tris 87,862
+     HERO   az  30deg  calls  243/ 243 (max  243)  tris 70,680
+     HERO   az  60deg  calls  239/ 239 (max  239)  tris 68,560
+     HERO   az  90deg  calls  240/ 240 (max  240)  tris 72,172
+     HERO   az 120deg  calls  217/ 217 (max  217)  tris 64,372
+     HERO   az 150deg  calls  199/ 199 (max  199)  tris 56,878
+     HERO   az 180deg  calls  159/ 159 (max  159)  tris 42,070
+     HERO   az 210deg  calls  189/ 189 (max  189)  tris 58,036
+     HERO   az 240deg  calls  219/ 219 (max  219)  tris 66,974
+     HERO   az 270deg  calls  230/ 230 (max  230)  tris 69,154
+     HERO   az 300deg  calls  249/ 249 (max  249)  tris 72,508
+     HERO   az 330deg  calls  261/ 261 (max  261)  tris 77,126
+     HERO   SWEEP  cheapest 159 calls at 180deg · dearest 284 calls at 0deg · vs today 108 = 2.63x worst, 1.47x best
+
+  ── LANTERN  rung 0 (read back 0, pr 2, shadows true, latch false)
+     boot: world ready 18.9s from navigation start · 120 discard frames took 180s (0.67 animation fps, sandbox)
+     frames (sandbox, n=40): median 1452.3ms  p95 1576.0ms  mean 1456.5ms  min 1354.8  max 1582.5
+     movers near 138u 351/972 · near 276u 722/972 · crowdGate 154
+     heap 330.7 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (30.1, 214.6) r 0.90 · spawn (31.0, 207.5) · hero (14.0, -175.0)
+     TODAY  calls 737/100 (max 737)  tris 186,281  passes 15  bloom true  shadows true  pr 2  camDist 29  void (30.1, 214.6) (attract mode is driving)
+     STAGE  az   0deg  calls  867/1621 (max 1621)  tris 327,110
+     STAGE  az  30deg  calls 2034/1278 (max 2034)  tris 387,066
+     STAGE  az  60deg  calls  937/1694 (max 1694)  tris 347,286
+     STAGE  az  90deg  calls 1360/ 606 (max 1360)  tris 299,244
+     STAGE  az 120deg  calls  218/ 972 (max  972)  tris 233,043
+     STAGE  az 150deg  calls  935/ 179 (max  935)  tris 228,692
+     STAGE  az 180deg  calls  139/ 897 (max  897)  tris 221,171
+     STAGE  az 210deg  calls  904/ 142 (max  904)  tris 220,123
+     STAGE  az 240deg  calls  156/ 917 (max  917)  tris 220,471
+     STAGE  az 270deg  calls 1093/ 331 (max 1093)  tris 254,983
+     STAGE  az 300deg  calls  629/1391 (max 1391)  tris 290,276
+     STAGE  az 330deg  calls 1880/1117 (max 1880)  tris 363,386
+     STAGE  SWEEP  cheapest 897 calls at 180deg · dearest 2034 calls at 30deg · vs today 737 = 2.76x worst, 1.22x best
+     HERO   standing at (14.0, -135.0) on canal, 40u off the landmark
+     HERO   az   0deg  calls  273/ 941 (max  941)  tris 232,682
+     HERO   az  30deg  calls  898/ 229 (max  898)  tris 215,518
+     HERO   az  60deg  calls  220/ 890 (max  890)  tris 215,467
+     HERO   az  90deg  calls  879/ 208 (max  879)  tris 208,691
+     HERO   az 120deg  calls  191/ 861 (max  861)  tris 205,395
+     HERO   az 150deg  calls  833/ 164 (max  833)  tris 201,087
+     HERO   az 180deg  calls  151/ 821 (max  821)  tris 200,183
+     HERO   az 210deg  calls  824/ 152 (max  824)  tris 200,017
+     HERO   az 240deg  calls  179/ 849 (max  849)  tris 202,633
+     HERO   az 270deg  calls  861/ 191 (max  861)  tris 206,496
+     HERO   az 300deg  calls  250/ 917 (max  917)  tris 218,563
+     HERO   az 330deg  calls  885/ 219 (max  885)  tris 214,490
+     HERO   SWEEP  cheapest 821 calls at 180deg · dearest 941 calls at 0deg · vs today 737 = 1.28x worst, 1.11x best
+
+  ── LANTERN  rung 3 (read back 3, pr 1, shadows false, latch true)
+     boot: world ready 18.3s from navigation start · 120 discard frames took 44s (2.72 animation fps, sandbox)
+     frames (sandbox, n=40): median 329.2ms  p95 623.9ms  mean 333.9ms  min 33.3  max 633.5
+     movers near 138u 354/972 · near 276u 724/972 · crowdGate 154
+     heap 328.1 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (30.1, 214.6) r 0.90 · spawn (31.0, 207.5) · hero (14.0, -175.0)
+     TODAY  calls 93/93 (max 93)  tris 25,625  passes 1  bloom false  shadows false  pr 1  camDist 29  void (30.1, 214.6) (attract mode is driving)
+     STAGE  az   0deg  calls  847/ 847 (max  847)  tris 137,410
+     STAGE  az  30deg  calls 1288/1289 (max 1289)  tris 205,509
+     STAGE  az  60deg  calls  927/ 927 (max  927)  tris 155,566
+     STAGE  az  90deg  calls  572/ 574 (max  574)  tris 108,678
+     STAGE  az 120deg  calls  193/ 193 (max  193)  tris 41,885
+     STAGE  az 150deg  calls  155/ 155 (max  155)  tris 37,218
+     STAGE  az 180deg  calls  148/ 148 (max  148)  tris 37,926
+     STAGE  az 210deg  calls  112/ 112 (max  112)  tris 26,617
+     STAGE  az 240deg  calls  146/ 146 (max  146)  tris 32,177
+     STAGE  az 270deg  calls  306/ 306 (max  306)  tris 62,504
+     STAGE  az 300deg  calls  651/ 651 (max  651)  tris 106,455
+     STAGE  az 330deg  calls 1096/1096 (max 1096)  tris 177,463
+     STAGE  SWEEP  cheapest 112 calls at 210deg · dearest 1289 calls at 30deg · vs today 93 = 13.86x worst, 1.20x best
+     HERO   standing at (14.0, -135.0) on canal, 40u off the landmark
+     HERO   az   0deg  calls  263/ 263 (max  263)  tris 63,064
+     HERO   az  30deg  calls  227/ 227 (max  227)  tris 48,924
+     HERO   az  60deg  calls  211/ 209 (max  211)  tris 45,364
+     HERO   az  90deg  calls  197/ 197 (max  197)  tris 41,408
+     HERO   az 120deg  calls  171/ 171 (max  171)  tris 35,263
+     HERO   az 150deg  calls  151/ 151 (max  151)  tris 31,570
+     HERO   az 180deg  calls  139/ 139 (max  139)  tris 29,372
+     HERO   az 210deg  calls  117/ 117 (max  117)  tris 21,251
+     HERO   az 240deg  calls  167/ 166 (max  167)  tris 29,559
+     HERO   az 270deg  calls  158/ 158 (max  158)  tris 26,398
+     HERO   az 300deg  calls  212/ 212 (max  212)  tris 40,340
+     HERO   az 330deg  calls  200/ 200 (max  200)  tris 42,120
+     HERO   SWEEP  cheapest 117 calls at 210deg · dearest 263 calls at 0deg · vs today 93 = 2.83x worst, 1.26x best
+
+  ── POWDER  rung 0 (read back 0, pr 2, shadows true, latch false)
+     boot: world ready 13.5s from navigation start · 120 discard frames took 169s (0.71 animation fps, sandbox)
+     frames (sandbox, n=40): median 1409.4ms  p95 1513.5ms  mean 1407.7ms  min 23.3  max 2866.4
+     movers near 138u 236/388 · near 276u 353/388 · crowdGate 154
+     heap 208.4 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (15.6, 93.7) r 0.90 · spawn (15.0, 95.0) · hero (5.0, -182.5)
+     TODAY  calls 95/546 (max 546)  tris 135,786  passes 15  bloom true  shadows true  pr 2  camDist 29  void (15.6, 93.7) (attract mode is driving)
+     STAGE  az   0deg  calls 1176/ 730 (max 1176)  tris 246,468
+     STAGE  az  30deg  calls  972/1419 (max 1419)  tris 290,678
+     STAGE  az  60deg  calls 1176/ 728 (max 1176)  tris 238,510
+     STAGE  az  90deg  calls  556/ 999 (max  999)  tris 210,288
+     STAGE  az 120deg  calls  923/ 481 (max  923)  tris 197,054
+     STAGE  az 150deg  calls  428/ 865 (max  865)  tris 194,460
+     STAGE  az 180deg  calls  838/ 403 (max  838)  tris 185,784
+     STAGE  az 210deg  calls  353/ 787 (max  787)  tris 179,996
+     STAGE  az 240deg  calls  814/ 380 (max  814)  tris 187,066
+     STAGE  az 270deg  calls  205/ 637 (max  637)  tris 151,338
+     STAGE  az 300deg  calls  735/ 306 (max  735)  tris 166,194
+     STAGE  az 330deg  calls  489/ 918 (max  918)  tris 195,860
+     STAGE  SWEEP  cheapest 637 calls at 270deg · dearest 1419 calls at 30deg · vs today 546 = 2.60x worst, 1.17x best
+     HERO   standing at (5.0, -142.5) on lodge, 40u off the landmark
+     HERO   az   0deg  calls  511/ 206 (max  511)  tris 119,936
+     HERO   az  30deg  calls  161/ 466 (max  466)  tris 103,636
+     HERO   az  60deg  calls  442/ 143 (max  442)  tris 97,592
+     HERO   az  90deg  calls  114/ 418 (max  418)  tris 92,836
+     HERO   az 120deg  calls  398/  95 (max  398)  tris 88,636
+     HERO   az 150deg  calls   87/ 390 (max  390)  tris 86,714
+     HERO   az 180deg  calls  387/  84 (max  387)  tris 87,298
+     HERO   az 210deg  calls   77/ 386 (max  386)  tris 87,964
+     HERO   az 240deg  calls  406/ 104 (max  406)  tris 91,196
+     HERO   az 270deg  calls  115/ 416 (max  416)  tris 90,466
+     HERO   az 300deg  calls  422/ 121 (max  422)  tris 92,972
+     HERO   az 330deg  calls  133/ 433 (max  433)  tris 95,796
+     HERO   SWEEP  cheapest 386 calls at 210deg · dearest 511 calls at 0deg · vs today 546 = 0.94x worst, 0.71x best
+
+  ── POWDER  rung 3 (read back 3, pr 1, shadows false, latch true)
+     boot: world ready 13.6s from navigation start · 120 discard frames took 41s (2.90 animation fps, sandbox)
+     frames (sandbox, n=40): median 321.7ms  p95 609.4ms  mean 322.9ms  min 19.0  max 669.7
+     movers near 138u 240/388 · near 276u 351/388 · crowdGate 154
+     heap 206.1 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (15.5, 93.8) r 0.90 · spawn (15.0, 95.0) · hero (5.0, -182.5)
+     TODAY  calls 83/83 (max 83)  tris 24,436  passes 1  bloom false  shadows false  pr 1  camDist 29  void (15.5, 93.8) (attract mode is driving)
+     STAGE  az   0deg  calls  706/ 709 (max  709)  tris 132,914
+     STAGE  az  30deg  calls  966/ 966 (max  966)  tris 179,688
+     STAGE  az  60deg  calls  713/ 713 (max  713)  tris 125,928
+     STAGE  az  90deg  calls  550/ 550 (max  550)  tris 98,432
+     STAGE  az 120deg  calls  473/ 473 (max  473)  tris 89,702
+     STAGE  az 150deg  calls  384/ 384 (max  384)  tris 77,586
+     STAGE  az 180deg  calls  396/ 396 (max  396)  tris 80,806
+     STAGE  az 210deg  calls  315/ 316 (max  316)  tris 68,252
+     STAGE  az 240deg  calls  378/ 378 (max  378)  tris 82,132
+     STAGE  az 270deg  calls  183/ 183 (max  183)  tris 42,098
+     STAGE  az 300deg  calls  276/ 276 (max  276)  tris 55,278
+     STAGE  az 330deg  calls  501/ 502 (max  502)  tris 96,158
+     STAGE  SWEEP  cheapest 183 calls at 270deg · dearest 966 calls at 30deg · vs today 83 = 11.64x worst, 2.20x best
+     HERO   standing at (5.0, -142.5) on lodge, 40u off the landmark
+     HERO   az   0deg  calls  194/ 194 (max  194)  tris 47,280
+     HERO   az  30deg  calls  134/ 134 (max  134)  tris 25,542
+     HERO   az  60deg  calls  139/ 139 (max  139)  tris 26,526
+     HERO   az  90deg  calls   90/  89 (max   90)  tris 15,922
+     HERO   az 120deg  calls   78/  78 (max   78)  tris 13,490
+     HERO   az 150deg  calls   79/  79 (max   79)  tris 13,614
+     HERO   az 180deg  calls   64/  64 (max   64)  tris 11,440
+     HERO   az 210deg  calls   76/  75 (max   76)  tris 16,554
+     HERO   az 240deg  calls  100/ 100 (max  100)  tris 20,922
+     HERO   az 270deg  calls  109/ 109 (max  109)  tris 22,718
+     HERO   az 300deg  calls  116/ 116 (max  116)  tris 23,692
+     HERO   az 330deg  calls  126/ 126 (max  126)  tris 26,468
+     HERO   SWEEP  cheapest 64 calls at 180deg · dearest 194 calls at 0deg · vs today 83 = 2.34x worst, 0.77x best
+
+  ── SKYLARK  rung 0 (read back 0, pr 2, shadows true, latch false)
+     boot: world ready 10.2s from navigation start · 120 discard frames took 189s (0.63 animation fps, sandbox)
+     frames (sandbox, n=40): median 1525.9ms  p95 1614.7ms  mean 1518.6ms  min 1387.4  max 1732.7
+     movers near 138u 369/549 · near 276u 538/549 · crowdGate 154
+     heap 245.8 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (91.2, -13.6) r 0.90 · spawn (90.0, -12.5) · hero (5.4, -82.6)
+     TODAY  calls 137/1649 (max 1649)  tris 473,962  passes 15  bloom true  shadows true  pr 2  camDist 29  void (91.2, -13.6) (attract mode is driving)
+     STAGE  az   0deg  calls 2070/ 553 (max 2070)  tris 558,068
+     STAGE  az  30deg  calls  870/2389 (max 2389)  tris 607,286
+     STAGE  az  60deg  calls 2114/ 593 (max 2114)  tris 552,814
+     STAGE  az  90deg  calls  590/2115 (max 2115)  tris 538,066
+     STAGE  az 120deg  calls 2692/1168 (max 2692)  tris 655,200
+     STAGE  az 150deg  calls  794/2322 (max 2322)  tris 596,458
+     STAGE  az 180deg  calls 2214/ 682 (max 2214)  tris 605,010
+     STAGE  az 210deg  calls 1119/2651 (max 2651)  tris 625,420
+     STAGE  az 240deg  calls 1924/ 390 (max 1924)  tris 530,164
+     STAGE  az 270deg  calls  289/1827 (max 1827)  tris 509,092
+     STAGE  az 300deg  calls 1785/ 244 (max 1785)  tris 497,926
+     STAGE  az 330deg  calls  376/1919 (max 1919)  tris 521,528
+     STAGE  SWEEP  cheapest 1785 calls at 300deg · dearest 2692 calls at 120deg · vs today 1649 = 1.63x worst, 1.08x best
+     HERO   standing at (5.4, -42.6) on circle, 40u off the landmark
+     HERO   az   0deg  calls 1105/ 375 (max 1105)  tris 277,934
+     HERO   az  30deg  calls  387/1123 (max 1123)  tris 277,816
+     HERO   az  60deg  calls 1098/ 362 (max 1098)  tris 271,432
+     HERO   az  90deg  calls  339/1072 (max 1072)  tris 266,826
+     HERO   az 120deg  calls 1002/ 266 (max 1002)  tris 253,120
+     HERO   az 150deg  calls  280/1017 (max 1017)  tris 257,132
+     HERO   az 180deg  calls  869/ 135 (max  869)  tris 227,068
+     HERO   az 210deg  calls   79/ 811 (max  811)  tris 217,712
+     HERO   az 240deg  calls  776/  46 (max  776)  tris 211,854
+     HERO   az 270deg  calls   80/ 805 (max  805)  tris 213,930
+     HERO   az 300deg  calls  889/ 165 (max  889)  tris 229,524
+     HERO   az 330deg  calls  292/1017 (max 1017)  tris 254,160
+     HERO   SWEEP  cheapest 776 calls at 240deg · dearest 1123 calls at 30deg · vs today 1649 = 0.68x worst, 0.47x best
+
+  ── SKYLARK  rung 3 (read back 3, pr 1, shadows false, latch true)
+     boot: world ready 10.2s from navigation start · 120 discard frames took 50s (2.39 animation fps, sandbox)
+     frames (sandbox, n=40): median 375.1ms  p95 400.0ms  mean 375.7ms  min 32.2  max 762.4
+     movers near 138u 366/550 · near 276u 539/550 · crowdGate 154
+     heap 261.0 MB (sandbox; WKWebView has no performance.memory — day 15 reads Xcode's gauge)
+     void at (91.1, -13.6) r 0.90 · spawn (90.0, -12.5) · hero (5.4, -82.6)
+     TODAY  calls 137/136 (max 137)  tris 36,684  passes 1  bloom false  shadows false  pr 1  camDist 29  void (91.1, -13.6) (attract mode is driving)
+     STAGE  az   0deg  calls  474/ 474 (max  474)  tris 96,038
+     STAGE  az  30deg  calls  897/ 897 (max  897)  tris 181,052
+     STAGE  az  60deg  calls  680/ 680 (max  680)  tris 134,554
+     STAGE  az  90deg  calls  551/ 551 (max  551)  tris 88,564
+     STAGE  az 120deg  calls 1148/1151 (max 1151)  tris 210,360
+     STAGE  az 150deg  calls  823/ 822 (max  823)  tris 171,586
+     STAGE  az 180deg  calls  697/ 695 (max  697)  tris 166,658
+     STAGE  az 210deg  calls 1115/1117 (max 1117)  tris 181,942
+     STAGE  az 240deg  calls  358/ 358 (max  358)  tris 79,158
+     STAGE  az 270deg  calls  278/ 278 (max  278)  tris 64,972
+     STAGE  az 300deg  calls  218/ 218 (max  218)  tris 46,100
+     STAGE  az 330deg  calls  351/ 350 (max  351)  tris 71,546
+     STAGE  SWEEP  cheapest 218 calls at 300deg · dearest 1151 calls at 120deg · vs today 137 = 8.40x worst, 1.59x best
+     HERO   standing at (5.4, -42.6) on circle, 40u off the landmark
+     HERO   az   0deg  calls  373/ 373 (max  373)  tris 79,142
+     HERO   az  30deg  calls  381/ 381 (max  381)  tris 74,308
+     HERO   az  60deg  calls  368/ 368 (max  368)  tris 70,306
+     HERO   az  90deg  calls  340/ 340 (max  340)  tris 66,790
+     HERO   az 120deg  calls  239/ 239 (max  239)  tris 46,576
+     HERO   az 150deg  calls  260/ 260 (max  260)  tris 49,466
+     HERO   az 180deg  calls  121/ 121 (max  121)  tris 22,590
+     HERO   az 210deg  calls   45/  45 (max   45)  tris 8,322
+     HERO   az 240deg  calls   32/  32 (max   32)  tris 7,774
+     HERO   az 270deg  calls   47/  47 (max   47)  tris 8,602
+     HERO   az 300deg  calls  137/ 137 (max  137)  tris 26,084
+     HERO   az 330deg  calls  257/ 257 (max  257)  tris 48,204
+     HERO   SWEEP  cheapest 32 calls at 240deg · dearest 381 calls at 30deg · vs today 137 = 2.78x worst, 0.23x best
+
+  ── TABLE (world, rung, stage, azimuth, calls A/B, max, tris, bloom, shadows, pr) ──
+  maple    r0 today    —deg   139/ 498  max  498     184084 tris  passes 15  bloom on   shadows on   pr 2
+  maple    r0 STAGE    0deg   892/ 524  max  892     267454 tris  passes 15  bloom on   shadows on   pr 2
+  maple    r0 STAGE   30deg   489/ 868  max  868     288704 tris  passes 15  bloom on   shadows on   pr 2
+  maple    r0 STAGE   60deg   804/ 421  max  804     248998 tris  passes 15  bloom on   shadows on   pr 2
+  maple    r0 STAGE   90deg   604/ 991  max  991     283101 tris  passes 15  bloom on   shadows on   pr 2
+  maple    r0 STAGE  120deg   971/ 589  max  971     291463 tris  passes 15  bloom on   shadows on   pr 2
+  maple    r0 STAGE  150deg   577/ 955  max  955     278196 tris  passes 15  bloom on   shadows on   pr 2
+  maple    r0 STAGE  180deg   979/ 603  max  979     276415 tris  passes 15  bloom on   shadows on   pr 2
+  maple    r0 STAGE  210deg   514/ 889  max  889     270608 tris  passes 15  bloom on   shadows on   pr 2
+  maple    r0 STAGE  240deg   856/ 480  max  856     271424 tris  passes 15  bloom on   shadows on   pr 2
+  maple    r0 STAGE  270deg   425/ 808  max  808     265946 tris  passes 15  bloom on   shadows on   pr 2
+  maple    r0 STAGE  300deg   907/ 516  max  907     261958 tris  passes 15  bloom on   shadows on   pr 2
+  maple    r0 STAGE  330deg   378/ 772  max  772     238914 tris  passes 15  bloom on   shadows on   pr 2
+  maple    r3 today    —deg   119/ 120  max  120      53412 tris  passes 1  bloom off  shadows off  pr 1
+  maple    r3 STAGE    0deg   430/ 430  max  430     129570 tris  passes 1  bloom off  shadows off  pr 1
+  maple    r3 STAGE   30deg   449/ 450  max  450     159914 tris  passes 1  bloom off  shadows off  pr 1
+  maple    r3 STAGE   60deg   525/ 527  max  527     125042 tris  passes 1  bloom off  shadows off  pr 1
+  maple    r3 STAGE   90deg   536/ 535  max  536     145297 tris  passes 1  bloom off  shadows off  pr 1
+  maple    r3 STAGE  120deg   629/ 629  max  629     166049 tris  passes 1  bloom off  shadows off  pr 1
+  maple    r3 STAGE  150deg   560/ 561  max  561     152224 tris  passes 1  bloom off  shadows off  pr 1
+  maple    r3 STAGE  180deg   541/ 544  max  544     147783 tris  passes 1  bloom off  shadows off  pr 1
+  maple    r3 STAGE  210deg   481/ 482  max  482     141146 tris  passes 1  bloom off  shadows off  pr 1
+  maple    r3 STAGE  240deg   467/ 468  max  468     139112 tris  passes 1  bloom off  shadows off  pr 1
+  maple    r3 STAGE  270deg   426/ 428  max  428     138214 tris  passes 1  bloom off  shadows off  pr 1
+  maple    r3 STAGE  300deg   522/ 522  max  522     135498 tris  passes 1  bloom off  shadows off  pr 1
+  maple    r3 STAGE  330deg   401/ 401  max  401     117522 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r0 today    —deg   127/ 694  max  694     161062 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 STAGE    0deg   382/ 950  max  950     204940 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 STAGE   30deg   823/ 254  max  823     197030 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 STAGE   60deg  1290/1858  max 1858     301624 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 STAGE   90deg   795/ 228  max  795     173084 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 STAGE  120deg   140/ 709  max  709     163632 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 STAGE  150deg   688/ 118  max  688     159332 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 STAGE  180deg   112/ 680  max  680     157266 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 STAGE  210deg   692/ 124  max  692     158158 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 STAGE  240deg   261/ 825  max  825     182366 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 STAGE  270deg  1212/ 649  max 1212     232018 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 STAGE  300deg   454/1015  max 1015     207506 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 STAGE  330deg   997/ 463  max  997     217608 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 HERO     0deg   263/ 514  max  514     242464 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 HERO    30deg   555/ 304  max  555     234854 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 HERO    60deg   488/ 735  max  735     252962 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 HERO    90deg   925/ 682  max  925     259700 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 HERO   120deg   691/ 927  max  927     248708 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 HERO   150deg   739/ 508  max  739     222910 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 HERO   180deg    89/ 320  max  320     178502 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 HERO   210deg   307/  77  max  307     178824 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 HERO   240deg   320/ 100  max  320     183264 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 HERO   270deg   128/ 333  max  333     196736 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 HERO   300deg   343/ 139  max  343     202810 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r0 HERO   330deg   161/ 364  max  364     209248 tris  passes 15  bloom on   shadows on   pr 2
+  pirate   r3 today    —deg   109/ 109  max  109      27376 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 STAGE    0deg   384/ 384  max  384      75180 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 STAGE   30deg   215/ 215  max  215      57500 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 STAGE   60deg  1243/1243  max 1243     158122 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 STAGE   90deg   208/ 208  max  208      38990 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 STAGE  120deg   121/ 121  max  121      27748 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 STAGE  150deg   102/ 102  max  102      26006 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 STAGE  180deg    95/  95  max   95      23780 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 STAGE  210deg   109/ 109  max  109      24784 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 STAGE  240deg   240/ 244  max  244      50928 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 STAGE  270deg   697/ 697  max  697     113192 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 STAGE  300deg   361/ 361  max  361      60286 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 STAGE  330deg   443/ 444  max  444      84028 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 HERO     0deg   224/ 224  max  224      84122 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 HERO    30deg   274/ 274  max  274      79136 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 HERO    60deg   442/ 442  max  442      96576 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 HERO    90deg   647/ 648  max  648     102614 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 HERO   120deg   671/ 671  max  671      94068 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 HERO   150deg   482/ 482  max  482      67950 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 HERO   180deg    60/  60  max   60      23000 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 HERO   210deg    46/  46  max   46      23974 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 HERO   240deg    63/  63  max   63      27336 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 HERO   270deg    84/  84  max   84      38566 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 HERO   300deg    97/  97  max   97      45556 tris  passes 1  bloom off  shadows off  pr 1
+  pirate   r3 HERO   330deg   113/ 113  max  113      49592 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r0 today    —deg   137/1040  max 1040     301554 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 STAGE    0deg  1949/1028  max 1949     535086 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 STAGE   30deg   851/1772  max 1772     496138 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 STAGE   60deg  1643/ 723  max 1643     480958 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 STAGE   90deg   670/1591  max 1591     468064 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 STAGE  120deg  1379/ 459  max 1379     403526 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 STAGE  150deg   397/1315  max 1315     382516 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 STAGE  180deg  1273/ 358  max 1273     372612 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 STAGE  210deg   355/1271  max 1271     379512 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 STAGE  240deg   528/1443  max 1443     421196 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 STAGE  270deg  1656/ 746  max 1656     455250 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 STAGE  300deg   688/1596  max 1596     443768 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 STAGE  330deg  1797/ 885  max 1797     508596 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 HERO     0deg   295/ 516  max  516     155556 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 HERO    30deg   477/ 254  max  477     139990 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 HERO    60deg   260/ 484  max  484     141268 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 HERO    90deg   472/ 247  max  472     141674 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 HERO   120deg   225/ 450  max  450     134282 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 HERO   150deg   438/ 213  max  438     128578 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 HERO   180deg   169/ 394  max  394     112228 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 HERO   210deg   443/ 218  max  443     133196 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 HERO   240deg   254/ 479  max  479     143600 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 HERO   270deg   490/ 266  max  490     145034 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 HERO   300deg   272/ 494  max  494     144906 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r0 HERO   330deg   489/ 268  max  489     144216 tris  passes 15  bloom on   shadows on   pr 2
+  gameday  r3 today    —deg   108/ 108  max  108      31028 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 STAGE    0deg   966/ 966  max  966     250094 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 STAGE   30deg   861/ 861  max  861     235058 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 STAGE   60deg   672/ 673  max  673     201942 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 STAGE   90deg   600/ 601  max  601     182818 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 STAGE  120deg   459/ 459  max  459     139898 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 STAGE  150deg   395/ 395  max  395     118062 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 STAGE  180deg   352/ 352  max  352     108210 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 STAGE  210deg   344/ 344  max  344     114488 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 STAGE  240deg   506/ 506  max  506     153122 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 STAGE  270deg   703/ 703  max  703     180232 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 STAGE  300deg   667/ 666  max  667     178698 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 STAGE  330deg   876/ 875  max  876     242982 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 HERO     0deg   284/ 284  max  284      87862 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 HERO    30deg   243/ 243  max  243      70680 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 HERO    60deg   239/ 239  max  239      68560 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 HERO    90deg   240/ 240  max  240      72172 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 HERO   120deg   217/ 217  max  217      64372 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 HERO   150deg   199/ 199  max  199      56878 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 HERO   180deg   159/ 159  max  159      42070 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 HERO   210deg   189/ 189  max  189      58036 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 HERO   240deg   219/ 219  max  219      66974 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 HERO   270deg   230/ 230  max  230      69154 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 HERO   300deg   249/ 249  max  249      72508 tris  passes 1  bloom off  shadows off  pr 1
+  gameday  r3 HERO   330deg   261/ 261  max  261      77126 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r0 today    —deg   737/ 100  max  737     186281 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 STAGE    0deg   867/1621  max 1621     327110 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 STAGE   30deg  2034/1278  max 2034     387066 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 STAGE   60deg   937/1694  max 1694     347286 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 STAGE   90deg  1360/ 606  max 1360     299244 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 STAGE  120deg   218/ 972  max  972     233043 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 STAGE  150deg   935/ 179  max  935     228692 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 STAGE  180deg   139/ 897  max  897     221171 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 STAGE  210deg   904/ 142  max  904     220123 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 STAGE  240deg   156/ 917  max  917     220471 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 STAGE  270deg  1093/ 331  max 1093     254983 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 STAGE  300deg   629/1391  max 1391     290276 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 STAGE  330deg  1880/1117  max 1880     363386 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 HERO     0deg   273/ 941  max  941     232682 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 HERO    30deg   898/ 229  max  898     215518 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 HERO    60deg   220/ 890  max  890     215467 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 HERO    90deg   879/ 208  max  879     208691 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 HERO   120deg   191/ 861  max  861     205395 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 HERO   150deg   833/ 164  max  833     201087 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 HERO   180deg   151/ 821  max  821     200183 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 HERO   210deg   824/ 152  max  824     200017 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 HERO   240deg   179/ 849  max  849     202633 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 HERO   270deg   861/ 191  max  861     206496 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 HERO   300deg   250/ 917  max  917     218563 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r0 HERO   330deg   885/ 219  max  885     214490 tris  passes 15  bloom on   shadows on   pr 2
+  lantern  r3 today    —deg    93/  93  max   93      25625 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 STAGE    0deg   847/ 847  max  847     137410 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 STAGE   30deg  1288/1289  max 1289     205509 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 STAGE   60deg   927/ 927  max  927     155566 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 STAGE   90deg   572/ 574  max  574     108678 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 STAGE  120deg   193/ 193  max  193      41885 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 STAGE  150deg   155/ 155  max  155      37218 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 STAGE  180deg   148/ 148  max  148      37926 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 STAGE  210deg   112/ 112  max  112      26617 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 STAGE  240deg   146/ 146  max  146      32177 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 STAGE  270deg   306/ 306  max  306      62504 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 STAGE  300deg   651/ 651  max  651     106455 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 STAGE  330deg  1096/1096  max 1096     177463 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 HERO     0deg   263/ 263  max  263      63064 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 HERO    30deg   227/ 227  max  227      48924 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 HERO    60deg   211/ 209  max  211      45364 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 HERO    90deg   197/ 197  max  197      41408 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 HERO   120deg   171/ 171  max  171      35263 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 HERO   150deg   151/ 151  max  151      31570 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 HERO   180deg   139/ 139  max  139      29372 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 HERO   210deg   117/ 117  max  117      21251 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 HERO   240deg   167/ 166  max  167      29559 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 HERO   270deg   158/ 158  max  158      26398 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 HERO   300deg   212/ 212  max  212      40340 tris  passes 1  bloom off  shadows off  pr 1
+  lantern  r3 HERO   330deg   200/ 200  max  200      42120 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r0 today    —deg    95/ 546  max  546     135786 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 STAGE    0deg  1176/ 730  max 1176     246468 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 STAGE   30deg   972/1419  max 1419     290678 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 STAGE   60deg  1176/ 728  max 1176     238510 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 STAGE   90deg   556/ 999  max  999     210288 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 STAGE  120deg   923/ 481  max  923     197054 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 STAGE  150deg   428/ 865  max  865     194460 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 STAGE  180deg   838/ 403  max  838     185784 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 STAGE  210deg   353/ 787  max  787     179996 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 STAGE  240deg   814/ 380  max  814     187066 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 STAGE  270deg   205/ 637  max  637     151338 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 STAGE  300deg   735/ 306  max  735     166194 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 STAGE  330deg   489/ 918  max  918     195860 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 HERO     0deg   511/ 206  max  511     119936 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 HERO    30deg   161/ 466  max  466     103636 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 HERO    60deg   442/ 143  max  442      97592 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 HERO    90deg   114/ 418  max  418      92836 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 HERO   120deg   398/  95  max  398      88636 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 HERO   150deg    87/ 390  max  390      86714 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 HERO   180deg   387/  84  max  387      87298 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 HERO   210deg    77/ 386  max  386      87964 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 HERO   240deg   406/ 104  max  406      91196 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 HERO   270deg   115/ 416  max  416      90466 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 HERO   300deg   422/ 121  max  422      92972 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r0 HERO   330deg   133/ 433  max  433      95796 tris  passes 15  bloom on   shadows on   pr 2
+  powder   r3 today    —deg    83/  83  max   83      24436 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 STAGE    0deg   706/ 709  max  709     132914 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 STAGE   30deg   966/ 966  max  966     179688 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 STAGE   60deg   713/ 713  max  713     125928 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 STAGE   90deg   550/ 550  max  550      98432 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 STAGE  120deg   473/ 473  max  473      89702 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 STAGE  150deg   384/ 384  max  384      77586 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 STAGE  180deg   396/ 396  max  396      80806 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 STAGE  210deg   315/ 316  max  316      68252 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 STAGE  240deg   378/ 378  max  378      82132 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 STAGE  270deg   183/ 183  max  183      42098 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 STAGE  300deg   276/ 276  max  276      55278 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 STAGE  330deg   501/ 502  max  502      96158 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 HERO     0deg   194/ 194  max  194      47280 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 HERO    30deg   134/ 134  max  134      25542 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 HERO    60deg   139/ 139  max  139      26526 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 HERO    90deg    90/  89  max   90      15922 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 HERO   120deg    78/  78  max   78      13490 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 HERO   150deg    79/  79  max   79      13614 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 HERO   180deg    64/  64  max   64      11440 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 HERO   210deg    76/  75  max   76      16554 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 HERO   240deg   100/ 100  max  100      20922 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 HERO   270deg   109/ 109  max  109      22718 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 HERO   300deg   116/ 116  max  116      23692 tris  passes 1  bloom off  shadows off  pr 1
+  powder   r3 HERO   330deg   126/ 126  max  126      26468 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r0 today    —deg   137/1649  max 1649     473962 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 STAGE    0deg  2070/ 553  max 2070     558068 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 STAGE   30deg   870/2389  max 2389     607286 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 STAGE   60deg  2114/ 593  max 2114     552814 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 STAGE   90deg   590/2115  max 2115     538066 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 STAGE  120deg  2692/1168  max 2692     655200 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 STAGE  150deg   794/2322  max 2322     596458 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 STAGE  180deg  2214/ 682  max 2214     605010 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 STAGE  210deg  1119/2651  max 2651     625420 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 STAGE  240deg  1924/ 390  max 1924     530164 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 STAGE  270deg   289/1827  max 1827     509092 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 STAGE  300deg  1785/ 244  max 1785     497926 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 STAGE  330deg   376/1919  max 1919     521528 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 HERO     0deg  1105/ 375  max 1105     277934 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 HERO    30deg   387/1123  max 1123     277816 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 HERO    60deg  1098/ 362  max 1098     271432 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 HERO    90deg   339/1072  max 1072     266826 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 HERO   120deg  1002/ 266  max 1002     253120 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 HERO   150deg   280/1017  max 1017     257132 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 HERO   180deg   869/ 135  max  869     227068 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 HERO   210deg    79/ 811  max  811     217712 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 HERO   240deg   776/  46  max  776     211854 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 HERO   270deg    80/ 805  max  805     213930 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 HERO   300deg   889/ 165  max  889     229524 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r0 HERO   330deg   292/1017  max 1017     254160 tris  passes 15  bloom on   shadows on   pr 2
+  skylark  r3 today    —deg   137/ 136  max  137      36684 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 STAGE    0deg   474/ 474  max  474      96038 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 STAGE   30deg   897/ 897  max  897     181052 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 STAGE   60deg   680/ 680  max  680     134554 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 STAGE   90deg   551/ 551  max  551      88564 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 STAGE  120deg  1148/1151  max 1151     210360 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 STAGE  150deg   823/ 822  max  823     171586 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 STAGE  180deg   697/ 695  max  697     166658 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 STAGE  210deg  1115/1117  max 1117     181942 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 STAGE  240deg   358/ 358  max  358      79158 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 STAGE  270deg   278/ 278  max  278      64972 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 STAGE  300deg   218/ 218  max  218      46100 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 STAGE  330deg   351/ 350  max  351      71546 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 HERO     0deg   373/ 373  max  373      79142 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 HERO    30deg   381/ 381  max  381      74308 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 HERO    60deg   368/ 368  max  368      70306 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 HERO    90deg   340/ 340  max  340      66790 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 HERO   120deg   239/ 239  max  239      46576 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 HERO   150deg   260/ 260  max  260      49466 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 HERO   180deg   121/ 121  max  121      22590 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 HERO   210deg    45/  45  max   45       8322 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 HERO   240deg    32/  32  max   32       7774 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 HERO   270deg    47/  47  max   47       8602 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 HERO   300deg   137/ 137  max  137      26084 tris  passes 1  bloom off  shadows off  pr 1
+  skylark  r3 HERO   330deg   257/ 257  max  257      48204 tris  passes 1  bloom off  shadows off  pr 1
+
+PASS — REPORT only: 276 sampled frames, every one a single animation frame with info.autoReset off and the rung read back [4075s]

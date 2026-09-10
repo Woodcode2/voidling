@@ -5,7 +5,7 @@ file top to bottom, then **`docs/MENU-BRIEF.md`** (the stream you are most likel
 here to build), then `docs/GOVERNOR.md` rules 1–7, then `docs/FABLE-BRIEF.md`
 (instruments + traps). **Measure before you change anything.**
 
-Last updated: **2026-09-10**, at commit `17246d8` on `claude/holeio-recon`;
+Last updated: **2026-09-10**, at day 1 of the menu stream on `claude/menu-ladder-0wt288`;
 `main` (production) is at `3cf26dc`, deployed and READY.
 
 ---
@@ -327,10 +327,51 @@ The ones that matter most now:
 | the gate itself | `deadpaint` could not say PASS; `rng` had no seed; `worldlists` missed object tables; `fresh` mislabelled its FAIL |
 | probes reading the game | `firstframe` and `vary` kept five-world copies of authored data; both read it off the page now |
 
-**Next: the menu and the ladder** — `docs/MENU-BRIEF.md` draft 2, seventeen
-crew-days, §6 is the order. Day 1 is a measurement, not a pixel — and it is
-read with `renderer.info.autoReset` off, one page per rung, at the stage's own
-frustum (§9.2, §9.4 say why draft 1's day 1 would have measured the wrong frame).
+**In progress: the menu and the ladder** — `docs/MENU-BRIEF.md` draft 2,
+seventeen crew-days, §6 is the order.
+
+**Day 1 is DONE (2026-09-10): the baseline exists, in `MENU-BRIEF.md` §2.9.**
+`qa/menuframe.mjs` is the instrument; the verbatim runs are in
+`docs/crews/round-8/menuframe-day1-{menu,match}.log`. What it found, in plain
+language:
+
+- **72–92% of today's menu frame is the half-rate shadow pass**, on every
+  world. The diorama's own scene costs about **+120 draw calls**. The change
+  already written into the brief at §2.7 — shadow pass every 4th frame on the
+  menu — is worth five to twelve times what the diorama costs, so it is the
+  first thing day 9 lands and the diorama is affordable on its back.
+- **Where the camera LOOKS is the biggest authored decision in the stream.**
+  At one point, azimuth alone swings the bill 2.7x on Pirate and 11.5x on
+  Lantern at rung 3. `a0` must be authored per world off the day-1 series.
+- **The costly place is the SPAWN point, not the low camera.** At the framing
+  §2.3 asks for, the menu gets CHEAPER than today's on four of five worlds
+  (Game Day 0.38–0.50x, Skylark 0.47–0.68x, Powder 0.71–0.94x).
+- **A number in the source was wrong and is now annotated.**
+  `prototype3d.ts:10613` says the opening frame is 4,694 draw calls / 1.40M
+  triangles. Re-taken: Game Day's opening is **337 / 221k** — the shadows-off
+  line beneath that comment is the fix the comment describes. The frame that
+  costs ~4,694 today is late play at r 12 (Game Day 4,978, Lantern 6,436).
+  **This matters downstream:** §2.8.3's bar was to be set against "the
+  in-match r=12 pair" believing that to be ~1,241; it is 2,280–6,436, so the
+  bar as written does not bite and day 9 must re-set it.
+
+Day 1's two guards also landed, each failed first on a build without them:
+`pickerfit` now FAILS on a picker short of `ALL_WORLDS.length` cards (the old
+probe prints "PASS — ... all 5 world cards" on a build with Skylark's card
+deleted), and `firstframe` FAILS on a missing `#menu` selector instead of
+silently skipping it.
+
+**Next: day 2** — `qa/pace.mjs` on six worlds, the CLEAR numbers, the first
+shadowless frame's ms, and Maple's stage (its `hero` is null, so day 1 could
+not frame it; §2.9.7).
+
+**HARNESS, read this before running anything:** the repo declares neither
+`playwright` nor `pngjs`, and `qa/` imports both — so on a fresh container the
+gate aborts with `ERR_MODULE_NOT_FOUND` and 4 of 35 steps read as red for the
+wrong reason. Link them into `artifacts/3d-game/node_modules` (playwright lives
+at `/opt/node22/lib/node_modules/playwright`; `npm pack pngjs` and unpack).
+**Declaring both as devDependencies of `artifacts/3d-game` is a one-line fix
+nobody has made and it costs every fresh session an hour.**
 
 **Open small items** (task list): `firstframe`'s title-card check asserts a
 contract the game deliberately dropped (fails on all six; needs a design
