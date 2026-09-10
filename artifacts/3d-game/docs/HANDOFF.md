@@ -15,8 +15,12 @@ Last updated: **2026-09-10**, at commit `17246d8` on `claude/holeio-recon`;
 The owner's current ask (2026-09-10): *"the menu is still the same looking … plan
 an exceptional menu … each level had different goals … making our splash image
 alive … 3 choices."* The plan exists and is grounded: **`docs/MENU-BRIEF.md`**,
-with the round's verbatim evidence in `docs/crews/round-8/`. It is one stream,
-sixteen crew-days, each day ending with the push gate green.
+with the round's verbatim evidence in `docs/crews/round-8/` (readers, concepts,
+judges, and the four skeptic verdicts). It is one stream, seventeen crew-days,
+each day ending with the push gate green. **Read the brief's §9 before §3–§5:**
+draft 1 was killed by the child's lens (it gated a dot on a WIN) and draft 2 is
+built on **finish advances, win decorates** — every bar in the brief is already
+corrected, and §9 keeps the old bar beside the new one.
 
 **How the work is done here (the operating model that produced the last nine
 commits):** the governor writes the brief with numbered bars and file:line
@@ -323,8 +327,10 @@ The ones that matter most now:
 | the gate itself | `deadpaint` could not say PASS; `rng` had no seed; `worldlists` missed object tables; `fresh` mislabelled its FAIL |
 | probes reading the game | `firstframe` and `vary` kept five-world copies of authored data; both read it off the page now |
 
-**Next: the menu and the ladder** — `docs/MENU-BRIEF.md`, sixteen crew-days,
-§6 is the order. Day 1 is a measurement, not a pixel.
+**Next: the menu and the ladder** — `docs/MENU-BRIEF.md` draft 2, seventeen
+crew-days, §6 is the order. Day 1 is a measurement, not a pixel — and it is
+read with `renderer.info.autoReset` off, one page per rung, at the stage's own
+frustum (§9.2, §9.4 say why draft 1's day 1 would have measured the wrong frame).
 
 **Open small items** (task list): `firstframe`'s title-card check asserts a
 contract the game deliberately dropped (fails on all six; needs a design
@@ -336,10 +342,14 @@ first-glance review of all six worlds' establishing shots; the art pass.
 
 ## 9. Open decisions — the owner's
 
-- The twelve in `docs/MENU-BRIEF.md` §8 (unlock strictness, Skylark's landmark,
-  what 100% means, BY MYSELF on the RIVALS level, prices on the SHOP tab, menu
-  sound, chrome-first boot, ground brightness, the child's three numbers, EAT
-  numbers, water on Maple, the fallback if the phone misses 16.7 ms).
+- The thirteen in `docs/MENU-BRIEF.md` §8. The first is the spine — does a dot
+  open the next by FINISHING it (recommended, strongly) or by WINNING it — and
+  the owner's 2026-09-06 "the clock running out fails it" still holds for the
+  level result either way. Then: Skylark's landmark, what the star means,
+  BY MYSELF on the RIVALS level, the SHOP shield (decided as a bar, open to
+  overrule), menu sound, chrome-first boot, ground brightness, the child's four
+  numbers, EAT numbers, water on Maple, the two-phone fallback, and the daily
+  calendar moving off the path to PLAY.
 - Kids Category vs regular 4+ listing (recommendation given: regular 4+; not
   confirmed).
 - Whether Lantern's greeting act stays.
@@ -375,7 +385,8 @@ Paste this, verbatim, as the first message of the build session:
 > the old build first → fix → probe passes → push gate green → commit with the
 > attribution trailer the harness gives you (no model identifiers anywhere in
 > the repo) → report the numbers, before → after, in plain language. When you
-> reach any of the twelve §8 decisions, stop and put it to the owner with the
-> governor's recommendation; do not choose for him. Never merge to `main`
+> reach any of the thirteen §8 decisions, stop and put it to the owner with the
+> governor's recommendation; do not choose for him — §8.1 (finish advances) is
+> the one to confirm before day 3, since `levels.ts` is built on it. Never merge to `main`
 > without the push profile green. If a number you wrote turns out wrong, say so
 > in your next reply and in the file that carried it.

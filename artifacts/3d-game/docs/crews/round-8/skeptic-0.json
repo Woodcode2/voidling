@@ -1,0 +1,103 @@
+{
+ "lens": "THE CHILD, aged six, who cannot read: one tap to play without reading; do five pips and a goal card make sense to her; does a FAIL on a timed goal punish her; does anything look like a paywall or a timer",
+ "refutations": [
+  {
+   "claim_or_bar": "§0.6 / §3.2 / §4.3 — 'The clock running out is NOT YET, never a punishment ... the third miss opens the next dot too.' Fail-forward at n>=3 keeps 'never a wall'.",
+   "refuted": true,
+   "severity": "blocks",
+   "why": "This build has one standing rule for this child and the plan breaks it three times per world. src/game/unlocks.ts:9-16 rejects WIN as a gate in so many words ('a six-year-old who cannot come first would be locked out ... the one thing this build has never done is punish a child for being small'). Today FINISHING advances her; the plan makes the green dot move only on a WIN, and a miss costs three full 3-minute matches (9 minutes of NOT YET) before the ladder lets her past. Dot 3 LANDMARK is a pace wall by the code's own admission: prototype3d.ts:1529-1531 'A weaker player simply never reaches r5.86 and the cue never fires', and worlds 2-5 land the hero only in the finale surge (:1553-1555). Dot 4 RIVALS needs myRank===1; the rivals' floor is 'never below 3rd' (rivals.ts:256, :701, :788) — first place is not floored, and the autopilot child wins 3/5 on Maple and Powder (WORLD_PAR :551, :556). Dot 5 CLEAR 100% is measured in single digits (:5462-5466) — a green dot that never moves. So on every world the small child meets three dots she cannot pass by being small, each costing nine minutes of a word she cannot read.",
+   "evidence": "src/game/unlocks.ts:5-16; src/prototype3d.ts:1529-1531, :1553-1555, :5462-5466, :551-556; src/proto3d/rivals.ts:256, :701, :788; plan §3.2 (n>=3), §3.4 (LANDMARK R needed per world), §4.3",
+   "fix": "FINISH advances, WIN decorates. Any finished match on the current dot marks it done and moves the green ring on (as completeWorld does between worlds today); a goal met inside the clock is the on-the-spot win with the ceremony, and the pip gets its tick/star only when the goal was actually met (grey-with-outline 'finished, not yet earned' otherwise, earnable on replay). Fail-forward at n>=3 becomes fail-forward at n>=1. If the owner insists on win-gated dots, dots 3/4/5 must be optional marks beside the row, not steps in it, and levels.mjs (b) must assert a 'weak run' seed (autopilot at half speed) reaches dot 5 of every world in <= 5 finishes."
+  },
+  {
+   "claim_or_bar": "§4.2 / §4.7 bar 3 — the timer chip, the 35 s red warning and the ten-second countdown stay as today; only #goal is added.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "The lens asks whether anything looks like a timer. Today the ending ritual — red timer at 35 s, announce('⏰ 35 SECONDS — EAT FASTER!!'), a 150 px numeral per second turning hot red at 3 with a rising-pitch tick (:9650-9679) — closes a match in which finishing IS progress, so it is a party-game bell. Under the plan the buzzer is a miss on four of five dots, so the identical ritual becomes the countdown to losing: the child cannot read 'EAT FASTER!!' but she can see a giant red 3-2-1 and hear the pitch climb toward the moment the green dot fails to move. That is the doom clock the standing constraint forbids, and the plan's no-emoji bar (1.3.7) does not even cover #banner, so the ⏰ stays too.",
+   "evidence": "src/prototype3d.ts:9650-9679 (timerEl color '#ff8a8a', announce with ⏰, #count 'hot' class at cs<=3, audio.pop(11-cs) rising); index.html:364-370 (#count 150px, .hot red); plan §4.2, §4.3, bar 1.3.7 container list",
+   "fix": "On goal levels the last-ten ritual keys on goal state: goal met → no countdown (the win ceremony already fired); goal unmet → the numerals stay gold (no .hot), the tick pitch is flat, and the 35 s banner is dropped or replaced by the goal sprite pulsing once. Add to levels.mjs (c): with ?len=15 and the goal unmet, #count never gains 'hot' and no #banner text contains a countdown instruction; extend bar 1.3.7's container list to #banner and #count."
+  },
+  {
+   "claim_or_bar": "§4.7 bar 1 / §5.1 bar 5 — 'Taps to play = 1 on /?manual=1 ... after one click on #btnPlay, armed === true.'",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "The bar is blind to the screen the child actually sees on a new day. The daily calendar (#daily, z45, full-screen) rises at module init whenever voidDailyLast !== today and the menu is visible (:7967, :8083-8084), and the plan keeps it (§1.2 '#daily stays'). 383 probe files seed voidDailyLast = today (qa/opening.mjs:242, qa/smoke.mjs:71) precisely so it never appears under Playwright, so the bar will print 1 while the six-year-old on her second day meets a modal with a text button 'CLAIM 90✦' (:8049) before PLAY exists — her real path is CLAIM-or-backdrop, then PLAY: two taps, and the first tap is on words and a coin number.",
+   "evidence": "src/prototype3d.ts:7967, :8049, :8083-8084; qa/opening.mjs:242; qa/smoke.mjs:71; grep count 383 files seeding voidDailyLast; plan §1.2 (#daily row), §5.1 row 5",
+   "fix": "Run bar 5 twice: once with voidDailyLast seeded to today and once seeded to yesterday. Both must read 1 tap to armed. To make the stale case pass, either the PLAY tap claims the day silently and launches (the coins count up on the end card, where the ceremony already lives), or the calendar moves to the end card after the match. The 'CLAIM' button must not be the first thing a non-reader is asked to press."
+  },
+  {
+   "claim_or_bar": "§1.1 band F / §8.5 — SHOP is a tab one thumb from PLAY, same size and hue weight as HOME and SCRAPBOOK; whether to show the cash tier is left as an open decision for the owner.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "Under this lens it is not open. The shop paints a dollar figure on every cash card (pr.textContent = iapPrice(...) ?? `$${s.cash.toFixed(2)}`, :8345-8347) under a gold '✨ LEGENDARY — A WHOLE NEW CHARACTER' header (:8396), and the end card keeps an OPEN SHOP door on every non-unlock match (§4.4 step 5, :5539-5563). A 132×96 px tab with a hat sprite beside the void's own face, leading to a dollar sign, is exactly the paywall shape the lens forbids, and the grown-up gate (:8160-8172) only fires at purchase, i.e. after she has already been shown the price and tapped it.",
+   "evidence": "src/prototype3d.ts:8345-8347, :8396, :8160-8172, :5539-5563; plan §1.1 band F, §4.4 step 5, §8.5",
+   "fix": "Make the governor's own recommendation a bar in qa/menu.mjs, not a question: with no grown-up gate passed this session, zero text nodes matching /[$€£]|\\d,\\d\\d/ are visible inside #shop, and the LEGENDARY tier is not rendered at all (an 'ask a grown-up' row in its place). The end card's OPEN SHOP door is shown only when a coin skin is affordable (its existing 'can' state, :8335-8336), never as the default next-thing."
+  },
+  {
+   "claim_or_bar": "§3.3 — tapping a locked pip: wiggle, padlock jiggle, one low pop, buzz(12), and 'the void does a scared blink (rig API)'.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "The one creature she loves, frightened, the instant she touches a padlock. A six-year-old reads that as 'I hurt him / I did something wrong', not 'later'. The rig's 'scared' mood (void3d.ts MOODS :1348-1408) is the match's hurt/threat face; using it as UI error feedback turns every stray tap on the ladder into a small punishment delivered through the character, on the same screen the plan asks to be safe to touch anywhere (§2.6 'the whole window is his hit area').",
+   "evidence": "plan §3.3 'Taps: ... locked = ... the void does a scared blink'; src/proto3d/void3d.ts:1348-1408 (MOODS table, 'scared' is the threat face); plan §2.6",
+   "fix": "On a locked tap the void looks at the padlock and does the 'smug' or 'sleepy' beat (a yawn or a shrug), never 'scared'. Add to menu.mjs bar 19: after a locked tap, voidling.faceState() is never 'scared' or 'hurt' for 2 s."
+  },
+  {
+   "claim_or_bar": "§4.4 steps 1-2 and bar 4.7.5 — #endHd leads with the word ('LEVEL 3 ✓', 'NOT YET', '#2 · NOT YET'), then #endPips flips within 400 ms, caption 'LEVEL 8 OF 30'; bar: pip class set before the first .endCnt mutation.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "The first thing on the one screen that tells her how she did is a word she cannot read, and on a miss it is a word with no picture at all. The plan's own promise for the menu is 'pictures of the goal, not numbers' (§0.3), then the end card opens with text. Today's loss headline is at least paired with a placement number and the coin count-up; 'NOT YET' alone is a blank to her. Bar 4.7.5 orders the pip before the coin count, but not before the headline, so the word wins the first 400 ms.",
+   "evidence": "plan §4.4 steps 1-2, §4.7 bar 5; src/prototype3d.ts:5433-5435 (today's headline is placement + title); index.html:2230 (#endHd is the first child of #endScroll)",
+   "fix": "On goal levels #endHd is the pip itself, big (the goal sprite with its state: green→grey flip on a win, green with a 'keep going' arrow on a miss, the padlock popping on fail-forward), and the word sits under it at 12 px for dad. Re-order bar 4.7.5: the pip element is visible (opacity 1) before any #endHd text node is."
+  },
+  {
+   "claim_or_bar": "§3.2 'the skipped pip stays green-and-open and can still be earned' vs §3.5 bar 1 / §5.1 bar 9 'exactly one current'.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "The two statements contradict, and the contradiction lands on the child: after a fail-forward she would have two big green dots (the skipped one 'green-and-open' and the newly opened one 'current'). Big green means 'this one is mine' and there can only be one of it for a non-reader; the bar says one, the rule says two.",
+   "evidence": "plan §3.2 (fail-forward text), §3.5 bar 1, §5.1 row 9",
+   "fix": "Define a fifth pip state for a skipped-but-earnable dot (grey with a thin green outline, 44 px, no ring) and assert in levels.mjs (a) that after fail-forward exactly one pip is 57 px and 'current' and the skipped one is that fifth state. Under 'finish advances' (fix 1) the state is simply 'done without the star', and the contradiction disappears."
+  },
+  {
+   "claim_or_bar": "§4.6 / §3.4 — the first-ever session auto-plays Maple with no menu (:6560-6562), and is therefore level maple/1 EAT 48,000 with the goal card 'EAT 48,000 OF THE TOWN' over the hand tutorial.",
+   "refuted": true,
+   "severity": "note",
+   "why": "Her very first match becomes a pass/fail level she was never told about, with a five-digit target derived from 0.6 × a par measured on the autopilot 'child' (WORLD_PAR :551 'verified: mean 103,642' is a bot mean, not a six-year-old's), under a tutorial hand (:10336). If she misses, the first result screen the game ever gives her is a miss (§4.6 concedes pip 1 may be 'green if not'). Today her first result is a placement with coins.",
+   "evidence": "src/prototype3d.ts:6560-6562, :551-558 (par provenance), :10336; plan §3.4 Maple row, §4.6",
+   "fix": "Session 1 is a finish-wins level (dot 1 done on any finish, the goal card is the world's own sub line as today); or the day-15 protocol must include 'does she clear dot 1 on her first run' as a bar before any EAT N is authored, and the goal card is suppressed while the hand tutorial is up."
+  },
+  {
+   "claim_or_bar": "§4.2 EAT chip '31,200 / 48,000 with a 4 px fill'; SET '40 SNACKS · 8 CARS · 5 HOUSES' counting down; goal-card line ≤ 6 words.",
+   "refuted": true,
+   "severity": "note",
+   "why": "Five-digit scores and a 40-count are not quantities a six-year-old holds; the only thing she can read in a scramble is a fill that visibly grows and a sprite that turns into a tick. A 4 px fill under a thumb is invisible; the plan's SET ticks are the right read but 40 snacks is a long time before the first tick appears.",
+   "evidence": "plan §4.2 (4 px fill), §3.4 SET triples (snack 40 on every world), §4.1 goal-card copy",
+   "fix": "Fill ≥ 8 px or fill the pip sprite itself; order the SET kinds so the smallest count ticks first (houses 5 before snacks 40) so she sees a tick inside the first minute; measure on day 15 whether she can say which chip is 'hers'."
+  },
+  {
+   "claim_or_bar": "§3.3 pip states — five states in four colours plus tick/star/padlock; magenta 'clear' reserved for a true 100%.",
+   "refuted": false,
+   "severity": "note",
+   "why": "Three of the states are readable without words (big green = mine, padlock = later, tick = done), which is what she needs. But magenta is reserved for a result measured in single digits (:5462-5466), so it is a colour she will never see — a reward that does not exist is not a reward, and a star she cannot get beside a tick she can is a small, permanent 'not good enough'.",
+   "evidence": "plan §3.3 table, §8.3; src/prototype3d.ts:5462-5466",
+   "fix": "Give magenta a reachable meaning per world (the p90-of-strong-runs number from §8.3, or 'goal met inside the clock' vs 'finished') so a good run can earn the star; keep the true-100 as a hidden extra if the owner wants it."
+  },
+  {
+   "claim_or_bar": "§1.1 band C / §2.6 — the whole window is the chomp hit surface; the season pennant #eventRibbon hangs inside the window with its existing tap handler that reloads into another world.",
+   "refuted": true,
+   "severity": "note",
+   "why": "A picture in the tap-to-chomp window that instead throws her into a page reload and a different world is the one tap on this screen that does something other than make him chomp; a 44 px pennant at the window's corner is inside a six-year-old's chomp reach. The child cannot read the date on it, so it is a picture, and pictures in the window make him chomp.",
+   "evidence": "plan §1.1 band C ('Nothing else may sit inside the window' except the pennant), §2.6; src/prototype3d.ts:6791-6795 (ribbon tap → voidWorld + voidAutoPlay + location.href)",
+   "fix": "Hang the pennant in band B beside the world chip, outside the chomp surface; or count it in the day-15 mis-tap protocol explicitly."
+  },
+  {
+   "claim_or_bar": "§8.4 — BY MYSELF greys on dot 4; RIVALS always deals the family.",
+   "refuted": false,
+   "severity": "note",
+   "why": "'BY MYSELF' is a text chip she cannot read; if a grown-up set solo for her, dot 4 silently forces the family on and requires her to beat them (see refutation 1). Acceptable only under 'finish advances'.",
+   "evidence": "plan §8.4; src/prototype3d.ts:6547-6556 (voidSolo toggle)",
+   "fix": "Under fix 1 nothing further; otherwise dot 4 in solo mode is 'finish a family match' with the tick for placing."
+  }
+ ],
+ "verdict": "KILLED",
+ "the_one_thing_that_would_sink_it": "The ladder makes WIN the gate on three of five dots per world — LANDMARK lands only in the last 30 s of a good run and never for a weak one (prototype3d.ts:1529-1531, :1553-1555), RIVALS needs a first place the rubber band does not floor (rivals.ts:256), CLEAR needs a 100% measured in single digits (:5462-5466) — so a small six-year-old sits nine minutes on 'NOT YET' at each of them while a red countdown she cannot read counts her down; unlocks.ts:9-16 names this exact design as the one thing the build has never done to a child. Finish must advance and win must decorate, or the plan cannot ship."
+}

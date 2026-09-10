@@ -1,0 +1,135 @@
+{
+ "lens": "PERFORMANCE on a four-year-old iPhone (tier B, AAA-BRIEF.md:898 iPhone 11/SE2): does the live diorama plus a menu hold 16.7 ms; is the freeze list complete; does createIsland at boot delay first paint; is the menu rung real or asserted",
+ "refutations": [
+  {
+   "claim_or_bar": "§0.1 / §2 'Nothing new is rendered; a hole is cut in the curtain' — the diorama costs nothing because the scene already renders behind the opaque menu",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "What renders behind today's menu is the SPAWN frame, not the diorama frame. On the boot menu the match camera branch runs with armed=false: targetDist = PLAY_DIST (29) at R 0.9 and camDist lerps 50→29 along camOffset (0.62,0.92,0.62) — a 46° downward pitch whose top edge sits 30–50° below the horizon, so the frustum ends ~36 units ahead. The plan's stage (height 9, look-at 2 units above ground ~20 units ahead) pitches ~19° down; with a 32° vertical FOV the top edge is ~3° below the horizon, camera.far is 1000 and nothing is far-culled — a horizon-level wedge to the island's rim, the frame class the intro measured at 4,694 calls. Same scene, different frustum; the cost is unknown, and 'costs nothing' is an assertion the plan's own day-1 series exists to test.",
+   "evidence": "src/prototype3d.ts:686 `const camOffset = new THREE.Vector3(0.62, 0.92, 0.62).normalize()`; :750 `const PLAY_DIST = 29`; :663-665 camera far 1000 and 'top edge sits 30-50 degrees BELOW the horizon'; :10495 targetDist; :10496-10500 the 4,694 / 1,241 draw-call comparison; :10949-10956 unconditional render",
+   "fix": "Day-1 baseline must print, per world, draw calls / triangles / moverStats for the STAGE frustum at menuDist=22 across the a0 sweep (the plan lists this) AND for today's parked spawn frame, and label which is 'today'. Strike 'costs nothing' from §0 until the two numbers are side by side; keep bar 2.8.3 (≤1.3× in-match) as the gate."
+  },
+  {
+   "claim_or_bar": "§2.8 bar 4: 'menu frame ≤ 16.7 ms median … on the owner's reference phone'",
+   "refuted": true,
+   "severity": "blocks",
+   "why": "Two defects. (1) In the Capacitor shell WKWebView is capped at 60 Hz (no CADisableMinimumFrameDurationOnPhone), so a rAF interval is quantised to ~16.7 or ~33.3 ms; a MEDIAN ≤ 16.7 passes with up to 49% of frames dropped — the bar cannot distinguish a smooth menu from one that stutters every other frame. (2) The four-year-old iPhone the lens asks about (tier B) appears nowhere in the plan: the only device is 'the owner's reference phone', and the tier table's 60-fps-with-dips target for tier B is never bound to the menu. As written the plan can go green on an iPhone 15 and ship a 30-fps menu on an iPhone 11.",
+   "evidence": "docs/STUDIO-ROUND-3.md:1888 (WKWebView 60 Hz cap); src/prototype3d.ts:9476-9477 dtRaw = clock.getDelta() (rAF interval); :10911-10913 the in-match adapter uses fps = N/ΣdtRaw over ≥4 s, not a median; docs/AAA-BRIEF.md:897-899 tiers A/B/C; the plan §2.8 bar 4 and §6 day 15 name one phone",
+   "fix": "Bar 4 becomes: over 600 rendered frames, fps = N/ΣdtRaw ≥ 57 AND frames > 20 ms ≤ 3% AND p95 ≤ 17.5 ms, on a named tier-B device (iPhone 11 or SE2) as well as the owner's phone; record both rows. Without a tier-B row the menu ships with an unknown cost on the lens device."
+  },
+  {
+   "claim_or_bar": "§2.7 menu-only degrade trigger: 'if the in-page median dtRaw over the last 120 frames exceeds 17 ms → step 1 …'",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "Same quantisation: on a vsynced 60 Hz device the median only exceeds 17 ms once MORE THAN HALF the frames miss vsync, i.e. the ladder engages at ≈40 fps and below. A menu dropping every third frame (45 fps, visibly janky) never degrades. The shipped adapter already knows this — it demotes on a mean of 46 fps.",
+   "evidence": "src/prototype3d.ts:10911-10914 `qAccT += dtRaw; qAccN++ … avg = qAccN / qAccT; if (avg < 46 …) qLevel++`; :10908-10910 the task-#40 note on why the sample must be unclamped wall time",
+   "fix": "Trigger on fps = N/ΣdtRaw < 55 over a 2 s window (rendered frames only — exclude frames the idle tier skipped and the first frame after a visibility resume, whose getDelta is seconds long); climb back on > 58 after 10 s, mirroring :10914-10921."
+  },
+  {
+   "claim_or_bar": "§2.8 bar 2 / menu.mjs bar 6: 'frame ratio menu/match ≤ 1.15, same page, same rung'",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "The rung is the same but the pixel ratio is not: the menu rung sets DPR 1.5 (rung ≤1) or 1.3 while the match at rung 0 renders at 2.0. Under swiftshader the frame is fill-bound, so the menu is measured at ~56% of the match's pixels (1.5²/2²) — a menu with twice the draw calls of the match can still read ≤ 1.15. The bar is flattered by the very setting it is meant to validate.",
+   "evidence": "src/prototype3d.ts:142-143 PR_TOP = 2; :1265 QUALITY[0].pr 2.0; :1315 setPixelRatio pattern; plan §2.7 'renderer.setPixelRatio(Math.min(devicePixelRatio, qLevel <= 1 ? 1.5 : 1.3))'",
+   "fix": "Measure the ratio with the pixel ratio pinned equal on both sides (a QA hook that forces renderer.setPixelRatio(1) for the sample), and print three numbers per side: JS ms (animate() minus render), draw calls, triangles. The 1.15 bar applies to each of JS ms and draw calls separately."
+  },
+  {
+   "claim_or_bar": "§2.2 step 6 / §2.7: bloomOn=false applied before the first animate(); DPR and bloom restored at introT <= 0 'not on the tap' (judge 2)",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "Today ensureComposer() runs on frame 1 under the boot cover because bloomOn starts true. With bloomOn=false before the first animate, the composer is never constructed until bloom returns — at introT <= 0, the controls-live frame. That frame then pays: UnrealBloomPass construction (bright target + 5 mip pairs + ~12 program compiles) + OutputPass compile + renderer.setSize reallocation from the DPR change + the shadow re-enable. That is exactly the frame qa/opening.mjs A4 samples (touch → move within 8 frames) and the first frame a child steers. Judge 2's double-flip concern was about shadows; the plan already leaves shadows alone on the menu, so restoring DPR/bloom on the tap double-flips nothing.",
+   "evidence": "src/prototype3d.ts:1303 `let bloomOn = QUALITY[0].bloom`; :159-162 ensureComposer builds lazily on first call; :10949-10953 `if (bloomOn) { const c = ensureComposer(); … }`; :10505-10510 introShadow restore at introT <= 0; :10510 controlsLive = true on the same frame",
+   "fix": "Under the boot cover, before applying the menu rung: ensureComposer(); one warm c.render(). Restore DPR + bloomOn in beginMatch (the tap frame, which no probe samples and which already snaps the camera) so the intro renders at match settings and the composer's targets are sized once; if the intro's 4,694-call frame at DPR 2 is the worry, restore DPR at introT <= 0.3 and bloom at the tap."
+  },
+  {
+   "claim_or_bar": "§2.2 step 4: 'from HOME/quit only, start the 900 ms camera ease from wherever the match camera is into the parked orbit'",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "At the whistle the match camera can sit at camDist up to 340, 46° down over most of the plateau; step 1 (restoreIsland) puts every eaten prop back on the same frame; the ease then sweeps a whole-island frame down to ground level with shadows ON (§2.7 leaves shadows 'whatever the renderer already has'). The intro turns shadows off for precisely this frame because it measured 4,694 calls / 1.40 M tris. The plan's bar 3 names the ease path but the design guarantees it is the most expensive 54 frames of the session on the dense worlds.",
+   "evidence": "src/prototype3d.ts:10495 `Math.min(340, …)`; :10496-10509 intro shadow-off rationale and toggle; :7620-7640 resetMatch's full-population restore; index.html:708-710 #end blur(8px) over the world",
+   "fix": "Either hard-cut to the parked stage behind the end card (the card's 82% ground + 8 px blur hides the cut) or run the ease with the intro's shadow toggle (programs cached after the first intro) and bloom off, and sample bar 3 at every frame of the ease on Game Day and Lantern."
+  },
+  {
+   "claim_or_bar": "§2.7: shadows-off step uses 'the intro's toggle … which the game already pays every match'",
+   "refuted": true,
+   "severity": "note",
+   "why": "three 0.185 rebuilds a material's program when lights.state.version changes (sun.castShadow flips the numDirectionalShadows hash) and shadowMapEnabled is a program-cache parameter, so the first toggle compiles the ~45 shadowless programs ONCE per session (cached after) — not every match. AUDIT :316 already places that stall at the first intro's start. Moving step 2 onto the menu moves a ~1.7 s freeze into the menu of exactly the phones that trigger step 2, and renderer.compile() with shadows on does NOT pre-warm that set.",
+   "evidence": "node_modules/three/build/three.module.js:18386 `if (materialProperties.needsLights && (materialProperties.lightsStateVersion !== lights.state.version)) needsProgramChange = true`; :8810/:8848 numDirectionalShadows in the lights hash → state.version++; :7732 `shadowMapEnabled: renderer.shadowMap.enabled && shadows.length > 0`; :17481 compileAsync (KHR_parallel_shader_compile); src/prototype3d.ts:1338-1341 measured 1,677 ms; docs/AUDIT-2026-08-23.md:316",
+   "fix": "Pre-warm under the cover: flip shadowMap.enabled=false + sun.castShadow=false, await renderer.compileAsync(scene, camera), flip back — both variants are then in the program cache. Day 2's 'first shadow-toggle recompile check' must measure ms of the first shadowless FRAME, not of the toggle call."
+  },
+  {
+   "claim_or_bar": "§2.8 bar 1: baseline 'per world, rung 0 and rung 3 (__pinQuality)'",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "__pinQuality(3) calls applyQuality with shadows:false → qShadowLatch=true (one-way) and every material invalidated; on the same page every later sample is shadowless and the sample window straddles a 1,677 ms rebuild. A rung-0-then-rung-3 sweep on one page is a reading from a rung nobody chose — the exact failure the pin hook's own comment records.",
+   "evidence": "src/prototype3d.ts:2255-2258 __pinQuality → applyQuality; :1334-1353 wantShadows / qShadowLatch; :2250-2254 'a shadow-cost sweep came back with rows reading a 0% saving … the ladder having already switched them off'",
+   "fix": "One page per rung; pin via addInitScript before the first frame; discard the first 120 frames after any pin; print the rung read back from __quality() beside every row."
+  },
+  {
+   "claim_or_bar": "§2.7 freeze list is complete: attract mode, rivals, bubbles, fadeOccluders, refreshHud, the eat loop frozen; island/voidling/life/curios kept",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "Two frame costs are missing. (a) The shadow pass re-renders the 2048² map every other frame (needsUpdate at :10946) although on the stage nothing moves but the crowd — the void is parked, sun.position is static. (b) Every overlay a child opens from the menu (#shop, .metaScr, #daily, #settings, #book) carries backdrop-filter blur 6–8 px; today they blur a static opaque menu, after the change they blur a live DPR-2 canvas every frame, and body.ovl freezes nothing in the render loop. The diorama keeps rendering at full cost under a sheet that hides it — the 'invisible work' STUDIO-ROUND-2 already named for the pause sheet.",
+   "evidence": "src/prototype3d.ts:10946 `if ((shadowFrame++ & 1) === 0) renderer.shadowMap.needsUpdate = true`; :144 autoUpdate=false; index.html:1589 #shop blur(8px), :1552 .metaScr blur(8px), :1137 #daily blur(6px), :1512 #settings blur(6px); src/prototype3d.ts:2347-2354 OVERLAYS → body.ovl only toggles a class; docs/STUDIO-ROUND-2-BOARD.md:1892",
+   "fix": "On the menu: shadowMap.needsUpdate every 4th frame (or only when a mover is inside the 45-unit shadow box); while body.ovl is set on the menu, drop to the idle tier or stop rendering entirely and thaw on close. Add both to menu.mjs bar 14 (frame counter flat while #shop.show)."
+  },
+  {
+   "claim_or_bar": "§2.7 idle tiers: '20 s without input → render every second frame; 3 min → every fourth'",
+   "refuted": true,
+   "severity": "note",
+   "why": "Skipping renderer.render halves only the render half. On a CPU-bound tier-B phone the JS sim still runs every rAF: life.update over ~966 Lantern walkers (stagger bands, fast movers exempt), voidling.update, island.update, curios, the 2 s music watchdog. And the tier is the wrong default for tier B: a child watching and tapping the void keeps a 60 fps horizon-level render for minutes; the pendulum at 0.039°/frame is invisible at 30 fps.",
+   "evidence": "src/proto3d/life.ts:6813-6816 ('~966 walkers'), :6852-6864 bands, :369-374 fast movers exempt; src/prototype3d.ts:9486-9487, :10246, :10281; plan §2.4 peak 0.039°/frame",
+   "fix": "On idle tiers advance the sim at the same cadence with doubled dt (the stagger already does this per band); on rung ≥ 2 render the menu at every second rAF from entry, not after 20 s, and set bar 3's px/frame at that cadence."
+  },
+  {
+   "claim_or_bar": "§2.7 'document.hidden → no render; one visibility handler … hidden and menuMode → stop the rAF; visible → resume'",
+   "refuted": false,
+   "severity": "note",
+   "why": "Not wrong, but mostly already true: WKWebView suspends rAF when backgrounded, so bar 2.8.8 measures only Chromium with an overridden document.hidden. The real hazard is the resume frame: clock.getDelta() returns the seconds away; dt clamps to 0.05 but dtRaw does not, and the plan's degrade sampler and the perf ring buffer would ingest a multi-second sample.",
+   "evidence": "src/prototype3d.ts:3761 `const clock = new THREE.Clock()`; :9476-9478 dtRaw unclamped, dt clamped; :10911 qAccT += dtRaw (gated on started, so the match adapter is safe; the menu sampler is new)",
+   "fix": "On resume call clock.getDelta() once and discard it; exclude that frame from the menu degrade window."
+  },
+  {
+   "claim_or_bar": "§6 day 13 chrome-first boot bar: 'chrome visible ≤ 300 ms after DOMContentLoaded' — and the lens question 'does createIsland at boot delay first paint'",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "The entry is a deferred `<script type=\"module\">` with top-level awaits; a module's top-level await delays DOMContentLoaded until the module settles — i.e. until after createIsland's 18 seams and the three later bootStage awaits. The bar is anchored on an event that fires AFTER the build it is meant to measure, so it is green by construction. Today the answer to the lens question is: the first paint of the cover happens at the first double-rAF yield (:1729); everything before it — renderer + PMREM environment (GPU + shader compile), preloadMusic, font CSS — is one synchronous block of unmeasured length, and each island chunk between seams blocks input for its full duration ('a handful of seconds on a phone' in total).",
+   "evidence": "index.html:2276 `<script type=\"module\" src=\"/src/prototype3d.ts\">`; src/prototype3d.ts:1729 first await, :1733 createIsland, :2365, :2768 later awaits; :383 audio.preloadMusic() and :657-659 pmrem before the first yield; :1698-1706 'ONE unbroken main-thread block — 17 s in the sandbox'",
+   "fix": "Anchor the bar on performance.timeOrigin (navigation start): chrome painted ≤ 300 ms, and PLAY's pressed state must render within one seam (≤ the longest chunk, which day 1 prints per world via the bootStage timestamps). Measure the pre-await prefix separately."
+  },
+  {
+   "claim_or_bar": "§2.2 step 1 restoreIsland() from enterMenu (the post-HOME menu)",
+   "refuted": false,
+   "severity": "note",
+   "why": "Correct and necessary, but it is a single-frame walk of every edible (6,537 on Game Day) writing position/scale/rotation and an instanced shadow attribute per prop — 'regrows in one frame' on PLAY AGAIN today; on HOME it now runs on the frame the ease (or cut) and the menu theme start. Its ms on tier B is unmeasured.",
+   "evidence": "src/prototype3d.ts:7620-7640 the edible loop with setShadowInstance per prop; :3119 setShadowInstance; src/proto3d/island.ts:7379 '6,537 things on this island'",
+   "fix": "Run restoreIsland the frame after #btnHome, behind the still-shown end card, and start the ease one frame later; menuframe prints its ms per world."
+  },
+  {
+   "claim_or_bar": "§2.8 bar 4 heap clause: 'heap ≤ in-match heap + 10% … read from __menuState through the Capacitor shell'",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "performance.memory does not exist in Safari/WKWebView and JSC keeps typed-array backing stores (Game Day: ~376 MB of vertex buffers) outside any JS-heap figure; the device heap bar as written cannot be read. Tier B's memory ceiling (450 MB, Game Day ~446 today) is the number that jetsams a four-year-old iPhone, and the plan's sprites/posters/composer-at-menu all land on top of it.",
+   "evidence": "docs/STUDIO-ROUND-3.md:4069 ('performance.memory … does not exist in Safari at all'); docs/AAA-BRIEF.md:180 and :900 (~446 MB / 450 MB ceiling)",
+   "fix": "Keep the Chromium heap delta bar in menuframe; on the device day read resident memory from Xcode's memory gauge for menu vs match on Game Day, and add 'no jetsam in a 5-minute menu idle on tier B' to §8.12."
+  },
+  {
+   "claim_or_bar": "menu.mjs bar 7: 'draw calls at every 10° of the pendulum and along the 900 ms ease ≤ 1.3× in-match r = 12'",
+   "refuted": true,
+   "severity": "note",
+   "why": "renderer.info.render.calls alternates frame to frame because the shadow pass runs every other frame; a single sample per azimuth reads whichever parity it lands on. The in-match r=12 reference has the same alternation.",
+   "evidence": "qa/_refute_perframe.mjs:1-4 header; src/prototype3d.ts:10946",
+   "fix": "Sample two consecutive frames per azimuth and compare the max of the pair against the max of the in-match pair; print both parities."
+  },
+  {
+   "claim_or_bar": "§2.4 crowdGate at menuDist 22 → 138 units (pirate ×2) and 'leaving is free'",
+   "refuted": false,
+   "severity": "note",
+   "why": "Arithmetic holds and the menu gate is tighter than the spawn gate (29·2.2+90 = 153.8). Fast movers bypass the gate on every world and Lantern's ~966 walkers still tick in the half/quarter bands; moverStats per world on day 1 (in the plan) is the right instrument. Leaving is free only for the camera — beginMatch's snap does not undo the menu DPR/bloom state, which §2.2 step 6 handles.",
+   "evidence": "src/prototype3d.ts:10276-10277; src/proto3d/life.ts:369-374, :6906-6914 moverStats; src/prototype3d.ts:10629 lerp 1 while armed",
+   "fix": "None beyond printing moverStats(138) and moverStats(276) per world on day 1."
+  }
+ ],
+ "verdict": "SOUND WITH CORRECTIONS",
+ "the_one_thing_that_would_sink_it": "The diorama is a horizon-level frustum (top edge ~3° below the horizon, camera.far 1000, nothing far-culled) rendered at 60 fps with the shadow pass on, on a device class — tier B, the four-year-old iPhone — that the plan never names, and the only frame-time bar it would face is a median of vsync-quantised rAF intervals that passes with 49% of frames dropped; the first honest device number arrives on day 15, after 14 crew-days are built."
+}

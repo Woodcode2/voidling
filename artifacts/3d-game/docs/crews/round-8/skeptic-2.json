@@ -1,0 +1,183 @@
+{
+ "lens": "THE CODE — every cited touch point, state key and flow claim read at its line in src/prototype3d.ts, src/proto3d/{island,void3d,rivals,life,fx,audio3d}.ts, src/game/{unlocks,matchdeck}.ts, index.html, qa/{ladder,firstframe,pickerfit,opening,gate}.mjs and docs/crews/round-7/holeio.polish-plan.md §4/§C, at branch head 7ab632b. Static reads only; no build, no browser.",
+ "refutations": [
+  {
+   "claim_or_bar": "§3.1/§3.2/§3.3 — `cur` = 'the lowest non-done goal of the lowest world with an open goal'; PLAY launches the current pip; fail-forward 'the third miss opens the next dot' (§0.6).",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "With the stated definition, after three misses on goal k the next pip becomes 'open' but goal k is still the lowest non-done goal, so `cur` (and the green pip, and PLAY) stay on the failed level forever. The child who cannot clear EAT is sent back to EAT on every PLAY — the exact wall §0.6 promises away. Bar 3.5.1 'exactly one current' also has no state to read: `st` is locked|open|done|clear and 'current' is undefined for a world with two open goals; and `cur` is global across worlds while the pips are per built world (§0.3), so on a profile with voidWorld='lantern' and maple/1 open, `cur`=maple/1 disagrees with the lantern pip row the menu shows.",
+   "evidence": "Plan §3.1 schema and `cur` rule; §3.2 fail-forward; §3.3 'current = PLAY'; §0.3 'five dots, one per goal on this world'. pickedWorld is a boot const: src/prototype3d.ts:355-358.",
+   "fix": "Define current(world) = the HIGHEST open, non-done goal in that world (fail-forward moves it; a replay of a lower open pip sets `playing` only). Store no global `cur`; derive the end card's 'N OF 30' as the count of done/clear pips + 1. Bar 3.5.1 becomes 'exactly one current per world row, computed by that function'."
+  },
+  {
+   "claim_or_bar": "§2.2 step 6 / §2.7 — 'DPR and bloom are restored where the intro restores shadows (introT <= 0, :10509), not on the tap'.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "introT only becomes > 0 in startMatch() (first touch), not at PLAY: startMatch sets `introT = DESCENT_LEN` (:6333) and beginMatch never touches it. So the whole ARMED idle — the arrival fall, the goal card at 0.5 s, and the first-touch frame the owner measured against Hole.io — renders at the menu's 1.3/1.5 DPR with no bloom, and the composer mip chain is then reallocated on the frame controls go live (introT <= 0), which is exactly 'the one frame that matters'. Judge 2's double-flip concern was about the touch frame; the PLAY tap is a different event a second or more earlier and already sits under the menu-hide/cover. The plan is also internally inconsistent: it restores SHADOWS in leaveMenu (before beginMatch) but defers DPR/bloom.",
+   "evidence": "src/prototype3d.ts:6297-6334 startMatch (`started = true` :6303, `introT = DESCENT_LEN` :6333); beginMatch :6081-6190 sets `armed = true` :6145 and never writes introT; intro restore branch :10510-10513 is inside `if (introT > 0)`; camera-intro constants :5956-5962; composer cache `let composer` :157, ensureComposer :159.",
+   "fix": "Restore pixel ratio and `bloomOn = QUALITY[qLevel].bloom` in leaveMenu() (called at beginMatch :6185), i.e. under the menu hide; leave the intro's shadow toggle alone. Bar: the first armed frame's `__quality().pr` equals QUALITY[qLevel].pr (opening.mjs already samples the armed idle)."
+  },
+  {
+   "claim_or_bar": "§5.1 bars 6/7 and §2.8 bars 2/3 — measured 'under __pinQuality(0)' while on the menu; §2.7 'qa/ladder.mjs's MENU GATE keeps passing because __quality() never moves'.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "`__pinQuality(n)` calls applyQuality() (:2255-2258), which writes `renderer.setPixelRatio(min(DPR, 2.0))` and `bloomOn = true` for rung 0 (:1315-1316) — it overwrites the menu rung's DPR 1.3/1.5 and bloom-off. So a probe that pins rung 0 on the menu measures a rung-0 menu (bloom composer at DPR 2), not the shipped menu rung, and the ratio/draw-call bars report the wrong pipeline. Nothing in the plan gives the menu rung precedence over applyQuality.",
+   "evidence": "src/prototype3d.ts:2255-2258 `_dbg.__pinQuality`; :1313-1316 applyQuality head (`renderer.setPixelRatio(...)`, `bloomOn = q.bloom`); :10948-10956 render branch reads `bloomOn`.",
+   "fix": "Make applyQuality() end with `if (menuMode) applyMenuRung()` (DPR/bloom only, never shadows), so a pin on the menu still renders the menu rung; the probe reads `__menuState().menuRung` and `__quality().level` separately. Bars 6/7 then say 'rung 0 ladder, menu rung applied'."
+  },
+  {
+   "claim_or_bar": "§2.1 — enterMenu() runs at 'module init when the menu will show (voidPlayed set and no voidAutoPlay, the complement of :6559-6562 / :6840-6841)'.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "The first-launch branch is `!DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW && !voidPlayed` (:6559). A fresh profile under any debug param (?len=, ?r=, ?fast, ?at, ?demo — DEBUG_HARNESS :3620) shows the menu WITHOUT voidPlayed, so the plan's condition leaves menuMode=false on a displayed menu: no menu rung, match-branch camera, attract mode driving the void (:9849, DEBUG_HARNESS is explicitly allowed there), window showing the wrong frame. §5.2 (b) and §5.1 bar 13 use ?len=8 on fresh profiles and would boot into exactly this state.",
+   "evidence": "src/prototype3d.ts:6559-6562 first-launch condition; :3618-3620 DEBUG_HARNESS; :3631-3632 AUTO_START; :9849 `(!armed || DEBUG_HARNESS)` attract branch; #daily already keys on the honest signal `menuEl.style.display !== 'none'` :7966.",
+   "fix": "Key module-init enterMenu() on the same test #daily uses: after the first-launch and voidAutoPlay blocks have run, `if (getComputedStyle(menuEl).display !== 'none') enterMenu()`. Add a levels.mjs/menu.mjs assertion that `__menuState().menuMode === true` whenever `#menu` is displayed."
+  },
+  {
+   "claim_or_bar": "§4.4 point 6 — '#endQuests deleted with its render block (:5461-5476, CSS index.html:487-497)'.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "Lines 5461-5476 are the #endStats tiles (YOU ATE / BITES / BIGGEST / YOUR BEST-NEW BEST, plus the comment block), not the quest board. The TODAY quest block is :5486-5502 (`const qs = el('endQuests')` :5488). A builder following the citation deletes the results tiles §4.4 point 4 says are 'unchanged'.",
+   "evidence": "src/prototype3d.ts:5460-5477 endStats innerHTML; :5478-5485 rank row; :5486-5502 `el('endQuests')` block; questsEl :3971, renderQuests :3972.",
+   "fix": "Cite :5486-5502 for #endQuests; the HUD board is questsEl :3971 + renderQuests :3972-…; the pool :3811-3968 (QUEST_POOL, draw, saveQuests); questEvent :4018 stays. Re-verify at build time by symbol, not line."
+  },
+  {
+   "claim_or_bar": "§4.3 — goalMet() 'sets goal.result = win and outroT = 2.0 exactly as the buzzer does'.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "During the buzzer's 2 s outro the eat loop, rivals and score all keep running (dtw = dt*0.3; eat loop breaks only on !started||ended||paused :10367). A check written as 'threshold met' without the buzzer's `outroT <= 0` guard fires after TIME has already set result='time', overwriting it with 'win' (or re-arming outroT). Conversely a goal met at matchClock ≤ 0.6 s and the buzzer can race in the same frame.",
+   "evidence": "src/prototype3d.ts:9681 `if (matchClock <= 0 && !ended && outroT <= 0)`; :9480 outro tick with dtw = dt*0.3; :10367-10368 eat loop gate; rivals.update gated only on !ended && !paused :10290.",
+   "fix": "goalMet() must carry the same `outroT <= 0` guard and set result first-writer-wins; probe: drive the counter across the threshold 1 s into a TIME outro (?len=8 + __rushClock) and assert #endHd reads NOT YET."
+  },
+  {
+   "claim_or_bar": "§2.2 enterMenu() ordered list — entry from pause-quit (:7776) with the crowd 'kept alive' (life.update).",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "beginMatch sets `life.calm(COPY.introLen + 1.2)` (:6120) and only endMatch restores `life.calm(Infinity)` (:5327). The quit handler (:7765-7778) never calls calm, so a child who quits and lands on the menu has the parked void (MENU_R 1.2, R passed to life.update :10281) inside the crowd's fear radius with calm expired — the diorama's crowd screams and flees from a void that is supposed to be idling. life.tension() is also only written inside the frozen refreshHud block (:10817) and keeps the match's last value.",
+   "evidence": "src/prototype3d.ts:5327 `life.calm(Infinity)` in endMatch only; :6120 beginMatch calm; :7765-7778 doQuit (no calm); :10281 life.update(dtw, tClock, x, z, R, crowdGate); :10817 `life.tension(...)` inside the hudCd block; src/proto3d/life.ts:6937 calm(), :2586 `calmT = Infinity` initial.",
+   "fix": "enterMenu() calls `life.calm(Infinity); life.tension(0);` unconditionally (idempotent on the HOME path). Bar: after quit → menu, `life.moverStats` panic count 0 for 120 cranked frames."
+  },
+  {
+   "claim_or_bar": "§3.4 / §4.1 / §4.2 — Skylark LANDMARK = 'EAT THE HANGAR (r 5.5, :6499)', while §4.2 says the win check reuses heroProp resolved at :6114-6116 and the poll at :10768.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "heroProp is the LARGEST edible on the island, full stop (:6115-6116); on Skylark that is the tethered whale at r 18 (:6196-6197), so the mechanism the plan reuses can never point at a hangar, the in-range cue would print '🐋 YOU CAN EAT THE WHALE NOW' (:1665) over a hangar level, and the whale's tether makes the poll unreachable until the ascension beat. There are also TWO force-placed hangars (offsets [-340,-120] and [380,160]), so 'the hangar' is undefined.",
+   "evidence": "src/prototype3d.ts:6114-6116 heroProp = max radius; :10753-10775 cue/poll on heroProp; :1653-1668 Skylark hero/heroCue/heroGone/heroName; src/proto3d/island.ts:6196-6197 whale tethered r 18; :6484-6499 two hangars; capture/eat skip tethered :5597, :5879.",
+   "fix": "LEVEL_SPEC.landmark names a prop tag per world (e.g. userData.landmark = 'hangar-1'); the goal-3 win poll reads that prop, not heroProp; the level's cue/gone strings live in LEVEL_SPEC, and heroCue stays the world's finale beat. Or resolve heroProp as the largest NON-tethered edible on goal 3 and keep the whale for the beat — decide in §8.2 either way."
+  },
+  {
+   "claim_or_bar": "§3.4 — SET triples 'Game Day car 6 (28 food trucks)' and 'Powder house 5 (26 house-like)' under the rule '6N ≤ supply for cars and houses' (always).",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "By the plan's own numbers 6×6 = 36 > 28 (Game Day car) and 6×5 = 30 > 26 (Powder house). The rule the plan calls 'always' is broken in its own table before any measurement.",
+   "evidence": "Plan §3.4 rows and the closing rule; HOUSE_LIKE src/prototype3d.ts:3919 (plan cites :3919 — correct); Powder chalets 24 + lodge + hut island.ts:5919/:5937-5940/:5981.",
+   "fix": "Game Day car 4, Powder house 4 as the provisional values (or state the rule as 3N for those kinds); day 2's questable count replaces them either way."
+  },
+  {
+   "claim_or_bar": "§2.3 Maple stage — void parked 'inboard of the rim' at the waterfall (190, 207.5) with 'no rim sky shows in the window' as the day-12 lookbook check.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "The waterfall is authored past the plateau edge: the sheet is centred at y = −8.5 (spanning −21.5..+4.5, 'lip breaks the cliff rim') and the spray at y = −22, at the SE rim. A camera low enough to frame the creature and the pouring sheet must look past the rim into the cosmos — the bar and the stage cannot both hold. The key art the plan wants to bring alive (§0.1) is precisely the island edge with the waterfall falling off it.",
+   "evidence": "src/proto3d/island.ts:278 WATERFALL [9800,10150] → w() :87 gives (190, 207.5); :3825-3832 plane 26 tall at y −8.5, rotation faces outward; :3834-3838 spray at y −22; camera far 1000 :663.",
+   "fix": "Rewrite the bar: 'rim and cosmos may show below/behind the sheet; the void stands on standable ground (inWater3/biomeAt non-null) and no ground gap shows between him and the rim'. Keep the azimuth sweep as the arbiter."
+  },
+  {
+   "claim_or_bar": "§2.4 — menuDist 'is passed in place of camDist to … fog (:10647)' from a fourth `else if (menuMode)` camera branch.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "The fog write is the last statement INSIDE the match `else` branch (:10648), as is camera.updateMatrixWorld() (:10643); a sibling `else if (menuMode)` branch never reaches them, so the menu would keep whatever fog the last match set (near 60+camDist·1.4 with camDist 50 or last value).",
+   "evidence": "src/prototype3d.ts:10488-10494 branch heads; :10643 updateMatrixWorld and :10648 fog both inside the final else.",
+   "fix": "The menu branch writes `scene.fog.near/far` from menuDist and calls camera.updateMatrixWorld() itself; bar 2.8 adds `__menuState().fogNear === 60 + menuDist*1.4`."
+  },
+  {
+   "claim_or_bar": "§4.4 point 2 / §4.7 bar 5 — 'painted before celebrateEnd() is called (:5364 solo, :5439 rivals)'; §3.2/§4.3 'the solo return at :5364'.",
+   "refuted": true,
+   "severity": "note",
+   "why": "Line drift: celebrateEnd is called at :5358 (solo) and :5442 (rivals); :5364 is `endEl.classList.add('show')` in the solo branch and the solo `return` is :5372. The ordering claim itself holds (celebrateEnd runs synchronously before `.show` in both branches, and its first .endCnt mutation is on the next rAF), so bar 5's 'before the first .endCnt mutation' is satisfiable.",
+   "evidence": "src/prototype3d.ts:5358, :5364, :5372, :5442, :5570; celebrateEnd :5290-5322 (tick on rAF).",
+   "fix": "Cite :5358/:5442 and :5372; keep the bar."
+  },
+  {
+   "claim_or_bar": "§2.2 step 3 — 'rivals.setVisible(false) (new …; the crew finds the mesh handle in rivals.list)'.",
+   "refuted": true,
+   "severity": "note",
+   "why": "`rivals.list` is the public Rival[] (name, color, score, x, z, r, …) with no mesh; the groups/halos are closure-internal (`rv.group`, `rv.halo`). The method must be added inside rivals.ts beside reset(). Also note rivals are already invisible until they join (:595), so setVisible only matters on the post-HOME/quit menus.",
+   "evidence": "src/proto3d/rivals.ts:27 Rival interface; :595 `group.visible = halo.visible = false`; :811 reset().",
+   "fix": "Add `setVisible(v)` to the Rivals interface (:35) iterating the internal cast; bar 2.8.7 reads it back."
+  },
+  {
+   "claim_or_bar": "§5.3 firstframe (splash) — 'freeze() keeps the canvas'.",
+   "refuted": true,
+   "severity": "note",
+   "why": "Every selector the splash step measures (`#menu .logo i`, `.logo`, `.tag`) lives in band B (56–140 px) over the opaque cosmos ground, so the canvas is not behind any measured glyph; keeping it visible reintroduces the A/B nondeterminism firstframe.mjs:76-79 documents (the moving diorama between shots) for no gain, and firstframe does not virtualise rAF.",
+   "evidence": "qa/firstframe.mjs:76-87 freeze/thaw and the foliage-bleed note; :215-218 the three selectors; plan §1.1 bands A–B GROUND.",
+   "fix": "Leave freeze() as is; only make a missing selector FAIL. If a measured selector ever moves over the window, crank to a fixed frame first (ladder.mjs:65-76 pattern)."
+  },
+  {
+   "claim_or_bar": "§3.1 schema — `first: 'YYYY-MM-DD' (toDateString convention, :5395)`.",
+   "refuted": true,
+   "severity": "note",
+   "why": "toDateString() yields 'Wed Sep 10 2026', not YYYY-MM-DD; the two conventions named are different strings.",
+   "evidence": "src/prototype3d.ts:7965 `new Date().toDateString()` (daily), same at :5395 per reading.",
+   "fix": "Pick one: toDateString (matches voidDailyLast/voidFirstWinDay) — drop the 'YYYY-MM-DD' label."
+  },
+  {
+   "claim_or_bar": "§4.4 point 5 + §3.2 — the NEW WORLD card (completeWorld on any finish) alongside 'TRY AGAIN on a miss (same level)'.",
+   "refuted": true,
+   "severity": "note",
+   "why": "Because a world opens on ANY finish (unlocks.ts:86-97, kept by §3.2), a failed EAT level on a world's first match produces a NOT YET card carrying both TRY AGAIN and TAKE ME THERE (which reloads into the next world with voidPlayGoal); two doors compete on the miss card and the second one abandons the ladder on the world just failed.",
+   "evidence": "src/game/unlocks.ts:89-97 completeWorld; src/prototype3d.ts:5509-5537 unlock card with reload; plan §4.4 points 5 and 7.",
+   "fix": "Decide: on a miss, show the next-world jewel as INFORMATION (locked look lifting) but keep TAKE ME THERE for wins only; or accept both doors and say so in §8."
+  },
+  {
+   "claim_or_bar": "§5.2 (b) — RIVALS 'force the goal by … myRank at the buzzer' under short clocks.",
+   "refuted": true,
+   "severity": "note",
+   "why": "rows filter `r.joined`; under ?len=8 the family has not joined, so myRank === 1 trivially and the probe cannot distinguish a working RIVALS level from a broken one.",
+   "evidence": "src/prototype3d.ts:5374-5378 rows/myRank; rivals join times scale to matchLen (rivals.reset(matchLen) :7643).",
+   "fix": "For the RIVALS case use a clock long enough for ≥ 2 joins (or rivals.reset with forced joins via a QA hook) and assert both a win and a loss outcome."
+  },
+  {
+   "claim_or_bar": "§2.7 idle tiers — '20 s without input → render every second frame; 3 min → every fourth' with §2.8 bar 10 'qa/ladder.mjs scenario 1 still passes'.",
+   "refuted": true,
+   "severity": "note",
+   "why": "ladder.mjs cranks by capturing the rAF callback each frame (`window.__pend = cb`) and fails with 'rAF chain broke' if animate() ever stops re-registering. An idle tier implemented by skipping rAF or via setTimeout breaks the MENU GATE scenario mechanically, not because of the adapter.",
+   "evidence": "qa/ladder.mjs:65-76 virtualise (captures rAF), :80-92 crank fails on a broken chain, :106-114 MENU GATE.",
+   "fix": "Throttle by skipping the render call, never the `requestAnimationFrame(animate)` re-registration (:10957)."
+  },
+  {
+   "claim_or_bar": "§4.7 bar 3 — HUD presence at match seconds 5/88/163.",
+   "refuted": true,
+   "severity": "note",
+   "why": "Solo levels (§8.4: dots 1,2,3,5 on the 120 s clock, :6131) never reach t = 163; the bar as written can only run with the family dealt.",
+   "evidence": "src/prototype3d.ts:6131 `matchLen = solo ? 120 : MATCH_LEN`.",
+   "fix": "Sample at 5 / matchLen·0.49 / matchLen·0.9."
+  },
+  {
+   "claim_or_bar": "§3.5 bar 3 pips 'ΔE ≥ 10' vs the polish plan's C bar 2 'four distinct colours at ≥ 3:1 from each other and from the ground'.",
+   "refuted": true,
+   "severity": "note",
+   "why": "The build plan substitutes a Lab ΔE bar for the recorded contrast-ratio bar without saying so; ΔE 10 between two mid-value hues can sit well under 3:1 luminance contrast.",
+   "evidence": "docs/crews/round-7/holeio.polish-plan.md C bar 2 (':155-166' region, read tonight); plan §3.5 bar 3.",
+   "fix": "Keep both: ΔE ≥ 10 AND pairwise luminance contrast ≥ 3:1 (pickerfit's ratio helper)."
+  },
+  {
+   "claim_or_bar": "§2 'Ours today' and §0.1 — the island is fully built before the menu and rendered every frame behind the opaque #menu on every non-first launch; body.menu is set on every menu entry; the daily card keys on menuEl.style.display; the clock starts on the first touch; win-on-the-spot goes beside :9681 and reaches endMatch via :9480; endMatch has no parameters; voidUnlocked CSV + migrate() grandfather rule; voidMatchN JSON; solo branch skips voidBest_/completeWorld; qShadowLatch one-way; intro shadow toggle; camera lerp 1 while armed; camDist snap in beginMatch.",
+   "refuted": false,
+   "severity": "note",
+   "why": "All verified at the lines: render unconditional :10948-10957 with `animate()` at :10974 after the top-level await; `<body class=\"menu\">` in the markup (index.html:1883) covers the boot menu, adds at :5553/:7699/:7776, removes :6185/:6870; #daily :7966; startMatch from renderer.domElement pointerdown :3380-3397 (the menu window overlays the canvas at z10, so the tap never reaches it — §2.6's 'stops there' holds without stopPropagation); buzzer :9681-9686, outro→endMatch :9480; endMatch() :5324; unlocks.ts:44-97; matchdeck.ts:25-44; solo return :5372 before :5450/:5509; applyQuality :1313-1360; intro toggle :10510-10513; lerp :10629; camDist = DESCENT_START :6152.",
+   "evidence": "as listed",
+   "fix": "none — record as confirmed"
+  },
+  {
+   "claim_or_bar": "§3.2 reconciliation vs owner decisions of 2026-09-06 and unlocks.ts invariants.",
+   "refuted": false,
+   "severity": "note",
+   "why": "Five goals in the owner's order, win on the spot with RIVALS at the buzzer, quest board retired, clock on first touch, live menu — all honoured; 'never a wall' and 'nobody re-locked' are preserved by deriving voidLevels from isUnlocked()/voidBest_ and only raising states. 'Strictly sequential' is correctly surfaced as an owner decision (§8.1) rather than assumed. Fail-forward is a governor addition consistent with decision 1 ('the clock running out fails it' — the level still fails; only the gate opens).",
+   "evidence": "docs/crews/round-7/holeio.polish-plan.md §4 rows 1,3,4,5; src/game/unlocks.ts:5-26, :57-74, :86-97.",
+   "fix": "none"
+  }
+ ],
+ "verdict": "SOUND WITH CORRECTIONS",
+ "the_one_thing_that_would_sink_it": "The plan's cost story assumes the diorama frame is 'the frame we already pay for', but the parked camera is a new frustum — low (height 9), 22 units out, looking horizontally across a plateau that is never far-culled (camera.far 1000, :663) — and the only precedent for a horizontal look across the island is the intro's 4,694-draw-call frame (:10496-10500). If day 1's azimuth sweep finds no 12° arc on Lantern (~966 walkers) or Game Day (6,537 edibles) under bar 2.8.3's 1.3×/2,000 draw calls, the fallback is the shadows-off toggle — which the plan itself admits may recompile ~45 programs on the menu's first frame (docs/AUDIT-2026-08-23.md:316, unmeasured) — and then half-rate rendering, i.e. a menu that stutters on the reference phone on the two worlds a child reaches after Maple. Until qa/menuframe.mjs prints those per-azimuth numbers, every downstream day (7–13) is authored against an unmeasured budget."
+}

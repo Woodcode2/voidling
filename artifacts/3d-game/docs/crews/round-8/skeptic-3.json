@@ -1,0 +1,183 @@
+{
+ "lens": "THE GATE AND THE PROBES — are the bars numbers a probe can fail; which push-profile steps break on which day; harness clock vs match clock (GOVERNOR rule 4); snapshots kept in probes (rule 4); can qa/menu.mjs and qa/levels.mjs run without a GPU (swiftshader, match clock ~14x slow, frames 100-1000 ms). Static reads of qa/gate.mjs, qa/ladder.mjs, qa/pickerfit.mjs, qa/firstframe.mjs, qa/opening.mjs, qa/lockedcards.mjs, qa/questable.mjs, qa/menushot.mjs, qa/endfit2.mjs, qa/_refute_perframe.mjs, qa/_gpuframe.mjs, docs/GOVERNOR.md, src/prototype3d.ts (animate :9467-10974, perfFrame :404-416, hooks :2040-2320, AUTO_START :3619-3632, attract :9849), node_modules/three (info.autoReset, Pass.js).",
+ "refutations": [
+  {
+   "claim_or_bar": "§5.2 (b)/(c): qa/levels.mjs enters each world's goal 1 plus one of each kind (10 runs) and 'forces the goal by the game's own path' (score threshold, three counted kinds, heroProp, myRank at buzzer, devouredPct), then samples HUD at t = 5 / 88 / 163 match-seconds — registered in the push profile (§5.3, day 10 '38/38').",
+   "refuted": true,
+   "severity": "blocks",
+   "why": "On this harness the match clock runs ~14x slower than wall (GOVERNOR.md:54-56; prototype3d.ts:2303-2309 '0.043 game-seconds per wall-second'; gate.mjs:225-227 'a ninth'). EAT N is designed to land at 90-150 match-s (§3.5 bar 6) = 20-35 wall-minutes per run under real rendering; 10 goal runs + 163-s HUD samples per kind = 4-6 wall-hours. gate.mjs SIGKILLs a step at step.timeout (gate.mjs:31, :58) and the largest registered timeout is 4200 s. RIVALS via 'myRank at the buzzer' is also nondeterministic (autopilot score vs family) with no score hook to force either outcome — grep shows only __setVoidR (:2240), __eatNearest (:2073), __rushClock (:2171). As written the probe either never joins push or the push gate stops being runnable.",
+   "evidence": "docs/GOVERNOR.md:54-61; src/prototype3d.ts:2303-2309, :2171, :2073, :2240; qa/gate.mjs:31, :58, :216-222; qa/ladder.mjs:65-90 (the cranked-clock technique with render stubbed: 3,500 frames in minutes).",
+   "fix": "Write (b)/(c) on the virtualised clock: capture rAF + performance.now (ladder.mjs:65-76), stub __renderer.render, crank at 16.667 ms so the eat loop, growth law and goal check run per frame in pure JS (150 match-s = 9,000 cranks). Add explicit hooks beside __matchState for the deterministic paths: __setScore(n) (EAT), __eatKind(kind, n) routed through the real eat handler lines :5825-5839 (SET), __eatHero() setting byPlayer (LANDMARK), __setRivalScores([...]) (RIVALS both outcomes), __devourAll() (CLEAR). Size the step's timeout from a measured run and print the wall time in the PASS line."
+  },
+  {
+   "claim_or_bar": "§2.8 bar 3 / §5.1 #7: draw calls from renderer.info at every azimuth ≤ 1.3× the in-match r = 12 count and ≤ 2,000, sampled under __pinQuality(0).",
+   "refuted": true,
+   "severity": "blocks",
+   "why": "renderer.info.autoReset is true (three.module.js:4528) and info.reset() runs at the start of EVERY renderer.render call. Rung 0 has bloom on (:1265, :1303), so the frame goes through the composer (:10948-10952) whose passes each call renderer.render on a full-screen quad (Pass.js:168). After composer.render(), info.render.calls holds the LAST quad pass (1-3 calls), not the scene. The menu side has bloomOn = false (§2.7) and reads the real scene count, so menu/match reads ~1,241/2 — the bar fails for the wrong reason, or, if someone 'fixes' it by comparing at rung 3, the ≤ 2,000 absolute is compared against an intro figure (4,694, :10496-10500) taken with a different shadow state. qa/_refute_perframe.mjs:25 and qa/_gpuframe.mjs:34 read the same field and never set autoReset=false, so their in-match numbers hold only where the adapter had already turned bloom off.",
+   "evidence": "node_modules/three/build/three.module.js:4528 (autoReset: true), :17111; node_modules/three/examples/jsm/postprocessing/Pass.js:168; src/prototype3d.ts:1265, :1303, :10946-10956, :10496-10500; qa/_refute_perframe.mjs:25; qa/_gpuframe.mjs:34; grep autoReset in qa/ and src/ = 0 hits.",
+   "fix": "In the probe: `R.info.autoReset = false; R.info.reset()` before cranking one frame, read calls/triangles after it, restore autoReset. Print bloom, shadowMap.enabled and pixel ratio in every PASS/FAIL line, and take the in-match reference and the menu reading with the SAME bloom state (both bloom off, since the menu never has it), or count the scene pass separately from the post passes. Re-take the 1,241 / 4,694 reference numbers with autoReset off before they are used as a bar."
+  },
+  {
+   "claim_or_bar": "§2.8 bar 1 (day-1 baseline): 'menu-idle median and p95 dtRaw (perfFrame, :411)' per world, rung 0 and rung 3.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "perfFrame is a no-op unless the page is loaded with ?perf (`const PERF = location.search.includes('perf')`, :404; `if (!PERF) return;` :412), and perfDts is a module-local never exposed to window (:409-416; no _dbg hook — grep perfDts/__perf shows only :408 __perfBeat). With ?perf the page also mounts a fixed DOM overlay (:421-425) that changes the composited frame being measured. The cited source cannot be read by a probe today.",
+   "evidence": "src/prototype3d.ts:404, :409-416, :421-425; _dbg hooks :2040-2320 contain no frame-time export.",
+   "fix": "Add `_dbg.__frameTimes()` returning the last N dtRaw values (always on, ring buffer of numbers, no overlay), or have the probe wrap requestAnimationFrame in-page and record performance.now deltas itself — and say which in the probe header. Also __pinQuality(3) latches qShadowLatch for the session (:1354): measure rung 0 on a fresh page, or rung 0 first."
+  },
+  {
+   "claim_or_bar": "§2.8 bar 2 / §5.1 #6: menu median dtRaw / in-match median ≤ 1.15 on the same page and rung, labelled 'sandbox, not device'.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "Two wrong-reason paths (rule 3b). (i) The menu-only degrade in §2.7 fires when the in-page median dtRaw exceeds 17 ms — under swiftshader every frame is 100-1000 ms, so the menu side is always measured at menuRung 3 (DPR 1.0, shadows off, render every second rAF) against a full-cost match at __pinQuality(0): the ratio passes because the menu was degraded, not because it is cheap. (ii) No noise floor: the ledger's own rule ('measure the noise floor before reading a gate that tight', GOVERNOR.md:643-645) and 1.15 is 15% on a software renderer whose frame time varies with what the crowd happens to do.",
+   "evidence": "plan §2.7 (17 ms median → steps 1-3); docs/GOVERNOR.md:643-645, :35-39 (rule 3b); qa/_clockrate.mjs (wall/match ratio measured per run, not constant).",
+   "fix": "Add `__pinMenuRung(n)` beside __pinQuality and pin 0 for the ratio bar; run the same state twice and print the spread; register qa/menuframe.mjs as a REPORT (no bar) until the measured spread says what 1.15 means here, then set the bar from that number. Keep draw calls and triangles (device-independent) as the hard bars."
+  },
+  {
+   "claim_or_bar": "§5.1 #3 pendulum: '__menuState().azimuth over 120 frames, sine fit; amplitude 5-7°, period 15-17 s'.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "120 cranked frames at 16.667 ms is 2.0 s of a 16 s period — one eighth of a cycle. A sine fit on an eighth of a cycle cannot separate amplitude from period (a 6°/16 s and a 12°/32 s pendulum are indistinguishable over that window). §2.5 also says the pendulum runs 'on the wall clock': if it reads Date.now() the virtualised clock never moves it (ladder.mjs:70-71 replaces performance.now only) and the probe reads a constant.",
+   "evidence": "qa/ladder.mjs:65-76 (only performance.now and rAF are virtualised); plan §2.5, §5.1 #3.",
+   "fix": "Crank ≥ 1,000 frames (one full period plus margin) before fitting, or expose the authored {a0, amp, period} in __menuState and assert the sampled azimuth series against them. Constrain the implementation: the pendulum phase advances on tClock/performance.now, never Date.now."
+  },
+  {
+   "claim_or_bar": "§5.1 #1 hero share: 'bbox of pixels that change between two cranked frames 30 apart = 45-53% of viewport height'; #3 'centroid drift of the changed-pixel mask median 0.2-1.0 px/frame'.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "The changed-pixel mask is the crowd walking, the water scrolling and the void blinking (all kept running in §2.7) — not the window and not the camera. On a stage whose top corners hold static scenery the bbox is smaller than the window (false FAIL); the centroid of that mask moves with the walkers, not the pendulum (false PASS/FAIL either way). 'What else would move this number' (GOVERNOR.md:35-39) is the crowd.",
+   "evidence": "plan §2.7 'Kept: island.update, voidling.update, life.update, curios'; docs/GOVERNOR.md:35-39; qa/firstframe.mjs:76-79 (the same wandering-canvas effect already broke an A/B measurement).",
+   "fix": "Window share = `#menuWindow.getBoundingClientRect().height / innerHeight` (the thing itself) plus a canvas-visibility check: screenshot the window box with the canvas hidden and shown, assert ≥ 60% of the box's pixels differ (the curtain really has a hole). Camera motion = project a fixed world point (MENU_STAGE.look or COPY.hero) through __cam each cranked frame and take the px/frame series — arithmetic, deterministic, no pixels."
+  },
+  {
+   "claim_or_bar": "§6 day 5: goalMet() beside :9681 and endMatch(result) land with 'push green' and no change to existing probes until day 10-11.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "Every existing match probe becomes a level-1 run on day 5. ?len/?r/?at/?fast put the harness in DEBUG_HARNESS (:3619) and attract mode self-drives the void through every edible in reach (:9849-9860); navigator.webdriver auto-starts the match (:3631-3632). A run that crosses EAT N ends ON THE SPOT, so newsfeed (plays from t > 3 through the match, qa/newsfeed.mjs:55, seeded SEED=7 and compared 'paired') and faceparity (samples from START_AT, qa/faceparity.mjs:168) get a shorter match; econ (push) rushes the clock at t > 3 (qa/econ.mjs:88, :112) and lands on a 'NOT YET' card whose DOM order changes on day 6 (#endQuests removed, #endPips inserted). The plan's day-5 gate line assumes none of this.",
+   "evidence": "src/prototype3d.ts:3619, :3631-3632, :9849-9860; qa/newsfeed.mjs:55; qa/faceparity.mjs:139, :168; qa/econ.mjs:85-89, :107-113; docs/GOVERNOR.md:731-733 ('pair the runs').",
+   "fix": "Make the goal check conditional on a level actually being played (`playing` set only by PLAY/pip/voidPlayGoal; AUTO_START harness matches with no seeded voidLevels run goal-free), or have the shared _enter helper seed voidLevels explicitly. Re-baseline newsfeed and faceparity on the day-5 build (same seed, same length) and record it."
+  },
+  {
+   "claim_or_bar": "§5.2 (h) hero exclusion: 'after 60 match-seconds of autopilot with the rivals hunting, heroProp.mesh.userData.eaten is false unless byPlayer'.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "It cannot fail before the fix (rule 2). Non-hunter rivals are capped at softCap = max(min(START_R + 0.02t, 1.6), 0.8·pr) (GOVERNOR.md:172-178) and the hero is r 6.5-18; in 60 match-seconds no rival on the untouched build reaches a radius that can take it, so the assertion is green with and without the exclusion.",
+   "evidence": "docs/GOVERNOR.md:172-178, :24-28 (rule 2); src/prototype3d.ts:10770-10774 (rivals can eat it in principle); plan §3.4 hero radii.",
+   "fix": "Force the condition: a hook that sets one rival's radius ≥ hero radius / EAT_RATIO and warps it onto heroProp, then assert the rivals' eat rule refuses it on goal 3 and takes it on goal 1. Commit the failing run on the pre-fix build."
+  },
+  {
+   "claim_or_bar": "§1.3 bar 3: ground 'value 0.45-0.65, chroma 0.35-0.55 at the four corners of the PLAY band … Measured by qa/menushot.mjs's frame'.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "qa/menushot.mjs is a screenshot script that prints 'ok' (menushot.mjs:16) — no bar, no verdict; a step registered pf on it reads silence. The §5.1 table (bars 1-19) has no ground-colour bar at all, so bar 1.3.3 has no probe. The colour model is unnamed: 'value'/'chroma' come from the recon's chroma.py (polish-plan.md:31, :100-107) and the numbers only make sense in that space.",
+   "evidence": "qa/menushot.mjs:1-17; docs/crews/round-7/holeio.polish-plan.md:31, :100-107; plan §5.1 table.",
+   "fix": "Add bar 20 to qa/menu.mjs: name the model (HSV value and chroma as chroma.py computes them), sample four 8×8 boxes at the PLAY band's corners on a cranked frame, print the four values, fail outside the band. Leave menushot as the lookbook's picture only."
+  },
+  {
+   "claim_or_bar": "§5.3 / day 1: qa/firstframe.mjs `freeze()` 'keeps the canvas' so the splash contrast is measured against the diorama.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "That is the exact nondeterminism the probe's own header retired: the A/B pair (shot with text, shot with text hidden) 'only isolates the glyphs if NOTHING ELSE moves' and at 393×700 the behind-mean came back foliage green from the wandering canvas (firstframe.mjs:76-83). In the new layout .logo / .logo i / .tag all sit on opaque ground bands A-B (§1.1), so the canvas contributes nothing to their backdrop; keeping it buys nothing and re-breaks the measurement. The only canvas-backed text is the pennant in band C.",
+   "evidence": "qa/firstframe.mjs:76-83, :88-105, :215-218; plan §1.1 bands A-B 'GROUND'; docs/GOVERNOR.md:665-669.",
+   "fix": "Leave freeze() hiding the canvas for the splash step; give the pennant its own bar in qa/menu.mjs under a virtualised (stopped) rAF so the two shots are of the same frame. Keep the day-1 change that a missing selector FAILS (firstframe.mjs:220)."
+  },
+  {
+   "claim_or_bar": "§2.7 idle tiers ('render every second frame … every fourth … document.hidden → stop the rAF') and §2.8 bar 10 'qa/ladder.mjs scenario 1 still passes'.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "ladder.mjs captures rAF into window.__pend and crank() FAILS with 'rAF chain broke after N frames — animate() threw' the moment a frame does not re-request rAF (ladder.mjs:70-71, :83-86). Scenario 1 cranks 500 × 40 ms = exactly 20 virtual seconds at the menu — the plan's idle threshold. If 'every second frame' or 'stop the rAF' is implemented by not calling requestAnimationFrame (or via setTimeout), the house probe and every cranked bar in menu.mjs break on the same line.",
+   "evidence": "qa/ladder.mjs:65-90, :106-114; plan §2.7 'Idle and hidden'.",
+   "fix": "Constrain: animate() always requests exactly one rAF per frame; idle/hidden tiers skip the renderer.render/composer.render call and the sim work inside animate, never the rAF. Bar 14 asserts `__menuState().frame` (a RENDER counter) stays flat, not the rAF count."
+  },
+  {
+   "claim_or_bar": "§5.1 header: 'each bar prints PASS — / FAIL —, exit 1 on any fail' with menu.mjs and levels.mjs registered pf.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "gate.mjs judges pf as `pass && !fail` over the whole stdout and ignores the exit code (gate.mjs:583-587). A 19-bar probe that prints 'PASS — bar 1 … PASS — bar 6' and then throws on bar 7 prints no FAIL line and is read as PASS — silence-as-consent one level down from the case the gate was built to catch. qa/endfit2.mjs, named for push, prints no PASS line and sets its own exit code (endfit2.mjs:80) and defaults PORT 4188 (:18) — registered pf it is permanent silence, the exact `opening` mistake gate.mjs:66-75 records.",
+   "evidence": "qa/gate.mjs:66-75, :583-587; qa/endfit2.mjs:18, :80.",
+   "fix": "Per-bar lines use a non-verdict token (e.g. '  ok   #3 …' / '  BAD  #3 …'); one final 'PASS —' or 'FAIL —' is printed only after the last bar, and process.on('uncaughtException'/'unhandledRejection') prints 'FAIL — <bar> threw'. Register endfit2 with verdict exitCode and pass PORT."
+  },
+  {
+   "claim_or_bar": "§6 day 6 deletes QUEST_POOL/renderQuests/questComplete/addEncoreQuest and the board; §5.3 'questable step is retired only after levels.mjs (e) is in the push profile'; (e) 'reuses questable.mjs:74-90's block'.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "The supply block reads `window.__questPools().houseLike` (questable.mjs:41-46, :74-77) — published at prototype3d.ts:3924-3925 next to the pools the plan deletes. questable was retracted once for keeping its own HOUSE_LIKE copy (GOVERNOR.md:451-452), so (e) must read it from the client. Day 6 removes the hook; (e) joins push on day 10 (§6 '38/38'); questable in 'live' is dead for four days and (e) has nothing to read.",
+   "evidence": "src/prototype3d.ts:3919, :3924-3925; qa/questable.mjs:41-46, :74-90; qa/gate.mjs:406-408; docs/GOVERNOR.md:451-452.",
+   "fix": "Replace __questPools with `__goalPools()` = { houseLike: HOUSE_LIKE, sets: LEVEL_SPEC[world].set } in the same commit that deletes the board; port questable's block to it; register levels (e) and retire questable in ONE commit."
+  },
+  {
+   "claim_or_bar": "§1.2 / §4.7 bar 1: one tap on #btnPlay → 'launchWorld() minus the picker'; §3.1 `cur` is 'the lowest non-done goal of the lowest world with an open goal'.",
+   "refuted": true,
+   "severity": "must-fix",
+   "why": "pickedWorld is a boot const from ?w= / voidWorld (:355-358) and ~110 probes load ?w=<world> and expect THAT world to start. If PLAY resolves to cur.world (the cross-world frontier) it reloads a ?w=pirate page into Maple for any seed whose frontier is Maple — the wrong-world-tested-as-right failure worlds.mjs was written against (GOVERNOR.md:529-535), and the `?.click()` probes would pass on it. The plan says both things in two sections and __menuState carries no field that settles it.",
+   "evidence": "src/prototype3d.ts:355-358, :6493-6505; docs/GOVERNOR.md:529-535; plan §1.2 vs §3.1.",
+   "fix": "Decide in writing: PLAY launches the BUILT world at that world's own frontier goal (a reload is never PLAY's job; world travel is the chip). Expose `__menuState().world === pickedWorld` and `.goal`, and make bar 5 assert no navigation happened (set window.__marker before the click, assert it survives)."
+  },
+  {
+   "claim_or_bar": "§2.7: 'qa/ladder.mjs's MENU GATE keeps passing because __quality() never moves'.",
+   "refuted": false,
+   "severity": "note",
+   "why": "MENU GATE compares only `.level` (ladder.mjs:110-113), which the menu rung never writes, so the step passes — but __quality() reads renderer.shadowMap.enabled and renderer.getPixelRatio() live (:2259-2260), so `.shadows` and `.pr` DO move under menuRung steps 1-2. The claim is right for the probe and wrong as stated; a later reader of __quality() at the menu will be misled.",
+   "evidence": "qa/ladder.mjs:106-114; src/prototype3d.ts:2259-2260.",
+   "fix": "Reword: 'qLevel never moves'; add `menuRung` and `pinnedMenuRung` to __menuState so the two ladders are distinguishable in one read."
+  },
+  {
+   "claim_or_bar": "§1.4: pip/tab sprites rendered by qa/icons.mjs under the ASSETVIEW branch and committed as public/assets/pips/*.png.",
+   "refuted": false,
+   "severity": "note",
+   "why": "Rendered-and-committed images of live props are a snapshot of the game kept in the repo (rule 4's first failure mode): a later art pass on the Town Hall leaves a stale hero icon and nothing fails. They are rendered under swiftshader (AA/precision differ from a device GPU) — acceptable at 96 px, but say so. packfresh.mjs already exists for the analogous studio-pack staleness.",
+   "evidence": "docs/GOVERNOR.md:41-52; qa/gate.mjs (packfresh step, art profile); plan §1.4.",
+   "fix": "Give qa/icons.mjs a `--check` mode: hash the factory sources named per icon (island.ts:8065, :7703, :7150, :6777, :5919, :6499/:6196) into a sidecar and FAIL when a hash moved and the PNG did not; register it static in push."
+  },
+  {
+   "claim_or_bar": "§1.3 bar 7 / §5.1 #11: no platform emoji, regex `\\p{Extended_Pictographic}` over .pips, .tabs, .goalLine, #goal, #titlecard, #endPips.",
+   "refuted": false,
+   "severity": "note",
+   "why": "The bar is failable, but its regex misses the plan's own glyphs: ✓ (U+2713) in #endHd 'LEVEL 3 ✓' (§4.4) and the tick/star on done/clear pips (§3.3) are not Extended_Pictographic yet render from Noto on Chromium and Apple's font on iOS — the same 'not this game' problem. #endHd is not in the container list.",
+   "evidence": "plan §3.3, §4.4 step 1, §5.1 #11.",
+   "fix": "Extend the regex to Dingbats/Misc Symbols blocks (U+2600-27BF) and add #endHd and the world chip; render tick/star/padlock as sprites per §1.4."
+  },
+  {
+   "claim_or_bar": "§4.7 bar 5: '#endPips finished-pip class set ≤ 400 ms after #end.show and before the first .endCnt mutation' by DOM timestamps.",
+   "refuted": false,
+   "severity": "note",
+   "why": "The class is set synchronously inside endMatch before endEl.classList.add('show') (:5570), so the timestamp delta is ≤ 0 by construction; what the child sees is a wall-clock CSS animation, which the ledger says cannot be photographed against the slow match clock and must be read from the DOM (GOVERNOR.md:672-675). The count-up's first .endCnt write comes from a rAF in celebrateEnd (:5306-5315), so 'before the first mutation' is a 1-frame race under swiftshader.",
+   "evidence": "src/prototype3d.ts:5290-5322, :5306, :5570; docs/GOVERNOR.md:672-675.",
+   "fix": "Assert from computed style: for the finished pip, animationDelay + animationDuration ≤ 0.4 s; for .endCnt's count-up, its t0 (expose it) ≥ the pip's animationDelay. Keep the 'element absent → FAIL' guard so the bar fails on the pre-fix build."
+  },
+  {
+   "claim_or_bar": "§5.1 #13: `voidRadius === MENU_R`, #2 `voidPx`, #12 `occluders` read from __menuState.",
+   "refuted": false,
+   "severity": "note",
+   "why": "Sound as game-reported state, with one snapshot risk: if MENU_R (1.2) is typed into the probe it is a transcribed constant (rule 4) and drifts the day the lookbook retunes it. voidPx as the game's own projection is acceptable but is the game grading itself; the probe can cross-check by projecting __voidGroup through __cam (both exist, :2139, :2048).",
+   "evidence": "docs/GOVERNOR.md:41-52; src/prototype3d.ts:2048, :2139; plan §2.4 'MENU_R = 1.2 … tuned in the lookbook'.",
+   "fix": "Expose `__menuState().menuR` and compare voidRadius to it; cross-check voidPx once by projection in the probe and print both."
+  },
+  {
+   "claim_or_bar": "§5.3 'New in the push profile: menu, levels, menuframe, endfit2, idiomguard — 35 → 40 steps' on the 'fast pre-push subset'.",
+   "refuted": false,
+   "severity": "note",
+   "why": "Unsized. qa/menu.mjs as one file runs 6 worlds × 430×932@2 real renders × 19 bars (bar 17 alone is 8 viewports), qa/menuframe.mjs 6 worlds × 2 rungs × 36 azimuths, levels.mjs 30 seeds + goal runs + 6 supply loads (questable's 6-world supply pass is registered at 1600 s in 'live' only, gate.mjs:406-408). Each world load here is minutes; the gate SIGKILLs at step.timeout and the ledger records timeouts sized before a world-count change going red on the clock (gate.mjs:216-222).",
+   "evidence": "qa/gate.mjs:31, :216-222, :406-408; qa/questable.mjs (per-world load + 2 s stable wait); plan §5.1, §5.3, §6.",
+   "fix": "Split each new probe into a static/DOM half (push, seconds) and a browser half (push only for maple, all worlds in live — the smoke/opening pattern, gate.mjs:89, :176-181); set timeouts from one measured run and print wall time per bar."
+  },
+  {
+   "claim_or_bar": "§2.7 menuRung degrade threshold: 'median dtRaw over the last 120 frames exceeds 17 ms'.",
+   "refuted": false,
+   "severity": "note",
+   "why": "A 60 Hz phone's honest median is 16.67 ms; the bar sits 0.33 ms above it with no measured jitter floor, so a healthy 60 Hz device can trip step 1 (DPR 1.0) permanently on the menu from vsync jitter alone. Not a probe bar, but it is a number with no run behind it (rule 3) and bar 16 will pass at 25 ms either way.",
+   "evidence": "src/prototype3d.ts:9476 (dtRaw = clock.getDelta, wall time); plan §2.7; docs/GOVERNOR.md:30-33.",
+   "fix": "Set the threshold from the day-15 device pair (e.g. p75 > 20 ms for two consecutive windows), and make bar 16 test hysteresis (no step at 16.7 ms cranks, step at 25 ms)."
+  },
+  {
+   "claim_or_bar": "§5.3 day 1 guards: pickerfit throws on zero cards; firstframe fails on a missing #menu selector. §2.8 bar 7 / #13 restored island; #16 menu rung; #19 locked tap; §3.5 bars 1-4 (state machine, monotone migration, pip geometry, fail-forward).",
+   "refuted": false,
+   "severity": "note",
+   "why": "These are numbers a probe can fail without a GPU: DOM boxes, localStorage seeds, __levels()/__menuState() state, Lab ΔE on opaque-ground screenshots (the pickerfit/lockedcards method already runs green under swiftshader), and cranked-clock logic (ladder.mjs's technique). Each fails on the pre-fix build by absence of the element/hook (throw), which satisfies rule 2. The vacuous-pass holes named (pickerfit.mjs:245-260, firstframe.mjs:220) are real and the day-1 fix is right.",
+   "evidence": "qa/pickerfit.mjs:104, :245-260; qa/firstframe.mjs:220; qa/lockedcards.mjs:41-49; qa/ladder.mjs:65-90; docs/GOVERNOR.md:18-28.",
+   "fix": "None beyond the corrections above; keep 'missing hook → throw' in every new bar and commit each failing run."
+  }
+ ],
+ "verdict": "SOUND WITH CORRECTIONS",
+ "the_one_thing_that_would_sink_it": "qa/levels.mjs as contracted runs ten goal-runs to 90-150 match-seconds on a harness whose match clock is ~14x slower than the wall (GOVERNOR.md:54-56), inside a gate that SIGKILLs at step.timeout (gate.mjs:31) — so either the ladder ships with its probe never in push, or the push gate stops being runnable; and on day 5 every existing match probe silently becomes a level-1 run that can end on the spot (attract-mode autopilot :9849 + AUTO_START :3631), turning newsfeed/faceparity/econ into unpaired comparisons. Write (b)/(c) on the virtualised clock with explicit goal hooks, gate the goal check on a level actually being played, and fix renderer.info.autoReset before any draw-call number is written down."
+}
