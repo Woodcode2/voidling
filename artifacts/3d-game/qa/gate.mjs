@@ -229,7 +229,13 @@ const SUITE = [
     cmd: ['node', 'qa/purpose.mjs', String(PORT), '--secs=30'],
     verdict: pf,
     why: 'the crowd has somewhere to be — a third of every world\'s moving people complete a journey (leave, arrive, stay) in thirty seconds, and the median person walks toward something rather than in circles (round 5, the owner\'s "every person moving, there\'s got to be a purpose behind that")' },
-  { id: 'splash', tier: 'quality', profiles: ['push', 'live', 'quality'], timeout: 900,
+  // TIMEOUT SIZED FROM TWO RUNS, NOT ONE. Six viewports of real-pixel contrast under
+  // swiftshader took 611 s on the host that ran the 2026-09-09 green gate and
+  // over 900 s on the 2026-09-10 host at the gate's own load of ~3.6 on 4 cores
+  // (every step that run was ~1.55x slower, purpose 1515 -> 2294 s). A 900 s
+  // ceiling read a slower machine as a red splash; 1800 s is 3x the fast host
+  // and ~1.9x the slow one, and is still a SIGKILL if the probe ever hangs.
+  { id: 'splash', tier: 'quality', profiles: ['push', 'live', 'quality'], timeout: 1800,
     cmd: ['node', 'qa/firstframe.mjs', String(PORT), 'maple', '--splash',
           '--views=430x932@2,440x956@3,440x814@3,430x740@3,393x700@3,375x667@2'],
     verdict: pf,
