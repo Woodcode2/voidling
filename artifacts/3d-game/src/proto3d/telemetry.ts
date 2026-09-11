@@ -30,9 +30,29 @@ const ctx: Record<string, unknown> = {};
 /** Set a dimension carried by all later events (world, skin, level…). */
 export function setCtx(k: string, v: unknown): void { ctx[k] = v; }
 
+// ── QA: THE LAST EVENTS, READABLE FROM A PROBE ────────────────────────────
+// Events are batched and posted to an edge function every probe stubs, so
+// asserting "this fired once with these fields" meant either unpicking a
+// batched POST body or waiting on a flush neither of which is the thing being
+// tested. This is a 200-slot ring written on the way past: no flag, no DOM, no
+// network, and it never affects what is actually sent.
+const EV_N = 200;
+let evRing: { event: string; props: Record<string, unknown>; t: number }[] = [];
+/** QA only. Pass true to clear the ring first — a probe asserting "fired once"
+ *  needs a known-empty start, and boot alone emits a handful of events. */
+export function recentEvents(clear = false): { event: string; props: Record<string, unknown>; t: number }[] {
+  if (clear) { evRing = []; return []; }
+  return evRing.slice();
+}
+
 /** Record a moment. Safe from anywhere; failures are swallowed upstream. */
 export function track(event: string, props: Record<string, unknown> = {}): void {
-  try { logEvent(event, { ...ctx, ...props }); } catch { /* telemetry never breaks a game */ }
+  try {
+    const merged = { ...ctx, ...props };
+    evRing.push({ event, props: merged, t: Date.now() });
+    if (evRing.length > EV_N) evRing.shift();
+    logEvent(event, merged);
+  } catch { /* telemetry never breaks a game */ }
 }
 
 // ── session shape ───────────────────────────────────────────────────────────

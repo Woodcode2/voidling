@@ -365,6 +365,13 @@ const SUITE = [
     cmd: ['node', 'qa/worldlists.mjs'], verdict: pf,
     why: 'no probe in qa/ believes in a game with fewer worlds than exist — the gate itself had a five-world list on the day world 6 shipped, and twenty-three probes were still frozen at world 4' },
 
+  // THE LADDER'S STATE. Registered on day 3 with (a)(f)(g)(i) — the parts that
+  // need no match wiring. (b)(c)(d)(e)(h) arrive with days 4-6 and the timeout
+  // is re-sized then; 420s is a measured 195s run with room for a slow box.
+  { id: 'levels', tier: 'feel', profiles: ['push', 'live'], timeout: 420,
+    cmd: ['node', 'qa/levels.mjs', String(PORT), '--only=a,f,g,i'], verdict: pf,
+    why: 'the ladder agrees with itself about where a child is — thirty dots, one green ring per world, and a dot that is opened only by a goal MET, never by a match merely finished' },
+
   { id: 'stickerreg', tier: 'quality', profiles: ['push', 'live'], timeout: 30,
     cmd: ['node', 'qa/stickerreg.mjs'], verdict: pf,
     why: 'every world hides things worth finding and every season is something a child can hunt — a world with no stickers ships a picker card whose invitation reads "✨ 0 SECRETS"' },

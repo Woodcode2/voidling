@@ -51,6 +51,8 @@ import { STICKERS_BY_WORLD, STICKERS, collectInRun, hasSticker, TIER_POINTS,
   runFinds, clearRun, foundCount, totalCount, type Sticker } from './game/stickers';
 import { liveEvents, eventForWorld, eventEndLabel, type SeasonEvent } from './game/seasons';
 import { isUnlocked, gateFor, completeWorld, WORLD_LABEL, unlockedCount, type WorldKey } from './game/unlocks';
+import { allLevels, current as levelCurrent, recordLevelResult, type Goal } from './game/levels';
+import { recentEvents } from './proto3d/telemetry';
 import { bumpMatch, deal, type Deal } from './game/matchdeck';
 // the district ids this world's newsroom knows, so a biome from another world
 // can never be handed to it as a key
@@ -356,6 +358,35 @@ const _wantWorld = new URLSearchParams(location.search).get('w')
   ?? localStorage.getItem('voidWorld') ?? 'maple';
 const pickedWorld: WorldId = (WORLDS as string[]).includes(_wantWorld) ? _wantWorld as WorldId : 'maple';
 setWorld(pickedWorld);
+
+// ── WHICH DOT IS BEING PLAYED, AND THE RULE THAT NOTHING ELSE MAY SET IT ───
+// `playingGoal` is non-null only when a HUMAN chose a level: PLAY, a pip tap,
+// or a cross-reload carrying voidPlayGoal. It is the switch that makes a match
+// a level attempt.
+//
+// It must stay null for everything else, and that is not fussiness. ?len= turns
+// on DEBUG_HARNESS and AUTO_START, so a browser with nobody behind it starts
+// its own match — and about a hundred probes run exactly that way. If those
+// counted as level attempts, then from the day goalMet() lands every one of
+// them could end early on a goal nobody set, and newsfeed, faceparity and econ
+// pair their runs, so their baselines would un-pair without anything looking
+// broken. qa/levels.mjs (i) is the bar.
+//
+// ?g= mirrors ?w= for probes; voidPlayGoal is the cross-reload channel beside
+// voidWorld and voidAutoPlay, written where those are and consumed here.
+let playingGoal: Goal | null = null;
+const _wantGoal = (() => {
+  const q = new URLSearchParams(location.search).get('g');
+  let stored: string | null = null;
+  try { stored = localStorage.getItem('voidPlayGoal'); } catch { /* private mode */ }
+  const n = Number(q ?? stored ?? 0);
+  return n >= 1 && n <= 5 ? (n as Goal) : null;
+})();
+try { localStorage.removeItem('voidPlayGoal'); } catch { /* one-shot: it travels once */ }
+// A goal asked for by name IS a human choosing a level — §3.1 lists
+// voidPlayGoal beside PLAY and a pip tap as the three things that may set it.
+// It survives the reload a world change costs and is consumed once.
+if (_wantGoal !== null) playingGoal = _wantGoal;
 
 // ── AUDIO COMES UP BEFORE THE ISLAND, AND THAT ORDER IS THE POINT ──────────
 // This used to sit ~1800 lines further down, which put it AFTER all five of
@@ -2042,6 +2073,11 @@ const _dbg = new Proxy(_dbgStore, {
     lookX?: number; lookZ?: number; lookY?: number } | null) => void;
   __heroPoint: () => { x: number; z: number } | null;
   __kindTally: () => Record<string, number>;
+  __levels: () => unknown[];
+  __levelCurrent: (w: string) => number;
+  __levelPlaying: () => number | null;
+  __recordLevel: (r: Record<string, unknown>) => unknown;
+  __events: (clear?: boolean) => unknown[];
   __landmarkProbe: () => { biggest: { x: number; z: number; radius: number; needR: number; qk: string } | null;
     nearHero: { x: number; z: number; radius: number; needR: number; qk: string } | null; eatRatio: number;
     band: Record<string, { n: number; rMin: number; rMax: number }> };
@@ -2384,6 +2420,23 @@ _dbg.__heroPoint = () => (COPY.hero ? { x: COPY.hero[0], z: COPY.hero[1] } : nul
 // QA (day 2): this match's eats by kind, from the eat handler's own
 // classification. Cleared at beginMatch, so it is per match, not per session.
 _dbg.__kindTally = () => ({ ...kindTally });
+// ── QA (day 3): THE LADDER ────────────────────────────────────────────────
+// All thirty rows from the SAME read path the pips will use — a probe that
+// read storage directly would be asserting against its own parser rather than
+// against the game, which is how qa/_distinct.mjs ended up unable to see a CSS
+// change at all.
+_dbg.__levels = () => allLevels();
+_dbg.__levelCurrent = (w: string) => levelCurrent(w);
+// null unless a human chose this level. See playingGoal's note: a harness
+// match must never read as a level attempt.
+_dbg.__levelPlaying = () => playingGoal;
+// Drive a result straight into the ladder without playing three minutes for
+// it. The state machine and the telemetry are pure given a result, and the
+// match wiring that produces one lands on day 5.
+_dbg.__recordLevel = (r: Record<string, unknown>) => recordLevelResult(r as never);
+// The last events, so "fired once with these fields" is assertable without
+// unpicking a batched POST to an endpoint every probe stubs.
+_dbg.__events = (clear?: boolean) => recentEvents(!!clear);
 // QA (day 2): what LANDMARK would actually be asking for. `biggest` is the
 // island's largest edible — what heroProp resolves to (`:6229`) and therefore
 // what the finale cue fires on. `nearHero` is the largest edible within 60
