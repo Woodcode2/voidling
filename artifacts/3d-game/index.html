@@ -108,6 +108,21 @@
         --r-sm: 12px; --r-md: 18px; --r-lg: 26px;
         --shadow-card: 0 10px 28px rgba(0,0,0,0.5);
         --shadow-pop: 0 16px 44px rgba(0,0,0,0.6);
+        /* ── THE CLOCK'S OWN GEOMETRY, ONCE ────────────────────────────────
+           #timer's type SCALES with the viewport and its neighbours have to
+           clear it. Both numbers lived only inside #timer, so the goal chip
+           below was positioned against a number read off one phone — and
+           stopped clearing the moment the clamp reached its ceiling.
+           MEASURED (qa/_chipfit.mjs, four viewports): the clock's bottom edge
+           is 47 / 54 / 60 / 60 at 360 / 430 / 834 / 1024 px wide, against a
+           chip parked at a flat 58 — so it cleared by 11px and 4px on phones
+           and OVERLAPPED BY 2px on both tablets. Declared here so the clock
+           and everything that has to sit under it read the same numbers. */
+        --timer-top: max(12px, calc(12px + env(safe-area-inset-top, 0px)));
+        --timer-type: clamp(26px, 8vw, 40px);
+        /* the clock's line box, measured at 1.20-1.22x its font-size across
+           all four viewports; 1.25 is that with the rounding in our favour */
+        --timer-bottom: calc(var(--timer-top) + 1.25 * var(--timer-type));
       }
       /* one rim treatment, spent everywhere a surface is raised */
       .clay { background: var(--panel);
@@ -132,8 +147,8 @@
            so the lane is gone and the clock centres properly — leaving 42vw
            would have parked it 12% off-centre for a reason that no longer
            exists. */
-        position: fixed; top: max(12px, calc(12px + env(safe-area-inset-top, 0px))); left: 0; right: 0; text-align: center; z-index: 5;
-        color: #fff; font-size: clamp(26px, 8vw, 40px); font-weight: 700; letter-spacing: 1px;
+        position: fixed; top: var(--timer-top); left: 0; right: 0; text-align: center; z-index: 5;
+        color: #fff; font-size: var(--timer-type); font-weight: 700; letter-spacing: 1px;
         /* every neighbour in the top band has a backing pill; the timer had a
            single soft blur, and its urgency colour #ff8a8a measured 1.02:1
            against beach sand — the alarm state was the LOWEST-contrast state
@@ -488,7 +503,9 @@
          readable at arm's length over a moving world. Cream on the house
          violet, the same pair every HUD chip uses. */
       #goal { position: fixed; left: 50%; transform: translateX(-50%);
-        top: calc(env(safe-area-inset-top, 0px) + 58px); z-index: 12;
+        /* under the clock, wherever the clock ends — not at a number picked
+           off one phone. 6px of air at every width (see --timer-bottom). */
+        top: calc(var(--timer-bottom) + 6px); z-index: 12;
         display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px;
         border-radius: 22px; background: rgba(28, 15, 61, 0.82);
         box-shadow: 0 2px 10px rgba(0,0,0,0.35); pointer-events: none; }

@@ -447,6 +447,22 @@ nagging.** `LEVEL_SPEC` per world, the goal object set in `beginMatch` before
   for the game, load-bearing for any probe of the card — and a code comment
   claiming the opposite has been retracted in place.
 
+Day 4's gate: **PASS 36/36** (`3d8b414`), 5,779 s. The `levels` step went
+394 s → 661 s carrying the two new parts, inside its re-sized 1,800 s timeout.
+
+One more thing day 4 measured, after that gate: **the goal chip was overlapping
+the clock on tablets.** `#timer`'s type is `clamp(26px, 8vw, 40px)`, so its
+bottom edge moves with the viewport — 47 / 54 / 60 / 60 px at 360 / 430 / 834 /
+1024 — and the chip had been parked at a flat 58 px picked off a 430 px phone.
+It cleared by 11 px and 4 px on phones and **overlapped by 2 px on both
+tablets**. The clock's top and type are now declared once on `:root` and the
+chip sits at `--timer-bottom + 6px`, so it tracks the clock instead of a
+transcribed number: **7-8 px of air at every width**. `qa/_chipfit.mjs` is the
+measurement (a scratch diagnostic, not gate-registered — the multi-viewport
+geometry bar belongs to day 12, where the brief already plans the viewport
+pass). **The branch tip carrying this CSS is NOT yet gate-green**; the last
+green build is `3d8b414` and the next full run covers days 4 and 5 together.
+
 **Next: day 5** — `goalMet()` with the `outroT <= 0` first-writer guard,
 `endMatch(result)`, `recordLevelResult` at the buzzer, `completeWorld` in the
 solo branch, the landmark exclusion and the quit path; `levels.mjs` (h), and
