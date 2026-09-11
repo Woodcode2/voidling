@@ -361,9 +361,33 @@ probe prints "PASS — ... all 5 world cards" on a build with Skylark's card
 deleted), and `firstframe` FAILS on a missing `#menu` selector instead of
 silently skipping it.
 
-**Next: day 2** — `qa/pace.mjs` on six worlds, the CLEAR numbers, the first
-shadowless frame's ms, and Maple's stage (its `hero` is null, so day 1 could
-not frame it; §2.9.7).
+**Day 2 is DONE (2026-09-11): the thirty goals are set from measurement,**
+`MENU-BRIEF.md` §3.4a. Thirty matches, six worlds, five seeded runs each on a
+virtualised clock, plus twelve hunting runs. Evidence in
+`docs/crews/round-8/goalcurve-day2-*.log` and the raw per-second series in
+`qa/out/goalcurve/*.json`. In plain language:
+
+- **Dot 3 (LANDMARK) was unwinnable on every world and is now fixable.** Growth
+  is back-loaded — radius ~2.8 at a quarter of the clock, ~4 at half, ~5.1 at
+  three quarters, 10-14 at the buzzer — so a hero landmark at r 6.5-11 is edible
+  only in the last 13-18 seconds, and Skylark's resolves to the tethered whale
+  needing R 16.22 against a law that tops at 12. Fix: dot 3 names a mid-tier
+  building at r 5.5-6.0, which every world already carries untagged. ~45 s of
+  slack instead of 13.
+- **CLEAR at 100% was wrong AND its evidence was wrong.** A competent run
+  devours 49-84% of the world. CLEAR set at 30% lands at ~70% of the clock.
+- **The autopilot cannot set a SET goal.** It eats nearest-first: 484 snacks and
+  ZERO houses by 70% of the clock. `DRIVE_KIND` hunts a kind and eats 40. The
+  binding constraint is when a kind first becomes edible, not the count — on
+  Maple the first house is 75 s and the fifth is 76 s.
+- **The boss the owner asked for already exists and fires.** NIBBLES peaks at
+  1.56-1.74x the player, charges 3x a match, and is edible ~120 s of 181. But
+  the marquee meal is p50 1 / **p10 0** — one run in three misses her even with
+  a perfect driver, so the 0.3%/s sag needs tuning before it can gate a dot.
+
+**Next: day 3** — `src/game/levels.ts` on the owner's WIN gate, `level_*`
+telemetry, `voidPlayGoal`/`?g=`, and `qa/levels.mjs` (a)(f)(g)(i) written first
+and failing.
 
 **HARNESS, read this before running anything:** the repo declares neither
 `playwright` nor `pngjs`, and `qa/` imports both — so on a fresh container the

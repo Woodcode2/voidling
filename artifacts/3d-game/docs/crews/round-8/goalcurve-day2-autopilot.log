@@ -1,0 +1,74 @@
+
+  GOALCURVE — what one competent run reaches, per world
+  worlds maple,pirate,gameday,lantern,powder,skylark · port 4177
+  THE DRIVER IS NOT A CHILD: nearest-edible autopilot, perfect information, no hesitation.
+  Every number below is a CEILING. Goals go under it by a factor day 15 measures.
+
+  ══ MAPLE ══  181 match-seconds · 5 seeded run(s) · SEED 7
+     EAT       final score  p10 104744 · p50 189607 · p90 280502
+               reached  25% of the clock p10 7175 · p50 7743 · p90 10141 · 50% p10 23775 · p50 24986 · p90 25721 · 75% p10 39866 · p50 51303 · p90 70984
+     LANDMARK  untagged r 6.5 needs R 5.86 · reached at p10 98 · p50 122 · p90 143s of 181
+     RIVALS    rank at the buzzer p10 1 · p50 1 · p90 1 · joined 5/5 · best rival p10 52375 · p50 62956 · p90 82935
+     SIZE      radius at 25% of the clock p10 2.827 · p50 2.832 · p90 2.871 · 50% p10 2.585 · p50 4.048 · p90 4.746 · 75% p10 5.486 · p50 7.282 · p90 9.309 · buzzer p10 13.24 · p50 15.59 · p90 21.41
+               biggest prop she could EAT then: 25% p10 3 · p50 3 · p90 3 · 50% p10 2.8 · p50 4.47 · p90 5.26 · 75% p10 5.28 · p50 6 · p90 6.5
+     CLEAR     world devoured p10 52 · p50 58 · p90 67% · of which HERS p10 29 · p50 36 · p90 49% and the family's p10 18 · p50 21 · p90 24%
+     SET       ate  bridge p10 1 · p50 1 · p90 4 · cabana p10 194 · p50 265 · p90 496 · car p10 4 · p50 8 · p90 19 · gild p10 2 · p50 4 · p90 7 · house p10 0 · p50 8 · p90 18 · roadworks p10 0 · p50 5 · p90 8 · snack p10 1037 · p50 1264 · p90 1557
+               have bridge 8 · cabana 1248 · car 52 · gild 21 · house 70 · roadworks 18 · snack 2519
+
+  ══ PIRATE ══  181 match-seconds · 5 seeded run(s) · SEED 7
+     EAT       final score  p10 120679 · p50 189587 · p90 271290
+               reached  25% of the clock p10 9506 · p50 13940 · p90 15082 · 50% p10 25800 · p50 28817 · p90 43122 · 75% p10 25800 · p50 65468 · p90 82594
+     LANDMARK  untagged r 10 needs R 9.01 · reached at p10 147 · p50 154 · p90 158s of 181
+     RIVALS    rank at the buzzer p10 1 · p50 1 · p90 1 · joined 4/4 · best rival p10 64190 · p50 70159 · p90 106855
+     SIZE      radius at 25% of the clock p10 2.834 · p50 3.511 · p90 3.521 · 50% p10 2.612 · p50 4.046 · p90 5.436 · 75% p10 6.154 · p50 6.432 · p90 7.933 · buzzer p10 12.76 · p50 16.45 · p90 22.45
+               biggest prop she could EAT then: 25% p10 3 · p50 3 · p90 3 · 50% p10 2.8 · p50 4.4 · p90 5.6 · 75% p10 5.6 · p50 7 · p90 8
+     CLEAR     world devoured p10 59 · p50 86 · p90 95% · of which HERS p10 43 · p50 62 · p90 74% and the family's p10 16 · p50 21 · p90 31%
+     SET       ate  cabana p10 92 · p50 200 · p90 246 · car p10 0 · p50 2 · p90 6 · gild p10 15 · p50 16 · p90 25 · snack p10 954 · p50 1477 · p90 1685
+               have cabana 578 · car 7 · gild 20 · snack 1764
+
+  ══ GAMEDAY ══  181 match-seconds · 5 seeded run(s) · SEED 7
+     EAT       final score  p10 194990 · p50 278995 · p90 353719
+               reached  25% of the clock p10 11953 · p50 14990 · p90 15652 · 50% p10 35482 · p50 42437 · p90 45701 · 75% p10 69466 · p50 84963 · p90 86672
+     LANDMARK  big r 11 needs R 9.91 · reached at p10 162 · p50 168 · p90 168s of 181
+     RIVALS    rank at the buzzer p10 1 · p50 1 · p90 1 · joined 4/4 · best rival p10 87407 · p50 93865 · p90 175717
+     SIZE      radius at 25% of the clock p10 2.832 · p50 2.835 · p90 2.838 · 50% p10 2.565 · p50 4.039 · p90 4.733 · 75% p10 5.693 · p50 5.732 · p90 6.459 · buzzer p10 13.55 · p50 13.73 · p90 16.21
+               biggest prop she could EAT then: 25% p10 3 · p50 3 · p90 3 · 50% p10 2.8 · p50 4.2 · p90 4.5 · 75% p10 4.2 · p50 4.5 · p90 7
+     CLEAR     world devoured p10 64 · p50 65 · p90 68% · of which HERS p10 42 · p50 43 · p90 49% and the family's p10 19 · p50 22 · p90 23%
+     SET       ate  big p10 0 · p50 10 · p90 17 · cabana p10 201 · p50 216 · p90 419 · car p10 41 · p50 55 · p90 72 · gild p10 2 · p50 8 · p90 10 · house p10 8 · p50 25 · p90 30 · rv p10 8 · p50 9 · p90 20 · snack p10 1004 · p50 1027 · p90 1062
+               have big 47 · cabana 1099 · car 185 · gild 20 · house 110 · rv 68 · snack 1883
+
+  ══ LANTERN ══  181 match-seconds · 5 seeded run(s) · SEED 7
+     EAT       final score  p10 154847 · p50 199883 · p90 206748
+               reached  25% of the clock p10 13282 · p50 17907 · p90 18433 · 50% p10 36542 · p50 48266 · p90 53000 · 75% p10 86514 · p50 93353 · p90 99659
+     LANDMARK  big r 11 needs R 9.91 · reached at p10 156 · p50 164 · p90 166s of 181
+     RIVALS    rank at the buzzer p10 1 · p50 1 · p90 1 · joined 5/5 · best rival p10 77904 · p50 89612 · p90 154923
+     SIZE      radius at 25% of the clock p10 2.827 · p50 2.833 · p90 2.888 · 50% p10 2.574 · p50 4.038 · p90 4.736 · 75% p10 5.731 · p50 6.399 · p90 6.465 · buzzer p10 12.69 · p50 15.95 · p90 19.34
+               biggest prop she could EAT then: 25% p10 3.06 · p50 3.06 · p90 3.06 · 50% p10 2.6 · p50 4.2 · p90 4.86 · 75% p10 2.6 · p50 2.6 · p90 7
+     CLEAR     world devoured p10 84 · p50 89 · p90 93% · of which HERS p10 54 · p50 63 · p90 66% and the family's p10 24 · p50 27 · p90 32%
+     SET       ate  cabana p10 78 · p50 120 · p90 148 · gild p10 5 · p50 10 · p90 11 · house p10 33 · p50 47 · p90 84 · snack p10 1751 · p50 1938 · p90 2073
+               have cabana 589 · gild 20 · house 319 · snack 2361
+
+  ══ POWDER ══  181 match-seconds · 5 seeded run(s) · SEED 7
+     EAT       final score  p10 48202 · p50 84572 · p90 115950
+               reached  25% of the clock p10 3298 · p50 5651 · p90 7392 · 50% p10 12406 · p50 20227 · p90 21426 · 75% p10 21544 · p50 32868 · p90 39401
+     LANDMARK  lodge r 10.5 needs R 9.46 · reached at p10 162 · p50 170 · p90 176s of 181
+     RIVALS    rank at the buzzer p10 1 · p50 1 · p90 1 · joined 4/4 · best rival p10 18608 · p50 22738 · p90 45069
+     SIZE      radius at 25% of the clock p10 2.368 · p50 2.651 · p90 3.528 · 50% p10 3.432 · p50 3.929 · p90 4.627 · 75% p10 4.588 · p50 5.144 · p90 6.141 · buzzer p10 10.47 · p50 12.69 · p90 14.67
+               biggest prop she could EAT then: 25% p10 2.6 · p50 2.8 · p90 3.6 · 50% p10 3.6 · p50 3.6 · p90 4.4 · 75% p10 2.4 · p50 3.6 · p90 4.4
+     CLEAR     world devoured p10 55 · p50 65 · p90 73% · of which HERS p10 42 · p50 53 · p90 64% and the family's p10 9 · p50 12 · p90 13%
+     SET       ate  cabana p10 0 · p50 0 · p90 1 · drift p10 31 · p50 37 · p90 61 · gild p10 4 · p50 10 · p90 12 · house p10 0 · p50 2 · p90 6 · hut p10 0 · p50 1 · p90 1 · lift p10 0 · p50 3 · p90 5 · pine p10 49 · p50 123 · p90 157 · sign p10 1 · p50 6 · p90 8 · sledkid p10 0 · p50 1 · p90 5 · snack p10 1749 · p50 2037 · p90 2499 · snowball p10 0 · p50 0 · p90 5 · snowballs p10 1 · p50 7 · p90 8 · snowman p10 22 · p50 36 · p90 37
+               have cabana 4 · drift 89 · gild 20 · house 25 · hut 1 · lift 12 · pine 301 · sign 8 · sledkid 6 · snack 3504 · snowball 0 · snowballs 8 · snowman 67
+
+  ══ SKYLARK ══  181 match-seconds · 5 seeded run(s) · SEED 7
+     EAT       final score  p10 62524 · p50 63223 · p90 122550
+               reached  25% of the clock p10 9965 · p50 12111 · p90 12575 · 50% p10 18310 · p50 26359 · p90 43942 · 75% p10 46681 · p50 59873 · p90 71382
+     LANDMARK  big r 18 needs R 16.22 · reached at nevers of 181
+     RIVALS    rank at the buzzer p10 1 · p50 1 · p90 1 · joined 3/3 · best rival p10 34245 · p50 35211 · p90 38959
+     SIZE      radius at 25% of the clock p10 2.837 · p50 2.842 · p90 2.843 · 50% p10 2.576 · p50 2.677 · p90 4.054 · 75% p10 5.676 · p50 5.721 · p90 6.5 · buzzer p10 11.55 · p50 12.28 · p90 13.17
+               biggest prop she could EAT then: 25% p10 2.8 · p50 2.8 · p90 2.8 · 50% p10 2.8 · p50 2.8 · p90 4.2 · 75% p10 5.2 · p50 5.5 · p90 5.5
+     CLEAR     world devoured p10 49 · p50 55 · p90 84% · of which HERS p10 47 · p50 51 · p90 80% and the family's p10 2 · p50 4 · p90 5%
+     SET       ate  big p10 62 · p50 84 · p90 112 · cabana p10 0 · p50 1 · p90 1 · car p10 53 · p50 56 · p90 78 · gild p10 7 · p50 11 · p90 13 · house p10 0 · p50 1 · p90 1 · small p10 1719 · p50 1992 · p90 3142 · snack p10 1683 · p50 1946 · p90 3058
+               have big 212 · cabana 3 · car 98 · gild 20 · house 2 · small 3611 · snack 3522
+
+  series written to qa/out/goalcurve/
+PASS — REPORT only: 6 world(s) x 5 seeded run(s) to the buzzer, every series read off the game's own hooks [2965s]

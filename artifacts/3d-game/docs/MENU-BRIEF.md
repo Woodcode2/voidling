@@ -847,7 +847,7 @@ winnable as first drafted, and these are the code's own words, not an opinion:
   on worlds 2–5 the landmark only comes into reach in the finale surge (`:1553-1555`).
 - **RIVALS** — needs `myRank === 1`, and the rubber band floors the family at "never
   below 3rd" (`rivals.ts:256`, `:701`, `:788`), not at first.
-- **CLEAR** — 100% `devouredPct` is measured in single digits on a real run (`:5462-5466`).
+- **CLEAR** — ~~100% `devouredPct` is measured in single digits on a real run (`:5462-5466`)~~ **WRONG, corrected day 2 (§3.4a, §9.7 #5):** the cited lines are the end-of-match stats block and say nothing about `devouredPct`, and measurement contradicts the claim — a competent run devours 49–84% of the world. CLEAR is a wall only because 100% was chosen; at 30% it is met at ~70% of the clock on every world.
 
 Win-gate those as drafted and a small six-year-old stops at Maple dot 3, permanently.
 So the decision converts §3.4 from a provisional table into the load-bearing one:
@@ -877,14 +877,14 @@ for being small". Three of the five dots are walls for a small child by the code
 admission: LANDMARK's cue "never fires" for a weaker player (`:1529-1531`) and worlds
 2–5 land the hero only in the finale surge (`:1553-1555`); RIVALS needs `myRank === 1`
 and the rubber band floors the family at "never below 3rd" (`rivals.ts:256`, `:701`,
-`:788`), not first place; CLEAR at 100% is measured in single digits (`:5462-5466`). Under
+`:788`), not first place; CLEAR at 100% is unreachable **though not for the reason given — see §9.7 #5**. Under
 draft 1 she sat nine minutes on a word she cannot read at each of them. Under this draft
 every finished match moves her on, and the marks are hers to come back for.
 
 **The alternatives, named.** (a) Draft 1's win gate with fail-forward at three misses —
 rejected above. (b) Thirty levels in one strict sequence — world W+1 opens only after
 W's goal 5. Cost, from the code: `devouredPct` counts everyone's meals against the
-plateau (`:4886`), real matches land in single digits on Maple (`:5462-5466`), so 25 of
+plateau (`:4886`), **and a competent run lands at 55% on Maple, not single digits (§3.4a)** — so 25 of
 30 levels and 5 of 6 worlds would be a wall for a six-year-old who cannot clear Maple —
 the exact case `unlocks.ts:8-16` forbids and `qa/unlocks.mjs` D asserts against. (c) A
 win gate where dots 3/4/5 are optional marks beside the row, not steps in it — a
@@ -906,7 +906,7 @@ Five states, one current per world (§3.1); the "green-and-open skipped pip" of 
 that contradicted "exactly one current" no longer exists (child skeptic note 7). Three
 of the states read without words — big green = mine, padlock = later, tick = I did it —
 and the star is **reachable**: it is the world's CLEAR number (§8.3), not a 100% measured
-in single digits, so a good run can earn it (child skeptic note 9).
+in single digits **(measured: 49–84% of the world, §3.4a — the star at 30% is comfortably earnable)**, so a good run can earn it (child skeptic note 9).
 
 Taps: current = PLAY; fin/done/clear = replay that level (transient `playing`); locked =
 200 ms wiggle + padlock jiggle + one low pop + `buzz(12)`, **no text**, and the void looks
@@ -950,6 +950,211 @@ CAN EAT THE WHALE NOW" (`:1665`) over a hangar level (code skeptic). Now
 `LEVEL_SPEC[world].landmark` names a prop tag (`userData.landmark`) set by the factory;
 the goal-3 poll reads that prop; the level's cue/gone strings live in `LEVEL_SPEC`;
 `heroCue`/`heroProp` stay the world's finale beat, untouched.
+
+### 3.4a The thirty goals, set from measurement — day 2, 2026-09-11
+
+This replaces §3.4's derived table. Every number below comes from
+`qa/goalcurve.mjs`: six worlds, five seeded runs each on a virtualised clock at
+16.667 ms a frame, plus twelve hunting runs for the SET kinds. Verbatim output
+in `docs/crews/round-8/goalcurve-day2-{autopilot,hunts}.log`; the raw per-second
+series for all thirty matches is in `qa/out/goalcurve/*.json`.
+
+**THE DRIVER IS NOT A CHILD, AND EVERY NUMBER HERE IS A CEILING.** The autopilot
+has perfect information and never hesitates; `WORLD_PAR`'s "verified: mean
+103,642" (`:551`) is this driver's mean and §3.4 already recorded that it is not
+a six-year-old's. So each goal is set at a fraction of what a competent run
+reaches on its BAD day (p10 of five runs), and **the fraction between this
+driver and a child is the one number that cannot be measured in a sandbox.** It
+comes off the owner's daughter on day 15 (§8.9). Until then every number here is
+provisional and says so.
+
+**Why p10 and not the mean.** Seeded, the WORLD is deterministic — rival scores
+repeat to within 0.5%. The PLAYER is not: the same seeded Maple came back
+108,533 / 176,364 / 182,378 across cranked runs, because the RNG stream's
+position when the match starts depends on the handful of real frames before the
+crank takes over. Under a win gate a goal must clear the bad days, not the
+average one.
+
+#### Dot 1 · EAT — met at about half the clock
+
+Score reached at 50% of the clock (p10), and the goal set under it:
+
+| world | score at 50% (p10) | at 75% (p10) | final (p10) | **EAT goal** | lands at |
+|---|---|---|---|---|---|
+| Maple | 18,790 | 34,294 | 113,799 | **18,000** | ~49% |
+| Pirate | 19,353 | 24,296 | 72,837 | **18,000** | ~47% |
+| Game Day | 34,800 | 54,128 | 187,772 | **32,000** | ~47% |
+| Lantern | 41,206 | 70,509 | 198,801 | **40,000** | ~49% |
+| Powder | 11,104 | 28,146 | 64,392 | **10,000** | ~46% |
+| Skylark | 32,020 | 59,502 | 76,827 | **30,000** | ~47% |
+
+Dot 1 is the first thing a child meets in a world and it is deliberately the
+easiest: met at about half the clock by a competent run, which leaves the whole
+second half as margin for a slower one. §3.4's draft set these at 0.6 x par —
+between 21,000 and 105,000 — which on Pirate was **87% of what a competent run
+reaches on a bad day**. That would have been a wall on dot 1.
+
+#### Dot 2 · SET — met between 22% and 55% of the clock
+
+The SET numbers could not be set from the autopilot at all. It eats
+nearest-first, so by 70% of the clock it had eaten 484 snacks and **zero houses
+and zero cars on Maple** — not because houses are unreachable, but because a
+snack is always nearer. `DRIVE_KIND` (`qa/_drive.mjs`) hunts a named kind and
+falls back to the nearest edible while none is in reach, which is what a child
+hunting houses actually does. Same world, same seed: **2 houses became 40.**
+
+The binding constraint is not the count. It is WHEN the kind first becomes
+edible — houses and cars sit at r 3.2-3.6 and the void has to grow into them.
+On Maple the first house is eaten at 75 s and the fifth at 76 s: once one is
+edible they all are, because they stand in streets.
+
+| world | triple | p10 completion | of the clock |
+|---|---|---|---|
+| Maple | **5 houses · 8 cars · 40 snacks** | 76 s (house 5 @76, car 8 @67) | 42% |
+| Pirate | **8 gold · 20 cabanas · 60 snacks** | 56 s (gold 8 @56, cabana 20 @48) | 31% |
+| Game Day | **4 trucks · 8 houses · 40 snacks** | 99 s (car 4 @48, house 8 @99) | 55% |
+| Lantern | **10 gold · 40 stalls · 100 snacks** | 48 s (gold 10 @48, house 40 @48) | 27% |
+| Powder | **4 gold · 4 chalets · 40 snacks** | 91 s (gold 4 @20, house 4 @91) | 50% |
+| Skylark | **10 gold · 40 vans · 100 snacks** | 39 s (gold 10 @27, car 40 @39) | 22% |
+
+The spread (22–55%) is not sloppiness, it is the worlds being different:
+Lantern's 319 stalls stand shoulder to shoulder and Powder's 25 chalets do not.
+**Gold is capped at 10 deliberately** — only 20 props are gilded per match
+(`GILD_PER_MATCH`) and the family eats some, so 20 reads "never" on Lantern and
+Skylark and 147 s on Pirate. A goal of 15 would be a coin toss.
+
+Supply, checked against the client's own `HOUSE_LIKE` via `__questPools`:
+Maple 70 house-like, Game Day 110, Lantern 319, Powder 25, Skylark 2, Pirate
+none. Every triple above clears 3N, and the cars-and-houses 6N rule.
+
+#### Dot 3 · LANDMARK — the hero landmark cannot be the goal
+
+Measured, and this is the finding that forces a change. The growth curve is
+brutally back-loaded — radius p10 ~2.8 at a quarter of the clock, ~4.0 at half,
+~5.1 at three quarters, then 10.5–14.3 at the buzzer. So every world's hero
+landmark is edible only in the last seconds, and on one world never:
+
+| world | hero landmark | needs R | reached at (p10 / p50 / p90) | slack |
+|---|---|---|---|---|
+| Maple | Town Hall r 6.5 | 5.86 | 127 / 137 / 145 s | 36 s |
+| Lantern | r 11 | 9.91 | 133 / 157 / 163 s | 18 s |
+| Pirate | Royal Mariner r 10 | 9.01 | 146 / 156 / 163 s | 18 s |
+| Game Day | Stadium r 11 | 9.91 | 149 / 160 / 168 s | 13 s |
+| Powder | Lodge r 10.5 | 9.46 | 163 / 165 / 168 s | **13 s** |
+| Skylark | the whale r 18 | 16.22 | **never** | — |
+
+A perfect driver reaches it with 13–18 seconds left on four worlds. Skylark's
+resolves to the tethered whale needing R 16.22 against a growth law that tops
+out at 12 (`LAW_TOP`) — impossible by construction, which is the trap §3.4
+predicted and this confirms.
+
+**The fix, measured rather than guessed.** `__landmarkProbe().band` lists what is
+standing at r 3.2–6.0, the band a child reaches with time to spare. Every world
+carries buildings there; they are simply untagged:
+
+| world | in the reachable band |
+|---|---|
+| Maple | 305 untagged (r 3.2–6) · 70 houses · 1 car |
+| Pirate | 242 untagged (r 3.4–5.6) |
+| Game Day | 68 RVs (r 4.2) · 62 untagged · 26 cars · 1 big (r 4.5) |
+| Lantern | 227 houses (r 3.4–4.6) · 3 big (r 4.2–6) |
+| Powder | 23 chalets (r 3.6) · 2 untagged (r 4.4–5.6) |
+| Skylark | 128 big (r 4.2–5.5) · 1 untagged (r 5.6) |
+
+**Dot 3 therefore names a mid-tier building of radius 5.5–6.0**, tagged in each
+world's factory as `LEVEL_SPEC[world].landmark` (day 4). It needs R 5.0–5.4,
+which a competent run passes at about 75% of the clock — roughly 45 seconds of
+slack instead of 13. The world's hero landmark is untouched and stays the
+finale beat (`heroCue`/`heroProp`), exactly as §3.4 requires.
+
+#### Dot 4 · RIVALS — rank 1 is the last world's goal, not the first's
+
+The autopilot takes rank 1 at p10, p50 and p90 on every world — but it
+outscores the family roughly two to one (Maple 132,658 against a best rival of
+78,305), so this says the goal is winnable by a strong player, not by a small
+one. The rubber band floors the family at "never below 3rd"
+(`rivals.ts:256`), so a rank goal below 3 is the honest ceiling for a child.
+
+Ramped across the unlock order, which is the difficulty curve the owner asked
+for: **Maple and Pirate rank ≤ 3 · Game Day and Lantern rank ≤ 2 · Powder and
+Skylark rank 1.**
+
+#### Dot 5 · CLEAR — 30% of the world, not 100%, and probably the boss instead
+
+§3.3, §3.4, §8.1, §8.3 and §9.1 all rest on "100% `devouredPct` is measured in
+single digits on a real run (`:5462-5466`)", used to argue the star is "a
+colour she would never see". **The citation does not support it** — those lines
+are the end-of-match stats block and say nothing about `devouredPct` — and the
+measurement contradicts it. Percentage of the world devoured, p10 of five runs:
+
+| world | at 50% of the clock | at 70% | at 90% | buzzer |
+|---|---|---|---|---|
+| Maple | 17 | 29 | 43 | 55 |
+| Pirate | 27 | 29 | 35 | 59 |
+| Game Day | 16 | 33 | 51 | 64 |
+| Lantern | 30 | 48 | 72 | **84** |
+| Powder | 19 | 31 | 43 | 55 |
+| Skylark | 21 | 39 | 48 | 49 |
+
+**And there is no tail grind.** The curve accelerates to the buzzer — the last
+tenth of the clock adds 10 to 24 points, because a void that size swallows
+whole blocks. The grind a child experiences is real but it is the MIDDLE of the
+match, before she is big enough for the fast part.
+
+`devouredPct` also counts the family's meals. Her own share at 70% (p10) is
+Maple 14%, Pirate 16%, Game Day 19%, Powder 22%, Lantern 28%, Skylark 38%.
+
+**CLEAR set at 30% of the world** is met at about 70% of the clock on every
+world — winnable with a minute to spare, against the 100% the brief assumed.
+
+**But dot 5 should probably not be CLEAR at all.** The owner's 2026-09-11 ask —
+a boss on the final dot of every world, a bigger family member — turns out to
+describe something already shipped and tuned: see §3.4b.
+
+#### 3.4b The boss already exists, and it fires
+
+`rivals.ts` authors NIBBLES (arch `BULLY`) as two acts: a predator looming at
+1.5x the player for the first 55% of the match, then STUFFED — growth stops and
+her ceiling sags 0.3%/s until the player's finale surge overtakes her and she
+becomes, in the file's own words, "the marquee meal — the whole payoff of the
+arc". The sag rate is already tuned: a first pass at 0.7%/s deflated her and
+"she no longer LOOKED like the biggest meal on the island, which is half of why
+a kid goes after her."
+
+Nothing had ever measured whether it lands, and `gate.mjs:210` puts
+`qa/rivalnotice` ON PROBATION — "last read 0.0/min in maple, gate open 0%". So
+it was measured (Maple, three seeded runs):
+
+| | measured |
+|---|---|
+| peak size | **1.56–1.74x** the player's radius |
+| charges | **3 per match**, every run |
+| bites taken off the player | 1–3 |
+| first edible | **~120 s of 181** — a minute to hunt her |
+| marquee meals taken | p50 **1** · p10 **0** |
+
+**The arc fires.** The pacing the owner asked for already exists. Two things
+follow. First, this is naming, not building: dot 5's goal becomes "EAT NIBBLES"
+and the percentage drops to a low ticket or out of the gate entirely. Second,
+**at p10 the marquee meal is 0** — one run in three misses her even with a
+perfect driver, and a boss dot that fails a third of the time for a perfect
+player cannot gate anything. The sag rate is a one-number change and day 4
+tunes it until p10 is 1.
+
+The threat is already shipped and rated 4+: she charges three times and bites
+the player in every match the game has ever run. Naming it raises it from
+background to foreground, which is a day-15 observation, not a new risk.
+
+**Different bosses per world** (the owner's ask) is largely already authored:
+the five archetypes have genuinely different AI — BULLY hunts, SHOWOFF crosses
+the island for the biggest thing, COPYCAT drives the player's own route seven
+seconds behind, HOARDER works a patch at half speed, COWARD bolts from anything
+bigger. Promoting a different relative per world gives six different fights out
+of shipped behaviour. **The blocker is one number and it is the owner's:** only
+`BULLY` can exceed `softCap` — both escapes are inside `if (isHunter)` — and
+`GOVERNOR.md` logged on 2026-08-25 that raising it is "a measured balance number
+the VOID TITAN feast depends on. Not mine to move." It is the same call the
+owner made on 2026-08-25 ("any void that's larger") and it is still open.
 
 ### 3.5 Bars
 
@@ -1587,6 +1792,24 @@ this one until we're ready. It's food for thought."* — so `HANDOFF.md` §2's "
 ad-skip currency, 4+ stays 4+" **stands unchanged and nothing about ads is approved**. It
 is recorded here so a later session does not read the phrase as a decision.
 
-A fifth item is a gap this brief did not know it had: **Maple has no stage to measure.** `WORLD_COPY.maple.hero` is null, so there is nothing for a hero-framed
+**Correction 5, day 2: "CLEAR at 100% is measured in single digits (`:5462-5466`)" is
+wrong, and it is load-bearing in six places** (§3.3, §3.4, §8.1, §8.3, §9.1 #1 and #10,
+where it argues the magenta star is "a colour she would never see"). The cited lines are
+the end-of-match stats block — `stats.matches++`, `stats.best`, the trophy payout — and
+say nothing about `devouredPct` at all. Measured across thirty matches (§3.4a): a
+competent run devours 49–84% of the world, of which 32–63% is the player's own. The star
+is not unreachable; 100% was simply the wrong number to ask for. Every use of the claim
+is annotated in place.
+
+**Correction 6, day 2: the autopilot cannot set a SET goal, and for one commit this brief
+had the reason backwards.** The nearest-edible driver ate 484 snacks and zero houses by
+70% of the clock on Maple, and the first reading of that was "Powder's house supply is
+zero, so its SET triple is unwinnable". That was wrong: Powder carries 25 house-like
+props, and the zero came from `goalcurve`'s own report printing only the kinds a run had
+EATEN rather than the full supply. Every triple §3.4 proposed has the supply it needs.
+The real finding is the driver: `DRIVE_KIND` hunts a named kind, and on the same world
+with the same seed it eats 40 houses where the autopilot ate 2 (§3.4a, dot 2).
+
+A seventh item is a gap this brief did not know it had: **Maple has no stage to measure.** `WORLD_COPY.maple.hero` is null, so there is nothing for a hero-framed
 sweep to stand off, and §2.3's Maple stage (the waterfall lip) is a module-local const in
 `island.ts` that no probe may transcribe. Day 2 exposes it and re-runs Maple (§2.9.7).
