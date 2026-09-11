@@ -548,9 +548,43 @@ if (pre.length) {
 }
 
 // ── RUN ──────────────────────────────────────────────────────────────────────
+// ── KILL THE STRAYS, AND THEN CHECK THAT THEY DIED ────────────────────────
+// This used to be one line and it had never once worked:
+//
+//   pkill -f 'chrome-linux/chrome'; pkill -f 'pw-browsers/chromium'
+//
+// `pkill -f` matches the FULL COMMAND LINE of every process, and the `bash -c`
+// carrying that string has both patterns inside its own command line. So the
+// first pkill terminated the cleanup shell — status 143, SIGTERM — and the
+// second, the one that kills the browser every probe in this directory
+// actually launches, never ran. The evidence is qa/_day4_straytest.sh.
+//
+// The consequence was a step's browser surviving into the next step, which is
+// trap #6 in docs/HANDOFF.md ("Zombie Chromium starves later probes into
+// timeouts") written down as a hazard rather than as this live bug. It cost a
+// day-4 gate run: `splash` went red on a 30-second screenshot timeout, and the
+// same build passed 6/6 views the moment the stray was killed by hand.
+//
+// Two fixes. A bracketed character in each pattern, so a pattern can never
+// match the shell that carries it. And a WAIT: pkill returns the instant it
+// has signalled, not when the process is gone, so the old shape would have
+// raced even if it had run. This escalates to SIGKILL and reports anything
+// that outlives both.
 const strays = () => new Promise(res => {
-  const k = spawn('bash', ['-c', "pkill -f 'chrome-linux/chrome' 2>/dev/null; pkill -f 'pw-browsers/chromium' 2>/dev/null; true"]);
-  k.on('close', () => res());
+  const k = spawn('bash', ['-c',
+    "alive() { pgrep -fc 'chrome-[l]inux/chrome|pw-browsers/[c]hromium' 2>/dev/null | head -1; }; "
+    + "for i in 1 2 3 4 5 6 7 8 9 10; do "
+    + "n=$(alive); n=${n:-0}; "
+    + "[ \"$n\" -eq 0 ] 2>/dev/null && exit 0; "
+    + "if [ $i -le 3 ]; then pkill -f 'chrome-[l]inux/chrome' 2>/dev/null; pkill -f 'pw-browsers/[c]hromium' 2>/dev/null; "
+    + "else pkill -9 -f 'chrome-[l]inux/chrome' 2>/dev/null; pkill -9 -f 'pw-browsers/[c]hromium' 2>/dev/null; fi; "
+    + "sleep 0.4; done; "
+    + "n=$(alive); n=${n:-0}; "
+    + "[ \"$n\" -eq 0 ] 2>/dev/null || echo \"   ! $n browser process(es) outlived SIGKILL — the next step starts on a busy box\"; "
+    + "true"]);
+  let out = '';
+  k.stdout.on('data', (d) => { out += d; });
+  k.on('close', () => { if (out.trim()) console.log(out.trimEnd()); res(); });
 });
 
 const run = (step) => new Promise(res => {
