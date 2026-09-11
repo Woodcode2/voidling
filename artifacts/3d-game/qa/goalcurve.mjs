@@ -56,7 +56,7 @@
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { ALL_WORLDS, initScript } from './worlds.mjs';
-import { DRIVE_NEAREST } from './_drive.mjs';
+import { DRIVE_NEAREST, DRIVE_KIND } from './_drive.mjs';
 
 const flag = (n, d) => { const h = process.argv.find((a) => a.startsWith(`--${n}=`)); return h ? h.slice(n.length + 3) : d; };
 const pos = process.argv.slice(2).filter((a) => !a.startsWith('--'));
@@ -64,6 +64,11 @@ const WORLD_ARG = pos[0] || 'all';
 const PORT = pos[1] || '4177';
 const SEED = Number(flag('seed', process.env.SEED || '7'));
 const RUNS = Number(flag('runs', '5'));
+// --hunt=<kind> swaps the nearest-edible driver for one that goes after a
+// named kind. The nearest-edible driver cannot measure a SET goal: on Maple it
+// ate 484 snacks and zero houses by 70% of the clock, because a snack is
+// always nearer. A goal set from a run that was not trying is not a goal.
+const HUNT = flag('hunt', '');
 const worlds = WORLD_ARG === 'all' ? ALL_WORLDS : [WORLD_ARG];
 for (const w of worlds) if (!ALL_WORLDS.includes(w)) { console.log(`\nFAIL — unknown world "${w}"`); process.exit(1); }
 
@@ -139,7 +144,7 @@ const runOnce = async (world) => {
   });
   const landmark = await p.evaluate(() => window.__landmarkProbe());
 
-  await p.evaluate(DRIVE_NEAREST);
+  await p.evaluate(HUNT ? DRIVE_KIND(HUNT) : DRIVE_NEAREST);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
   // rendering off only AFTER the clock is running — the pointerdown that starts
   // it goes through the canvas, and the intro's camera work is real frames.
@@ -295,7 +300,16 @@ for (const world of worlds) {
   const atFrac = (r, f) => { const T = r.gc[r.gc.length - 1].t; return r.gc.reduce((a, s) => Math.abs(s.t - T * f) < Math.abs(a.t - T * f) ? s : a, r.gc[0]); };
   const END = Math.round(med(runs.map((r) => r.gc[r.gc.length - 1].t)));
 
-  console.log(`  ══ ${world.toUpperCase()} ══  ${END} match-seconds · ${runs.length} seeded run(s) · SEED ${SEED}`);
+  console.log(`  ══ ${world.toUpperCase()} ══  ${END} match-seconds · ${runs.length} seeded run(s) · SEED ${SEED}`
+    + (HUNT ? ` · HUNTING "${HUNT}"` : ''));
+  if (HUNT) {
+    // time to N of the hunted kind — the number a SET goal is actually made of
+    const toN = (r, n) => { const h = r.gc.find((x) => (x.k[HUNT] || 0) >= n); return h ? Math.round(h.t) : null; };
+    const line = [1, 2, 3, 4, 5, 8, 10, 15, 20, 40]
+      .map((n) => `${n}: ${span(runs, (r) => toN(r, n))}`).join('  ·  ');
+    console.log(`     HUNT      seconds to reach N of "${HUNT}" (of ${runs[0].supply[HUNT] ?? 0} on the island)`);
+    console.log(`               ${line}`);
+  }
   console.log(`     EAT       final score  ${span(runs, (r) => r.final.score)}`);
   console.log(`               reached  25% of the clock ${span(runs, (r) => atFrac(r, 0.25).score)} · 50% ${span(runs, (r) => atFrac(r, 0.5).score)} · 75% ${span(runs, (r) => atFrac(r, 0.75).score)}`);
   if (lm) {

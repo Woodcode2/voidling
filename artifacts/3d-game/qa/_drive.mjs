@@ -51,3 +51,69 @@ export const DRIVE_NEAREST = `(() => {
   };
   requestAnimationFrame(tick);
 })()`;
+
+/** Drive at the nearest edible OF A GIVEN KIND, falling back to the nearest
+ *  edible of anything while none of that kind is within reach.
+ *
+ *  WHY THIS EXISTS. The nearest-edible driver above is a competent player with
+ *  no agenda, and it is the wrong instrument for a SET goal. Measured on Maple:
+ *  by 70% of the clock it had eaten 484 snacks and ZERO houses and ZERO cars —
+ *  not because houses are unreachable, but because a snack is always nearer.
+ *  Houses and cars sit at r 3.2-3.6 and only enter the eat rule once the void
+ *  has grown, so a driver that never chooses them never measures them. Setting
+ *  "eat 5 houses" from that run would set it from a run that was not trying.
+ *
+ *  The fallback is what makes it a PLAYER rather than a stopwatch: a child
+ *  hunting houses still eats what she drives over, and still has to grow before
+ *  a house is edible at all. Eating only when the target kind is in reach would
+ *  measure a void that refuses to grow.
+ *
+ *  The kind test is the game's own (prototype3d.ts:5939-5953): radius bands for
+ *  snack/big/cabana, userData.gild for gold, userData.qk for named kinds, and
+ *  the client's HOUSE_LIKE list via __questPools for house — never a list
+ *  transcribed here. qa/questable.mjs's header records what happens otherwise:
+ *  a probe that knew chalets were houses while the game did not, passing a
+ *  world whose chip was dead. */
+export const DRIVE_KIND = (kind) => `(() => {
+  const KIND = ${JSON.stringify(kind)};
+  const HL = new Set(window.__questPools().houseLike);
+  const isKind = (e) => {
+    const m = e.mesh, r = e.radius || 0, qk = m.userData.qk;
+    if (KIND === 'snack') return r < 1;
+    if (KIND === 'big') return r >= 6;
+    if (KIND === 'gild') return !!m.userData.gild;
+    if (KIND === 'cabana') return r >= 2.6 && r <= 3.4;
+    if (KIND === 'house') return qk === 'house' || (qk && HL.has(qk));
+    return qk === KIND;
+  };
+  const cv = document.querySelector('canvas');
+  const cx = innerWidth / 2, cy = innerHeight / 2;
+  cv.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: cx, clientY: cy, bubbles: true }));
+  const tick = () => {
+    const vs = window.__voidState();
+    let best = null, bd = 1e9, anyBest = null, anyD = 1e9;
+    for (const e of window.__edibles) {
+      if (e.eaten || !e.mesh?.visible || e.radius > vs.r * 0.92) continue;
+      const dx = e.mesh.position.x - vs.x, dz = e.mesh.position.z - vs.z;
+      const d = dx * dx + dz * dz;
+      if (d < anyD) { anyD = d; anyBest = { dx, dz }; }
+      if (isKind(e) && d < bd) { bd = d; best = { dx, dz }; }
+    }
+    const t = best || anyBest;
+    if (t) {
+      const cam = window.__cam;
+      let fx = vs.x - cam.position.x, fz = vs.z - cam.position.z;
+      const fl = Math.hypot(fx, fz) || 1; fx /= fl; fz /= fl;
+      const rx = -fz, rz = fx;
+      const m = Math.hypot(t.dx, t.dz) || 1;
+      const wx = t.dx / m, wz = t.dz / m;
+      const sx = -fz * wx + fx * wz;
+      const sy = -rz * wx + rx * wz;
+      const sm = Math.hypot(sx, sy) || 1;
+      dispatchEvent(new PointerEvent('pointermove', { pointerId: 1,
+        clientX: cx + sx / sm * 110, clientY: cy + sy / sm * 110, bubbles: true }));
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+})()`;
