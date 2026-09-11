@@ -8,8 +8,16 @@
 // and the world behind the menu is a place, not an emergency. The pause
 // sheet's LEAVE THE MATCH takes a different exit: doQuit() sets started =
 // false, armed = false, ended = true, shows the menu, and never touches calm.
-// So a menu reached by QUITTING sits inside a crowd that is still fleeing the
-// void, at whatever panic the match left behind.
+// So a menu reached by QUITTING has panic SUPPRESSION SWITCHED OFF where the
+// ordinary exit has it on.
+//
+// Stated precisely, because the first version of this note overstated it: the
+// measured difference is the hold, not a crowd caught mid-sprint. On the run
+// that found this, nobody was actually fleeing at the moment of sampling
+// (0 of 283 on both paths) — what differs is that the end-card path leaves
+// calm at Infinity and the quit path leaves it at 0, so on the quit path the
+// crowd CAN panic behind the menu and on the other it cannot. That is the bar
+// this probe holds, and it is the honest one.
 //
 // WHY IT HAS SURVIVED. Nothing could see it. life.moverStats returned only
 // { near, total } — how many people, not whether they were running — and

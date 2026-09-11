@@ -2043,7 +2043,8 @@ const _dbg = new Proxy(_dbgStore, {
   __heroPoint: () => { x: number; z: number } | null;
   __kindTally: () => Record<string, number>;
   __landmarkProbe: () => { biggest: { x: number; z: number; radius: number; needR: number; qk: string } | null;
-    nearHero: { x: number; z: number; radius: number; needR: number; qk: string } | null; eatRatio: number };
+    nearHero: { x: number; z: number; radius: number; needR: number; qk: string } | null; eatRatio: number;
+    band: Record<string, { n: number; rMin: number; rMax: number }> };
   __renderBloom: () => void;
   __composer: () => unknown;
   __juiceState: () => { fov: number; fovKick: number; stop: number; puffs: number; buzzes: number };
@@ -2407,7 +2408,25 @@ _dbg.__landmarkProbe = () => {
       if (d <= 60 && (!nearHero || e.radius > nearHero.radius)) nearHero = e;
     }
   }
-  return { biggest: one(biggest), nearHero: one(nearHero), eatRatio: EAT_RATIO };
+  // ── WHAT COULD DOT 3 ACTUALLY BE? ────────────────────────────────────────
+  // Measured on day 2: a competent autopilot's radius is ~2.8 at a quarter of
+  // the clock, ~4 at half and ~5.7 at three quarters, then explodes to 10-16
+  // by the buzzer. So a landmark of radius 6.5-11 — which is what every world
+  // authors as its hero — is only edible in the last seconds, and under the
+  // owner's win gate that makes dot 3 a wall on all six worlds. A landmark a
+  // CHILD can win is one whose radius sits under that curve with a minute to
+  // spare, which means roughly r 3.5-5.5. This lists what is actually standing
+  // in that band, by kind and by count, so dot 3 can be named from the island
+  // instead of guessed at.
+  const band: Record<string, { n: number; rMin: number; rMax: number }> = {};
+  for (const e of edibles) {
+    if (e.eaten || !e.mesh.visible || e.mesh.userData.tethered) continue;
+    if (e.radius < 3.2 || e.radius > 6) continue;
+    const k = String(e.mesh.userData.qk ?? 'untagged');
+    const b = band[k] ?? (band[k] = { n: 0, rMin: 99, rMax: 0 });
+    b.n++; b.rMin = Math.min(b.rMin, +e.radius.toFixed(2)); b.rMax = Math.max(b.rMax, +e.radius.toFixed(2));
+  }
+  return { biggest: one(biggest), nearHero: one(nearHero), eatRatio: EAT_RATIO, band };
 };
 _dbg.__warpVoid = (x: number, z: number) => {
   voidState.x = x; voidState.z = z;
@@ -7940,6 +7959,16 @@ el('btnHome').addEventListener('click', () => {
       form: curStage, bites: rivalEv.bites, ...fpsSummary(),
     });
     started = false; armed = false; ended = true;
+    // ── AND THE TOWN GOES BACK TO BEING A TOWN ──────────────────────────────
+    // endMatch calls life.calm(Infinity) so the crowd settles behind the
+    // results card — panic contagion off, nobody running from a void that has
+    // stopped. This exit never did, so a menu reached by LEAVING a match had
+    // the suppression switched off where the ordinary exit has it on: measured
+    // by qa/menucalm.mjs as calm 0 here against calm Infinity there, on the
+    // same match. Invisible today because the menu is opaque; from §2 of the
+    // menu brief the menu is a window onto this exact scene, with the void
+    // parked in the middle of it.
+    life.calm(Infinity);
     audio.stopMusic();
     document.body.classList.add('menu');
     menuEl.style.display = '';
