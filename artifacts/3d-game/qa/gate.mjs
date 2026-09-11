@@ -365,12 +365,15 @@ const SUITE = [
     cmd: ['node', 'qa/worldlists.mjs'], verdict: pf,
     why: 'no probe in qa/ believes in a game with fewer worlds than exist — the gate itself had a five-world list on the day world 6 shipped, and twenty-three probes were still frozen at world 4' },
 
-  // THE LADDER'S STATE. Registered on day 3 with (a)(f)(g)(i) — the parts that
-  // need no match wiring. (b)(c)(d)(e)(h) arrive with days 4-6 and the timeout
-  // is re-sized then; 420s is a measured 195s run with room for a slow box.
-  { id: 'levels', tier: 'feel', profiles: ['push', 'live'], timeout: 900,
-    cmd: ['node', 'qa/levels.mjs', String(PORT), '--only=a,e,f,g,i'], verdict: pf,
-    why: 'the ladder agrees with itself about where a child is — thirty dots, one green ring per world, and a dot that is opened only by a goal MET, never by a match merely finished' },
+  // THE LADDER'S STATE. Registered on day 3 with (a)(e)(f)(g)(i) — the parts
+  // that need no match wiring. Day 4 adds (b) the goal card and (c) the HUD,
+  // both of which run real matches on a virtualised clock; (d) and (h) arrive
+  // with the end card on days 5-6. Timeout re-sized with them: the day-3 set
+  // measured 394s, and (b)+(c) add six cranked matches at ~34s each plus their
+  // page loads. 1800 leaves room for a box under load.
+  { id: 'levels', tier: 'feel', profiles: ['push', 'live'], timeout: 1800,
+    cmd: ['node', 'qa/levels.mjs', String(PORT), '--only=a,b,c,e,f,g,i'], verdict: pf,
+    why: 'the ladder agrees with itself about where a child is — thirty dots, one green ring per world, a dot opened only by a goal MET rather than a match merely finished, and a goal the child can actually see on screen while she plays for it' },
 
   { id: 'stickerreg', tier: 'quality', profiles: ['push', 'live'], timeout: 30,
     cmd: ['node', 'qa/stickerreg.mjs'], verdict: pf,

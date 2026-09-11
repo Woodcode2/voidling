@@ -1,0 +1,17 @@
+
+  LEVELS — the ladder's state @ :4177
+  The gate is a WIN (owner, §8.1): goal k+1 opens on 'done', never on 'fin'.
+
+  BAD  (b) __matchState() does not publish cardAt/cardLen — the window cannot be read off the game
+  BAD  (b) __goalState() is missing — the level line cannot be read off the game
+  ok   (b) the goal card unrolled at frame 26 (0.43 game-s after the probe took the clock)
+  ok   (b) the goal card was raised exactly once
+  BAD  (b) the card fired one frame after goalCardT 0.483s — the authored mark is undefineds
+  BAD  (b) __goalState() is null on an armed level match
+  ok   (b) the card names the dot: LEVEL 1
+  ok   (b) the goal card is never up while the ghost hand is (0 card-up state(s) sampled)
+  BAD  (c) goal 1: the §3.1 goal hooks are missing: __setScore, __eatKind, __eatLandmark, __setRivalScores, __devourAll
+  BAD  (c) goal 1: __goalState() is missing
+
+FAIL — levels threw: Cannot access 'want' before initialization
+EXIT=1

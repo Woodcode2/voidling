@@ -1216,11 +1216,25 @@ built for a match in which finishing IS progress. The end card order is `#endHd,
 
 `beginMatch` fills `.lvl` = "LEVEL 3" (world-local 1–5), `.name` = the world name, `.sub`
 = the line below, **before** `armed = true` (`:6145`); the one-time fill at `:1674-1677`
-goes. `GOAL_CARD_AT/LEN` untouched (measured against Hole.io, recon 11.5). **The goal
-card is suppressed while the hand tutorial is up** (`:10336`) — the first session
-auto-plays Maple with no menu (`:6560-6562`) and a five-digit target over the hand is not
-a first level, it is noise (child skeptic note 8); on that run dot 1 is passed by
-finishing like any other, and the tick is hers if the number falls.
+goes. `GOAL_CARD_AT/LEN` untouched (measured against Hole.io, recon 11.5). **The card and the
+hand must never share the screen** — the first session auto-plays Maple with no menu
+(`:6560-6562`) and a five-digit target over the wordless drag lesson is not a first level,
+it is noise (child skeptic note 8); on that run dot 1 is passed by finishing like any
+other, and the tick is hers if the number falls.
+
+**DAY 4 MEASURED THE CLASH AND FIXED IT ON THE OTHER SIDE.** `levels.mjs` (b) on the
+shipped build: on the one frame the card unrolled, the ghost hand was already up — 1 of 1
+sampled states. The cause is that `beginMatch` sets `controlsLive = true` at arm without
+setting `handHold`, which is only ever set at `:11134` on the far side of the descent —
+a line the armed idle never reaches — so the hand was live from the first armed frame and
+the card unrolled on top of it half a second later. This brief said "suppress the card
+under the hand"; that is the wrong half, because `teachDrag` is `firstEver || pickedWorld
+=== 'maple'` (`:6786`), true for **every child on every Maple match**, and Maple is where
+all thirty dots begin — a card suppressed under the hand is a card no Maple player ever
+sees. The authored order is restored instead (`handHold = GOAL_CARD_AT + GOAL_CARD_LEN`
+at arm, plus the hand gated on the card's own `titleUntil` so the two clocks cannot
+overlap by a frame at the far edge): card, settle, lesson, exactly as the hand's own
+comment has always described it.
 
 | world | 1 EAT | 2 SET | 3 LANDMARK | 4 RIVALS | 5 CLEAR |
 |---|---|---|---|---|---|
@@ -1276,6 +1290,19 @@ numerals stay gold (`#count` never gains `.hot`), the tick pitch is flat. RIVALS
 `myRank === 1` at 10 s → today's hot countdown, because there it is the bell to a win;
 `myRank > 1` → gold and flat. `levels.mjs` (c): with `?len=15` and the goal unmet,
 `#count` never has class `hot` and no `#banner` text matches `/FASTER|SECONDS/`.
+
+**Landed day 4, and it is TWO flags, not one** — the build found that out. The nag (red
+clock, `⏰ EAT FASTER!!`) and the celebration (hot numerals, rising tick) are different
+messages, and only the celebration keeps the RIVALS-at-#1 exemption. With a single flag,
+a RIVALS level fired the banner at **t ≈ 0**: on a short match the clock is under 35 s
+from the first frame, and the player is #1 before anyone has joined, so the nag rode in
+on the celebration's exemption (`levels.mjs` (c), goal 4, the one finding left after the
+other sixty-five went). So: `hurry = !goal || goal.met` gates the clock colour and the
+banner; `bell = hurry || (goal.n === 4 && rank === 1)` gates the numerals and the tick
+pitch. `levels.mjs` (c) holds **both halves** — five goals with the ending gold and
+silent, a sixth run where the player leads a RIVALS level and the hot countdown is still
+there, and a goal-free control where the whole shipped ending is intact. A rule that only
+removes is indistinguishable from a deletion; these three cases tell them apart.
 
 ### 4.3 Win on the spot, and the miss
 
@@ -1549,8 +1576,8 @@ count goes 35 → 43, each timeout sized from a measured run and printed.
 | 1 | **Baseline, honestly read.** `_dbg.__frameTimes()`, `__pinMenuRung`, `autoReset=false` sampling in a new `qa/menuframe.mjs`: menu-idle `dtRaw` / draw calls (both shadow parities) / tris / `moverStats(138)` and `(276)` / heap per world, **one page per rung** pinned by `addInitScript`, at the STAGE frustum (0–360° azimuth series at each candidate stage) **and** today's parked spawn frame, labelled; the 1,241 / 4,694 reference pair re-taken the same way; the boot prefix measured from `performance.timeOrigin` per world (`bootStage` timestamps). Guards: `pickerfit` FAILS on a short picker — zero cards was already guarded at `:285`, the live hole was four-of-six (§9.7); `firstframe` fails on a missing `#menu` selector (`freeze()` unchanged). | push 35/35 green on today's menu; the baseline table in the brief with the two frames side by side |
 | 2 | **The ladder's ground.** `qa/pace.mjs` on all six worlds (radius- and score-vs-time; autopilot and SET-style); supply per world with the `'big'` dedupe; CLEAR `devouredPct` at the buzzer, p50/p90 of strong runs → the CLEAR number per world; **the first shadowless FRAME's ms** after the `compileAsync` pre-warm (§2.7). Safe code: `restoreIsland()` split (`:7571-7644`), `life.calm`/`tension` on the menu path, delete the stale gate comment (`:6919-6931`). | push green; §3.4 numbers replaced by measured ones; §8.2/8.3 decided from data |
 | 3 | `src/game/levels.ts` (schema with the five states, migrate, `current(world)`, `recordLevelResult`, `__levels`), `level_*` telemetry, `voidPlayGoal`/`?g=`, `playing` set only by PLAY/pip/`voidPlayGoal`. `qa/levels.mjs` (a), (f), (g), (i) written first and failing. | push green; `levels-static` (a)(f)(g) green, (i) green |
-| 4 | `LEVEL_SPEC` table beside `WORLD_COPY` (`:1492`) with `landmark` tags set in the factories, goal object in `beginMatch`, goal card per match (suppressed under the hand), `#goal` HUD chip with the sprite fill and smallest-first SET order, `questEvent` dedupe, the goal hooks of §3.1. `levels.mjs` (c). | push green; `levels` (a)(c)(f)(g)(i) |
-| 5 | `goalMet()` beside `:9681` with the `outroT <= 0` first-writer guard and the `playing` gate, `endMatch(result)`, `recordLevelResult` at `:5329` (finish → fin, win → done/clear, k+1 opens), `completeWorld` in the solo branch before `:5372`, landmark exclusion, quit path, the gold-not-red last ten seconds. `levels.mjs` (b), (h) on the virtualised clock. **Re-baseline `newsfeed`/`faceparity`/`econ` pairs on this build and record it.** | push green; `levels` all but (d)(e); the re-baseline commit |
+| 4 | `LEVEL_SPEC` table beside `WORLD_COPY` (`:1492`) with `landmark` tags set in the factories, goal object in `beginMatch`, goal card per match (the hand held off it, §4.1), `#goal` HUD chip with smallest-first SET order, `questEvent` dedupe, the goal hooks of §3.1, **and the gold-not-red last ten seconds** — moved up from day 5 because it is `levels.mjs` (c)'s own last bar and a probe written but not asserting is worse than one that says it does not cover something. `levels.mjs` (b) and (c). | push green; `levels` (a)(b)(c)(e)(f)(g)(i) |
+| 5 | `goalMet()` beside `:9681` with the `outroT <= 0` first-writer guard and the `playing` gate, `endMatch(result)`, `recordLevelResult` at `:5329` (finish → fin, win → done/clear, k+1 opens), `completeWorld` in the solo branch before `:5372`, landmark exclusion, quit path. `levels.mjs` (h) on the virtualised clock; (b)'s "goal already met → no countdown" half, which needs a match that can end on the spot. **Re-baseline `newsfeed`/`faceparity`/`econ` pairs on this build and record it.** | push green; `levels` all but (d)(e); the re-baseline commit |
 | 6 | End card: the pip headline, `#endPips`, caption, jewel-as-information vs door, CONTINUE / TRY AGAIN, shop door only when affordable, calendar coins in `#endSub`; **one commit** deletes `#endQuests` (`:5486-5502`) + `QUEST_POOL`/`renderQuests`/`questComplete`/`addEncoreQuest` (`:3811-4004`) + the four `voidQuest*` keys + `__questPools`, adds `__goalPools`, ports `questable`'s block into `levels.mjs` (e), registers (e) in push and retires `questable`. `levels.mjs` (d); `endfit2` registered (exit code, PORT). | push green with `levels-live` and `endfit2` in; `levels` complete |
 | 7 | Menu chrome (`index.html`): the four band elements, transparent-centre window, lifted ground, pips from `qa/icons.mjs` sprites (tick/star/padlock as sprites, `--check` sidecar), goal line, PLAY, tabs, world chip with the pennant beside it, `#soloTog`; delete gift/orb/navRow/`::after`; `#book` chapters with `#trophies`/`#topvoids`/the calendar re-parented; the shop shield row. `qa/menu.mjs --static` bars 8–11, 17, 19–21. | push green (the window shows the raw canvas behind — expected); `menu-static` 8–11, 17, 19–21; `icons-check` |
 | 8 | `prototype3d.ts`: `menuMode`, `enterMenu`/`leaveMenu` (calm, park, hide family, hard cut behind the end card, DPR/bloom restore in `leaveMenu`), `MENU_STAGE` (a0 from day 1's series), camera branch with its own fog write and `updateMatrixWorld`, `menuDist` plumbing, freeze list incl. the shadow-pass cadence, `MENU_R`, moods and scripted beats (sleepy on a locked tap), tap-chomp + haptics, `__menuState` with the authored pendulum, `menuR`, `fogNear`, `frame`/`rafs`. `menu.mjs --live` bars 1–4, 12, 13, 22, 23. | push green; `menu` 1–4, 8–13, 17, 19–23 |
@@ -1809,6 +1836,37 @@ props, and the zero came from `goalcurve`'s own report printing only the kinds a
 EATEN rather than the full supply. Every triple §3.4 proposed has the supply it needs.
 The real finding is the driver: `DRIVE_KIND` hunts a named kind, and on the same world
 with the same seed it eats 40 houses where the autopilot ate 2 (§3.4a, dot 2).
+
+**Correction 8, day 4: the goal card and the ghost hand were already sharing the screen,
+and this brief asked for the fix on the wrong side.** §4.1 said "the goal card is
+suppressed while the hand tutorial is up". Measured (`levels.mjs` (b), shipped build,
+virtualised clock): on the one frame the card unrolled the hand was already up, 1 of 1
+sampled states — so the clash is real. But `teachDrag` is true for **every child on every
+Maple match** (`:6786`), and Maple is where all thirty dots begin, so suppressing the card
+under the hand would mean no Maple player ever sees the card that names her goal. The
+cause is on the hand's side: `beginMatch` turns the controls live at arm and never sets
+`handHold`, which is only set at `:11134` beyond the descent — a line the armed idle never
+reaches. Fixed there; §4.1 rewritten.
+
+**Correction 9, day 4: the goal card never fires on an AUTO_START match, and it is not a
+bug.** The card block is inside `if (armed && !started …)` and `AUTO_START` calls
+`startMatch()` from a microtask the moment the world arms — so under Playwright (where
+`navigator.webdriver` turns AUTO_START on for every probe) `goalCardT` never advances and
+the card never appears. It is right for the game: the card belongs to the armed idle a
+human sits in. It is a fact any probe of the card has to know, and `levels.mjs` (b) uses
+`?manual=1` and the `voidAutoPlay` reload path for exactly this reason. The line in §4.2
+that reads "a player who taps at 100 ms sees it unroll over their descent" (a code comment
+at `:10095`) is **wrong on the same evidence** — after the tap `started` is true and the
+block is skipped.
+
+**Correction 10, day 4: probing a cranked match with the renderer live is not affordable.**
+The first run of `levels.mjs` (c) was still cranking a FIFTEEN-SECOND match after nine
+minutes of wall clock and was killed there — upwards of 25 s of wall per cranked
+match-second under swiftshader, against six matches in the part. With `renderer.render`
+and the bloom composer stubbed for the duration of the crank (a harness-side stub; nothing
+in (c) reads a pixel) the same match cranks in **34 s**. Recorded because §5.2 mandates
+the virtualised clock for the level probe without saying what it costs, and the next probe
+to use it will hit the same wall.
 
 A seventh item is a gap this brief did not know it had: **Maple has no stage to measure.** `WORLD_COPY.maple.hero` is null, so there is nothing for a hero-framed
 sweep to stand off, and §2.3's Maple stage (the waterfall lip) is a module-local const in

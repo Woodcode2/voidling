@@ -400,9 +400,58 @@ virtualised clock, plus twelve hunting runs. Evidence in
   the marquee meal is p50 1 / **p10 0** — one run in three misses her even with
   a perfect driver, so the 0.3%/s sag needs tuning before it can gate a dot.
 
-**Next: day 3** — `src/game/levels.ts` on the owner's WIN gate, `level_*`
-telemetry, `voidPlayGoal`/`?g=`, and `qa/levels.mjs` (a)(f)(g)(i) written first
-and failing.
+**Day 3 is DONE (2026-09-11): the ladder exists and it is the owner's gate.**
+`src/game/levels.ts` — thirty dots, five states (`locked / open / fin / done /
+clear`), states that only ever rise, `current(world)` a pure function of that
+world's row rather than a stored frontier, and `recordLevelResult` in which
+**only a goal MET opens the next dot** (§8.1, the owner's decision). Migration
+derives from `isUnlocked()`, so the ~40 QA seeds read as "goal 1 open in every
+listed world" and no seed had to be touched. `level_*` telemetry, `?g=` and the
+`voidPlayGoal` cross-reload channel. `qa/levels.mjs` (a)(e)(f)(g)(i), written
+first and failing. Bar (e) — "is every one of the thirty goals winnable on the
+island that actually exists" — caught three of the numbers in this crew's own
+table before they shipped: gold at 8-10 is arithmetically impossible (20 gilds a
+match against the 3N rule caps it at 6), Skylark's 40 vans needed 240 props on an
+island carrying 98, and the gild supply had been read on the menu, where it is
+always zero because `gildTreasure()` runs inside `beginMatch`.
+
+**Day 4 is DONE (2026-09-11): the goal is on screen, and the ending stopped
+nagging.** `LEVEL_SPEC` per world, the goal object set in `beginMatch` before
+`armed`, the goal card carrying the LEVEL's line, the `#goal` HUD chip on the
+5 Hz cadence, the `questEvent` `'big'` dedupe, the five §3.1 goal hooks, and
+`qa/levels.mjs` (b) and (c). Before → after on the same probe: **66 findings →
+0**. What it found on the shipped build, in plain language:
+
+- **The goal card and the drag lesson were talking over each other.** On the one
+  frame the card unrolled, the ghost hand was already up — 1 of 1 sampled
+  states. `beginMatch` turns the controls live at arm and never sets the hold
+  that the hand's own comment says exists for this. The brief asked for the card
+  to be suppressed under the hand; that would have meant no Maple player ever
+  sees it, because Maple teaches the drag on every match. Fixed on the hand's
+  side: card, settle, lesson, the order the code always claimed.
+- **The last thirty-five seconds were a countdown to losing.** Red clock, "⏰ 35
+  SECONDS — EAT FASTER!!", a hot red 3-2-1 with the pitch climbing — written for
+  a match where finishing IS the progress, and measured firing on **every** level
+  run with the goal unmet (309-369 frames hot per fifteen-second match). It now
+  keys on goal state, and it took TWO flags: the nag (clock colour + banner) goes
+  whenever a level's goal is unmet; the celebration (hot numerals + rising tick)
+  keeps its one exemption, RIVALS at #1, where the countdown is the bell to a
+  win. With one flag the nag rode in on the exemption and fired at t ≈ 0.
+- **A cranked match with the renderer live is not affordable.** The first run of
+  (c) was still cranking a fifteen-second match after nine minutes and was
+  killed — upwards of 25 s of wall per cranked match-second under swiftshader.
+  With `renderer.render` and the composer stubbed for the crank (nothing in (c)
+  reads a pixel) the same match takes **34 s**. Whole part: 236 s.
+- **The goal card never fires on an AUTO_START match**, because its timer only
+  runs in the armed idle and `AUTO_START` starts the match from a microtask. Right
+  for the game, load-bearing for any probe of the card — and a code comment
+  claiming the opposite has been retracted in place.
+
+**Next: day 5** — `goalMet()` with the `outroT <= 0` first-writer guard,
+`endMatch(result)`, `recordLevelResult` at the buzzer, `completeWorld` in the
+solo branch, the landmark exclusion and the quit path; `levels.mjs` (h), and
+(b)'s "goal already met → no countdown" half. **Re-baseline
+`newsfeed`/`faceparity`/`econ` on that build and record it.**
 
 **HARNESS, read this before running anything:** the repo declares neither
 `playwright` nor `pngjs`, and `qa/` imports both — so on a fresh container the

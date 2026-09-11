@@ -51,7 +51,8 @@ import { STICKERS_BY_WORLD, STICKERS, collectInRun, hasSticker, TIER_POINTS,
   runFinds, clearRun, foundCount, totalCount, type Sticker } from './game/stickers';
 import { liveEvents, eventForWorld, eventEndLabel, type SeasonEvent } from './game/seasons';
 import { isUnlocked, gateFor, completeWorld, WORLD_LABEL, unlockedCount, type WorldKey } from './game/unlocks';
-import { allLevels, current as levelCurrent, recordLevelResult, type Goal } from './game/levels';
+import { allLevels, current as levelCurrent, recordLevelResult, trackLevelStart,
+  type Goal } from './game/levels';
 import { recentEvents } from './proto3d/telemetry';
 import { bumpMatch, deal, type Deal } from './game/matchdeck';
 // the district ids this world's newsroom knows, so a biome from another world
@@ -1641,6 +1642,95 @@ const LEVEL_SPEC: Record<WorldId, LevelSpec> = {
     set: [{ kind: 'gild', n: 6, label: 'GOLD' }, { kind: 'car', n: 15, label: 'VANS' }, { kind: 'snack', n: 100, label: 'SNACKS' }] },
 };
 
+/** The dot being played, or null. Non-null ONLY when a human chose a level —
+ *  see playingGoal. Everything below reads this; nothing else writes it. */
+interface ActiveGoal {
+  n: Goal; kind: string; line: string;
+  /** Latched on the first crossing. A threshold that is re-tested every frame
+   *  and a score that can FALL (a hunter steal takes points back) would
+   *  otherwise un-win a level she has already won. */
+  met: boolean;
+  /** EAT's high-water mark, for the same reason: the number stays honest but
+   *  the progress bar never goes backwards under a child's hand. */
+  hi: number;
+}
+let goal: ActiveGoal | null = null;
+/** The five kinds in dot order. levels.ts owns the same list; this is the
+ *  render side's copy of the NAME only, never of the rule. */
+const GOAL_KIND_NAMES = ['eat', 'set', 'landmark', 'rivals', 'clear'] as const;
+
+/** SMALLEST COUNT FIRST. §4.2: houses 5 before snacks 40, so the first tick
+ *  lands inside the first minute rather than at the buzzer — the whole point of
+ *  a three-part goal for a six-year-old is that one of the three finishes
+ *  early. The six specs happen to be written in ascending order today; sorting
+ *  here means the seventh world cannot quietly break it. Sorted copy, never the
+ *  table itself. */
+const setOrder = (w: WorldId) => LEVEL_SPEC[w].set.slice().sort((a, b) => a.n - b.n);
+
+/** The one line the goal card and the HUD chip share, in the world's own
+ *  words. §4.1: six words or fewer, the number first, for a reader who is
+ *  learning to read. */
+function goalLine(w: WorldId, n: Goal): string {
+  const sp = LEVEL_SPEC[w], place = (WORLD_COPY[w].place || 'the world').toUpperCase();
+  switch (n) {
+    case 1: return `EAT ${sp.eat.toLocaleString()} OF ${place}`;
+    case 2: return setOrder(w).map((x) => `${x.n} ${x.label}`).join(' · ');
+    case 3: return `EAT THE ${sp.landmark.toUpperCase()}`;
+    case 4: return sp.rank === 1 ? 'BE THE BIGGEST VOID' : `FINISH TOP ${sp.rank}`;
+    default: return `EAT ${sp.clear}% OF ${place}`;
+  }
+}
+
+/** ── THE GOAL CHIP, LIVE ──────────────────────────────────────────────────
+ *  One line: what this dot wants, and where she is against it. Hidden outright
+ *  when no level is being played, so a harness match shows nothing and a
+ *  goal-free match cannot grow a HUD element nobody asked for.
+ *
+ *  Each kind reads the game's own number and nothing else:
+ *    EAT       playerScore, against a HIGH-WATER MARK — score falls when a
+ *              hunter steals, and a bar that goes backwards under a child's
+ *              hand reads as the game taking something away
+ *    SET       __kindTally, the eat handler's own classification, counted
+ *              DOWN and smallest-count-first so the first one lands early
+ *    LANDMARK  the void's radius against the tagged prop's needR
+ *    RIVALS    the board's own rank
+ *    CLEAR     devouredPct
+ *  Text only for now; the sprites §1.4 renders arrive with the icon sheet. */
+function refreshGoalChip(): void {
+  const el0 = document.getElementById('goal');
+  if (!el0) return;
+  if (!goal || !started || ended) { el0.hidden = true; return; }
+  const sp = LEVEL_SPEC[pickedWorld];
+  let label = '', val = '';
+  switch (goal.n) {
+    case 1: {
+      goal.hi = Math.max(goal.hi, playerScore);
+      label = 'EAT'; val = `${Math.round(goal.hi).toLocaleString()} / ${sp.eat.toLocaleString()}`;
+      break;
+    }
+    case 2: {
+      label = 'COLLECT';
+      val = setOrder(pickedWorld).map((x) => {
+        const left = Math.max(0, x.n - (kindTally[x.kind] ?? 0));
+        return left === 0 ? `${x.label} ✓` : `${left} ${x.label}`;
+      }).join('  ');
+      break;
+    }
+    case 3: {
+      const need = sp.landmarkR || 1;
+      label = sp.landmark.toUpperCase();
+      val = voidling.radius >= need ? 'EAT IT NOW' : `${Math.round(Math.min(100, voidling.radius / need * 100))}%`;
+      break;
+    }
+    case 4: label = 'PLACE'; val = `#${lastRank || '-'} OF ${1 + rivals.list.filter((r) => r.joined).length}`; break;
+    default: label = 'WORLD'; val = `${Math.floor(devouredPct)}% / ${sp.clear}%`; break;
+  }
+  const l = el0.querySelector('.gLabel'), v = el0.querySelector('.gVal');
+  if (l) l.textContent = label;
+  if (v) v.textContent = val;
+  el0.hidden = false;
+}
+
 const WORLD_COPY: Record<WorldId, WorldCopy> = {
   maple: {
     // MAPLE FALLS WAS WEARING PIRATE BAY'S ICON. 🏝️ is a palm on a sand spit,
@@ -2158,6 +2248,13 @@ const _dbg = new Proxy(_dbgStore, {
   __levelCurrent: (w: string) => number;
   __levelPlaying: () => number | null;
   __recordLevel: (r: Record<string, unknown>) => unknown;
+  __goalState: () => Record<string, unknown> | null;
+  // the §3.1 goal drivers — one per kind, all through the game's own paths
+  __setScore: (n: number) => number;
+  __eatKind: (kind: string, n?: number) => number;
+  __eatLandmark: () => { name: string; radius: number; voidR: number } | null;
+  __setRivalScores: (scores: number[]) => number;
+  __devourAll: (pct?: number) => number;
   __events: (clear?: boolean) => unknown[];
   __landmarkProbe: () => { biggest: { x: number; z: number; radius: number; needR: number; qk: string } | null;
     nearHero: { x: number; z: number; radius: number; needR: number; qk: string } | null; eatRatio: number;
@@ -2548,6 +2645,11 @@ _dbg.__levelCurrent = (w: string) => levelCurrent(w);
 // null unless a human chose this level. See playingGoal's note: a harness
 // match must never read as a level attempt.
 _dbg.__levelPlaying = () => playingGoal;
+// The dot this match is actually playing, as the match sees it: the line the
+// card and the chip share, the latch, and EAT's high-water mark. A probe that
+// rebuilt the line from LEVEL_SPEC would be asserting against its own copy of
+// goalLine(), which is the one thing GOVERNOR rule 4 forbids.
+_dbg.__goalState = () => (goal ? { ...goal } : null);
 // Drive a result straight into the ladder without playing three minutes for
 // it. The state machine and the telemetry are pure given a result, and the
 // match wiring that produces one lands on day 5.
@@ -2599,6 +2701,121 @@ _dbg.__landmarkProbe = () => {
   }
   return { biggest: one(biggest), nearHero: one(nearHero), eatRatio: EAT_RATIO, band };
 };
+// ── QA (day 4): DRIVING A GOAL WITHOUT PLAYING THE MATCH ───────────────────
+// Five hooks, one per goal kind. MENU-BRIEF §3.1 lists them as blocking: the
+// level probe runs on a VIRTUALISED clock under swiftshader, where the
+// autopilot manages about two animation frames a second, and "eat fifteen vans"
+// is not something a driver can be relied on to do inside a probe's budget —
+// day 2 measured the nearest-first driver eating ZERO houses and ZERO cars by
+// 70% of Maple's clock. Without these, part (c) and day 5's part (d) would be
+// asserting against whatever the driver happened to find.
+//
+// Every one of them goes through the GAME's own path and not a shortcut around
+// it, because the thing under test is the path:
+//   · __eatKind and __eatLandmark call capture(), so the questEvent lines that
+//     feed kindTally are the same lines a child's bite runs through — including
+//     the 'big' dedupe two hundred lines above the eat handler
+//   · __setRivalScores moves joinAt into the past rather than setting joined,
+//     so the real arrival code places and sizes the rival
+//   · __devourAll marks props the way the accounting sweep reads them and lets
+//     that sweep compute devouredPct itself
+// Only __setScore writes a number directly, because playerScore IS the number.
+
+/** EAT. Sets the score outright. Returns what it set. */
+_dbg.__setScore = (n: number): number => {
+  playerScore = Math.max(0, Math.round(n));
+  return playerScore;
+};
+
+/** SET. Eats up to `n` props that the eat handler will classify as `kind`,
+ *  through capture(). Returns how many it actually found — a caller that asked
+ *  for fifteen and got nine is looking at a supply wall, which is exactly what
+ *  bar (e) exists to catch, so it is reported rather than thrown. */
+_dbg.__eatKind = (kind: string, n = 1): number => {
+  const HL = new Set(HOUSE_LIKE);
+  // the same predicate set as capture()'s questEvent lines, in the same order
+  const fires = (e: Edible): boolean => {
+    const u = e.mesh.userData, qk = u.qk as string | undefined, r = e.radius || 0;
+    if (kind === 'snack') return r < 1;
+    if (kind === 'big') return r >= 6 || qk === 'big';
+    if (kind === 'gild') return !!u.gild;
+    if (kind === 'cabana') return r >= 2.6 && r <= 3.4;
+    if (kind === 'house') return qk === 'house' || (!!qk && HL.has(qk));
+    return qk === kind;
+  };
+  let done = 0;
+  // NEAREST FIRST, so the void does not teleport its way across the island in
+  // the accounting: capture() grows it, and growth order changes what else is
+  // edible. A child eats what is near them; so does this.
+  const pool = edibles.filter((e) => !e.eaten && e.mesh.visible && fires(e))
+    .sort((a, b) => Math.hypot(a.mesh.position.x - voidState.x, a.mesh.position.z - voidState.z)
+      - Math.hypot(b.mesh.position.x - voidState.x, b.mesh.position.z - voidState.z));
+  for (const e of pool) {
+    if (done >= n) break;
+    capture(e); done++;
+  }
+  return done;
+};
+
+/** LANDMARK. Eats the prop this world tagged for dot 3, through capture(), so
+ *  byPlayer and the questEvent lines are set by the game. Returns the tag and
+ *  the radius the void ended at, or null if this world has no tagged prop —
+ *  which is a finding, not a skip. */
+_dbg.__eatLandmark = (): { name: string; radius: number; voidR: number } | null => {
+  for (const e of edibles) {
+    if (e.eaten || !e.mesh.visible) continue;
+    const tag = e.mesh.userData.landmark as string | undefined;
+    if (!tag) continue;
+    const radius = +e.radius.toFixed(2);
+    // the void has to be able to eat it, or capture() is being asked to do
+    // something the game would never do; grow it to the game's own bar first
+    if (voidling.radius < radius / EAT_RATIO) voidling.setRadius(radius / EAT_RATIO);
+    capture(e);
+    return { name: tag, radius, voidR: +voidling.radius.toFixed(2) };
+  }
+  return null;
+};
+
+/** RIVALS. Writes the family's scores and pulls every one of them onto the
+ *  island by moving its arrival into the past — `joinAt` is the real gate
+ *  (rivals.ts:1077), so placement, radius and cast all run as authored. Short
+ *  lists leave the rest alone; a longer list is truncated. Returns the number
+ *  of rivals it touched. */
+_dbg.__setRivalScores = (scores: number[]): number => {
+  let n = 0;
+  for (const r of rivals.list) {
+    const priv = r as unknown as { joinAt: number };
+    if (typeof priv.joinAt === 'number') priv.joinAt = -1;   // next update() walks them in
+    if (n < scores.length) { r.score = Math.max(0, Math.round(scores[n])); n++; }
+  }
+  return n;
+};
+
+/** CLEAR. Marks props consumed BY THE PLAYER until the accounting sweep would
+ *  report at least `pct`, and returns how many it marked. It does not call
+ *  capture(): three thousand captures is three thousand puff bursts, three
+ *  thousand score floaters and a void the size of the island, none of which is
+ *  what a CLEAR goal is testing. The sweep at :5309 reads `eaten`, `visible`
+ *  and `byPlayer`, and those are what it writes. DEPARTED props are skipped —
+ *  they left the denominator, and a balloon that went up was never eaten. */
+_dbg.__devourAll = (pct = 100): number => {
+  const live = edibles.filter((e) => !e.mesh.userData.departed);
+  const want = Math.ceil(live.length * Math.min(100, Math.max(0, pct)) / 100);
+  let have = live.reduce((k, e) => k + (e.eaten || !e.mesh.visible ? 1 : 0), 0), n = 0;
+  for (const e of live) {
+    if (have >= want) break;
+    if (e.eaten || !e.mesh.visible) continue;
+    // the same bookkeeping capture() does, minus the spectacle: the spiral
+    // fields so the drain loop cannot read an undefined orbit, the mesh flag
+    // the hero check reads, and the prop's baked contact shadow off — a prop
+    // hidden without it leaves its shadow standing on the grass.
+    e.eaten = true; e.t = 1; e.orbit = 0; e.orbitR = 0;
+    e.mesh.visible = false; e.mesh.userData.eaten = true; e.mesh.userData.byPlayer = true;
+    setShadowInstance((e.mesh.userData.shIdx as number) ?? -1, false);
+    have++; n++;
+  }
+  return n;
+};
 _dbg.__warpVoid = (x: number, z: number) => {
   voidState.x = x; voidState.z = z;
   voidling.group.position.set(x, voidling.group.position.y, z);
@@ -2636,6 +2853,16 @@ _dbg.__matchState = () => ({
   // these, and a goal card that never appeared cost a full diagnostic run to
   // localise. armed vs started is the whole shape of the opening.
   armed, goalCardT, arriveLanded, introT,
+  // …and the card's own two constants, so a probe can assert "shown inside its
+  // window" against the numbers the game is using rather than a transcription
+  // of them. goalCardT counts up from 0 at arm and is -1 once the card fires,
+  // so the last value before the flip IS the elapsed-since-arm at fire.
+  cardAt: GOAL_CARD_AT, cardLen: GOAL_CARD_LEN,
+  // …and when the card is actually OVER. #titlecard.show is never removed (the
+  // animation is `forwards`, and the class only goes at a match reset), so the
+  // class is the raise event and this is the window. A probe reading the class
+  // alone would find the card "up" for the rest of the match.
+  titleUntil,
   // tClock is the game's own monotonic clock and it runs during the armed idle,
   // where matchClock deliberately does not. Anything measuring the opening needs
   // it: dt is clamped to 0.05/frame, so under a software renderer managing about
@@ -6180,7 +6407,16 @@ function capture(e: Edible, giveHunger = true) {
   e.mesh.userData.byPlayer = true;   // the DEVOURED meter is split you-vs-family
   const qk = e.mesh.userData.qk as string | undefined;
   if (e.radius < 1) questEvent('snack');
-  if (e.radius >= 6) questEvent('big');   // landmark-class: hotels, ships, the temple, the stage
+  // ── 'big' FIRED TWICE ON A TAGGED PROP, AND A GOAL COUNTS WHAT IT FIRES ──
+  // A prop of radius >= 6 that ALSO carries qk 'big' — which is how every
+  // world tags its landmark-class meshes — went through this line and then
+  // through `if (qk) questEvent(qk)` below, so one bite counted two. It never
+  // mattered while these only fed a quest board nobody gated on; it matters
+  // now that a SET goal is a count and a win is a threshold on it. Deduped by
+  // firing the radius rule only when the tag has not already said the same
+  // thing (qa/questable.mjs's supply block has carried the same dedupe for the
+  // supply side since it was written — the two agree now).
+  if (e.radius >= 6 && qk !== 'big') questEvent('big');   // landmark-class: hotels, ships, the temple, the stage
   if (e.mesh.userData.gild) questEvent('gild');
   if (e.radius >= 2.6 && e.radius <= 3.4) questEvent('cabana');
   if (qk) questEvent(qk);
@@ -6499,6 +6735,25 @@ function beginMatch(solo = false) {
     applyHour(HOURS[pickedWorld][hand.hour]);
   }
   ensureFirstBite();
+  // ── THE LEVEL, AND THE CARD THAT NAMES IT ────────────────────────────────
+  // Set before `armed`, because the goal card is shown off the arm clock
+  // (GOAL_CARD_AT 0.5 s) and a card filled after that is a card filled too
+  // late. The one-time fill at module init is now only the fallback for a
+  // goal-free match — which is every harness match, and every match before a
+  // human has chosen a dot.
+  goal = playingGoal ? { n: playingGoal, kind: GOAL_KIND_NAMES[playingGoal - 1],
+    line: goalLine(pickedWorld, playingGoal), met: false, hi: 0 } : null;
+  if (goal) trackLevelStart(pickedWorld, goal.n);
+  {
+    const tl = document.querySelector('#titlecard .lvl');
+    const ts = document.querySelector('#titlecard .sub');
+    // "LEVEL 3" is the dot inside THIS world, 1-5 — not the 1-30 ordinal. The
+    // ordinal belongs on the end card (§4.4.2); Hole.io puts it there and the
+    // owner's own recon frames agree.
+    if (tl) tl.textContent = goal ? `LEVEL ${goal.n}` : `LEVEL ${COPY.n}`;
+    if (ts) ts.textContent = goal ? goal.line : COPY.sub;
+  }
+  refreshGoalChip();
   armed = true;
   // see AUTO_START: a browser with no human behind it starts its own match
   if (AUTO_START) queueMicrotask(() => startMatch());
@@ -6517,6 +6772,29 @@ function beginMatch(solo = false) {
   // lerp below, which now takes the authored position exactly while armed.
   arriveT = 0; arriveLanded = false;
   goalCardT = 0;
+  // ── THE LESSON AND THE TARGET WERE TALKING AT ONCE ────────────────────────
+  // MEASURED (qa/levels.mjs (b), on the shipped build): on the one frame the
+  // goal card unrolled, the ghost hand was already up — 1 of 1 sampled states.
+  // handHold's own comment two hundred lines up says "the lesson lands AFTER
+  // the card has gone, not in the same frame the controls go live (the MK8D
+  // order — card, settle, teach)", and beginMatch sets controlsLive = true
+  // without ever setting the hold, so the hand was live from the first armed
+  // frame and the card unrolled on top of it half a second later. The hold was
+  // only ever set at :11134, on the far side of the descent, which the armed
+  // idle never reaches.
+  //
+  // It never mattered while the card carried the world's name. It matters now
+  // that it carries the level's goal: a five-digit target over a wordless drag
+  // lesson is two teachers talking at once, and the first session auto-plays
+  // Maple with no menu at all (MENU-BRIEF §4.1, child skeptic note 8).
+  //
+  // Fixed on the HAND's side rather than by suppressing the card, because
+  // teachDrag is true on Maple for EVERY child on EVERY match (:6786) — a card
+  // suppressed under the hand would be a card no Maple player ever sees, and
+  // Maple is where all thirty dots begin. The authored order is restored
+  // instead: card, settle, lesson.
+  handHold = GOAL_CARD_AT + GOAL_CARD_LEN;
+  titleUntil = 0;   // no card is up yet; the hand's own gate below reads this
   voidling.arriveY(ARRIVE_HIGH);
   resetFps();
   // the quality adapter starts its window HERE. Frames before this line are
@@ -9873,9 +10151,23 @@ function animate() {
         sfx('land', () => audio.voice('happy'));
       }
     }
-    // The goal card is timer-driven: it does not wait for the touch, and the touch
-    // does not wait for it. A player who taps at 100 ms sees it unroll over their
-    // descent exactly as a player who never taps sees it unroll over the idle.
+    // The goal card is timer-driven: it does not wait for the touch.
+    //
+    // THIS COMMENT USED TO SAY the touch does not wait for it either — "a player
+    // who taps at 100 ms sees it unroll over their descent exactly as a player
+    // who never taps sees it unroll over the idle". That is not what the code
+    // does and never was: this whole block sits inside `armed && !started`, and
+    // the touch is what sets `started`. A player who taps before GOAL_CARD_AT
+    // never sees the card at all, and neither does any AUTO_START match, where
+    // startMatch() runs from a microtask the instant the world arms. Measured on
+    // day 4 of the menu stream (qa/levels.mjs (b), which needs ?manual=1 for
+    // exactly this reason). Retracted here rather than quietly deleted:
+    // GOVERNOR.md rule 3b.
+    //
+    // Left as it is, because it is right for the game — the card belongs to the
+    // armed idle a human sits in, and a child who taps instantly has told us
+    // what she wants to do. The HUD chip carries the goal from the first frame
+    // of play for her (§4.2), which is the half that must never be missable.
     if (goalCardT >= 0) {
       goalCardT += dt;
       if (goalCardT >= GOAL_CARD_AT) {
@@ -10017,12 +10309,49 @@ function animate() {
     }
     if (introT > 0) { const dk = Math.pow(0.9, dt * 60); velX *= dk; velZ *= dk; }
     if (matchClock <= 35) {
-      timerEl.style.color = '#ff8a8a';
+      // ── THE SAME BELL MEANS TWO DIFFERENT THINGS NOW ────────────────────
+      // Everything below was written for a match where FINISHING is the
+      // progress: the red timer, the EAT FASTER banner and the hot 3-2-1 are a
+      // party closing, and they are good. Under a ladder, the identical ritual
+      // played at a child who has not met her goal is a countdown to losing —
+      // a giant red numeral she cannot read with the pitch climbing toward the
+      // moment the green dot fails to move. The owner's floor is that nothing
+      // in this game pressures a six-year-old, and a ladder is exactly where a
+      // clock starts to.
+      //
+      // So the ritual keys on goal state (MENU-BRIEF §4.2), and it splits in
+      // two, because the two halves are saying different things.
+      //
+      // `hurry` is the NAG — the red clock and the EAT FASTER banner. It is
+      // "you are running out of time to do the thing", and under a ladder with
+      // the goal unmet that is pressure on a six-year-old about a dot that is
+      // about to not move. It survives only where finishing IS the progress:
+      //   · no level at all — every match before a dot is chosen, and every
+      //     harness match: unchanged, this is the game that shipped
+      //   · the goal already met — day 5 ends the match on the spot, so this
+      //     only ever reads true for the frames in between
+      //
+      // `bell` is the CELEBRATION — the hot numerals and the rising tick. It is
+      // "here it comes", and it keeps one case the nag does not: RIVALS at #1,
+      // where the countdown is the bell to a win and taking it away would be
+      // taking the best ten seconds in the game. MEASURED (qa/levels.mjs (c)):
+      // with one flag for both, a RIVALS level fired the banner at t≈0 — the
+      // clock is under 35 s from the first frame on a short match and the
+      // player is #1 before anyone has joined, so the nag rode in on the
+      // celebration's exemption.
+      //
+      // Anything else: gold numerals, flat tick, no banner, no red clock.
+      // Nothing is removed from the ending — it is the same ritual in the
+      // other colour, which is what "no timers that pressure" has to mean when
+      // the timer is still there.
+      const hurry = !goal || goal.met;
+      const bell = hurry || (goal !== null && goal.n === 4 && lastRank === 1);
+      if (hurry) timerEl.style.color = '#ff8a8a';
       // The warning used to fire at 30s — the exact frame the TREASURE FEAST
       // beat fires — and announce() overwrote the beat banner in the same
       // animate() call. The game's biggest scoring moment was silent in every
       // logged run. Moved to 35s so the two never collide.
-      if (!moments.last30 && !ended) { moments.last30 = true; announce('⏰ 35 SECONDS — EAT FASTER!!'); }
+      if (hurry && !moments.last30 && !ended) { moments.last30 = true; announce('⏰ 35 SECONDS — EAT FASTER!!'); }
       // ── THE FINAL TEN SECONDS ARE A RITUAL, NOT A SURPRISE ───────────────
       // Between the 35-second banner and the buzzer there was NOTHING: the
       // match's whole ending was a red timer in a corner a child in a scramble
@@ -10040,10 +10369,14 @@ function animate() {
         countTick = cs;
         const cEl = el('count').firstElementChild as HTMLElement;
         cEl.textContent = String(cs);
-        cEl.classList.toggle('hot', cs <= 3);
+        cEl.classList.toggle('hot', bell && cs <= 3);
         cEl.classList.remove('pop'); void cEl.offsetWidth; cEl.classList.add('pop');
-        audio.pop(11 - cs);
-        fx.ring(voidState.x, voidState.z, cs <= 3 ? 0xff6a5e : 0xffd23f,
+        // pop() pitches with its argument, so 11-cs climbs the scale toward the
+        // buzzer. A flat 6 is the same tick nine times: a metronome, not a
+        // siren. (The goal sprite's single pulse that replaces the banner
+        // arrives with the icon sheet — §4.2; the chip carries the words today.)
+        audio.pop(bell ? 11 - cs : 6);
+        fx.ring(voidState.x, voidState.z, bell && cs <= 3 ? 0xff6a5e : 0xffd23f,
           voidling.radius * (1.5 + (10 - cs) * 0.07), 0.55);
       }
     }
@@ -10703,7 +11036,12 @@ function animate() {
   // danger beats stay on firstRun — those are once-in-a-lifetime moments, and
   // replaying them every Maple match would turn the intro level into a
   // permanent tutorial. The owner asked for the hand, not the lecture.
-  handEl.classList.toggle('show', teachDrag && armed && !ended && controlsLive && handHold <= 0 && !dragDone);   // armed: the hand teaches the gesture that starts the match
+  // …and never while the card is up. handHold above holds the hand across the
+  // card's authored window, but the two clocks meet at its far edge and a
+  // one-frame overlap is still an overlap; titleUntil is the card's OWN end
+  // (set where it is raised), so the hand waits on the card's state rather
+  // than on a duration that happens to match it.
+  handEl.classList.toggle('show', teachDrag && armed && !ended && controlsLive && handHold <= 0 && tClock >= titleUntil && !dragDone);   // armed: the hand teaches the gesture that starts the match
   // …and NOT UNTIL THEY CAN MOVE. This fires on any frame the guide is idle,
   // which includes the gaps between the drag lesson's repeats — so a child who
   // had not yet worked out the control was being told "that one is BIGGER than
@@ -11210,7 +11548,7 @@ function animate() {
 
   hudCd -= dt;
   if (hudCd <= 0) {
-    hudCd = 0.2; refreshHud();
+    hudCd = 0.2; refreshHud(); refreshGoalChip();
     hungerFill.style.width = `${Math.max(6, Math.round(hunger * 100))}%`;
     hungerEl.classList.toggle('ready', hunger >= COST.gulp);
     pwBtns[0].classList.toggle('off', hunger < COST.gulp || powerCd > 0);

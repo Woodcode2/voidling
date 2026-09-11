@@ -1,0 +1,37 @@
+
+  LEVELS — the ladder's state @ :4177
+  The gate is a WIN (owner, §8.1): goal k+1 opens on 'done', never on 'fin'.
+
+  ok   (c) goal 1: #timer ran down 9.85 → 6.96 → 1.16
+  ok   (c) goal 1: #goal up: "32 / 18,000" → "4,590 / 18,000" → "11,003 / 18,000"
+       goal 1: 18 cranked match-second(s) in 34s of wall clock
+  ok   (c) goal 1: the countdown stayed gold with the goal unmet
+  ok   (c) goal 1: no EAT FASTER banner with the goal unmet
+  ok   (c) goal 2: #timer ran down 9.85 → 6.96 → 1.27
+  ok   (c) goal 2: #goal down: "5 HOUSES  8 CARS  37 SNACKS" → "4 HOUSES  8 CARS  33 SNACKS" → "1 HOUSES  8 CARS  21 SNACKS"
+       goal 2: 18 cranked match-second(s) in 34s of wall clock
+  ok   (c) goal 2: the countdown stayed gold with the goal unmet
+  ok   (c) goal 2: no EAT FASTER banner with the goal unmet
+  ok   (c) goal 3: #timer ran down 9.85 → 6.96 → 1.29
+  ok   (c) goal 3: #goal up: "23%" → "29%" → "EAT IT NOW"
+       goal 3: 18 cranked match-second(s) in 34s of wall clock
+  ok   (c) goal 3: the countdown stayed gold with the goal unmet
+  ok   (c) goal 3: no EAT FASTER banner with the goal unmet
+  ok   (c) goal 4: #timer ran down 9.85 → 6.85 → 1.05
+  ok   (c) goal 4: #goal rank: "#1 OF 1" → "#5 OF 5" → "#5 OF 5"
+       goal 4: 18 cranked match-second(s) in 35s of wall clock
+  ok   (c) goal 4: the countdown stayed gold with the goal unmet
+  ok   (c) goal 4: no EAT FASTER banner with the goal unmet
+  ok   (c) goal 5: #timer ran down 9.85 → 6.85 → 0.85
+  ok   (c) goal 5: #goal up: "0% / 28%" → "10% / 28%" → "20% / 28%"
+       goal 5: 17 cranked match-second(s) in 33s of wall clock
+  ok   (c) goal 5: the countdown stayed gold with the goal unmet
+  ok   (c) goal 5: no EAT FASTER banner with the goal unmet
+  ok   (c) rivals@1: leading a RIVALS level keeps the hot countdown (120 frames hot, rank 1 on 835)
+  ok   (c) rivals@1: no EAT FASTER banner even while leading
+  ok   (c) control: #goal stays hidden on a goal-free match
+  ok   (c) control: the shipped ending is intact — #count hot on 244 frames
+  ok   (c) control: the shipped banner is intact — "⏰35 SECONDS — EAT FASTER!!"
+
+PASS — the ladder holds: c green, the win gate moves the ring only on 'done' [264s]
+EXIT=0

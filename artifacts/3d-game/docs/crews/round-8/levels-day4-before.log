@@ -1,0 +1,147 @@
+
+  LEVELS — the ladder's state @ :4177
+  The gate is a WIN (owner, §8.1): goal k+1 opens on 'done', never on 'fin'.
+
+  BAD  (c) goal 1: the §3.1 goal hooks are missing: __setScore, __eatKind, __eatLandmark, __setRivalScores, __devourAll
+  BAD  (c) goal 1: __goalState() is missing
+  BAD  (c) goal 1 @t5.15: #goal is not visible — she cannot see what this dot wants
+  BAD  (c) goal 1 @t5.15: #goal reads label "", expected "EAT"
+  BAD  (c) goal 1 @t5.15: #goal value "" does not parse as a up reading for this kind
+  BAD  (c) goal 1 @t8.15: #goal is not visible — she cannot see what this dot wants
+  BAD  (c) goal 1 @t8.15: #goal reads label "", expected "EAT"
+  BAD  (c) goal 1 @t8.15: #goal value "" does not parse as a up reading for this kind
+  BAD  (c) goal 1 @t14.06: #goal is not visible — she cannot see what this dot wants
+  BAD  (c) goal 1 @t14.06: #goal reads label "", expected "EAT"
+  BAD  (c) goal 1 @t14.06: #goal value "" does not parse as a up reading for this kind
+       goal 1: 18 cranked match-second(s) in 34s of wall clock
+  BAD  (c) goal 1: #count went hot on 369 frames with the goal unmet — a red 3-2-1 counting down to the green dot not moving
+  BAD  (c) goal 1: the banner read "⏰35 SECONDS — EAT FASTER!!" with the goal unmet
+  BAD  (c) goal 2: the §3.1 goal hooks are missing: __setScore, __eatKind, __eatLandmark, __setRivalScores, __devourAll
+  BAD  (c) goal 2: __goalState() is missing
+  BAD  (c) goal 2 @t5.15: #goal is not visible — she cannot see what this dot wants
+  BAD  (c) goal 2 @t5.15: #goal reads label "", expected "COLLECT"
+  BAD  (c) goal 2 @t5.15: #goal value "" does not parse as a down reading for this kind
+  BAD  (c) goal 2 @t8.15: #goal is not visible — she cannot see what this dot wants
+  BAD  (c) goal 2 @t8.15: #goal reads label "", expected "COLLECT"
+  BAD  (c) goal 2 @t8.15: #goal value "" does not parse as a down reading for this kind
+  BAD  (c) goal 2 @t14.06: #goal is not visible — she cannot see what this dot wants
+  BAD  (c) goal 2 @t14.06: #goal reads label "", expected "COLLECT"
+  BAD  (c) goal 2 @t14.06: #goal value "" does not parse as a down reading for this kind
+       goal 2: 17 cranked match-second(s) in 34s of wall clock
+  BAD  (c) goal 2: #count went hot on 309 frames with the goal unmet — a red 3-2-1 counting down to the green dot not moving
+  BAD  (c) goal 2: the banner read "⏰35 SECONDS — EAT FASTER!!" with the goal unmet
+  BAD  (c) goal 3: the §3.1 goal hooks are missing: __setScore, __eatKind, __eatLandmark, __setRivalScores, __devourAll
+  BAD  (c) goal 3: __goalState() is missing
+  BAD  (c) goal 3 @t5.1: #goal is not visible — she cannot see what this dot wants
+  BAD  (c) goal 3 @t5.1: #goal reads label "", expected "BARN"
+  BAD  (c) goal 3 @t5.1: #goal value "" does not parse as a up reading for this kind
+  BAD  (c) goal 3 @t8.1: #goal is not visible — she cannot see what this dot wants
+  BAD  (c) goal 3 @t8.1: #goal reads label "", expected "BARN"
+  BAD  (c) goal 3 @t8.1: #goal value "" does not parse as a up reading for this kind
+  BAD  (c) goal 3 @t13.79: #goal is not visible — she cannot see what this dot wants
+  BAD  (c) goal 3 @t13.79: #goal reads label "", expected "BARN"
+  BAD  (c) goal 3 @t13.79: #goal value "" does not parse as a up reading for this kind
+       goal 3: 18 cranked match-second(s) in 35s of wall clock
+  BAD  (c) goal 3: #count went hot on 354 frames with the goal unmet — a red 3-2-1 counting down to the green dot not moving
+  BAD  (c) goal 3: the banner read "⏰35 SECONDS — EAT FASTER!!" with the goal unmet
+  BAD  (c) goal 4: the §3.1 goal hooks are missing: __setScore, __eatKind, __eatLandmark, __setRivalScores, __devourAll
+  BAD  (c) goal 4: __goalState() is missing
+  BAD  (c) goal 4 @t5.1: #goal is not visible — she cannot see what this dot wants
+  BAD  (c) goal 4 @t5.1: #goal reads label "", expected "PLACE"
+  BAD  (c) goal 4 @t5.1: #goal value "" does not parse as a rank reading for this kind
+  BAD  (c) goal 4 @t8.1: #goal is not visible — she cannot see what this dot wants
+  BAD  (c) goal 4 @t8.1: #goal reads label "", expected "PLACE"
+  BAD  (c) goal 4 @t8.1: #goal value "" does not parse as a rank reading for this kind
+  BAD  (c) goal 4 @t13.9: #goal is not visible — she cannot see what this dot wants
+  BAD  (c) goal 4 @t13.9: #goal reads label "", expected "PLACE"
+  BAD  (c) goal 4 @t13.9: #goal value "" does not parse as a rank reading for this kind
+       goal 4: 18 cranked match-second(s) in 34s of wall clock
+  BAD  (c) goal 4: #count went hot on 360 frames with the goal unmet — a red 3-2-1 counting down to the green dot not moving
+  BAD  (c) goal 4: the banner read "⏰35 SECONDS — EAT FASTER!!" with the goal unmet
+  BAD  (c) goal 5: the §3.1 goal hooks are missing: __setScore, __eatKind, __eatLandmark, __setRivalScores, __devourAll
+  BAD  (c) goal 5: __goalState() is missing
+  BAD  (c) goal 5 @t5.1: #goal is not visible — she cannot see what this dot wants
+  BAD  (c) goal 5 @t5.1: #goal reads label "", expected "WORLD"
+  BAD  (c) goal 5 @t5.1: #goal value "" does not parse as a up reading for this kind
+  BAD  (c) goal 5 @t8.1: #goal is not visible — she cannot see what this dot wants
+  BAD  (c) goal 5 @t8.1: #goal reads label "", expected "WORLD"
+  BAD  (c) goal 5 @t8.1: #goal value "" does not parse as a up reading for this kind
+  BAD  (c) goal 5 @t14.01: #goal is not visible — she cannot see what this dot wants
+  BAD  (c) goal 5 @t14.01: #goal reads label "", expected "WORLD"
+  BAD  (c) goal 5 @t14.01: #goal value "" does not parse as a up reading for this kind
+       goal 5: 18 cranked match-second(s) in 38s of wall clock
+  BAD  (c) goal 5: #count went hot on 366 frames with the goal unmet — a red 3-2-1 counting down to the green dot not moving
+  BAD  (c) goal 5: the banner read "⏰35 SECONDS — EAT FASTER!!" with the goal unmet
+  BAD  (c) control: a harness match with no ?g= reads playing="hook missing"
+  ok   (c) control: #goal stays hidden on a goal-free match
+  ok   (c) control: the shipped ending is intact — #count hot on 240 frames
+  ok   (c) control: the shipped banner is intact — "⏰35 SECONDS — EAT FASTER!!"
+  · (c) goal 1: the §3.1 goal hooks are missing: __setScore, __eatKind, __eatLandmark, __setRivalScores, __devourAll
+  · (c) goal 1: __goalState() is missing
+  · (c) goal 1 @t5.15: #goal is not visible — she cannot see what this dot wants
+  · (c) goal 1 @t5.15: #goal reads label "", expected "EAT"
+  · (c) goal 1 @t5.15: #goal value "" does not parse as a up reading for this kind
+  · (c) goal 1 @t8.15: #goal is not visible — she cannot see what this dot wants
+  · (c) goal 1 @t8.15: #goal reads label "", expected "EAT"
+  · (c) goal 1 @t8.15: #goal value "" does not parse as a up reading for this kind
+  · (c) goal 1 @t14.06: #goal is not visible — she cannot see what this dot wants
+  · (c) goal 1 @t14.06: #goal reads label "", expected "EAT"
+  · (c) goal 1 @t14.06: #goal value "" does not parse as a up reading for this kind
+  · (c) goal 1: #count went hot on 369 frames with the goal unmet — a red 3-2-1 counting down to the green dot not moving
+  · (c) goal 1: the banner read "⏰35 SECONDS — EAT FASTER!!" with the goal unmet
+  · (c) goal 2: the §3.1 goal hooks are missing: __setScore, __eatKind, __eatLandmark, __setRivalScores, __devourAll
+  · (c) goal 2: __goalState() is missing
+  · (c) goal 2 @t5.15: #goal is not visible — she cannot see what this dot wants
+  · (c) goal 2 @t5.15: #goal reads label "", expected "COLLECT"
+  · (c) goal 2 @t5.15: #goal value "" does not parse as a down reading for this kind
+  · (c) goal 2 @t8.15: #goal is not visible — she cannot see what this dot wants
+  · (c) goal 2 @t8.15: #goal reads label "", expected "COLLECT"
+  · (c) goal 2 @t8.15: #goal value "" does not parse as a down reading for this kind
+  · (c) goal 2 @t14.06: #goal is not visible — she cannot see what this dot wants
+  · (c) goal 2 @t14.06: #goal reads label "", expected "COLLECT"
+  · (c) goal 2 @t14.06: #goal value "" does not parse as a down reading for this kind
+  · (c) goal 2: #count went hot on 309 frames with the goal unmet — a red 3-2-1 counting down to the green dot not moving
+  · (c) goal 2: the banner read "⏰35 SECONDS — EAT FASTER!!" with the goal unmet
+  · (c) goal 3: the §3.1 goal hooks are missing: __setScore, __eatKind, __eatLandmark, __setRivalScores, __devourAll
+  · (c) goal 3: __goalState() is missing
+  · (c) goal 3 @t5.1: #goal is not visible — she cannot see what this dot wants
+  · (c) goal 3 @t5.1: #goal reads label "", expected "BARN"
+  · (c) goal 3 @t5.1: #goal value "" does not parse as a up reading for this kind
+  · (c) goal 3 @t8.1: #goal is not visible — she cannot see what this dot wants
+  · (c) goal 3 @t8.1: #goal reads label "", expected "BARN"
+  · (c) goal 3 @t8.1: #goal value "" does not parse as a up reading for this kind
+  · (c) goal 3 @t13.79: #goal is not visible — she cannot see what this dot wants
+  · (c) goal 3 @t13.79: #goal reads label "", expected "BARN"
+  · (c) goal 3 @t13.79: #goal value "" does not parse as a up reading for this kind
+  · (c) goal 3: #count went hot on 354 frames with the goal unmet — a red 3-2-1 counting down to the green dot not moving
+  · (c) goal 3: the banner read "⏰35 SECONDS — EAT FASTER!!" with the goal unmet
+  · (c) goal 4: the §3.1 goal hooks are missing: __setScore, __eatKind, __eatLandmark, __setRivalScores, __devourAll
+  · (c) goal 4: __goalState() is missing
+  · (c) goal 4 @t5.1: #goal is not visible — she cannot see what this dot wants
+  · (c) goal 4 @t5.1: #goal reads label "", expected "PLACE"
+  · (c) goal 4 @t5.1: #goal value "" does not parse as a rank reading for this kind
+  · (c) goal 4 @t8.1: #goal is not visible — she cannot see what this dot wants
+  · (c) goal 4 @t8.1: #goal reads label "", expected "PLACE"
+  · (c) goal 4 @t8.1: #goal value "" does not parse as a rank reading for this kind
+  · (c) goal 4 @t13.9: #goal is not visible — she cannot see what this dot wants
+  · (c) goal 4 @t13.9: #goal reads label "", expected "PLACE"
+  · (c) goal 4 @t13.9: #goal value "" does not parse as a rank reading for this kind
+  · (c) goal 4: #count went hot on 360 frames with the goal unmet — a red 3-2-1 counting down to the green dot not moving
+  · (c) goal 4: the banner read "⏰35 SECONDS — EAT FASTER!!" with the goal unmet
+  · (c) goal 5: the §3.1 goal hooks are missing: __setScore, __eatKind, __eatLandmark, __setRivalScores, __devourAll
+  · (c) goal 5: __goalState() is missing
+  · (c) goal 5 @t5.1: #goal is not visible — she cannot see what this dot wants
+  · (c) goal 5 @t5.1: #goal reads label "", expected "WORLD"
+  · (c) goal 5 @t5.1: #goal value "" does not parse as a up reading for this kind
+  · (c) goal 5 @t8.1: #goal is not visible — she cannot see what this dot wants
+  · (c) goal 5 @t8.1: #goal reads label "", expected "WORLD"
+  · (c) goal 5 @t8.1: #goal value "" does not parse as a up reading for this kind
+  · (c) goal 5 @t14.01: #goal is not visible — she cannot see what this dot wants
+  · (c) goal 5 @t14.01: #goal reads label "", expected "WORLD"
+  · (c) goal 5 @t14.01: #goal value "" does not parse as a up reading for this kind
+  · (c) goal 5: #count went hot on 366 frames with the goal unmet — a red 3-2-1 counting down to the green dot not moving
+  · (c) goal 5: the banner read "⏰35 SECONDS — EAT FASTER!!" with the goal unmet
+  · (c) control: a harness match with no ?g= reads playing="hook missing"
+
+FAIL — the ladder does not hold its own state (66 finding(s)) [236s]
+EXIT=1

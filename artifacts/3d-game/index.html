@@ -483,6 +483,24 @@
          a real system and they belong somewhere a child is actually deciding
          what to do next, with words on them. That is the results screen — see
          renderQuestStrip(). */
+      /* THE GOAL CHIP. 44px tall because a six-year-old's finger and a
+         six-year-old's eye want the same thing: the number she is chasing,
+         readable at arm's length over a moving world. Cream on the house
+         violet, the same pair every HUD chip uses. */
+      #goal { position: fixed; left: 50%; transform: translateX(-50%);
+        top: calc(env(safe-area-inset-top, 0px) + 58px); z-index: 12;
+        display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px;
+        border-radius: 22px; background: rgba(28, 15, 61, 0.82);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.35); pointer-events: none; }
+      #goal .gLabel { font-size: 12px; letter-spacing: 1.2px; color: #cfc4ee; }
+      #goal .gVal { font-size: 17px; color: #fff6df; font-weight: 700; }
+      body.menu #goal, body.ovl #goal { display: none; }
+      /* …and `display: flex` above beats the user agent's own [hidden] rule, so
+         el.hidden = true left the chip on screen. The chip is hidden on every
+         goal-free match — which is every harness match — so without this the
+         HUD grows an element nobody asked for on ~110 existing probes. */
+      #goal[hidden] { display: none; }
+
       #quests { display: none !important; }
       #endQuests { width: min(92%, 380px); margin: 2px auto 0; display: none; flex-direction: column; gap: 6px; }
       #endQuests.on { display: flex; }
@@ -1884,6 +1902,13 @@
     <div id="timer">3:00</div>
     <div id="coins">✦ 0</div>
     <div id="quests"></div>
+    <!-- THE LEVEL'S GOAL, LIVE. Sits where #quests will leave (the daily board
+         is retired on day 6 of the menu stream) and carries one line: what this
+         dot wants and how close she is. Empty and display:none unless a human
+         chose a level — a harness match with no level runs goal-free, which is
+         what keeps ~110 existing match probes from silently becoming level
+         runs. Built by the module; nothing here is ever re-templated. -->
+    <div id="goal" hidden><span class="gLabel"></span><b class="gVal"></b></div>
     <!-- built once by the module; NOTHING here is ever re-templated -->
     <div id="growth">
       <div class="gRow"><span class="gNow">VOIDLING</span><span class="gM">6m</span>

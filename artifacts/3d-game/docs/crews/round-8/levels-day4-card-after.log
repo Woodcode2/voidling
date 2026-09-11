@@ -1,0 +1,42 @@
+
+  LEVELS — the ladder's state @ :4177
+  The gate is a WIN (owner, §8.1): goal k+1 opens on 'done', never on 'fin'.
+
+  ok   (b) the goal card unrolled at frame 26 (0.43 game-s after the probe took the clock)
+  ok   (b) the goal card was raised exactly once
+  ok   (b) the card fired at 0.5s after arming, on the authored mark (last frame before: 0.483s)
+  ok   (b) the card carries this level's own line: "EAT 18,000 OF THE TOWN"
+  ok   (b) the card names the dot: LEVEL 1
+  ok   (b) the goal card is never up while the ghost hand is (1 card-up state(s) sampled)
+  ok   (c) goal 1: #timer ran down 9.85 → 6.96 → 1.07
+  ok   (c) goal 1: #goal up: "35 / 18,000" → "4,562 / 18,000" → "11,135 / 18,000"
+       goal 1: 18 cranked match-second(s) in 35s of wall clock
+  ok   (c) goal 1: the countdown stayed gold with the goal unmet
+  ok   (c) goal 1: no EAT FASTER banner with the goal unmet
+  ok   (c) goal 2: #timer ran down 9.85 → 6.96 → 1.26
+  ok   (c) goal 2: #goal down: "5 HOUSES  8 CARS  37 SNACKS" → "4 HOUSES  8 CARS  34 SNACKS" → "1 HOUSES  8 CARS  25 SNACKS"
+       goal 2: 18 cranked match-second(s) in 34s of wall clock
+  ok   (c) goal 2: the countdown stayed gold with the goal unmet
+  ok   (c) goal 2: no EAT FASTER banner with the goal unmet
+  ok   (c) goal 3: #timer ran down 9.85 → 6.96 → 1.27
+  ok   (c) goal 3: #goal up: "23%" → "29%" → "EAT IT NOW"
+       goal 3: 18 cranked match-second(s) in 34s of wall clock
+  ok   (c) goal 3: the countdown stayed gold with the goal unmet
+  ok   (c) goal 3: no EAT FASTER banner with the goal unmet
+  ok   (c) goal 4: #timer ran down 9.85 → 6.85 → 1.05
+  ok   (c) goal 4: #goal rank: "#1 OF 1" → "#6 OF 6" → "#6 OF 6"
+       goal 4: 18 cranked match-second(s) in 38s of wall clock
+  ok   (c) goal 4: the countdown stayed gold with the goal unmet
+  BAD  (c) goal 4: the banner read "⏰35 SECONDS — EAT FASTER!!" with the goal unmet
+  ok   (c) goal 5: #timer ran down 9.85 → 6.85 → 0.85
+  ok   (c) goal 5: #goal up: "0% / 28%" → "10% / 28%" → "20% / 28%"
+       goal 5: 17 cranked match-second(s) in 32s of wall clock
+  ok   (c) goal 5: the countdown stayed gold with the goal unmet
+  ok   (c) goal 5: no EAT FASTER banner with the goal unmet
+  ok   (c) control: #goal stays hidden on a goal-free match
+  ok   (c) control: the shipped ending is intact — #count hot on 249 frames
+  ok   (c) control: the shipped banner is intact — "⏰35 SECONDS — EAT FASTER!!"
+  · (c) goal 4: the banner read "⏰35 SECONDS — EAT FASTER!!" with the goal unmet
+
+FAIL — the ladder does not hold its own state (1 finding(s)) [258s]
+EXIT=1
