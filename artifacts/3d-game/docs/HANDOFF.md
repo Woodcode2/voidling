@@ -299,16 +299,31 @@ The ones that matter most now:
 5. **Python `replace()` edits that print "done" unconditionally are not
    edits.** `assert s.count(OLD) == 1` before every replace, then grep after.
 6. **Zombie Chromium** starves later probes into timeouts. `pgrep -f
-   'chrome-linux/chrome'` and kill before diagnosing a hang.
-7. **The sandbox renders ~1 fps.** Sample against `__matchState().t`.
-8. `preserveDrawingBuffer` is off — screenshot, then decode the PNG in-page.
-9. **A single-world probe run and that world inside an `all` run can differ
+   'chrome-[l]inux/chrome'` and kill before diagnosing a hang. **Bracket a
+   character in the pattern.** `pkill -f` matches the FULL COMMAND LINE of
+   every process, so an unbracketed pattern matches the shell that carries it —
+   and the terminal invoking it, and this file's own reader. The gate's
+   between-step cleanup was written unbracketed and therefore killed itself
+   before its second line ran, so from the day it was written until 2026-09-11
+   it never once killed a browser (`qa/_day4_straytest.sh` is the failing run).
+   Four tool calls died to the same trap while diagnosing it.
+7. **A probe's own waits are sized; Playwright's defaults are not.** Every wait
+   in `qa/firstframe.mjs` is 300-400 s because a world takes 10-40 s to build
+   here — but `page.screenshot()` carries Playwright's 30 s default, and a
+   full-page capture of a live canvas at DPR 3 measured **26.2 s on an idle
+   box**. It passed alone and went red inside the gate, twice, on builds that
+   were fine. `gate.mjs`'s step timeout had already been raised once for the
+   same symptom one level up. When a probe goes red on a timeout, ask what the
+   INNER default is before believing the build.
+8. **The sandbox renders ~1 fps.** Sample against `__matchState().t`.
+9. `preserveDrawingBuffer` is off — screenshot, then decode the PNG in-page.
+10. **A single-world probe run and that world inside an `all` run can differ
    even at SEED=7.** Compare like with like. The placement baseline's own header
    records which categories drift and by how much.
-10. **Suspect the instrument when it disagrees with the owner.** Then widen it.
-11. **A monitor that only emits on success is silent on failure**, and silence
+11. **Suspect the instrument when it disagrees with the owner.** Then widen it.
+12. **A monitor that only emits on success is silent on failure**, and silence
     looks like "still running". Cover the failure signatures too.
-12. **Guessing the cause three times is slower than tracing once.** The last
+13. **Guessing the cause three times is slower than tracing once.** The last
     placement bug was solved only when the loop was made to say what it did
     (`window.__settleTrace`). When two readings of the code disagree, instrument.
 
