@@ -134,12 +134,41 @@ const shotPair = async (p, name, ms) => {
 
 let fails = 0;
 let missingReq = 0;   // required #menu selectors that were not on the page at all
+/** Slowest full-page capture seen, so the run says how close it came to the
+ *  cap instead of only saying whether it crossed it. */
+let slowestShot = { ms: 0, what: '' };
+const shot = async (page, path, what) => {
+  const t0 = Date.now();
+  await page.screenshot({ path });
+  const ms = Date.now() - t0;
+  if (ms > slowestShot.ms) slowestShot = { ms, what };
+};
 const RUNS = SPLASH_ONLY ? VIEWS.map((v) => ({ WORLD: WORLDS[0], v })) : WORLDS.map((WORLD) => ({ WORLD, v: VIEWS[0] }));
 for (const { WORLD, v } of RUNS) {
   VP = v; VTAG = v.tag;
   const rec = { world: WORLD, introLen: NaN, seed: SEED, view: VP, shots: [], contrast: [] };
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
   const p = await b.newPage({ viewport: { width: VP.width, height: VP.height }, deviceScaleFactor: VP.dpr });
+  // ── PLAYWRIGHT'S 30-SECOND DEFAULT IS NOT A BUDGET THIS PROBE CAN MEET ────
+  // Every wait in this file is already sized at 300-400 s, because a world
+  // takes 10-40 s to build under swiftshader and everything here waits on one.
+  // The screenshots were the exception, silently: page.screenshot() carries
+  // Playwright's own 30 s default, and these are FULL-PAGE captures of a live
+  // WebGL canvas at deviceScaleFactor 3 — 1320x2442 device pixels on the
+  // 440x814 view — which a software renderer has to produce a fresh frame for.
+  //
+  // Alone on a quiet box that lands inside 30 s and the step passes. Inside the
+  // gate it runs straight after `purpose` (33 minutes of six-world crowd
+  // simulation) and `opening`, and the same capture tips over the cap: the step
+  // died with "page.screenshot: Timeout 30000ms exceeded / waiting for fonts to
+  // load... / fonts loaded" on the fourth viewport, twice, on builds that pass
+  // 6/6 views when run on their own.
+  //
+  // gate.mjs's step timeout was raised once for exactly this shape of problem
+  // ("sized on one host and read a slower one as red"). This is the same
+  // mistake one level down, in a default nobody chose. The timing below means a
+  // future reader can see the headroom rather than discover it as a red.
+  p.setDefaultTimeout(180000);
   p.on('pageerror', (e) => console.log(`  [pageerror] ${e.message.split('\n')[0]}`));
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
   await p.addInitScript(({ seed, first }) => {
@@ -161,9 +190,9 @@ for (const { WORLD, v } of RUNS) {
   //    document commits, then again once the module has filled .lName.
   await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'commit', timeout: 300000 });
   await p.waitForSelector('#loadScr', { state: 'attached', timeout: 300000 });
-  await p.screenshot({ path: `${OUT}/${WORLD}_boot0${VTAG}.png` });
+  await shot(p, `${OUT}/${WORLD}_boot0${VTAG}.png`, `${WORLD} boot0 ${VP.width}x${VP.height}@${VP.dpr}`);
   await p.waitForFunction(() => document.querySelector('#loadScr .lName')?.textContent.trim().length > 1, null, { timeout: 300000 }).catch(() => { });
-  await p.screenshot({ path: `${OUT}/${WORLD}_boot${VTAG}.png` });
+  await shot(p, `${OUT}/${WORLD}_boot${VTAG}.png`, `${WORLD} boot ${VP.width}x${VP.height}@${VP.dpr}`);
   const bootName = await p.evaluate(() => document.querySelector('#loadScr .lName')?.textContent.trim());
   const bootTip = await p.evaluate(() => document.querySelector('#loadScr .lTip')?.textContent.trim());
   // THE BAR MOVES. Sample #lPct across the build: a loader that shows one value
@@ -212,7 +241,7 @@ for (const { WORLD, v } of RUNS) {
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
   await p.waitForFunction(() => !document.querySelector('#loadScr.show, #loadScr.boot'), null, { timeout: 300000 }).catch(() => { });
   await p.waitForTimeout(800);
-  await p.screenshot({ path: `${OUT}/${WORLD}_menu${VTAG}.png` });
+  await shot(p, `${OUT}/${WORLD}_menu${VTAG}.png`, `${WORLD} menu ${VP.width}x${VP.height}@${VP.dpr}`);
   await freeze(p, '#menu');
   // ── THESE THREE ARE REQUIRED, and that is a change ──────────────────────
   // contrast() returns { missing: true } for a selector that is not on the
@@ -289,4 +318,7 @@ for (const { WORLD, v } of RUNS) {
   for (const c of rec.contrast) { if (c.missing) { if (c.required) { fails++; missingReq++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: ${c.required} is not on the page — the splash step measured nothing where the menu's own type should be`); } continue; } if (!c.glyphPx) { fails++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: no glyph pixels found — the measurement did not run`); continue; } const large = parseFloat(c.size) >= 18.66 || (/CUTE|ENDER/.test(c.text) && parseFloat(c.size) >= 14); const bar = large ? 3 : 4.5; if (c.p10 < bar) { fails++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: p10 ${c.p10}:1 under the ${bar}:1 bar (${large ? 'large' : 'body'} text)`); } }
 }
 if (fails) process.exitCode = 1;
+console.log(`  slowest full-page capture: ${(slowestShot.ms / 1000).toFixed(1)}s (${slowestShot.what}) `
+  + `— Playwright's own default is 30s and this probe now allows 180s; a number creeping toward that `
+  + `is the box getting slower, not the game`);
 console.log(fails ? `FAIL — firstframe: ${missingReq ? `${missingReq} required #menu selector(s) missing from the page` + (fails > missingReq ? ` and ${fails - missingReq} splash line(s) under their WCAG bar` : '') : `${fails} splash line(s) under their WCAG bar against the real pixels behind the glyphs`}` : `PASS — firstframe: every splash line clears its WCAG bar against the real pixels behind the glyphs; frames in ${OUT}/`);
