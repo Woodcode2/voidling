@@ -26,6 +26,8 @@
 //                       finish
 //   (f) migration       monotone, never re-locks, maple/1 always at least open
 //   (g) telemetry       the level_* events fire once with the right payload
+//   (e) winnable        every one of the thirty goals can be met on the island
+//                       that actually exists — the bar that makes a win gate safe
 //   (i) goal-free       a harness match with no ladder seeded touches nothing
 //
 // A MISSING HOOK THROWS, it does not skip. qa/_zgrade.mjs modelled a tone curve
@@ -39,7 +41,7 @@ import { ALL_WORLDS, UNLOCK_ALL } from './worlds.mjs';
 
 const flag = (n, d) => { const h = process.argv.find((a) => a.startsWith(`--${n}=`)); return h ? h.slice(n.length + 3) : d; };
 const PORT = process.argv.slice(2).filter((a) => !a.startsWith('--'))[0] || '4177';
-const ONLY = flag('only', 'a,f,g,i').split(',');
+const ONLY = flag('only', 'a,e,f,g,i').split(',');
 
 const fails = [];
 const bad = (m) => { fails.push(m); console.log(`  BAD  ${m}`); };
@@ -224,6 +226,60 @@ if (ONLY.includes('g')) {
   else ok(`(g) ?g= and voidPlayGoal set the played goal`);
   if (leftover !== null) bad(`(g) voidPlayGoal survived as ${JSON.stringify(leftover)} — it is a one-shot and every later match would inherit it`);
   else ok(`(g) the goal channel is consumed once`);
+}
+
+// ── (e) EVERY GOAL IS WINNABLE ON THE ISLAND THAT EXISTS ───────────────────
+// The bar that makes the owner's win gate safe. Under it a goal that cannot be
+// met is not a hard level, it is where a child's game ends — so "is dot 3
+// winnable" has to be answerable from the island rather than arguable from the
+// table. Each world is loaded and its own spec is checked against its own
+// supply, with the eat handler's rules and the client's HOUSE_LIKE.
+//
+// It would have caught every one of day 2's findings before they shipped: the
+// Skylark landmark resolving to a whale needing R 16.2, a SET kind asking for
+// more than the island carries, and a landmarkR that does not match the prop
+// actually tagged.
+if (ONLY.includes('e')) {
+  for (const world of ALL_WORLDS) {
+    const p = await open({ voidUnlocked: UNLOCK_ALL }, `?w=${world}`);
+    await p.waitForFunction(() => {
+      const n = window.__edibles.length;
+      if (window.__lastN !== n) { window.__lastN = n; window.__stableSince = performance.now(); return false; }
+      return performance.now() - (window.__stableSince || 0) > 2000;
+    }, null, { timeout: 300000, polling: 250 }).catch(() => { });
+    const g = await p.evaluate(() => window.__goalPools());
+    await p.close();
+
+    // dot 3 — the tagged prop must EXIST, and landmarkR must be what the game
+    // will actually test against (the prop's radius over EAT_RATIO), not a
+    // number typed beside it that drifted.
+    if (!g.landmark) bad(`(e) ${world}: no prop carries a landmark tag — dot 3 has nothing to point at`);
+    else {
+      if (g.landmark.name !== g.spec.landmark) bad(`(e) ${world}: the tagged landmark is "${g.landmark.name}" but the spec names "${g.spec.landmark}"`);
+      if (Math.abs(g.landmark.needR - g.spec.landmarkR) > 0.02) bad(`(e) ${world}: landmarkR is ${g.spec.landmarkR} but "${g.landmark.name}" (r ${g.landmark.radius}) needs R ${g.landmark.needR} — the spec and the island disagree`);
+      if (g.landmark.needR > g.lawTop) bad(`(e) ${world}: "${g.landmark.name}" needs R ${g.landmark.needR}, above LAW_TOP ${g.lawTop} — the clock alone can never buy it`);
+      else ok(`(e) ${world}: dot 3 is "${g.landmark.name}" (r ${g.landmark.radius}, needs R ${g.landmark.needR} of LAW_TOP ${g.lawTop})`);
+    }
+
+    // dot 2 — 3N of every kind, and 6N for cars and houses because the family
+    // eats 40-50% of the board and a goal racing them for the last one is a
+    // goal decided by the rubber band.
+    for (const { kind, n, label } of g.spec.set) {
+      // gild is MADE per match by gildTreasure(), not placed on the island, so
+      // its supply on a pre-match page is zero on every world. The count a
+      // match will have is the constant the game publishes.
+      const have = kind === 'gild' ? g.gildPerMatch : (g.supply[kind] ?? 0);
+      const need = (kind === 'car' || kind === 'house') ? n * 6 : n * 3;
+      if (have < need) bad(`(e) ${world}: dot 2 asks ${n} ${label} (${kind}) and the island carries ${have} — under the ${need} this kind needs`);
+    }
+    if (!fails.some((f) => f.startsWith(`(e) ${world}: dot 2`))) ok(`(e) ${world}: dot 2's three kinds all clear their supply rule`);
+
+    // dot 4 — a rank the rubber band can actually deliver.
+    if (!(g.spec.rank >= 1 && g.spec.rank <= 3)) bad(`(e) ${world}: dot 4 wants rank ${g.spec.rank} — the family is floored at "never below 3rd", so only 1-3 is meetable`);
+    // dot 5 — a share of the world, never the 100% the brief assumed.
+    if (!(g.spec.clear > 0 && g.spec.clear <= 60)) bad(`(e) ${world}: dot 5 wants ${g.spec.clear}% of the world — measured p10 at 70% of the clock is 29-48%`);
+    if (!(g.spec.eat > 0)) bad(`(e) ${world}: dot 1 has no score`);
+  }
 }
 
 // ── (i) A HARNESS MATCH IS GOAL-FREE ───────────────────────────────────────

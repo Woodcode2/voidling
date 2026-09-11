@@ -1562,6 +1562,85 @@ interface WorldCopy {
   // moved into those pools verbatim; nothing was thrown away.
   rivalFullNews: string;  // …and the survivor has slowed right down
 }
+/** ══ THE THIRTY GOALS ═══════════════════════════════════════════════════════
+ *
+ *  Five dots per world in the owner's order — EAT, SET, LANDMARK, RIVALS,
+ *  CLEAR — and under his win gate (MENU-BRIEF §8.1) every one of them has to be
+ *  winnable, because a goal that cannot be met is a wall and the gate has no
+ *  other release valve inside a world.
+ *
+ *  EVERY NUMBER HERE WAS MEASURED, not derived. Thirty matches — six worlds,
+ *  five seeded runs each on a virtualised clock — plus twelve hunting runs for
+ *  the SET kinds (`qa/goalcurve.mjs`, `docs/crews/round-8/goalcurve-day2-*.log`,
+ *  raw series in `qa/out/goalcurve/*.json`). The draft these replace was
+ *  arithmetic on WORLD_PAR, and on Pirate it asked for 87% of what a competent
+ *  autopilot reaches on a bad day — on dot ONE of a world.
+ *
+ *  AND THE DRIVER IS NOT A CHILD. The autopilot has perfect information and
+ *  never hesitates; WORLD_PAR's "verified mean" is its mean, not a
+ *  six-year-old's. So each goal sits under p10 — the bad days — and the
+ *  fraction between this driver and a child is the one number a sandbox cannot
+ *  measure. It comes off the owner's daughter on day 15 (§8.9). Until then
+ *  every number here is provisional, and the right response to "she cannot do
+ *  it" is to move these, never to move the child.
+ *
+ *  `landmark` names a prop tagged by its factory via island.ts's asLandmark().
+ *  It is NOT heroProp: heroProp is the largest edible, which on Skylark is the
+ *  tethered whale needing R 16.2 — the clock alone buys LAW_TOP 12 and the rest
+ *  is feast headroom at 1.25 a rival, so that is a four-rival hunt rather than
+ *  a landmark — and which on every world is edible only in the last seconds. Each world's hero landmark is
+ *  untouched and stays its finale beat. */
+export interface LevelSpec {
+  /** Dot 1: score to reach. Measured at ~half the clock for a p10 run. */
+  eat: number;
+  /** Dot 2: three kinds and counts, SMALLEST COUNT FIRST so the first tick
+   *  lands inside the first minute. Kinds are the eat handler's own
+   *  (`questEvent`), never a list re-derived here. */
+  set: { kind: string; n: number; label: string }[];
+  /** Dot 3: the tagged prop's name, and the radius the void needs to eat it
+   *  (the prop's own radius over EAT_RATIO — the cue's test, not a guess). */
+  landmark: string;
+  landmarkR: number;
+  /** Dot 4: the rank to beat at the buzzer. Ramped across the unlock order —
+   *  the rubber band floors the family at "never below 3rd", so rank 1 on
+   *  world 1 would be a wall. */
+  rank: number;
+  /** Dot 5: share of the WORLD devoured. Measured p10 at ~70% of the clock. */
+  clear: number;
+}
+const LEVEL_SPEC: Record<WorldId, LevelSpec> = {
+  // p10 run reaches 18,790 at half the clock · barn r 5.0 needs R 4.50 (~62%)
+  // · SET done at 76 s (42%) · devours 29% by 70%
+  maple: { eat: 18000, landmark: 'barn', landmarkR: 4.50, rank: 3, clear: 28,
+    set: [{ kind: 'house', n: 5, label: 'HOUSES' }, { kind: 'car', n: 8, label: 'CARS' }, { kind: 'snack', n: 40, label: 'SNACKS' }] },
+  // 19,353 at half · lookout r 4.0 needs R 3.60 (~45%) · SET at 56 s (31%)
+  // GOLD IS CAPPED AT 6 EVERYWHERE, and the cap is arithmetic rather than
+  // taste: gildTreasure() gilds GILD_N = 20 props a match, the family eats
+  // 40-50% of the board, and the 3N supply rule therefore tops gold out at 6.
+  // The hunt agrees — on Pirate a hunting run reached 8 gold at 56 s but 15 at
+  // 81 s with a p90 of 147, and 20 never. A gold goal above this is a race
+  // against the rubber band for the last few coins.
+  pirate: { eat: 18000, landmark: 'lookout', landmarkR: 3.60, rank: 3, clear: 28,
+    set: [{ kind: 'gild', n: 6, label: 'GOLD' }, { kind: 'cabana', n: 20, label: 'CABANAS' }, { kind: 'snack', n: 60, label: 'SNACKS' }] },
+  // 34,800 at half · clock tower r 4.5 needs R 4.05 (~51%) · SET at 99 s (55%)
+  gameday: { eat: 32000, landmark: 'clock tower', landmarkR: 4.05, rank: 2, clear: 32,
+    set: [{ kind: 'car', n: 4, label: 'TRUCKS' }, { kind: 'house', n: 8, label: 'HOUSES' }, { kind: 'snack', n: 40, label: 'SNACKS' }] },
+  // 41,206 at half · gate r 5.0 needs R 4.50 (~62%) · SET at 48 s (27%) ·
+  // devours 48% by 70%, the densest world in the game
+  lantern: { eat: 40000, landmark: 'gate', landmarkR: 4.50, rank: 2, clear: 45,
+    set: [{ kind: 'gild', n: 6, label: 'GOLD' }, { kind: 'house', n: 40, label: 'STALLS' }, { kind: 'snack', n: 100, label: 'SNACKS' }] },
+  // 11,104 at half · bell tower r 4.4 needs R 3.96 (~55%) · SET at 91 s (50%)
+  powder: { eat: 10000, landmark: 'bell tower', landmarkR: 3.96, rank: 1, clear: 30,
+    set: [{ kind: 'gild', n: 4, label: 'GOLD' }, { kind: 'house', n: 4, label: 'CHALETS' }, { kind: 'snack', n: 40, label: 'SNACKS' }] },
+  // 32,020 at half · hangar r 5.5 needs R 4.95 (~73%) · SET at 39 s (22%)
+  // vans were 40 on the hunt's timing (39 s) but the island carries 98 and the
+  // family eats 40-50% of the board, so 40 would have been a race against the
+  // rubber band for the last few. 15 clears the 6N rule and the hunt reached it
+  // at 22 s.
+  skylark: { eat: 30000, landmark: 'hangar', landmarkR: 4.95, rank: 1, clear: 38,
+    set: [{ kind: 'gild', n: 6, label: 'GOLD' }, { kind: 'car', n: 15, label: 'VANS' }, { kind: 'snack', n: 100, label: 'SNACKS' }] },
+};
+
 const WORLD_COPY: Record<WorldId, WorldCopy> = {
   maple: {
     // MAPLE FALLS WAS WEARING PIRATE BAY'S ICON. 🏝️ is a palm on a sand spit,
@@ -2074,6 +2153,8 @@ const _dbg = new Proxy(_dbgStore, {
   __heroPoint: () => { x: number; z: number } | null;
   __kindTally: () => Record<string, number>;
   __levels: () => unknown[];
+  __levelSpec: () => unknown;
+  __goalPools: () => Record<string, unknown>;
   __levelCurrent: (w: string) => number;
   __levelPlaying: () => number | null;
   __recordLevel: (r: Record<string, unknown>) => unknown;
@@ -2426,6 +2507,43 @@ _dbg.__kindTally = () => ({ ...kindTally });
 // against the game, which is how qa/_distinct.mjs ended up unable to see a CSS
 // change at all.
 _dbg.__levels = () => allLevels();
+// This world's five goals, read off the table the game plays from rather than
+// transcribed into a probe — the one rule qa/questable.mjs's header exists to
+// teach.
+_dbg.__levelSpec = () => ({ world: pickedWorld, ...LEVEL_SPEC[pickedWorld] });
+// ── WHAT THIS ISLAND CAN ACTUALLY SUPPLY, against what the spec asks ───────
+// The supply side of every SET goal, counted with the eat handler's own rules
+// and the client's own HOUSE_LIKE, plus the tagged dot-3 landmark. A spec that
+// asks for four chalets on an island with three is a wall, and under a win
+// gate a wall is where a child's game ends — so this is the read that makes
+// "is every goal winnable" answerable instead of arguable.
+_dbg.__goalPools = () => {
+  const HL = new Set(HOUSE_LIKE);
+  const supply: Record<string, number> = {};
+  const bump = (k: string) => { supply[k] = (supply[k] || 0) + 1; };
+  let lm: { name: string; radius: number; needR: number } | null = null;
+  for (const e of edibles) {
+    const m = e.mesh, qk = m.userData.qk as string | undefined, r = e.radius || 0;
+    if (r < 1) bump('snack');
+    if (r >= 6) bump('big');
+    if (m.userData.gild) bump('gild');
+    if (r >= 2.6 && r <= 3.4) bump('cabana');
+    if (qk) bump(qk);
+    if (qk && HL.has(qk) && qk !== 'house') bump('house');
+    const tag = m.userData.landmark as string | undefined;
+    if (tag && !lm) lm = { name: tag, radius: +r.toFixed(2), needR: +(r / EAT_RATIO).toFixed(2) };
+  }
+  // R_CAP is 18 but the CLOCK alone only buys LAW_TOP 12; the six above it are
+  // feast headroom at 1.25 a rival. A goal sized against R_CAP would be sized
+  // against a number ordinary play never reaches.
+  // GILD IS MADE PER MATCH, NOT PLACED ON THE ISLAND. gildTreasure() runs
+  // inside beginMatch and gilds GILD_N props, so a supply count taken on the
+  // menu reports zero gold on every world and a gold goal reads as unwinnable
+  // when it is nothing of the kind. The count a match will HAVE is the
+  // constant, so it is published rather than inferred from a pre-match island.
+  return { world: pickedWorld, spec: LEVEL_SPEC[pickedWorld], supply, landmark: lm,
+    houseLike: [...HL], eatRatio: EAT_RATIO, lawTop: 12, rCap: R_CAP, gildPerMatch: GILD_N };
+};
 _dbg.__levelCurrent = (w: string) => levelCurrent(w);
 // null unless a human chose this level. See playingGoal's note: a harness
 // match must never read as a level attempt.

@@ -368,8 +368,8 @@ const SUITE = [
   // THE LADDER'S STATE. Registered on day 3 with (a)(f)(g)(i) — the parts that
   // need no match wiring. (b)(c)(d)(e)(h) arrive with days 4-6 and the timeout
   // is re-sized then; 420s is a measured 195s run with room for a slow box.
-  { id: 'levels', tier: 'feel', profiles: ['push', 'live'], timeout: 420,
-    cmd: ['node', 'qa/levels.mjs', String(PORT), '--only=a,f,g,i'], verdict: pf,
+  { id: 'levels', tier: 'feel', profiles: ['push', 'live'], timeout: 900,
+    cmd: ['node', 'qa/levels.mjs', String(PORT), '--only=a,e,f,g,i'], verdict: pf,
     why: 'the ladder agrees with itself about where a child is — thirty dots, one green ring per world, and a dot that is opened only by a goal MET, never by a match merely finished' },
 
   { id: 'stickerreg', tier: 'quality', profiles: ['push', 'live'], timeout: 30,

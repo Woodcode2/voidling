@@ -274,6 +274,33 @@ function riverXAtWorld(wy: number): number | null {
   }
   return null;
 }
+/** ── NAME A BUILDING AS A LEVEL'S LANDMARK ────────────────────────────────
+ *  Dot 3 of every world is "eat the <landmark>", and measurement is why this
+ *  exists rather than the obvious alternative. The obvious alternative was
+ *  `heroProp` — the largest edible on the island — and it is wrong twice over.
+ *  On SKYLARK FIELD the largest edible is the tethered whale, which needs a
+ *  void of radius 16.2. The CLOCK alone buys LAW_TOP 12 and the six above it
+ *  are feast headroom at 1.25 a rival, so the whale is a four-rival hunt
+ *  rather than a landmark — measured over five runs a competent autopilot
+ *  finished at 11.6 and reached it never. And on every other world the hero
+ *  landmark
+ *  (r 6.5-11) only becomes edible in the last 13-18 seconds of a 181-second
+ *  match, measured with a perfect autopilot — so under the owner's win gate
+ *  dot 3 was a wall for a child on all six worlds.
+ *
+ *  The fix is a NAMED building in the band a child actually reaches. Growth is
+ *  back-loaded (radius ~2.8 at a quarter of the clock, ~4.0 at half, ~5.1 at
+ *  three quarters), so a landmark of radius 4-5.5 is edible from about half to
+ *  three quarters of the way in — a minute of slack instead of thirteen
+ *  seconds. Each world's hero landmark is untouched and stays its finale beat.
+ *
+ *  The tag rides on the mesh's own userData, so it survives placement without
+ *  any of the six placement paths needing to know about levels. */
+export const asLandmark = <T extends THREE.Object3D>(mesh: T, name: string): T => {
+  mesh.userData.landmark = name;
+  return mesh;
+};
+
 const LAGOON = { x: 3675, y: 10307, rx: 832, ry: 608 };
 const WATERFALL: [number, number] = [9800, 10150];
 
@@ -5951,7 +5978,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const vil = REG('village');
       const cx = vil.poly.reduce((a, q) => a + q[0], 0) / vil.poly.length;
       const cy = vil.poly.reduce((a, q) => a + q[1], 0) / vil.poly.length;
-      drop(AL.makeBellTower(), [cx, cy], 4.4, 0, true);
+      drop(asLandmark(AL.makeBellTower(), 'bell tower'), [cx, cy], 4.4, 0, true);   // dot 3's landmark
       drop(AL.makeRink(), [cx + 260, cy + 160], 2.2, 0, true);
       for (const p2 of PW.clusterAt(cx - 300, cy - 220, 5, 220))
         drop(AL.makeSnowman(), p2, 1.0, snowmanYaw(), false, 'snowman');
@@ -6496,7 +6523,9 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         // open test, not the claim, and a hangar that claims only its eat
         // radius lets a retrieve vehicle park through its wall. 7.1x9.1 is a
         // half-diagonal of 5.77, and 5.77 / 0.62 = 9.3.
-        if (best) drop(SKF.skHangar(), best, 5.5, layoutYaw() + Math.PI / 2, true, 'big', 9.5);
+        // dot 3's landmark. §8.2 asked hangar or whale; the whale needs R 16.2
+        // against a law topping at 12, so the question is answered by arithmetic.
+        if (best) drop(asLandmark(SKF.skHangar(), 'hangar'), best, 5.5, layoutYaw() + Math.PI / 2, true, 'big', 9.5);
       }
     }
     for (const [n, r, sep, qk, mk] of [
@@ -6775,7 +6804,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // and so could never be swallowed at all. A finale you cannot eat is not a
     // finale.
     drop(NM.makeBathhouse(), BH, 11.0, 0, true, 'big');
-    drop(NM.makeTorii(1.15), GATE, 5.0, 0, true, 'big');
+    drop(asLandmark(NM.makeTorii(1.15), 'gate'), GATE, 5.0, 0, true, 'big');   // dot 3's landmark
     drop(NM.makeMoonBridge(24), BRIDGE, 4.2, Math.PI / 2, true, 'big');
 
     // ── THE DRUM TOWER ────────────────────────────────────────────────────
@@ -7148,7 +7177,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // Pirate Bay's landmarks run 1.6 to 2.4, so this is in family: a big meal
     // reads bigger than the hole that takes it, which is the hole.io fantasy.
     drop(TG.makeStadium(), STAD, 11.0, 0, true, 'big');
-    drop(TG.makeClockTower(), TOWER, 4.5, 0, true, 'big');
+    drop(asLandmark(TG.makeClockTower(), 'clock tower'), TOWER, 4.5, 0, true, 'big');   // dot 3's landmark
 
     // ── THE TAILGATE ──────────────────────────────────────────────────────
     // The hero district, and the spawn. lotSlots() lays vehicles along the
@@ -7853,7 +7882,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // ── WAYPOINTS IN THE WILD ────────────────────────────────────────────
     // 61% of the island is undistricted and held exactly ONE prop taller than
     // 3 units, so the walk between districts had nothing in it.
-    landmark(LUXE.makeCrowsNestTower(), [4400, 2450], 4, 0.4, 120);   // north headland lookout
+    landmark(asLandmark(LUXE.makeCrowsNestTower(), 'lookout'), [4400, 2450], 4, 0.4, 120);   // north headland lookout — dot 3's landmark
     landmark(LUXE.makeAnchorMonument(), [2450, 4200], 3, -0.6, 100);  // west coast marker
     landmark(LUXE.makeMapPavilion(), [5330, 6890], 4, 1.1, 120);      // between bazaar and beach
     landmark(LUXE.makeFireTable(), [5120, 8600], 2.4, 0, 90);
@@ -8286,7 +8315,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
   // paddocks ./life stocks with livestock.
   {
     // THE BARNYARD, on (3,0) — a proper farmstead: house, barn, silos, coop
-    landmark(MS.makeBarn(), 6650, 1560, 5, 0, 'barn');
+    landmark(asLandmark(MS.makeBarn(), 'barn'), 6650, 1560, 5, 0, 'barn');   // dot 3's landmark
     landmark(MS.makeSilo(), 7180, 1420, 2.8, 0, 'silo A');
     landmark(MS.makeSilo(), 7180, 1760, 2.8, 0, 'silo B');
     landmark(MS.makeFarmhouse(), 6180, 2060, 4.2, Math.PI, 'farmhouse');
