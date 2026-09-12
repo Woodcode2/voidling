@@ -63,6 +63,51 @@ await strays();
 await run('node', ['qa/_dumpbake.mjs', 'maple'], 'ground bake: maple');
 shots.push({ path: 'qa/out/bake/maple.png', world: 'maple',
   shows: "the ground texture itself, 3072px — GROUND's whole surface, before any prop stands on it" });
+await strays();
+
+// ── THE MENU, WHICH DID NOT EXIST AS A SURFACE WHEN THIS FILE WAS WRITTEN ──
+// MENU-BRIEF §6 day 12. The menu was a still splash when this lookbook was
+// built; from day 8 it is a live 3D diorama of the world she is on, with day 7's
+// ladder over it and day 10's hop and first reveal moving on it. NONE of that
+// had a picture of itself, which under docs/STUDIO.md rule 1 — "no team may
+// report on a surface it has not seen rendered" — makes the entire menu stream
+// un-reviewable at the studio pass. A reviewer pointed at a surface with no
+// frame is a reviewer inventing one.
+//
+// Six worlds, because the stage is DERIVED per world (deriveStage picks the
+// azimuth off the island's own scatter) rather than authored — so Maple looking
+// right is not evidence about Powder Pass, and day 8 got the framing wrong four
+// times, every one of them caught by looking rather than by a number.
+await run('node', ['qa/_dioshot.mjs', PORT, '--views'], 'menu diorama: 6 worlds x 3 views');
+for (const w of ALL_WORLDS) {
+  shots.push({ path: `qa/out/dioshot/${w}.png`, world: w,
+    shows: `the menu as a child first sees ${w} — STATIC's framing, LIGHT's hour and `
+      + `HERO's read at menu size, with the ladder over it` });
+  shots.push({ path: `qa/out/dioshot/${w}-small.png`, world: w,
+    shows: `${w} at 360px — the width where the ladder panel and PLAY have the least room` });
+  shots.push({ path: `qa/out/dioshot/${w}-tablet.png`, world: w,
+    shows: `${w} at 834px — the width where a phone layout starts swimming` });
+}
+await strays();
+
+// the ladder's two moments of motion, and the state it settles into
+await run('node', ['qa/_revealshot.mjs', PORT], 'first reveal + pip hop');
+for (const [n, what] of [['3-reveal-done', 'the first reveal, arrived — five dots left to right, the void looking down at them'],
+  ['4-settled', 'the menu at rest: the ladder still, the ring on her dot, the goal line under it'],
+  ['8-hop-settled', 'after a win — the dot she played wearing its tick, the ring hopped to the one she opened']]) {
+  shots.push({ path: `qa/out/revealshot/${n}.png`, world: 'maple', shows: what });
+}
+await strays();
+
+// ── THE END CARD, WIN AND MISS ────────────────────────────────────────────
+// The one screen that tells a child how she did, and the one place the pip
+// language is 96px instead of 40. Both outcomes, because "NOT YET" is the harder
+// of the two to get right and is the one she will see more often.
+await run('node', ['qa/_endshot.mjs', PORT, 'maple'], 'end card: win + miss');
+shots.push({ path: 'qa/out/endshot/maple-g1-win-phone.png', world: 'maple',
+  shows: 'the end card on a win — the headline pip, the row of five, the coins under them' });
+shots.push({ path: 'qa/out/endshot/maple-g1-miss-phone.png', world: 'maple',
+  shows: 'the end card on a MISS — "NOT YET", the replay arrow, nothing that says failed' });
 
 const present = shots.filter((s) => existsSync(s.path));
 const missing = shots.filter((s) => !existsSync(s.path));
