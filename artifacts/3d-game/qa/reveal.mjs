@@ -102,7 +102,7 @@ const open = async (ctx, { levels = null, extra = {}, q = '' } = {}) => {
       localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
       localStorage.setItem('voidMute', '1');
       localStorage.setItem('voidDailyLast', new Date().toDateString());
-      localStorage.setItem('voidUnlocked', 'maple,pirate');
+      localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
       // ONCE, NOT ON EVERY NAVIGATION. addInitScript runs before the first line
       // of every document in this page's life, the reload included — so the
       // first version of this removed voidLevels again on bar 1's second load

@@ -83,7 +83,7 @@ const open = async (ctx, { last, q = '', coins = '500' } = {}) => {
       localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
       localStorage.setItem('voidMute', '1');
       localStorage.setItem('voidCoins', c);
-      localStorage.setItem('voidUnlocked', 'maple,pirate');
+      localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
       localStorage.setItem('voidDailyLast', lastSeen);
       // a ladder that has been seen, so the first reveal is not part of what
       // this probe is measuring
