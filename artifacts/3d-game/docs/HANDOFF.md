@@ -609,6 +609,59 @@ camera. Nothing is loaded for it. The menu is a camera, not an asset.
   the ground and readable, the drift alive and inside its authored swing, and
   the camera handed back on PLAY.
 
+**Day 9 is DONE (2026-09-12): the menu costs half what it did.** Day 8 made the
+menu a live 3D world; this measured what that costs a phone and cut it in half.
+`qa/menucost.mjs` is the instrument, `docs/crews/round-8/menucost-day9.log` the
+run.
+
+**Why it mattered:** the menu is where a phone sits for the longest unbroken
+stretch — a child opens the app, looks at it, wanders off, comes back — while a
+match is three minutes and stops. Measured first on Maple: **519 draw calls a
+frame against the match's 243**, so the app's battery and heat were being set by
+the screen where nothing happens. That is the worst trade available and it is
+invisible to anyone who only profiles gameplay.
+
+**Three savings, all on `menuMode` only:**
+- the shadow pass at a quarter rate instead of a half (nothing on a menu is
+  moving fast enough for a shadow to be late for)
+- the DRAW on alternate frames — **never the rAF**, so the sim steps, the town
+  walks, the drift advances and input is answered every frame; only the picture
+  is redrawn at 30fps, on a camera moving 0.008° per frame
+- the far plane pulled in to cull the half of the island nobody will walk
+  across, with the fog fading the last stretch so the cut is never seen
+
+| world | menu/match before | after | cut |
+|---|---|---|---|
+| powder | 0.97x | **0.51x** | 48% |
+| gameday | 1.56x | **0.78x** | 50% |
+| lantern | 1.81x | **0.97x** | 47% |
+| pirate | 2.48x | 1.20x | 52% |
+| skylark | 2.38x | 1.21x | 49% |
+| maple | 2.54x | 1.28x | 50% |
+
+**Two measurement corrections, both mine, both recorded because both produced a
+confident wrong number first:**
+1. **The instrument could not measure a half-rate renderer.** It read the
+   counters once per frame, which is exact while every frame draws and nonsense
+   the moment one does not — half the reads landed on a frame with no render in
+   it, and the "mean" went UP when the real cost halved. It now resets once and
+   divides an accumulated window by the frames in it, which is what a battery
+   pays and is immune to any cadence trick. The per-frame numbers (519, 410) are
+   sound against each other and against nothing measured after the skip landed.
+2. **Fog does not cull.** A pass pulled the menu's fog in hard on the theory
+   that it would cut the frustum; three.js fog is a fragment-shader term and
+   culling is `camera.far` alone. It bought nothing (233 → 269, inside the
+   noise) and, LOOKED AT, had put the fog's near plane at 36 units with the void
+   standing at 58 — the star of the menu rendered as a ghost in his own shot.
+
+**And a third, about method:** single runs of the same build came back 233, 269
+and 274 calls a frame while the match moved 160 → 218 underneath them, because
+the prop scatter is re-rolled every load and the stage azimuth with it. No claim
+smaller than that spread is a claim about the code. `__menuOptim(on)` flips the
+three savings on one already-loaded page, so A and B are the same island, the
+same azimuth and the same town — which is what turned a noisy 1.46x into a
+measured 49%.
+
 **Two things day 8 leaves open, both for day 9:**
 
 1. **The chosen azimuth varies between sessions**, e.g. Maple 315° on one load
@@ -627,7 +680,9 @@ camera. Nothing is loaded for it. The menu is a camera, not an asset.
    doing together with day 9's azimuth re-scoring, since both change the same
    loop.
 
-**Next:** day 9 is the menu's performance rung — day 1 measured that 72–92% of
+**Still open after day 9** (both were day 8's, and day 9 did not reach them):
+day 9's own headline was the menu's frame cost and that is done; the azimuth
+re-scoring against day 1's cost series — day 1 measured that 72–92% of
 today's menu frame is the half-rate shadow pass and that azimuth alone swings
 the bill up to 11.5x, so the derived azimuth should be re-scored against that
 cost series rather than on framing alone.

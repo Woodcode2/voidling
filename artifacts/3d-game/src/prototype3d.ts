@@ -714,7 +714,10 @@ const ENV_GAIN = 1.0;   // gradient level, tuned to the room box's mean radiance
   }
   scene.environmentIntensity = 0.15;   // specular sheen only — keep colours saturated
 }
-const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 1000);
+/** The authored far plane. The menu pulls it in to cull the far half of an
+ *  island nobody is going to walk across; every other path puts it back. */
+const PLAY_FAR = 1000;
+const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, PLAY_FAR);
 let camDist = 50;
 // THE LOOK-UP. The play camera's top edge sits 30-50 degrees BELOW the horizon
 // at every radius (sky survey, brief §3B), so a sky full of balloons is never
@@ -1037,6 +1040,23 @@ function menuVoidR(dist: number): number {
  *  of three thousand props at twenty-four azimuths is not a thing to do on
  *  every trip back to the menu. */
 let menuStage: MenuStage | null = null;
+
+/** ── THE MENU'S COST SAVINGS, AS ONE SWITCH ───────────────────────────────
+ *  Three things make the menu cheap: the shadow pass runs at a quarter rate
+ *  instead of a half, the DRAW happens on alternate frames (never the rAF), and
+ *  the far plane is pulled in to cull the half of the island nobody is going to
+ *  walk across.
+ *
+ *  Measuring what they are worth by building twice does not work: the island's
+ *  prop scatter is re-rolled every load and the stage azimuth with it, so
+ *  single runs of the same build came back 233, 269 and 274 calls a frame and
+ *  the MATCH frame moved 160 to 218 underneath them. Any claim smaller than
+ *  that spread is a claim about the scatter.
+ *
+ *  So the A and the B are the same page: one load, one island, one azimuth, and
+ *  this flips the three savings off between samples. QA only — nothing in the
+ *  game writes it, and with it untouched the shipped path is the fast one. */
+let menuOptim = true;
 
 /** True while the menu owns the screen. The freeze list, the camera branch and
  *  the crowd all read it; nothing else may write it but enterMenu/leaveMenu. */
@@ -2565,6 +2585,7 @@ const _dbg = new Proxy(_dbgStore, {
     lookX?: number; lookZ?: number; lookY?: number } | null) => void;
   __heroPoint: () => { x: number; z: number } | null;
   __menuState: () => Record<string, unknown>;
+  __menuOptim: (on: boolean) => boolean;
   __kindTally: () => Record<string, number>;
   __levels: () => unknown[];
   __levelSpec: () => unknown;
@@ -2927,6 +2948,8 @@ _dbg.__menuCam = (c) => {
 // shot, whether the drift is moving, and what the frame costs. A probe that
 // took a picture and called it done would pass on a still image of the right
 // island.
+// the A/B switch for the menu's three savings — see menuOptim's own note
+_dbg.__menuOptim = (on: boolean): boolean => (menuOptim = !!on);
 _dbg.__menuState = () => {
   const ms = menuStage ?? { az: 0, amp: 0, period: 1, x: 0, z: 0, dist: 0, h: 0, lookY: 0, blocked: -1 };
   return {
@@ -11993,10 +12016,34 @@ function animate() {
     if (camera.fov !== 32) { camera.fov = 32; camera.updateProjectionMatrix(); }
     camera.updateMatrixWorld();
     if (scene.fog) {
-      (scene.fog as THREE.Fog).near = 60 + stageCam.dist * 1.4;
-      (scene.fog as THREE.Fog).far = 260 + stageCam.dist * 4;
+      // ── FOG DOES NOT CULL. THE FAR PLANE CULLS. ──────────────────────────
+      // A first pass pulled the menu's fog in hard on the theory that it would
+      // cut the frustum down. It does not: three.js fog is a fragment shader
+      // term, and culling is decided by camera.far alone. MEASURED
+      // (qa/menucost.mjs): 233 -> 269 calls per frame, i.e. nothing beyond
+      // run-to-run noise, and LOOKED AT (qa/_dioshot.mjs) it had put the near
+      // plane of the fog at 36 units with the void standing at 58 — the star of
+      // the menu rendered as a ghost, hazed over in his own shot. Both halves
+      // wrong, from one wrong assumption.
+      //
+      // Done properly the two work TOGETHER, and each has its own job:
+      //   camera.far  cuts the far half of the island out of the frustum, which
+      //               is the only thing here that saves a draw call
+      //   fog         fades the last stretch before that cut, so the cut is
+      //               never seen — which is what fog has always been for
+      // The subject sits at `dist`, so the fog starts just BEYOND him: he is in
+      // clear air, the town around him is clear, and the distance goes soft.
+      const d = stageCam.dist;
+      (scene.fog as THREE.Fog).near = menuMode && menuOptim ? d * 1.15 : 60 + d * 1.4;
+      (scene.fog as THREE.Fog).far = menuMode && menuOptim ? d * 2.1 : 260 + d * 4;
+      // …and the frustum ends just past where the fog has finished, so nothing
+      // ever pops at the edge of the world.
+      const wantFar = menuMode && menuOptim ? d * 2.3 : PLAY_FAR;
+      if (camera.far !== wantFar) { camera.far = wantFar; camera.updateProjectionMatrix(); }
     }
   } else {
+    // the menu shortens the world to cull it; a match gets its distance back
+    if (!TOPDOWN && camera.far !== PLAY_FAR) { camera.far = PLAY_FAR; camera.updateProjectionMatrix(); }
     // CONTINUOUS zoom (hole.io): distance ∝ R^0.78 — the void visibly gains
     // ~20% screen size across a form before the camera catches up, so growth
     // reads every few seconds instead of only at evolutions
@@ -12462,7 +12509,50 @@ function animate() {
   // world randomly "turning to night" — confusing mid-match, and a kids' game
   // should look identical from the first second to the last. Maple Isle is
   // permanently high noon. (The lamp/window emissive ramp goes with it.)
-  if ((shadowFrame++ & 1) === 0) renderer.shadowMap.needsUpdate = true;
+  // ── THE SHADOW PASS PAYS FOR THE MENU, AND THE MENU IS NOT MOVING ────────
+  // MEASURED (qa/menucost.mjs, Maple): the menu frame costs 519 draw calls
+  // against the match's 243 — TWICE the frame, on the screen where nothing is
+  // happening — and 73% of the dearer menu frame is this one line. That is the
+  // worst trade in the app: a phone's battery and heat are set by the longest
+  // unbroken stretch it spends anywhere, and that stretch is a child looking at
+  // the menu, not a three-minute match.
+  //
+  // The half-rate cadence is right for PLAY: the void moves, the crowd moves,
+  // the sun's box follows him, and a stale shadow reads instantly. On the menu
+  // the camera drifts seven degrees over twenty-eight seconds, the void sits
+  // still and the town is calm — there is nothing for a shadow to be late for.
+  // Every fourth frame is invisible there and pays for the diorama outright.
+  //
+  // 4, not 8: the town's own movers still walk (life.ts is not frozen — a menu
+  // with a dead town is a picture, which is the thing day 8 replaced), and at 8
+  // a walking figure's shadow visibly steps behind it.
+  const shadowEvery = menuMode && menuOptim ? 4 : 2;
+  // ── AND THE MENU DOES NOT NEED SIXTY OF THEM A SECOND ────────────────────
+  // Quartering the shadow pass took the menu from 519 draw calls to 410, and
+  // then the shape of the bill changed: the SHADOWLESS menu frame is 231 calls
+  // against the match's 80. Shadows are no longer what is expensive — the
+  // camera is. It stands 58-92 units back and 32 degrees up, so it simply sees
+  // far more island than a play camera dollied in on a small void, and there is
+  // no cadence trick for "you can see the whole town".
+  //
+  // But a scene that drifts a quarter of a degree per second does not have to
+  // be REDRAWN sixty times a second to look alive. Every other frame is 30fps
+  // on a camera moving 0.008 degrees per frame, which no eye resolves, and it
+  // halves everything at once: the geometry, the shadow pass, the bloom
+  // composer's fifteen passes, the lot.
+  //
+  // THE rAF IS NEVER SKIPPED, which is the whole trick (§2.8 "idle tiers that
+  // never skip the rAF"). animate() runs every frame: the sim steps, the town
+  // walks, the HUD refreshes, the drift advances on its own clock, and input is
+  // answered on the frame it arrives. Only the DRAW is halved. Skipping the
+  // callback instead would drop dt on the floor and make the menu stutter in
+  // exactly the way this is meant to avoid.
+  //
+  // Never while anything is animating for real: the intro, the outro, a match.
+  // menuMode is false through all of those by construction.
+  const drawThisFrame = !menuMode || !menuOptim || (shadowFrame % 2) === 0;
+  if (shadowFrame++ % shadowEvery === 0) renderer.shadowMap.needsUpdate = true;
+  if (!drawThisFrame) { requestAnimationFrame(animate); return; }
   // …through the composer only on the rungs that can afford it. applyQuality
   // owns bloomOn, so the adapter switching rungs switches the glow with it.
   if (bloomOn) {

@@ -1,0 +1,36 @@
+
+  MENU COST — the frame a phone draws while she is deciding
+
+  world     where  calls/frame  tris/frame frames  q bloom
+  maple     menu-raw          580      194563     24  0 on
+  maple     menu              291       98739     24  0 on
+  maple     match             228      197006     24  1 on
+            →      the three savings cut the menu frame by 50% (580 → 291 calls/frame, median of 2); menu/match 2.54x → 1.28x
+
+  pirate    menu-raw          592      227881     24  0 on
+  pirate    menu              287      113238     24  0 on
+  pirate    match             239      153483     24  1 on
+            →      the three savings cut the menu frame by 52% (592 → 287 calls/frame, median of 2); menu/match 2.48x → 1.20x
+
+  gameday   menu-raw          663      217562     24  0 on
+  gameday   menu              331      108219     24  0 on
+  gameday   match             424      231883     24  1 on
+            →      the three savings cut the menu frame by 50% (663 → 331 calls/frame, median of 2); menu/match 1.56x → 0.78x
+
+  lantern   menu-raw         1157      302763     24  0 on
+  lantern   menu              617      161775     26  0 on
+  lantern   match             639      254176     24  1 on
+            →      the three savings cut the menu frame by 47% (1157 → 617 calls/frame, median of 2); menu/match 1.81x → 0.97x
+
+  powder    menu-raw          423      105573     24  0 on
+  powder    menu              222       56088     24  0 on
+  powder    match             434      205992     25  1 on
+            →      the three savings cut the menu frame by 48% (423 → 222 calls/frame, median of 2); menu/match 0.97x → 0.51x
+
+  skylark   menu-raw          990      262653     24  0 on
+  skylark   menu              503      134224     24  0 on
+  skylark   match             416      215603     24  1 on
+            →      the three savings cut the menu frame by 49% (990 → 503 calls/frame, median of 2); menu/match 2.38x → 1.21x
+
+PASS — measured 9 world(s) [1245s]
+DONE
