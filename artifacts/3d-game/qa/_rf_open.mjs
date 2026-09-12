@@ -4,6 +4,7 @@
 // appetite, not the child's. userData.byPlayer is the real thing.
 // Runs to t=45 only, then closes: no need to burn a 180s software-rendered match.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const RUNS = Number(process.argv[3] || 3);
 const UNTIL = Number(process.argv[4] || 45);
@@ -19,8 +20,7 @@ for (const wid of WORLDS) for (let run = 0; run < RUNS; run++) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
     if (['daily','gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
   await p.evaluate(() => { window.__renderer.render = () => {}; });
   await p.evaluate((UNTIL) => {

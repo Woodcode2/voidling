@@ -18,6 +18,7 @@
 // In both cases the world's hand-written bed must be the score — audible,
 // promptly, without anyone touching a pause button.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4177';
 let bad = 0;
@@ -41,8 +42,7 @@ for (const mode of ['404', 'garbage']) {
     .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
   if (await p.$('#tapGate.show')) await p.click('#tapGate');
   await p.waitForTimeout(600);
-  await p.click('#btnPlay'); await p.waitForTimeout(1000);
-  await p.click('#worldRow .wCard[data-world="maple"]');
+  await enterMatch(p, 'maple');
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 900000 });
   await p.waitForTimeout(1500);
   // the bed builds voices continuously; a dozen oscillators over 3s is a

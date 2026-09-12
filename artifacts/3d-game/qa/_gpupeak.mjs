@@ -2,6 +2,7 @@
 // out of machine. WORLD ENDER framing is where the camera is highest and the
 // frustum widest, which is the most expensive frame of the match.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 for (const wid of (process.argv[2] || 'gameday,lantern').split(',')) {
@@ -12,8 +13,7 @@ for (const wid of (process.argv[2] || 'gameday,lantern').split(',')) {
   await p.goto(`http://127.0.0.1:4177/?w=${wid}`, { waitUntil:'domcontentloaded', timeout:300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout:400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach(e => { if (['daily','gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   const intro = await p.evaluate(async () => { const R = window.__renderer, s = [];
     for (let i = 0; i < 22; i++) { await new Promise(r => requestAnimationFrame(r)); s.push([R.info.render.calls, R.info.render.triangles]); } return s; });
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 4, null, { timeout:600000 });

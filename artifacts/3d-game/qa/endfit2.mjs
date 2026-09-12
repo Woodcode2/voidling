@@ -14,6 +14,7 @@
 // this is a layout property of N cards, and playing until a run happens to
 // find five would take an hour and still not be a controlled test.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.argv[2] || '4188';
 const SIZES = [[375, 667, 'iPhone SE 3'], [375, 812, 'iPhone 13 mini'], [390, 844, 'iPhone 15'], [430, 932, 'Pro Max']];
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -35,8 +36,7 @@ for (const [w, h, label] of SIZES) {
   // get the genuine article without playing three minutes per size.
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1200);
-  await p.click('#worldRow .wCard[data-world="maple"]');
+  await enterMatch(p, 'maple');
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
   await p.evaluate(() => { window.__renderer.render = () => { }; window.__rushClock?.(179); });
   await p.waitForFunction(() => document.getElementById('end')?.classList.contains('show'),

@@ -3,6 +3,7 @@
 // closed the gap; negative means it fled. Sample across the whole match and
 // bucket by act. Act one should be positive, act three negative.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--no-sandbox'] });
 const p = await b.newPage({ viewport:{width:430,height:932}, deviceScaleFactor:1 });
@@ -12,8 +13,7 @@ await p.addInitScript(()=>{try{localStorage.setItem('voidPlayed','1');localStora
 await p.goto('http://127.0.0.1:4177/?w=lantern',{waitUntil:'domcontentloaded',timeout:300000});
 await p.waitForFunction(()=>!!window.__voidState,null,{timeout:400000});
 await p.evaluate(()=>document.querySelectorAll('.show').forEach(e=>{if(['daily','gift'].includes(e.id))e.classList.remove('show')}));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click('#worldRow .wCard[data-world="lantern"]');
+await enterMatch(p, 'lantern');
 await p.waitForFunction(()=>window.__matchState&&window.__matchState().t>0.2,null,{timeout:400000});
 await p.evaluate(()=>{ window.__renderer.render = () => {}; });
 

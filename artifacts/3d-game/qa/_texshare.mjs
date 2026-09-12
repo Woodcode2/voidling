@@ -16,6 +16,7 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
+import { enterMatch } from './_enter.mjs';
 
 const R = Number(process.argv[2] || 3.6);
 const PORT = process.argv[3] || '4177';
@@ -33,8 +34,7 @@ await p.addInitScript(() => { try {
   localStorage.setItem('voidDailyLast', new Date().toDateString()); } catch {} });
 await p.goto(`http://127.0.0.1:${PORT}/?w=maple`, { waitUntil: 'domcontentloaded' });
 await p.waitForFunction(() => !!window.__voidState);
-await p.click('#btnPlay'); await p.waitForTimeout(1600);
-await p.click('#worldRow .wCard[data-world="maple"]');
+await enterMatch(p, 'maple');
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 4, null, { polling: 500 });
 log('match running');
 await p.addStyleTag({ content: 'body > *:not(canvas):not(script) { visibility: hidden !important; }' });

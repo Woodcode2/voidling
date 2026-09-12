@@ -13,6 +13,7 @@
 //     the way while the eyes are still being painted on top of it.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { enterMatch } from './_enter.mjs';
 
 const WORLD = process.argv[2] || 'maple';
 const PORT = process.argv[3] || '4242';
@@ -31,8 +32,7 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloa
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show')
   .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1500);
-await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+await enterMatch(p, WORLD);
 await p.evaluate(() => { window.__realRender = window.__renderer.render.bind(window.__renderer); });
 const draw = (on) => p.evaluate((v) => { window.__renderer.render = v ? window.__realRender : () => {}; }, on);
 await draw(false);

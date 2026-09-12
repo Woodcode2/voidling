@@ -14,6 +14,7 @@
 // thing the eye reads, and it is scene-independent by construction — which is
 // the entire point of an outline.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--no-sandbox'] });
 for (const wid of (process.argv[2]||'lantern,maple,gameday').split(',')) {
@@ -24,8 +25,7 @@ for (const wid of (process.argv[2]||'lantern,maple,gameday').split(',')) {
   await p.goto(`http://127.0.0.1:4177/?w=${wid}`,{waitUntil:'domcontentloaded',timeout:300000});
   await p.waitForFunction(()=>!!window.__voidState,null,{timeout:400000});
   await p.evaluate(()=>document.querySelectorAll('.show').forEach(e=>{if(['daily','gift'].includes(e.id))e.classList.remove('show')}));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(()=>(window.__matchState?.().t??0)>8,null,{timeout:600000});
   await p.evaluate(()=>window.__setVoidR(4.5));
   await p.waitForTimeout(2400);

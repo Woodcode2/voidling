@@ -7,6 +7,7 @@
 // Headlines are pulled from the shipped verdict table rather than played for,
 // so every one of them is measured, not just whichever one this run produced.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4237';
 const DEVICES = [
@@ -39,8 +40,7 @@ for (const [W, H, INS, LABEL] of DEVICES) {
   await p.goto(`http://127.0.0.1:${PORT}/?w=maple`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => { try { window.__pinQuality(0); } catch { } });
-  await p.click('#btnPlay'); await p.waitForTimeout(1200);
-  await p.click('#worldRow .wCard[data-world="maple"]');
+  await enterMatch(p, 'maple');
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 2, null, { timeout: 600000 });
   await p.evaluate(() => { window.__renderer.render = () => { }; window.__setVoidR(14); window.__rushClock(4); });
   await p.waitForFunction(() => document.getElementById('end')?.classList.contains('show'), null, { timeout: 900000 });

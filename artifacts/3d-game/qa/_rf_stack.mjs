@@ -1,6 +1,7 @@
 // Who actually writes #banner.innerHTML? Capture a stack on every paint so a
 // same-frame double-paint can be attributed to a function, not guessed at.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const BASE = process.env.RF_BASE || 'http://127.0.0.1:4177';
 const WID = process.argv[2] || 'gameday';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -14,8 +15,7 @@ await p.goto(`${BASE}/?w=${WID}`, { waitUntil: 'domcontentloaded', timeout: 3000
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${WID}"]`);
+await enterMatch(p, WID);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
 await p.evaluate(() => { window.__renderer.render = () => {}; });
 await p.evaluate(() => {

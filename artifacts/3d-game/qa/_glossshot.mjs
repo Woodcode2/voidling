@@ -3,6 +3,7 @@
 // 4178 and the only thing that can differ between the two PNGs is the shading.
 //   node qa/_glossshot.mjs <port> <tag> [worlds]
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.argv[2] || '4177';
 const TAG = process.argv[3] || 'after';
 const worlds = (process.argv[4] || 'gameday,lantern,pirate,maple').split(',');
@@ -29,8 +30,7 @@ for (const wid of worlds) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1200);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 600000 });
   await p.evaluate(async (spot) => {
     window.__pinQuality(0);

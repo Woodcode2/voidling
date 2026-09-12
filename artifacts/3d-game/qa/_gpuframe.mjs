@@ -8,6 +8,7 @@
 // match and again at the whistle, they must not have grown.
 import { chromium } from 'playwright';
 import { writeFileSync } from 'fs';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.env.PORT || 4177;
 const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -23,8 +24,7 @@ for (const wid of WORLDS) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
 
   // ── the establishing shot: sample every frame of the intro dive ──────────
   const intro = await p.evaluate(async () => {

@@ -19,6 +19,7 @@
 // make the occlusion itself worse.
 import { chromium } from 'playwright';
 import { ALL_WORLDS } from './worlds.mjs';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.argv[2] || '4177';
 const N = +(process.argv[3] || 26);
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -34,8 +35,7 @@ for (const wid of ALL_WORLDS) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1200);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 5, null, { timeout: 600000 });
 
   const rows = await p.evaluate(async (n) => {

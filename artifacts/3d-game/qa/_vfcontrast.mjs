@@ -13,6 +13,7 @@
 import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 import fs from 'node:fs';
+import { enterMatch } from './_enter.mjs';
 
 const WORLD = process.argv[2] || 'maple';
 const OUT = 'qa/out/vf';
@@ -36,8 +37,7 @@ await p.goto(`http://127.0.0.1:4177/?w=${WORLD}`, { waitUntil: 'domcontentloaded
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+await enterMatch(p, WORLD);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 600000 });
 
 // find the PLAZA (Maple's square) by asking the island, and stand on it

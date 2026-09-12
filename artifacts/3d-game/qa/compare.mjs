@@ -11,6 +11,7 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import { ALL_WORLDS } from './worlds.mjs';
+import { enterMatch } from './_enter.mjs';
 
 const ALL = ALL_WORLDS;
 const list = process.argv.slice(2).filter((w) => ALL.includes(w));
@@ -32,8 +33,7 @@ for (const w of worlds) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show')
     .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${w}"]`);
+  await enterMatch(p, w);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 5, null, { timeout: 600000 });
 
   for (const [label, r] of [['1-small', 1.4], ['2-mid', 5], ['3-large', 10]]) {

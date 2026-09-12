@@ -8,6 +8,7 @@
 // and the face can be judged the way a reviewer with a big phone judges them.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { enterMatch } from './_enter.mjs';
 
 const WORLD = process.argv[2] || 'maple';
 const RS = process.argv.slice(3).map(Number).filter((n) => n > 0);
@@ -26,8 +27,7 @@ await p.goto(`http://127.0.0.1:4177/?w=${WORLD}`, { waitUntil: 'domcontentloaded
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show')
   .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+await enterMatch(p, WORLD);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 5, null, { timeout: 600000 });
 // the ticker and the bubbles crowd the frame and none of them are the subject
 await p.addStyleTag({ content: '#news,#hud,#stageBar,.vb,.vf,#btnHome,#coins{opacity:0!important}' });

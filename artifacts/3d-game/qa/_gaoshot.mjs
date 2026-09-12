@@ -4,6 +4,7 @@
 // checked against each other), same pinned quality rung, 1290x2796.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { enterMatch } from './_enter.mjs';
 fs.mkdirSync('qa-out', { recursive: true });
 const LABEL = process.argv[2] || 'before';
 const PORT = process.argv[3] || '4231';
@@ -27,8 +28,7 @@ for (const wid of WORLDS) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 5, null, { timeout: 600000 });
   await p.evaluate(() => window.__pinQuality(0));
   await p.addStyleTag({ content: 'body > *:not(canvas){visibility:hidden!important}' });

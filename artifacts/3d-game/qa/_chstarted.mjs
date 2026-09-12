@@ -6,6 +6,7 @@
 // size-gate sweep (:4201) and audio.setZone (:4635) all key off !started /
 // started.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.env.PORT || 4177;
 const W = process.argv[2] || 'maple';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -22,8 +23,7 @@ await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
 console.log('menu, before any match: started =', await p.evaluate(() => window.__matchState().t > 0));
 
-await p.click('#btnPlay'); await p.waitForTimeout(1500);
-await p.click(`#worldRow .wCard[data-world="${W}"]`);
+await enterMatch(p, W);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 5, null, { timeout: 900000 });
 await p.evaluate(() => window.__rushClock(1.2));
 await p.waitForFunction(() => document.getElementById('end').classList.contains('show'),

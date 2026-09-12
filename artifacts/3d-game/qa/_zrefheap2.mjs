@@ -3,6 +3,7 @@
 // of the 433MB actually gets duplicated into VRAM. Then rematch and see whether
 // the world's geometry is disposed or accumulates.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const W = process.argv[2] || 'gameday';
 const PORT = process.argv[3] || 4188;
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
@@ -36,8 +37,7 @@ const snap = async (tag) => {
 };
 await p.waitForTimeout(8000);
 await snap('menu');
-await p.click('#btnPlay'); await p.waitForTimeout(1500);
-await p.click(`#worldRow .wCard[data-world="${W}"]`);
+await enterMatch(p, W);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
 await p.waitForTimeout(3000);
 await snap('match start');

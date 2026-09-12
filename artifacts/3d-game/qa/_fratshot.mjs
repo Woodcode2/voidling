@@ -1,6 +1,7 @@
 // Look at the tightest pair of big buildings in Game Day. AABB overlap is a
 // conservative test on rotated meshes; a photograph is not.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const SITES = [['frat', 111.7, 78.3], ['brickhall', 180.8, -23.8]];
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
@@ -13,8 +14,7 @@ await p.goto('http://127.0.0.1:4177/?w=gameday', { waitUntil: 'domcontentloaded'
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click('#worldRow .wCard[data-world="gameday"]');
+await enterMatch(p, 'gameday');
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 4, null, { timeout: 600000 });
 await p.waitForTimeout(9000);
 for (const [tag, x, z] of SITES) {

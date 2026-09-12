@@ -5,6 +5,7 @@
 // reports the edible census of the bathhouse district over the match.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.argv[2] || '4177';
 fs.mkdirSync('qa-out/refute', { recursive: true });
 
@@ -20,8 +21,7 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=lantern`, { waitUntil: 'domcontentload
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="lantern"]`);
+await enterMatch(p, 'lantern');
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
 
 // ── 1. FIND THE BATHHOUSE in 3D coords, and census it at t~5.

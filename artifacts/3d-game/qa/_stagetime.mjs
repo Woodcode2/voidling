@@ -9,6 +9,7 @@
 // and the per-second call rate of every one-shot in 20s windows.
 import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
+import { enterMatch } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4243';
 const WORLDS = (process.argv[3] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
@@ -44,8 +45,7 @@ for (const wid of WORLDS) {
     });
     await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
       if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-    await p.click('#btnPlay'); await p.waitForTimeout(1400);
-    await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+    await enterMatch(p, wid);
     await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
     await p.evaluate(() => { window.__renderer.render = () => {}; });
     await p.evaluate(() => {

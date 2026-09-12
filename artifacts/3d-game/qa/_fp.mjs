@@ -9,6 +9,7 @@
 // Quality is PINNED to rung 0 before the match starts and read back.
 import { chromium } from 'playwright';
 import { writeFileSync } from 'fs';
+import { enterMatch } from './_enter.mjs';
 
 const WORLDS = (process.argv[2] || 'maple').split(',');
 const MODE   = process.argv[3] || 'js';
@@ -32,8 +33,7 @@ for (const wid of WORLDS) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 600000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.3, null, { timeout: 900000 });
 
   const q = await p.evaluate((mode) => {

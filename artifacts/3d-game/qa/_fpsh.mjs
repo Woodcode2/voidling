@@ -7,6 +7,7 @@
 // Absolute ms are swiftshader; the EVEN/ODD ratio is the property that carries.
 //   node qa/_fpsh.mjs [world] [port]
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const WID = process.argv[2] || 'maple';
 const PORT = process.argv[3] || '4231';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -21,8 +22,7 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=${WID}`, { waitUntil: 'domcontentloade
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 600000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${WID}"]`);
+await enterMatch(p, WID);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 20, null, { timeout: 900000 });
 const counts = await p.evaluate(() => {
   window.__pinQuality(0);

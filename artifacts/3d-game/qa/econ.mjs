@@ -23,6 +23,7 @@
 //      section used to check was REMOVED by the owner's decision — its
 //      absence is now part of the contract.)
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4177';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -82,8 +83,7 @@ const fails = [];
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show')
     .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(900);
-  await p.click('#worldRow .wCard[data-world="maple"]');
+  await enterMatch(p, 'maple');
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 900000 });
   await p.evaluate(() => window.__rushClock(0.05));
   await p.waitForFunction(() => document.getElementById('end')?.classList.contains('show'), null, { timeout: 120000 });

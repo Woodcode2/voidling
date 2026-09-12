@@ -1,6 +1,7 @@
 // How BAD is the unclamp on Lantern? Count audio nodes scheduled per second
 // before and after musStage 4. If the scheduler dies, the score goes silent.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });
@@ -17,8 +18,7 @@ await p.goto('http://127.0.0.1:4177/?w=lantern', { waitUntil: 'domcontentloaded'
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
   if (['daily','gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click('#worldRow .wCard[data-world="lantern"]');
+await enterMatch(p, 'lantern');
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
 await p.evaluate(() => { window.__renderer.render = () => {}; });
 for (const st of [3, 4, 3]) {

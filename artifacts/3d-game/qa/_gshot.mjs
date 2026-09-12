@@ -3,6 +3,7 @@
 // 1290x2796 is the iPhone 15 Pro Max panel; we render 430x932 @ DPR 3.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { enterMatch } from './_enter.mjs';
 fs.mkdirSync('qa-out', { recursive: true });
 const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const PORT = process.argv[3] || '4231';
@@ -19,8 +20,7 @@ for (const wid of WORLDS) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 5, null, { timeout: 600000 });
   await p.evaluate(() => window.__pinQuality(0));
   await p.waitForTimeout(3000);

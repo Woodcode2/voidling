@@ -12,6 +12,7 @@
 //
 //   node qa/_ret_troph.mjs [port] [world] [matches]
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.argv[2] || '4231';
 const WORLD = process.argv[3] || 'maple';
 const N = +(process.argv[4] || 3);
@@ -48,8 +49,7 @@ console.log('BEFORE ANY MATCH:', JSON.stringify(await readTrophies(), null, 1));
 
 await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+await enterMatch(p, WORLD);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
 await p.evaluate(() => { window.__renderer.render = () => { }; });
 

@@ -54,6 +54,7 @@
 // nearest-edible autopilot the perf probes use.
 import { chromium } from 'playwright';
 import { ALL_WORLDS } from './worlds.mjs';
+import { enterMatch } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4177';
 const WORLDS = process.argv.slice(3).length ? process.argv.slice(3) : ALL_WORLDS;
@@ -133,9 +134,7 @@ for (const wid of WORLDS) {
   // pinned at 0 forever. The world has to be entered the way a child enters
   // it — press PLAY, then pick the card.
   await p.waitForSelector('#btnPlay', { state: 'visible', timeout: 400000 });
-  await p.click('#btnPlay');
-  await p.waitForSelector(`#worldRow .wCard[data-world="${wid}"]`, { state: 'visible', timeout: 400000 });
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
 
   // Steer at the nearest edible we can actually swallow. Rendering stays ON:

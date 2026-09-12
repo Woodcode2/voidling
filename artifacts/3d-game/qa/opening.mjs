@@ -29,6 +29,7 @@
 // before touching, which is a property of the probe and not of the game.
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { enterMatch } from './_enter.mjs';
 
 const WORLD = process.argv[2] || 'maple';
 const PORT = Number(process.argv[3] || 4177);
@@ -255,8 +256,7 @@ async function runOnce(browser, tapMs, shots) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+  await enterMatch(p, WORLD);
   await p.waitForFunction(() => !!window.__matchState, null, { timeout: 400000 });
   // Reset the sampler to the first gameplay frame, not to page load, and assert
   // the camera really is still high — if it is not, the intro was missed and

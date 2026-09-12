@@ -4,6 +4,7 @@
 // This names the allocation sites with the sampling heap profiler. Run against
 // the UNMINIFIED build (port 4178) so the names are readable.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.env.PORT || 4178;
 const WORLDS = (process.argv[2] || 'maple').split(',');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -18,8 +19,7 @@ for (const wid of WORLDS) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 600000 });
   await p.evaluate(() => { window.__renderer.render = () => {};
     const cv = document.querySelector('canvas');

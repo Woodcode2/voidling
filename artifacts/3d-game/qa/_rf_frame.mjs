@@ -13,6 +13,7 @@
 // props' screen-space bounding boxes into a coverage mask, so "how much of the
 // picture is stuff" is measured in pixels, not in gameplay radii.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const WORLDS = (process.argv[2] || 'maple,gameday,pirate,lantern').split(',');
 const PORT = process.argv[3] || '4177';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -28,8 +29,7 @@ for (const wid of WORLDS) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 5.5, null, { timeout: 900000 });
   await p.evaluate(() => { window.__renderer.render = () => {}; });
   await p.waitForTimeout(4000);

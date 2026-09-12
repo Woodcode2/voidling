@@ -1,6 +1,7 @@
 // REFUTE part 3: the "find circle" — when is it up, what colour, and is it
 // actually off-centre from the body?
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT=process.argv[3]||'4177', WORLD=process.argv[2]||'maple';
 const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',
   args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader']});
@@ -12,8 +13,7 @@ await p.addInitScript(()=>{try{localStorage.setItem('voidPlayed','1');localStora
 await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`,{waitUntil:'domcontentloaded',timeout:300000});
 await p.waitForFunction(()=>!!window.__voidState,null,{timeout:400000});
 await p.evaluate(()=>document.querySelectorAll('.show').forEach(e=>{if(['daily','gift'].includes(e.id))e.classList.remove('show');}));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+await enterMatch(p, WORLD);
 await p.waitForFunction(()=>(window.__matchState?.().t??0)>0.2,null,{timeout:400000});
 await p.evaluate(()=>{
   window.__RR=window.__renderer.render.bind(window.__renderer);

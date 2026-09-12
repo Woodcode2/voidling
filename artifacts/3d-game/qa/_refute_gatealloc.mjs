@@ -6,6 +6,7 @@
 // anything it churns and drops — the actual 40-67 MB/match-second — is invisible.
 // This runs two sampling windows back to back inside ONE match and prints both.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.env.PORT || 4179;
 const WID = process.argv[2] || 'maple';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -19,8 +20,7 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=${WID}`, { waitUntil: 'domcontentloade
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${WID}"]`);
+await enterMatch(p, WID);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 600000 });
 await p.evaluate(() => { window.__renderer.render = () => {};
   const cv = document.querySelector('canvas'); const cx = innerWidth / 2, cy = innerHeight / 2;

@@ -27,6 +27,7 @@
 //     forgets to ramp it back is playing and inaudible — srcs alone cannot
 //     see that, so the gain is asserted directly).
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4177';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -74,8 +75,7 @@ const station = async (label, mustBeMenu) => {
 };
 
 const intoMatch = async () => {
-  await p.click('#btnPlay'); await p.waitForTimeout(800);
-  await p.click('#worldRow .wCard[data-world="maple"]');
+  await enterMatch(p, 'maple');
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 900000 });
 };
 
@@ -101,8 +101,7 @@ await p.waitForFunction(() => document.body.classList.contains('menu'), null, { 
 await station('quit → splash', true);
 
 // ── LEG 3: the world-switch reload page ───────────────────────────────────
-await p.click('#btnPlay'); await p.waitForTimeout(800);
-await p.click('#worldRow .wCard[data-world="pirate"]');   // reloads the page
+await enterMatch(p, 'pirate');   // reloads the page
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show')
   .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));

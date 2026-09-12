@@ -10,6 +10,7 @@
 // coin chip, and every stat card against the pinned PLAY AGAIN row. It also
 // checks nothing is cut off past the bottom of the scrollport.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.argv[2] || '4177';
 const SIZES = [[430, 932], [390, 844], [320, 568]];
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -26,8 +27,7 @@ for (const [w, h] of SIZES) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1000);
-  await p.click('#worldRow .wCard[data-world="lantern"]');
+  await enterMatch(p, 'lantern');
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 4, null, { timeout: 600000 });
   await p.evaluate(() => { window.__renderer.render = () => {}; });
   // grow the void so the card carries a long headline, evolve rows and

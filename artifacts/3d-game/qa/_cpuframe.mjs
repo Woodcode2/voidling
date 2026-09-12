@@ -13,6 +13,7 @@
 // heap growth rate (GC pressure), and a CDP CPU profile of the top self-time.
 import { chromium } from 'playwright';
 import { writeFileSync } from 'fs';
+import { enterMatch } from './_enter.mjs';
 
 const PORT = process.env.PORT || 4177;
 const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
@@ -30,8 +31,7 @@ for (const wid of WORLDS) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
 
   const cdp = await p.context().newCDPSession(p);

@@ -6,6 +6,7 @@
 //       props are also eaten OUT of the scene and others spawn IN)
 //   (b) what does one clone actually COST in bytes? measure it, don't assume.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.env.PORT || 4177;
 const WORLDS = (process.argv[2] || 'maple').split(',');
 const UNTIL = +(process.argv[3] || 120);
@@ -21,8 +22,7 @@ for (const wid of WORLDS) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 600000 });
 
   const census = () => {

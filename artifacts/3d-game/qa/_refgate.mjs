@@ -5,6 +5,7 @@
 // carries pingClock/calmT, and Maple's train mover exposes `get mesh()` which
 // returns null for six seconds after the train is eaten.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.env.PORT || 4177;
 const WORLD = process.argv[2] || 'lantern';
 const GATE = process.argv[3] === 'on' ? true : (process.argv[3] === 'raw' ? 'raw' : false);
@@ -24,8 +25,7 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloa
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+await enterMatch(p, WORLD);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 5, null, { timeout: 600000 });
 await p.evaluate(() => {
   window.__renderer.render = () => {};

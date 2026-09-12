@@ -12,6 +12,7 @@
 //   • the RIVALS — same names, same order, same behaviour?
 //   • the BEATS — same four moments at the same four times?
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const WORLD = process.argv[2] || 'maple';
 const RUNS = +(process.argv[3] || 3);
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -45,8 +46,7 @@ for (let k = 0; k < RUNS; k++) {
   });
   await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+  await enterMatch(p, WORLD);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
   await p.evaluate(() => { window.__renderer.render = () => {}; });
   const live = await p.evaluate(() => {

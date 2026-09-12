@@ -3,6 +3,7 @@
 // a 4x crop of her head so the mouth can be judged, not guessed.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { enterMatch } from './_enter.mjs';
 
 const WORLD = process.argv[2] || 'maple';
 fs.mkdirSync('qa-out/rf-face3', { recursive: true });
@@ -18,8 +19,7 @@ await p.goto(`http://127.0.0.1:4177/?w=${WORLD}`, { waitUntil: 'domcontentloaded
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show')
   .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1500);
-await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+await enterMatch(p, WORLD);
 // everyone joined, hunt window open (ends at 0.55*180 = 99s)
 await p.waitForFunction(() => {
   const m = window.__matchState?.(); if (!m) return false;

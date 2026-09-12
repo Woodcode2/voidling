@@ -3,6 +3,7 @@
 // time so the FPS number is meaningless; the renderer's own info counters are
 // not, and they are what a phone actually pays for.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--no-sandbox'] });
 for (const wid of (process.argv[2] || 'gameday,lantern').split(',')) {
@@ -13,8 +14,7 @@ for (const wid of (process.argv[2] || 'gameday,lantern').split(',')) {
   await p.goto(`http://127.0.0.1:4177/?w=${wid}`,{waitUntil:'domcontentloaded',timeout:300000});
   await p.waitForFunction(()=>!!window.__voidState,null,{timeout:400000});
   await p.evaluate(()=>document.querySelectorAll('.show').forEach(e=>{if(['daily','gift'].includes(e.id))e.classList.remove('show')}));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(()=>window.__matchState&&window.__matchState().t>3,null,{timeout:600000});
   const r = await p.evaluate(async () => {
     const R = window.__renderer;

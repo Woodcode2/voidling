@@ -3,6 +3,7 @@
 // matches per page, so the per-match re-roll in beginMatch() is exercised the
 // way PLAY AGAIN exercises it.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const WORLDS = (process.argv[2] || 'maple,gameday').split(',');
 const RUNS = Number(process.argv[3] || 3);
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -19,8 +20,7 @@ await Promise.all(WORLDS.map(async (wid) => {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
     if (['daily','gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
   await p.evaluate(() => { window.__renderer.render = () => {}; });
 

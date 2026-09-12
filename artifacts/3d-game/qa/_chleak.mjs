@@ -3,6 +3,7 @@
 // listener counts at the SAME point of each match (t just past the intro).
 // Also reports whether a service worker ever registers.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.env.PORT || 4177;
 const W = process.argv[2] || 'maple';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -58,8 +59,7 @@ async function playTo(sec) {
 }
 
 // match 1 via the picker
-await p.click('#btnPlay'); await p.waitForTimeout(1500);
-await p.click(`#worldRow .wCard[data-world="${W}"]`);
+await enterMatch(p, W);
 await playTo(10);
 const a = await sample('match1@10s');
 

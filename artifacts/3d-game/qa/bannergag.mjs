@@ -14,6 +14,7 @@
 // match clock runs near wall speed; the greedy bot from qa/_rf_banner.mjs
 // drives so the town has something to react to.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.argv[2] || '4177', WORLD = process.argv[3] || 'maple';
 const WINDOW = 45;   // match-seconds observed after the first card paints
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -30,8 +31,7 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloa
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+await enterMatch(p, WORLD);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
 
 await p.evaluate(() => {

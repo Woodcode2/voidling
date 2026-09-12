@@ -4,6 +4,7 @@
 // off (the other proposed lever).
 import { chromium } from 'playwright';
 import { mkdirSync } from 'fs';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.env.PORT || 4177;
 const wid = process.argv[2] || 'maple';
 mkdirSync('qa-out/refute', { recursive: true });
@@ -16,8 +17,7 @@ await p.addInitScript(() => { try { localStorage.setItem('voidPlayed','1');
 await p.goto(`http://127.0.0.1:${PORT}/?w=${wid}`, { waitUntil:'domcontentloaded', timeout:300000 });
 await p.waitForFunction(() => !!window.__voidState, null, { timeout:400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach(e => { if (['daily','gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+await enterMatch(p, wid);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 4, null, { timeout:600000 });
 const st = await p.evaluate(async () => {
   window.__setVoidR(12);

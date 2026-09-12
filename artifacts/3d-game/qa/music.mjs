@@ -19,6 +19,7 @@
 // means a 404 (or a decode failure) and a bed constructing voices every second.
 import { chromium } from 'playwright';
 import { ALL_WORLDS } from './worlds.mjs';
+import { enterMatch } from './_enter.mjs';
 
 const ALL = ALL_WORLDS;
 const worlds = process.argv.slice(2).filter((w) => ALL.includes(w));
@@ -72,8 +73,7 @@ for (const w of list) {
   // the tap gate is the first thing a human touches now — the probe is a human
   const gate = await p.$('#tapGate.show');
   if (gate) { await p.click('#tapGate'); await p.waitForTimeout(350); }
-  await p.click('#btnPlay'); await p.waitForTimeout(1200);
-  await p.click(`#worldRow .wCard[data-world="${w}"]`);
+  await enterMatch(p, w);
   // RETRACTED, and worth keeping so nobody re-learns it: this comment used to
   // blame the Pirate Bay timeout on swiftshader being slow, and raising the
   // limit from 600s to 900s changed nothing — because the wait was never going

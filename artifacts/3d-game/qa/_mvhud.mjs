@@ -10,6 +10,7 @@
 // Then screenshots.
 import { chromium } from 'playwright';
 import fs from 'fs';
+import { enterMatch } from './_enter.mjs';
 
 const PORT = process.argv[3] || '4237';
 const WORLD = process.argv[2] || 'maple';
@@ -87,8 +88,7 @@ for (const [W, H, INS, LABEL] of DEVICES) {
   await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => { try { window.__pinQuality(0); } catch { } });
-  await p.click('#btnPlay'); await p.waitForTimeout(1200);
-  await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+  await enterMatch(p, WORLD);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 600000 });
 
   // MOMENT 1 — opening, small void, guide pill up

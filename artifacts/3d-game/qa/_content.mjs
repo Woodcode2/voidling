@@ -7,6 +7,7 @@
 //   node qa/_content.mjs [worlds] > qa-out/content.json
 import { chromium } from 'playwright';
 import { writeFileSync, mkdirSync } from 'fs';
+import { enterMatch } from './_enter.mjs';
 const worlds = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
@@ -24,8 +25,7 @@ for (const wid of worlds) {
   // enter the match so anything that populates on start exists
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1500);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 600000 });
   // wait for a stable edible count (async glb fallbacks)
   let prev = -1, stable = 0;

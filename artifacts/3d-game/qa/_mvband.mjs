@@ -5,6 +5,7 @@
 // only grows. Measured on the clock's INK (a Range over its text node), not on
 // its box — the box is a fixed lane and always overlaps the chip.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.argv[2] || '4237';
 const DEVICES = [
   [375, 667, { top: 20, bottom: 0, left: 0, right: 0 }, 'SE3     '],
@@ -24,8 +25,7 @@ for (const [W, H, INS, LABEL] of DEVICES) {
     localStorage.setItem('voidDailyLast', new Date().toDateString()); } catch { } });
   await p.goto(`http://127.0.0.1:${PORT}/?w=maple`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
-  await p.click('#btnPlay'); await p.waitForTimeout(1200);
-  await p.click('#worldRow .wCard[data-world="maple"]');
+  await enterMatch(p, 'maple');
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 600000 });
   await p.evaluate(() => { window.__renderer.render = () => { }; });
   const rows = await p.evaluate(() => {

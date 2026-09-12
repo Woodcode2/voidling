@@ -2,6 +2,7 @@
 // screenshot + per-attribute byte census + heap. Run once before the patch and
 // once after; the tag is argv[2].
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const TAG = process.argv[2] || 'base';
 const W = process.argv[3] || 'maple';
 const PORT = process.argv[4] || 4291;
@@ -28,8 +29,7 @@ await p.waitForFunction(() => {
   if (window.__lastN !== n) { window.__lastN = n; window.__stableSince = performance.now(); return false; }
   return performance.now() - (window.__stableSince || 0) > 2500;
 }, null, { timeout: 400000 });
-await p.click('#btnPlay'); await p.waitForTimeout(1500);
-await p.click(`#worldRow .wCard[data-world="${W}"]`);
+await enterMatch(p, W);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
 await p.waitForTimeout(3000);
 // PIN the camera: fixed void position and radius so the two runs frame the same thing

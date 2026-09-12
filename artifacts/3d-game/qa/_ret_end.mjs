@@ -14,6 +14,7 @@
 //
 //   node qa/_ret_end.mjs [port] [world]
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.argv[2] || '4231';
 const WORLD = process.argv[3] || 'maple';
 
@@ -60,8 +61,7 @@ for (const [name, prof] of Object.entries(PROFILES)) {
   });
 
   // one match, clock rushed — we want the RESULTS SCREEN, not a fair score
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+  await enterMatch(p, WORLD);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
   await p.evaluate(() => { window.__renderer.render = () => { }; });
   await p.waitForTimeout(4000);

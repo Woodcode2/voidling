@@ -6,6 +6,7 @@
 // flat top-of-profile answers neither.
 //   node qa/_fpspike.mjs [world] [port] [t0] [t1] [thresholdMs]
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const WID = process.argv[2] || 'lantern';
 const PORT = process.argv[3] || '4232';
 const T0 = +(process.argv[4] || 55), T1 = +(process.argv[5] || 100);
@@ -22,8 +23,7 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=${WID}`, { waitUntil: 'domcontentloade
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 600000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${WID}"]`);
+await enterMatch(p, WID);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.3, null, { timeout: 900000 });
 await p.evaluate(() => {
   window.__pinQuality(0); window.__renderer.render = () => {};

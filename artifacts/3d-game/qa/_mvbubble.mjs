@@ -11,6 +11,7 @@
 // This samples the live bubble rects over a real match, against __matchState().t,
 // with the renderer stubbed so the sim runs at its proper rate.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 
 const PORT = process.argv[3] || '4237';
 const WORLD = process.argv[2] || 'maple';
@@ -32,8 +33,7 @@ for (const [W, H, INS, LABEL] of DEVICES) {
     localStorage.setItem('voidDailyLast', new Date().toDateString()); } catch { } });
   await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
-  await p.click('#btnPlay'); await p.waitForTimeout(1200);
-  await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+  await enterMatch(p, WORLD);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 600000 });
   // now that the match is running, stub the draw: the sim runs ~9x faster and
   // nothing here reads pixels

@@ -3,6 +3,7 @@
 // coverage (#news / #banner / #evolve carrying .show), and the growth bar text.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { enterMatch } from './_enter.mjs';
 const wid = process.argv[2] || 'gameday';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
@@ -15,8 +16,7 @@ await p.goto(`http://127.0.0.1:4177/?w=${wid}`, { waitUntil:'domcontentloaded', 
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
   if (['daily','gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+await enterMatch(p, wid);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
 
 await p.evaluate(() => { window.__realRender = window.__renderer.render.bind(window.__renderer); window.__renderer.render = () => {}; });

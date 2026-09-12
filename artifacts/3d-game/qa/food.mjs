@@ -39,6 +39,7 @@
 import { chromium } from 'playwright';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { assertFreshDist } from './_freshdist.mjs';
+import { enterMatch } from './_enter.mjs';
 
 const PORT = Number(process.argv[2] || 4177);
 const ARGW = process.argv.slice(3).filter((a) => !a.startsWith('--'));
@@ -75,8 +76,7 @@ for (const world of WORLDS) {
   // qa/_worldshots.mjs both do exactly this.
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${world}"]`);
+  await enterMatch(p, world);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
   // ── WAIT FOR THE PLAY CAMERA, NOT FOR A CLOCK ─────────────────────────────
   // The first version waited 2.5 wall-seconds and shot whatever was there. The

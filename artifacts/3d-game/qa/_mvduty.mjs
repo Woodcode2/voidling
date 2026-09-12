@@ -18,6 +18,7 @@
 // PART B: one forced size-class-up bite through capture(), sampled through the
 // hit-stop window, so the freeze pose can be read rather than argued about.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4177';
 const WORLD = process.argv[3] || 'maple';
@@ -40,8 +41,7 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloa
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show')
   .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1500);
-await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+await enterMatch(p, WORLD);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 900000 });
 
 // THE DRIVER, copied verbatim from qa/faceparity.mjs:118-140 so the numbers

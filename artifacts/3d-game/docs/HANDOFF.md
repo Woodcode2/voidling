@@ -609,6 +609,24 @@ camera. Nothing is loaded for it. The menu is a camera, not an asset.
   the ground and readable, the drift alive and inside its authored swing, and
   the camera handed back on PLAY.
 
+**Two things day 8 leaves open, both for day 9:**
+
+1. **The chosen azimuth varies between sessions**, e.g. Maple 315° on one load
+   and 270° on the next. This is the island, not the scoring: the prop scatter
+   uses `Math.random()` per load, so "which side has the most town behind the
+   subject" genuinely has a different answer each time, and the stage adapting
+   to the island actually built is correct. Recorded because it is surprising,
+   and because it means a framing approved from one screenshot is not the
+   framing every child gets — only the INVARIANTS are guaranteed.
+2. **…and one of those invariants is currently a hope.** If every one of the 24
+   azimuths were blocked, `deriveStage` picks the least-bad and `blocked > 0`.
+   (k) would catch it on that run — but stochastically, which makes the bar
+   flaky rather than strong. The fix is an escalation: when the best azimuth is
+   still blocked, raise the camera (a high enough camera always clears) and
+   re-score, so `blocked === 0` becomes something the function GUARANTEES. Worth
+   doing together with day 9's azimuth re-scoring, since both change the same
+   loop.
+
 **Next:** day 9 is the menu's performance rung — day 1 measured that 72–92% of
 today's menu frame is the half-rate shadow pass and that azimuth alone swings
 the bill up to 11.5x, so the derived azimuth should be re-scored against that

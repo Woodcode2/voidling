@@ -3,6 +3,7 @@
 // only; every other world gets the board that was authored for Maple, which
 // asks for CARS and HOUSES. Count the props each world actually tags.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
@@ -18,8 +19,7 @@ for (const wid of WORLDS) {
   await p.evaluate(() => { try { window.__renderer.render = () => {}; } catch {} });
   await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
     if (['daily','gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1200);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 1, null, { timeout: 400000 });
   const r = await p.evaluate(() => {
     const tags = {};

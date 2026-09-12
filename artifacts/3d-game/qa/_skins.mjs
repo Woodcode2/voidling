@@ -17,6 +17,7 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
+import { enterMatch } from './_enter.mjs';
 
 const R = Number(process.argv[2] || 3.6);
 const PORT = process.argv[3] || '4177';
@@ -40,8 +41,7 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=maple`, { waitUntil: 'domcontentloaded
 await p.waitForFunction(() => !!window.__voidState);
 await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click('#worldRow .wCard[data-world="maple"]');
+await enterMatch(p, 'maple');
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6);
 // nothing but the game world in the crop — speech bubbles and the news ticker
 // are DOM, and they land ON the hero

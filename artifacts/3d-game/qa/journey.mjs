@@ -16,6 +16,7 @@
 //     A theme that restarts when the shop opens is a theme that restarts —
 //     `starts` in musicState() counts it, and pixels cannot.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4177';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -66,8 +67,7 @@ const mFront = await look();
 if (mFront.menu.starts > 1) fails.push(`menu theme restarted crossing front-of-house screens (starts=${mFront.menu.starts})`);
 
 // into a match, out to results
-await p.click('#btnPlay'); await p.waitForTimeout(1000);
-await p.click('#worldRow .wCard[data-world="maple"]');
+await enterMatch(p, 'maple');
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 900000 });
 const mMatch = await step('in match');
 if (mMatch.menu.srcs > 0) fails.push('menu theme still playing under the match');

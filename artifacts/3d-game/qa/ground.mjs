@@ -13,6 +13,7 @@
 // dark. Reporting three octaves says WHICH one is missing rather than just
 // "it looks flat".
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 
@@ -26,8 +27,7 @@ for (const wid of (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skyla
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 7, null, { timeout: 600000 });
   // hide every prop and mover and the whole overlay, so what is left IS ground
   await p.evaluate(() => {

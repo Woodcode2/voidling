@@ -27,6 +27,7 @@
 // Exempted rather than silenced: a 404 on a music slot is listed, and a 404 on
 // anything else under /assets/ still fails the run.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 
 const WORLD = process.argv[2] || 'maple';
 const PORT = process.argv[3] || '4177';
@@ -77,8 +78,7 @@ await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
 // the tap gate is the first thing a human touches now — the probe is a human
 const gate = await p.$('#tapGate.show');
 if (gate) { await p.click('#tapGate'); await p.waitForTimeout(350); }
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+await enterMatch(p, WORLD);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
 
 const r0 = await p.evaluate(() => window.__voidState().r);

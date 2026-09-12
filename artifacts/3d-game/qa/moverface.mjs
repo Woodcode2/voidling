@@ -8,6 +8,7 @@
 // tight head crop per subject.
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.argv[2] || '4177';
 const WORLD = process.argv[3] || 'maple';
 const OUT = 'qa/out/moverface';
@@ -25,8 +26,7 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloa
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${WORLD}"]`); await p.waitForTimeout(2500);
+await enterMatch(p, WORLD); await p.waitForTimeout(2500);
 await p.mouse.click(215, 700).catch(() => {});
 await p.waitForFunction(() => { const m = window.__matchState && window.__matchState(); return m && m.t > 1.5; },
   null, { timeout: 120000, polling: 200 });

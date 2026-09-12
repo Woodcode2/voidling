@@ -3,6 +3,7 @@
 // UNMINIFIED build (port 4232) so the names mean something.
 //   node qa/_fpcpu.mjs [worlds] [port] [t0] [t1]
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const WORLDS = (process.argv[2] || 'maple').split(',');
 const PORT = process.argv[3] || '4232';
 const T0 = +(process.argv[4] || 20), T1 = +(process.argv[5] || 70);
@@ -19,8 +20,7 @@ for (const wid of WORLDS) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 600000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.3, null, { timeout: 900000 });
   await p.evaluate(() => {
     window.__pinQuality(0);

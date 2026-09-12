@@ -4,6 +4,7 @@
 // interval never fired). So: run the real game with an OfflineAudioContext
 // standing in for the live one, render the bed, and measure it.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--no-sandbox','--autoplay-policy=no-user-gesture-required'] });
 const p = await b.newPage({ viewport:{width:430,height:932}, deviceScaleFactor:1 });
@@ -17,8 +18,7 @@ const wid = process.argv[2] || 'lantern';
 await p.goto(`http://127.0.0.1:4177/?w=${wid}`,{waitUntil:'domcontentloaded',timeout:300000});
 await p.waitForFunction(()=>!!window.__voidState,null,{timeout:400000});
 await p.evaluate(()=>document.querySelectorAll('.show').forEach(e=>{if(['daily','gift'].includes(e.id))e.classList.remove('show')}));
-await p.click('#btnPlay'); await p.waitForTimeout(1200);
-await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+await enterMatch(p, wid);
 await p.waitForFunction(()=>(window.__matchState?.().t??0)>6,null,{timeout:600000});
 
 const r = await p.evaluate(async () => {

@@ -4,6 +4,7 @@
 // (prototype3d.ts:2246) — so the one line whose job is to say what to play for
 // next is blank for the entire rest of the game's life.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 for (const [tag, owned] of [['fresh', ['classic']],
@@ -21,8 +22,7 @@ for (const [tag, owned] of [['fresh', ['classic']],
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click('#worldRow .wCard[data-world="maple"]');
+  await enterMatch(p, 'maple');
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
   await p.evaluate(() => { window.__renderer.render = () => {}; window.__setVoidR?.(9); window.__rushClock?.(176); });
   await p.waitForFunction(() => document.getElementById('end')?.classList.contains('show'),

@@ -13,6 +13,7 @@
 // what a child's phone speaker gets.
 import { chromium } from 'playwright';
 import { ALL_WORLDS } from './worlds.mjs';
+import { enterMatch } from './_enter.mjs';
 
 const ALL = ALL_WORLDS;
 const worlds = process.argv.slice(2).filter((w) => ALL.includes(w));
@@ -80,8 +81,7 @@ for (const w of list) {
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show')
     .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1200);
-  await p.click(`#worldRow .wCard[data-world="${w}"]`);
+  await enterMatch(p, w);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 600000 });
 
   console.log(`\n${w.toUpperCase()}`);

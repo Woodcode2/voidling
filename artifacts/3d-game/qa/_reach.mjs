@@ -4,6 +4,7 @@
 // (3) What a WORLD ENDER at the law cap looks like standing in each world:
 //     shoot the finale, at the radius the growth law actually reaches.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 const OFF = [[104, -24], [94, -91], [81, -46], [15, 170], [54.7, 78], [25.3, 173.2], [112.5, -43]];
@@ -17,8 +18,7 @@ for (const wid of (process.argv[2] || 'pirate,maple,gameday,lantern').split(',')
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1400);
-  await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+  await enterMatch(p, wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 4, null, { timeout: 600000 });
   await p.waitForTimeout(6000);
   if (wid === 'pirate') {

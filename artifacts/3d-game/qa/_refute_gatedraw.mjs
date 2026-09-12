@@ -6,6 +6,7 @@
 // child can feel. So: watch renderer.info.programs across the match, and watch
 // the render pass keep rendering (do NOT stub renderer.render for this one).
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.env.PORT || 4177;
 const WID = process.argv[2] || 'maple';
 const UNTIL = +(process.argv[3] || 60);
@@ -20,8 +21,7 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=${WID}`, { waitUntil: 'domcontentloade
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${WID}"]`);
+await enterMatch(p, WID);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 600000 });
 // drive toward food, but LEAVE THE RENDERER ALONE
 await p.evaluate(() => {

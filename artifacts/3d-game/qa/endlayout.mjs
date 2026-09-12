@@ -19,6 +19,7 @@
 // at 430x932, 390x844 and 360x780 — WITH SIMULATED SAFE-AREA INSETS, because
 // env() is 0 in this harness and on a real iPhone every number is ~93px worse.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4177';
 const SIZES = [[430, 932], [390, 844], [360, 780]];
@@ -49,8 +50,7 @@ for (const [W, H] of SIZES) {
   await p.evaluate(() => document.querySelectorAll('.show')
     .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
   if (await p.$('#tapGate.show')) await p.click('#tapGate');
-  await p.click('#btnPlay'); await p.waitForTimeout(900);
-  await p.click('#worldRow .wCard[data-world="maple"]');
+  await enterMatch(p, 'maple');
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 1, null, { timeout: 900000 });
   await p.evaluate(() => window.__rushClock(0.05));
   await p.waitForSelector('#end.show', { timeout: 600000 });

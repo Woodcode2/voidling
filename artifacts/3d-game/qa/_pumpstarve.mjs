@@ -7,6 +7,7 @@
 // longer than the lookahead the score runs dry. This measures the pump's
 // actual fire gaps and the frame interval next to each other.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.argv[2] || '4243';
 const W = process.argv[3] || 'maple';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -32,8 +33,7 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=${W}`, { waitUntil: 'domcontentloaded'
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1200);
-await p.click(`#worldRow .wCard[data-world="${W}"]`);
+await enterMatch(p, W);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 600000 });
 await p.evaluate(() => { window.__pinQuality?.(0); });
 

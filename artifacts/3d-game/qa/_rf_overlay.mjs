@@ -4,6 +4,7 @@
 // 3) measure real bubble/floater overlap with the void's projected silhouette.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.argv[3] || '4177';
 const WORLD = process.argv[2] || 'maple';
 const OUT = '/tmp/claude-0/-home-user-voidling/1f93d8f7-3ff2-5559-8b0b-a74b62b39437/scratchpad/out';
@@ -21,8 +22,7 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil:'domcontentload
 await p.waitForFunction(() => !!window.__voidState, null, { timeout:400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
   if (['daily','gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+await enterMatch(p, WORLD);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout:400000 });
 
 // KEYBOARD steering — no synthetic finger, so #joy stays display:none like real

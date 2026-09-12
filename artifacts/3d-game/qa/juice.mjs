@@ -16,6 +16,7 @@
 // Contract: at least THREE of four answer. Fails on the pre-fix build, where
 // the lens never moved in the entire codebase (fov was written exactly once).
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4177';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -33,8 +34,7 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=maple`, { waitUntil: 'domcontentloaded
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show')
   .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1200);
-await p.click('#worldRow .wCard[data-world="maple"]');
+await enterMatch(p, 'maple');
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 900000 });
 
 // a size where houses are a big-but-legal bite, near a built-up district

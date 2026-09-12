@@ -6,6 +6,7 @@
 //   B. after a finished match, exited via the results screen's HOME
 //   C. after a match exited via pause -> LEAVE
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.env.PORT || 4177;
 const W = process.argv[2] || 'maple';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -48,8 +49,7 @@ async function travel(p, frames = 240) {
 // B — results screen -> HOME
 {
   const { ctx, p } = await fresh();
-  await p.click('#btnPlay'); await p.waitForTimeout(1500);
-  await p.click(`#worldRow .wCard[data-world="${W}"]`);
+  await enterMatch(p, W);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 900000 });
   await p.evaluate(() => window.__rushClock(1.2));
   await p.waitForFunction(() => document.getElementById('end').classList.contains('show'), null, { timeout: 900000 });
@@ -62,8 +62,7 @@ async function travel(p, frames = 240) {
 // C — pause -> LEAVE
 {
   const { ctx, p } = await fresh();
-  await p.click('#btnPlay'); await p.waitForTimeout(1500);
-  await p.click(`#worldRow .wCard[data-world="${W}"]`);
+  await enterMatch(p, W);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 900000 });
   await p.click('#btnQuit'); await p.waitForTimeout(600);
   await p.click('#pauseQuit');

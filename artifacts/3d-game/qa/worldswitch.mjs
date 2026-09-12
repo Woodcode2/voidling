@@ -10,6 +10,7 @@
 // runs, scores and finishes behind a frozen 100% cover the child cannot
 // dismiss. Every world, every run.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const PORT = process.argv[2] || '4177';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
@@ -24,9 +25,7 @@ for (const [from, to] of [['maple', 'pirate'], ['pirate', 'gameday'], ['gameday'
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.click('#btnPlay'); await p.waitForTimeout(1200);
-  // pick the OTHER world — this is the path that reloads
-  await p.click(`#worldRow .wCard[data-world="${to}"]`);
+  await enterMatch(p, to);
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.waitForTimeout(9000);
   const r = await p.evaluate(() => {

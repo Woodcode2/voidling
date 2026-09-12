@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const WORLD = process.argv[2] || 'lantern';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
@@ -11,8 +12,7 @@ await p.addInitScript(() => { try { localStorage.setItem('voidPlayed','1'); loca
 await p.goto(`http://127.0.0.1:4177/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => { if (['daily','gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1200);
-await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+await enterMatch(p, WORLD);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 900000 });
 const out = await p.evaluate(() => {
   const THREE = window.__THREE, ren = window.__renderer, scene = window.__scene, cam = window.__cam;

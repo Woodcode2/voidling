@@ -7,6 +7,7 @@
 //     distinct colour actually present in the scene and report the sRGB error.
 //  4. Does deleteAttribute('uv') before merge actually survive mergeGeometries?
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 const W = process.argv[2] || 'gameday';
 const PORT = process.argv[3] || 4291;
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
@@ -44,8 +45,7 @@ await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
 await p.waitForTimeout(6000);
 
 // ---- play, and grow the void so the camera pulls back and the whole map draws
-await p.click('#btnPlay'); await p.waitForTimeout(1500);
-await p.click(`#worldRow .wCard[data-world="${W}"]`);
+await enterMatch(p, W);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
 await p.waitForTimeout(4000);
 for (const R of [8, 20, 40]) {

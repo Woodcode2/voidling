@@ -33,6 +33,7 @@
 // A probe that homed on the curios would measure the hiding places instead of
 // the hunting, and would report a number no child will ever see.
 import { chromium } from 'playwright';
+import { enterMatch } from './_enter.mjs';
 
 const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const RUNS = +(process.argv[3] || 1);
@@ -60,8 +61,7 @@ for (const wid of WORLDS) {
     await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
     await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
       if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-    await p.click('#btnPlay'); await p.waitForTimeout(1400);
-    await p.click(`#worldRow .wCard[data-world="${wid}"]`);
+    await enterMatch(p, wid);
     await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
     await p.evaluate(() => { window.__renderer.render = () => { }; });
 
