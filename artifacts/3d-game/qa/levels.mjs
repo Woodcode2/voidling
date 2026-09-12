@@ -43,13 +43,13 @@
 // coverage after the hair was raised; both passed. GOVERNOR.md rule 4: parse
 // the real thing and throw if the call site has moved.
 //
-//   node qa/levels.mjs [port] [--only=a,b,c,e,f,g,h,i]
+//   node qa/levels.mjs [port] [--only=a,b,c,d,e,f,g,h,i]
 import { chromium } from 'playwright';
 import { ALL_WORLDS, UNLOCK_ALL } from './worlds.mjs';
 
 const flag = (n, d) => { const h = process.argv.find((a) => a.startsWith(`--${n}=`)); return h ? h.slice(n.length + 3) : d; };
 const PORT = process.argv.slice(2).filter((a) => !a.startsWith('--'))[0] || '4177';
-const ONLY = flag('only', 'a,b,c,e,f,g,h,i').split(',');
+const ONLY = flag('only', 'a,b,c,d,e,f,g,h,i').split(',');
 
 const fails = [];
 const bad = (m) => { fails.push(m); console.log(`  BAD  ${m}`); };
@@ -833,6 +833,217 @@ if (ONLY.includes('c')) {
     else ok(`(c) control: the shipped ending is intact — #count hot on ${r.hot} frames`);
     if (r.banner === null) bad('(c) control: the 35-second banner never fired on a goal-free match — the ending was removed, not keyed');
     else ok(`(c) control: the shipped banner is intact — "${r.banner}"`);
+  }
+}
+
+// ── (d) THE END CARD SAYS WHERE SHE IS ─────────────────────────────────────
+// §4.7 bars 4 and 6. The end card is the one screen in the game whose whole job
+// is progression, and the child skeptic's rule governs it: the PICTURE first,
+// the word second, and on a miss nothing that reads as punishment.
+//
+// Four runs, because four things can only be told apart by playing them out:
+//   win     the goal met -> the tick pip, clock still on it, CONTINUE
+//   miss    the buzzer with the goal unmet -> the come-back pip, NOT YET, the
+//           next dot STILL LOCKED, the green ring still on this one
+//   race    the counter driven over the line one second INTO the TIME outro ->
+//           still NOT YET. This is the first-writer guard, and it is the one
+//           bar here that cannot be reasoned about from the source: during the
+//           outro the eat loop and the score keep running at dtw = dt x 0.3.
+//   rivals  never ends before the buzzer, whatever the rank does
+if (ONLY.includes('d')) {
+  // what the pip's own markup must say, per state. Reading the GLYPH rather
+  // than a colour or a label: the glyph is the thing a child who cannot read
+  // actually receives, so it is the thing worth asserting.
+  const GLYPH = { locked: 'ic-lock', open: null, fin: 'ic-again', done: 'ic-tick', clear: 'ic-star' };
+  const readCard = () => ({
+    shown: !!document.getElementById('end')?.classList.contains('show'),
+    clock: +(window.__matchState().clock).toFixed(2),
+    hdIsPip: !!document.querySelector('#endHd .pip'),
+    hdState: (document.querySelector('#endHd .pip')?.className.match(/s-(\w+)/) || [])[1] ?? '',
+    hdGlyph: (document.querySelector('#endHd .pip use')?.getAttribute('href') || '').replace('#', ''),
+    hdWord: document.querySelector('#endHd .pipHW')?.textContent ?? '',
+    pips: [...document.querySelectorAll('#endPips .pip')].map((e) => (e.className.match(/s-(\w+)/) || [])[1] ?? ''),
+    here: [...document.querySelectorAll('#endPips .pip')].map((e) => e.classList.contains('here')),
+    cap: document.getElementById('endPipsCap')?.textContent ?? '',
+    again: document.getElementById('btnAgain')?.textContent ?? '',
+    // what the ONE footer button says. There is no second TRY AGAIN: under the
+    // win gate current(world) after a miss is this dot, so a second button
+    // would launch the identical match (see paintLevelEnd).
+    // ── HOW MANY THINGS ARE ON THIS SCREEN? ───────────────────────────────
+    // The end card grew one honest block at a time until qa/_endshot.mjs showed
+    // TWELVE of them stacked for a six-year-old. On a level it answers four
+    // questions; this counts the blocks that are actually drawn, so the next
+    // honest addition has to argue with a number instead of slipping in.
+    blocks: [...(document.getElementById('endScroll')?.children ?? [])]
+      .filter((e) => e.getBoundingClientRect().height > 2)
+      .map((e) => e.id || e.className || e.tagName.toLowerCase()),
+    statsOpen: !!document.getElementById('endStats')?.classList.contains('open'),
+    listShown: (document.getElementById('endList')?.getBoundingClientRect().height ?? 0) > 2,
+    nextHtml: document.getElementById('endNext')?.innerHTML ?? '',
+    nextState: (document.querySelector('#endNext .pip')?.className.match(/s-(\w+)/) || [])[1] ?? '',
+    nextText: document.querySelector('#endNext .unlockCard b')?.textContent ?? '',
+    // painted BEFORE the coin count-up, so the pips must already be there on
+    // the frame the card appears
+    pipsAtShow: window.__pipsAtShow ?? -1,   // set synchronously on the frame #end gains .show
+    levels: window.__levels().filter((r) => r.world === 'maple').map((r) => ({ n: r.goal, st: r.st, tries: r.n })),
+  });
+
+  // ── (d1) A WIN ──────────────────────────────────────────────────────────
+  {
+    const p = await open({ voidUnlocked: UNLOCK_ALL }, '?w=maple&g=1&len=60');
+    await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0, null, { timeout: 600000 }).catch(() => { });
+    await VIRTUALISE(p);
+    await p.evaluate(`window.READ = ${readCard.toString()}`);
+    const r = await p.evaluate(([n, step]) => {
+      window.__setScore(window.__levelSpec().eat + 1);
+      for (let i = 0; i < n; i++) {
+        const due = window.__q; window.__q = [];
+        if (!due.length) return { broke: true, i };
+        window.__virt += step;
+        for (const cb of due) cb(window.__virt);
+        window.__setScore(window.__levelSpec().eat + 1);
+        if (document.getElementById('end')?.classList.contains('show')) {
+          // COUNTED ON THIS FRAME, synchronously. A MutationObserver cannot do
+          // this job: the whole crank is one task, so its callbacks do not run
+          // until the evaluate returns, and the first version of this bar read
+          // -1 on a build that paints the pips perfectly well. Reading the DOM
+          // on the frame the class lands is both correct and stricter.
+          window.__pipsAtShow = document.querySelectorAll('#endPips .pip').length;
+          for (let k = 0; k < 12; k++) { const d2 = window.__q; window.__q = []; window.__virt += step; for (const cb of d2) cb(window.__virt); }
+          return window.READ();
+        }
+      }
+      return { timeout: true, ...window.READ() };
+    }, [60 * 90, 1000 / 60]);
+    await p.close();
+    if (r.broke || r.timeout) bad(`(d) win: the card never opened (${r.broke ? 'rAF broke' : 'timed out'})`);
+    else {
+      if (!(r.clock > 0)) bad(`(d) win: the card opened at clock ${r.clock} — a win on the spot leaves time on it`);
+      else ok(`(d) win: the card opened with ${r.clock}s left`);
+      if (!r.hdIsPip) bad('(d) win: #endHd is not a pip — the headline must be the picture, not a word');
+      else if (!['done', 'clear'].includes(r.hdState)) bad(`(d) win: the headline pip is "${r.hdState}" after a win`);
+      else if (r.hdGlyph !== GLYPH[r.hdState]) bad(`(d) win: the headline pip wears "${r.hdGlyph}", expected "${GLYPH[r.hdState]}"`);
+      else ok(`(d) win: the headline is the ${r.hdState} pip wearing ${r.hdGlyph}, captioned "${r.hdWord}"`);
+      if (r.pips.length !== 5) bad(`(d) win: #endPips has ${r.pips.length} pips, not 5`);
+      else ok(`(d) win: the five dots read ${r.pips.join(' · ')}`);
+      if (r.pipsAtShow !== 5) bad(`(d) win: ${r.pipsAtShow} pips existed on the frame the card appeared — they must be painted BEFORE the coin count-up, or the money lands first`);
+      else ok('(d) win: the pips were already painted when the card appeared');
+      if (!/^LEVEL \d+ OF 30$/.test(r.cap)) bad(`(d) win: the ordinal caption reads "${r.cap}"`);
+      else ok(`(d) win: "${r.cap}"`);
+      if (!/CONTINUE/.test(r.again)) bad(`(d) win: the primary button reads "${r.again}" after a win`);
+      else ok(`(d) win: the footer says "${r.again}"`);
+      if (/TRY AGAIN/.test(r.again)) bad('(d) win: the footer offers TRY AGAIN on a match she won');
+      if (r.nextState !== 'open') bad(`(d) win: #endNext shows "${r.nextText || r.nextHtml.slice(0, 60)}" — after a win the slot belongs to the dot she just opened, not to a shop door`);
+      else ok(`(d) win: #endNext is the next dot, "${r.nextText}"`);
+      // FOUR QUESTIONS. A ceiling, not a target — and a deliberately loud one,
+      // because every block on this card was added for a good reason and the
+      // twelfth will be too.
+      if (r.blocks.length > 7) bad(`(d) win: ${r.blocks.length} blocks on a level end card — ${r.blocks.join(', ')}. A six-year-old is answering "did I do it", not reading a dashboard`);
+      else ok(`(d) win: ${r.blocks.length} blocks on the card — ${r.blocks.join(', ')}`);
+      if (r.statsOpen) bad('(d) win: the stat tiles are open by default — they are the grown-up\'s numbers and start closed on a level');
+      if (r.listShown) bad('(d) win: the standings are shown on an EAT dot — they belong to RIVALS, where they are the goal');
+      else ok('(d) win: no standings on an EAT dot');
+    }
+  }
+
+  // ── (d2) A MISS, and (d3) THE RACE ──────────────────────────────────────
+  for (const race of [false, true]) {
+    const tag = race ? 'race' : 'miss';
+    const p = await open({ voidUnlocked: UNLOCK_ALL }, '?w=maple&g=1&len=10');
+    await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0, null, { timeout: 600000 }).catch(() => { });
+    await VIRTUALISE(p);
+    const before = await p.evaluate(() => window.__levels().filter((x) => x.world === 'maple').map((x) => ({ n: x.goal, st: x.st, tries: x.n })));
+    await p.evaluate(`window.READ = ${readCard.toString()}`);
+    const r = await p.evaluate(([n, step, doRace]) => {
+      let injected = false;
+      for (let i = 0; i < n; i++) {
+        const due = window.__q; window.__q = [];
+        if (!due.length) return { broke: true, i };
+        window.__virt += step;
+        for (const cb of due) cb(window.__virt);
+        const ms = window.__matchState();
+        // THE RACE: one second into the TIME outro, shove the counter over the
+        // line. TIME got there first, so the result must stay TIME.
+        if (doRace && !injected && ms.clock <= -0.05
+          && !document.getElementById('end')?.classList.contains('show')) {
+          injected = true; window.__setScore(window.__levelSpec().eat + 5000);
+        }
+        if (document.getElementById('end')?.classList.contains('show')) {
+          for (let k = 0; k < 12; k++) { const d2 = window.__q; window.__q = []; window.__virt += step; for (const cb of d2) cb(window.__virt); }
+          return { ...window.READ(), injected };
+        }
+      }
+      return { timeout: true, ...window.READ(), injected };
+    }, [60 * 40, 1000 / 60, race]);
+    await p.close();
+    if (r.broke || r.timeout) { bad(`(d) ${tag}: the card never opened`); continue; }
+    if (race && !r.injected) { bad('(d) race: the outro window was never caught, so the first-writer guard was not exercised'); continue; }
+    if (r.hdState !== 'fin') bad(`(d) ${tag}: the headline pip is "${r.hdState}" after the buzzer with the goal unmet — it must be the come-back dot${race ? ', and a counter crossing DURING the outro must not steal the result' : ''}`);
+    else ok(`(d) ${tag}: the headline is the fin pip${race ? ' even with the counter driven over the line inside the outro' : ''}`);
+    if (r.hdGlyph !== 'ic-again') bad(`(d) ${tag}: the miss pip wears "${r.hdGlyph}" — a miss shows a come-back arrow, never a cross`);
+    else ok(`(d) ${tag}: the miss wears the come-back arrow, captioned "${r.hdWord}"`);
+    if (r.hdWord !== 'NOT YET') bad(`(d) ${tag}: the miss reads "${r.hdWord}"`);
+    const d2 = (r.levels || []).find((x) => x.n === 2) || {};
+    if (d2.st !== 'locked') bad(`(d) ${tag}: dot 2 is "${d2.st}" after a miss — only a WIN opens the next dot (§8.1)`);
+    else ok(`(d) ${tag}: dot 2 stayed locked`);
+    if (!(r.here || [])[0]) bad(`(d) ${tag}: the green here-ring is not on dot 1 — after a miss the ring has not moved`);
+    else ok(`(d) ${tag}: the here-ring is still on dot 1`);
+    const b1 = (before || []).find((x) => x.n === 1) || {};
+    const a1 = (r.levels || []).find((x) => x.n === 1) || {};
+    if (a1.tries !== (Number(b1.tries) || 0) + 1) bad(`(d) ${tag}: attempts went ${b1.tries} → ${a1.tries}`);
+    else ok(`(d) ${tag}: the attempt was counted (${a1.tries})`);
+    if (!/TRY AGAIN/.test(r.again)) bad(`(d) ${tag}: the footer reads "${r.again}" after a miss — it must say what it does, and what it does is replay this dot`);
+    else ok(`(d) ${tag}: the footer says "${r.again}"`);
+    if (r.nextState !== 'fin') bad(`(d) ${tag}: #endNext shows "${r.nextText || r.nextHtml.slice(0, 60)}" — after a miss the slot is this dot again, which is where the ring still is`);
+    else ok(`(d) ${tag}: #endNext is this dot again, "${r.nextText}"`);
+  }
+
+  // ── (d4) RIVALS NEVER ENDS EARLY ────────────────────────────────────────
+  {
+    const p = await open({ voidUnlocked: UNLOCK_ALL }, '?w=maple&g=4&len=12');
+    await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0, null, { timeout: 600000 }).catch(() => { });
+    await VIRTUALISE(p);
+    const r = await p.evaluate(([n, step]) => {
+      // hand her rank 1 from the first frame: a rank is only true at the
+      // buzzer, so this must NOT end the match
+      window.__setRivalScores([0, 0, 0, 0, 0]);
+      let early = null;
+      for (let i = 0; i < n; i++) {
+        const due = window.__q; window.__q = [];
+        if (!due.length) return { broke: true, i };
+        window.__virt += step;
+        for (const cb of due) cb(window.__virt);
+        window.__setRivalScores([0, 0, 0, 0, 0]);
+        const ms = window.__matchState();
+        if (document.getElementById('end')?.classList.contains('show')) {
+          if (ms.clock > 0.2 && !early) early = +ms.clock.toFixed(2);
+          return { early, clock: +ms.clock.toFixed(2), rank: ms.rank,
+            hdState: (document.querySelector('#endHd .pip')?.className.match(/s-(\w+)/) || [])[1] ?? '' };
+        }
+      }
+      return { timeout: true };
+    }, [60 * 40, 1000 / 60]);
+    await p.close();
+    if (r.broke || r.timeout) bad('(d) rivals: the card never opened');
+    else if (r.early !== null) bad(`(d) rivals: the match ended at clock ${r.early} while leading — a rank is only true at the buzzer, so RIVALS may never end early`);
+    else {
+      ok(`(d) rivals: leading from the first frame, the match still ran to the buzzer (clock ${r.clock})`);
+      if (!['done', 'clear'].includes(r.hdState)) bad(`(d) rivals: rank ${r.rank} at the buzzer gave the "${r.hdState}" pip — first place is a win`);
+      else ok(`(d) rivals: rank ${r.rank} at the buzzer resolved as ${r.hdState}`);
+    }
+  }
+
+  // ── (d5) THE ORDINAL IS FOR THE END CARD, NOT THE MENU ──────────────────
+  {
+    const p = await open({ voidUnlocked: UNLOCK_ALL }, '?w=maple');
+    const inMenu = await p.evaluate(() => {
+      const m = document.getElementById('menu');
+      return m ? /\d+\s+OF\s+30/.test(m.textContent || '') : null;
+    });
+    await p.close();
+    if (inMenu === null) bad('(d) there is no #menu to check');
+    else if (inMenu) bad('(d) "N OF 30" appears in #menu — the 1-30 ordinal is the grown-up\'s number and belongs on the end card only (§4.7 bar 6)');
+    else ok('(d) the 1-30 ordinal stays off the menu');
   }
 }
 

@@ -52,7 +52,8 @@ import { STICKERS_BY_WORLD, STICKERS, collectInRun, hasSticker, TIER_POINTS,
 import { liveEvents, eventForWorld, eventEndLabel, type SeasonEvent } from './game/seasons';
 import { isUnlocked, gateFor, completeWorld, WORLD_LABEL, unlockedCount, type WorldKey } from './game/unlocks';
 import { allLevels, current as levelCurrent, recordLevelResult, trackLevelStart,
-  type Goal } from './game/levels';
+  ordinal as levelOrdinal, type Goal, type LevelState } from './game/levels';
+import { ensurePipDefs, pipRow, pipHead, pip, PIP_WORD } from './proto3d/pips';
 import { recentEvents } from './proto3d/telemetry';
 import { bumpMatch, deal, type Deal } from './game/matchdeck';
 // the district ids this world's newsroom knows, so a biome from another world
@@ -5983,6 +5984,87 @@ function celebrateEnd(coins: number, xpGain: number, lead: string, won = false, 
   requestAnimationFrame(tick);
 }
 
+/** ── THE LADDER, ON THE ONE SCREEN THAT SAYS WHAT JUST HAPPENED ───────────
+ *  Paints the end card's progression furniture and returns true when it took
+ *  the screen. Returns false on a match nobody chose a dot for — every harness
+ *  match and every match before the ladder is touched — and then the card is
+ *  exactly the one that shipped.
+ *
+ *  ORDER MATTERS AND IT IS THE POINT. This runs BEFORE celebrateEnd(), whose
+ *  coin count-up takes 900 ms. So the pips light first and the money lands on
+ *  top of progress rather than instead of it: what a child is owed for the
+ *  match is a smaller thing than where she now is on the ladder, and the screen
+ *  should say them in that order.
+ *
+ *  It must also run AFTER recordLevelResult(), which is at the top of
+ *  endMatch() — the states drawn here are read back out of the ladder through
+ *  the same allLevels() the menu uses, never from a local guess about what the
+ *  result "should" have done. If the two ever disagree, the pips are right and
+ *  the guess was wrong. */
+function paintLevelEnd(result: GoalResult): boolean {
+  // CLEAR FIRST, BAIL SECOND. A card is reused across matches, so furniture
+  // left over from a level run would sit on the next goal-free one — the pips
+  // of a world she is no longer playing, under a headline about a percentage.
+  el('endPips').innerHTML = ''; el('endPipsCap').textContent = '';
+  endHd.classList.remove('pipHd');
+  endEl.classList.remove('lvl', 'rivals');
+  el('endStats').classList.remove('open');
+  if (!goal) return false;
+  ensurePipDefs();
+  // FOUR QUESTIONS, and the card answers only those (see index.html's note on
+  // `#end.lvl`). The standings come back on a RIVALS dot, where the standings
+  // ARE the goal rather than a second scoreboard beside it.
+  endEl.classList.add('lvl');
+  if (goal.n === 4) endEl.classList.add('rivals');
+  // a riddle about a sticker she did NOT find is a tease at the moment of a
+  // result; a sticker she DID find stays, because it is the one thing she keeps
+  el('endFinds').classList.toggle('tease', !runFinds().length);
+  const rows = allLevels().filter((r) => r.world === pickedWorld);
+  const states = rows.map((r) => r.st as LevelState);
+  const mine = states[goal.n - 1] ?? 'fin';
+
+  // 1. THE HEADLINE IS THE PIP. Picture at 96px, the word under it at 13px.
+  // Draft 1 led with the word and the child skeptic killed it: the first thing
+  // on the one screen that tells her how she did was a word she cannot read,
+  // and on a miss it was a word with no picture at all.
+  endHd.innerHTML = pipHead(mine, goal.n);
+  endHd.classList.add('pipHd');
+
+  // 2. THE FIVE DOTS, with this match's dot popping once. The caption is the
+  // 1-30 ordinal — that is the grown-up's number, so it goes small and under.
+  el('endPips').innerHTML = pipRow(states, { size: 34, popAt: goal.n });
+  el('endPipsCap').textContent = `LEVEL ${levelOrdinal(pickedWorld, goal.n)} OF 30`;
+
+  // 3. THE NEXT REWARD. On a win before dot 5 the next pip is drawn large with
+  // its padlock already off — the thing she just earned, shown as a thing
+  // rather than described. On a miss it is this dot again, which is honest: the
+  // ring has not moved.
+  const nx = el('endNext');
+  if (result === 'win' && goal.n < 5) {
+    const nextState = states[goal.n] ?? 'open';
+    nx.innerHTML = `<div class="unlockCard">${pip(nextState, { n: goal.n + 1, size: 56, cls: 'pop' })}`
+      + `<b>NEXT UP</b><span>${goalLine(pickedWorld, (goal.n + 1) as Goal)}</span></div>`;
+  } else if (result !== 'win') {
+    nx.innerHTML = `<div class="unlockCard">${pip(mine, { n: goal.n, size: 56 })}`
+      + `<b>${PIP_WORD[mine]}</b><span>${goal.line}</span></div>`;
+  }
+
+  // 4. THE FOOTER SAYS WHAT IT DOES. CONTINUE goes to whatever is current —
+  // after a win that is the next dot, after a miss it is this one again — and
+  // on a miss a second, smaller TRY AGAIN says the replay out loud, because a
+  // child who has just missed needs to be told she may.
+  // ONE BUTTON, AND IT SAYS WHAT IT DOES. Draft 1 put a second, smaller TRY
+  // AGAIN under the primary — but under the win gate current(world) after a
+  // miss IS this dot, so the two buttons launched the identical match. Two
+  // controls with one meaning on a card that already scrolls is a worse screen,
+  // not a kinder one. The primary is relabelled instead: CONTINUE when the
+  // ladder moved, TRY AGAIN when it did not. LOOKED AT, not reasoned about —
+  // qa/_endshot.mjs put them side by side and the redundancy was obvious.
+  const again = document.getElementById('btnAgain');
+  if (again) again.textContent = result === 'win' ? 'CONTINUE →' : 'TRY AGAIN';
+  return true;
+}
+
 /** How this match resolved AS A LEVEL. null on every match nobody chose a dot
  *  for — which is every harness match and every match before the ladder is
  *  touched — and on those nothing below behaves differently. */
@@ -6040,7 +6122,7 @@ function endMatch(result: GoalResult = null) {
     const reward2 = Math.max(5, Math.min(80, Math.round(devouredPct * 0.8))) + (newBest ? 20 : 0);
     addCoins(reward2);
     if (devouredPct >= 40) questEvent('solo40');
-    endHd.textContent = `${devouredPct}% DEVOURED`;
+    if (!paintLevelEnd(result)) endHd.textContent = `${devouredPct}% DEVOURED`;
     // solo pays the same ladder — stats first, so this run's trophies count
     stats.matches++; stats.bestForm = Math.max(stats.bestForm, curStage); saveStats();
     const troPay2 = payTrophies();
@@ -6141,8 +6223,10 @@ function endMatch(result: GoalResult = null) {
   // and no deadpan irony at the lowest moment: "RUDE." read literally at six
   // is "who was rude — me?"
   const LOSE_TITLES = ['STILL HUNGRY!', 'OUT-NOMMED!', 'SO CLOSE TO DELICIOUS', 'STILL SO MUCH LEFT TO EAT!', 'SNACK-SIZED THIS TIME'];
-  endHd.textContent = myRank === 1 ? WIN_TITLES[Math.floor(Math.random() * WIN_TITLES.length)]
-    : `#${myRank} · ${LOSE_TITLES[Math.floor(Math.random() * LOSE_TITLES.length)]}`;
+  if (!paintLevelEnd(result)) {
+    endHd.textContent = myRank === 1 ? WIN_TITLES[Math.floor(Math.random() * WIN_TITLES.length)]
+      : `#${myRank} · ${LOSE_TITLES[Math.floor(Math.random() * LOSE_TITLES.length)]}`;
+  }
   {
     // the lead line names the biggest thing that just happened beyond the
     // placement: a trophy beats a level, and the placement line is the default
@@ -6218,6 +6302,17 @@ function endMatch(result: GoalResult = null) {
     // have to read past "86✦ to the TOXIC skin" to find out.
     const opened = completeWorld(pickedWorld);
     const nx = el('endNext');
+    // ── WHOSE SLOT IS THIS? ───────────────────────────────────────────────
+    // #endNext answers "what next", and on a level the answer is the ladder —
+    // paintLevelEnd has already written the next dot into it. Both writers
+    // below run later and were silently winning: MEASURED with qa/_endshot.mjs,
+    // a won dot showed "✦ you can afford the TOXIC skin!" in the slot where
+    // NEXT UP belongs, and a miss showed an empty box. A shop door is never the
+    // answer to "what next" for a child who just moved up a ladder — the child
+    // skeptic's rule, and it was already written into §4.4 point 5.
+    //
+    // A NEW WORLD still outranks everything, including the pip: it is the
+    // biggest prize the game gives out and it happens five times ever.
     if (opened) {
       track('world_unlocked', { world: opened, after: pickedWorld, total: unlockedCount() });
       nx.innerHTML = `<div class="unlockCard">🔓 <b>NEW WORLD!</b><span>${WORLD_LABEL[opened]} is open</span>`
@@ -6242,8 +6337,29 @@ function endMatch(result: GoalResult = null) {
         endEl.appendChild(sp);
         setTimeout(() => sp.remove(), 3200);
       }
-      return;   // the skin nudge waits for a match that did not just open a world
-    }
+      // ── THE `return` THAT WAS HERE HID THE WHOLE RESULTS CARD ───────────
+      // Its comment said "the skin nudge waits for a match that did not just
+      // open a world", which is the right intention and the wrong mechanism: a
+      // bare `return` in this block leaves endMatch(), and
+      // `endEl.classList.add('show')` is SIXTY LINES BELOW IT. So on the one
+      // match in five that opens a world, the panel above was built, the
+      // confetti fell, audio.win() played — and the card it was all drawn on
+      // never appeared. The child heard a cheer, got a world, and was left
+      // looking at a finished match with no results screen at all.
+      //
+      // MEASURED (qa/_unlockcard.mjs): seeded with Maple only, one match to the
+      // buzzer — #end .show false, voidUnlocked "maple,pirate", the unlock panel
+      // fully rendered inside a hidden card. Control with every world already
+      // open: #end .show true. Five matches in every child's life, and they are
+      // the five biggest.
+      //
+      // The nudge is skipped by NOT ENTERING its branch, which is what the
+      // comment always meant.
+    } else if (!goal) {
+    // …and on a LEVEL this slot is already spoken for: paintLevelEnd wrote the
+    // next dot into it, and a shop door is not the answer to "what next" for a
+    // child who just moved up a ladder (§4.4 point 5). `else if (!goal)` above
+    // is what keeps both of those true without another early return.
     const g = nextGoal();
     if (g) {
       const k = Math.min(1, g.have / g.need);
@@ -6274,6 +6390,7 @@ function endMatch(result: GoalResult = null) {
         requestAnimationFrame(() => { _dbg.__shopTab?.(); });
       });
     } else nx.innerHTML = '';
+    }
   }
   endList.innerHTML = rows.map((r, i) =>
     `<div class="er ${r.me ? 'me' : ''}" style="animation-delay:${0.15 + i * 0.12}s"><span>${r.me && i === 0 ? '👑' : i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
@@ -8473,7 +8590,24 @@ function resetMatch() {
   timerEl.style.color = '';
   beginMatch(soloMode);
 }
-el('btnAgain').addEventListener('click', () => { track('again_tap', { played: stats.matches }); resetMatch(); });
+document.getElementById('endMore')?.addEventListener('click', () => {
+  const st = el('endStats');
+  const open = st.classList.toggle('open');
+  const b = document.getElementById('endMore');
+  if (b) b.textContent = open ? 'MY NUMBERS ▴' : 'MY NUMBERS ▾';
+  track('end_more', { open, level: goal ? goal.n : 0 });
+});
+el('btnAgain').addEventListener('click', () => {
+  track('again_tap', { played: stats.matches, level: goal ? goal.n : 0 });
+  // CONTINUE MEANS CONTINUE. After a level it launches whatever is current for
+  // this world — the next dot after a win, this dot again after a miss — read
+  // from levelCurrent() rather than incremented here, so the button and the
+  // green ring can never point at different dots. No reload: the world is
+  // already built and resetMatch re-arms it in place.
+  if (goal) playingGoal = levelCurrent(pickedWorld);
+  resetMatch();
+});
+
 el('btnHome').addEventListener('click', () => {
   track('home_tap', { played: stats.matches });
   el('end').classList.remove('show');

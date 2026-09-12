@@ -494,6 +494,51 @@ guard, `endMatch(result)`, `recordLevelResult` above the solo return,
   exempting anyone from it. Verified by deleting the exclusion and rebuilding:
   the family ate the barn on dot 3 in 20.1 s (`levels-day5-h-before.log`).
 
+**Day 6a is DONE (2026-09-12): the ladder is on the end card, and a live bug
+was found underneath it.**
+
+- **`src/proto3d/pips.ts`** is the single renderer for the whole ladder — five
+  states, inline SVG symbols, one definition that is crisp at 28 px in a row and
+  96 px as a headline. MENU-BRIEF §4.4 asked for a bitmap sprite sheet from a
+  `qa/icons.mjs` that does not exist; SVG needs no art delivery, no request, and
+  takes its colours from the stylesheet where every other colour in this game is
+  decided. The menu's six rows (day 7) use the same module.
+- **The headline is the picture.** A 96 px pip with the word under it at 13 px:
+  the tick on a win, the come-back arrow on a miss, never a cross and never a
+  word first.
+- **THE RESULTS CARD NEVER OPENED ON THE MATCH THAT UNLOCKS A WORLD.** A bare
+  `return` inside the unlock branch — comment: "the skin nudge waits for a match
+  that did not just open a world" — leaves `endMatch()`, and
+  `endEl.classList.add('show')` is **sixty lines below it**. Measured
+  (`qa/_unlockcard.mjs`): seeded with Maple only, one match to the buzzer —
+  `#end` `.show` **false**, `voidUnlocked` "maple,pirate", the unlock panel and
+  its confetti fully rendered *inside a hidden card*; control with every world
+  open, **true**. That is five matches in every child's life, and they are the
+  five biggest. Fixed by not entering the branch instead of returning from the
+  function.
+- **The card was twelve things and is now seven.** The owner, on seeing it:
+  "keep it simple right. We're working with kids." Looked at rather than
+  reasoned about (`qa/_endshot.mjs`): it had grown standings, a riddle about a
+  sticker she did NOT find, four stat tiles, a drop orb, a shop nudge and the
+  daily board. On a level it now answers four questions — did I do it, where am
+  I, what did I get, what is next — with the grown-up's numbers behind one
+  toggle in the lowest slot, the standings only on a RIVALS dot, and the shop
+  door never winning the "what next" slot from the ladder. `levels.mjs` (d)
+  counts the blocks, so the twelfth addition has to argue with a number.
+- **One button, one meaning.** CONTINUE after a win, TRY AGAIN after a miss.
+  Draft 1 had both, and under the win gate `current(world)` after a miss IS this
+  dot — so they launched the identical match.
+
+**Deferred, deliberately:** the daily quest board's full retirement (§6 day 6's
+"one commit"). It is a ~300-line deletion across the pool, the encore logic,
+four storage keys and the coin bonuses, and on the level card it costs exactly
+one block — which is now hidden. It gets its own day, where a mistake in the
+economy is visible rather than buried in a menu commit. `questEvent()` survives
+either way: the SET goal counts through it.
+
+**Next: day 7 — the menu ladder** (the owner's first ask): all thirty dots on
+the menu, locked ones visible and dimmed, unlocking as she goes.
+
 **Next: day 6** — the end card: the pip headline, `#endPips`, the caption,
 CONTINUE / TRY AGAIN, the shop door only when affordable; **one commit** retires
 the quest board and ports `questable` into `levels.mjs` (e); `levels.mjs` (d);

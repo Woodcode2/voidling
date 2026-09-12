@@ -519,6 +519,119 @@
       #goal[hidden] { display: none; }
 
       #quests { display: none !important; }
+      /* ── THE PIP: the whole ladder's visual language ───────────────────
+         One shape, five states, drawn from --pipSize so the 28px row and the
+         96px headline are the same element at two sizes rather than two
+         elements that have to be kept looking alike. src/proto3d/pips.ts
+         builds the markup; this decides what each state LOOKS like, which is
+         where every other colour in this game is decided too.
+
+         The states, and the rule behind each colour:
+           locked  full shape, drained — "it is there, you have not reached it"
+           open    bright and EMPTY with the green here-ring; nothing has
+                   happened on this dot yet and the pip must not imply it has
+           fin     filled grey, keeps the here-ring (a missed dot is still the
+                   current one under the win gate), wears the come-back arrow
+           done    the tick, in the house green
+           clear   the star, in gold, and it glows — this is the one a child
+                   shows somebody */
+      .pip { --pipSize: 28px; display: inline-flex; flex-direction: column; align-items: center;
+        width: var(--pipSize); height: var(--pipSize); flex: 0 0 auto; position: relative; }
+      .pipDot { width: 100%; height: 100%; border-radius: 50%; display: grid; place-items: center;
+        box-sizing: border-box; position: relative;
+        border: max(2px, calc(var(--pipSize) * 0.075)) solid rgba(255,255,255,0.22);
+        background: rgba(255,255,255,0.07); color: #fff;
+        transition: background 180ms ease, border-color 180ms ease, color 180ms ease; }
+      .pipG { width: 62%; height: 62%; display: block; }
+      .pipN { font-size: calc(var(--pipSize) * 0.42); font-weight: 700; font-style: normal;
+        line-height: 1; color: inherit; }
+      /* LOCKED — the shape survives, the colour does not. A locked dot that is
+         hidden or shrunk teaches a child there is nothing there; a locked dot
+         at full size teaches her there is somewhere to get to. */
+      .pip.s-locked .pipDot { border-color: rgba(255,255,255,0.13); background: rgba(255,255,255,0.04);
+        color: rgba(203,178,255,0.40); }
+      .pip.s-locked .pipG { width: 52%; height: 52%; }
+      /* OPEN — bright, empty, and the only thing asking to be pressed */
+      .pip.s-open .pipDot { border-color: #fff6df; background: rgba(255,246,223,0.14); color: #fff6df; }
+      /* FIN — attempted. Grey, never red; the arrow is an invitation. */
+      .pip.s-fin .pipDot { border-color: rgba(255,255,255,0.30); background: rgba(255,255,255,0.14);
+        color: rgba(255,255,255,0.72); }
+      /* DONE — the tick, kept forever */
+      .pip.s-done .pipDot { border-color: #7ef2a0; background: rgba(126,242,160,0.16); color: #7ef2a0; }
+      /* CLEAR — the star, and the one state in the set that GLOWS */
+      .pip.s-clear .pipDot { border-color: #ffd23f; background: rgba(255,210,63,0.18); color: #ffd23f;
+        box-shadow: 0 0 calc(var(--pipSize) * 0.30) rgba(255,210,63,0.55); }
+      /* YOU ARE HERE. A ring outside the dot, so it reads as a marker placed on
+         the ladder rather than part of the dot's own state — which is exactly
+         what it is: levels.ts derives it, the pip only wears it. */
+      .pip.here::after { content: ''; position: absolute; inset: calc(var(--pipSize) * -0.16);
+        border-radius: 50%; border: max(2px, calc(var(--pipSize) * 0.06)) solid #7ef2a0;
+        opacity: 0.92; animation: pipHere 2.2s ease-in-out infinite; pointer-events: none; }
+      @keyframes pipHere { 0%,100% { transform: scale(1); opacity: 0.92; }
+        50% { transform: scale(1.07); opacity: 0.55; } }
+      /* the one-shot flip a pip does when it has just CHANGED. 320ms, the same
+         beat the padlock pops off at (§4.4). */
+      .pip.pop .pipDot { animation: pipPop 320ms cubic-bezier(0.34,1.56,0.64,1) 1; }
+      @keyframes pipPop { 0% { transform: scale(0.55) rotate(-14deg); }
+        60% { transform: scale(1.14) rotate(4deg); } 100% { transform: scale(1) rotate(0); } }
+      .pipRow { display: flex; gap: 12px; justify-content: center; align-items: center;
+        margin: 2px auto 0; }
+      /* THE HEADLINE PIP: picture first, word under it, caption under that. */
+      .pipHead { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+      .pipHW { font-size: 13px; letter-spacing: 3px; color: #efe6ff; }
+      .pipHC { font-size: 12px; font-style: normal; letter-spacing: 1.4px; color: #b9a6e4; }
+      /* the five dots on the end card, and the ordinal under them for dad */
+      #endPips { width: min(92%, 380px); margin: 10px auto 0; }
+      #endPipsCap { text-align: center; font-size: 12px; letter-spacing: 1.4px;
+        color: #b9a6e4; margin-top: 7px; }
+      /* ── A CELEBRATION, NOT A DASHBOARD ───────────────────────────────
+         The end card grew one honest block at a time — standings, a sticker
+         hint, four stat tiles, a drop orb, a shop nudge, a quest board — and
+         LOOKED AT (qa/_endshot.mjs) it is TWELVE things stacked for a
+         six-year-old to parse at the exact moment she wants to know one thing:
+         did I do it.
+
+         On a level it answers four questions and nothing else:
+            did I do it        the pip + the word
+            where am I now     the five dots
+            what did I get     the count-up
+            what is next       the next dot, and the button
+         The rest is not deleted — it is for the grown-up, so it goes behind one
+         small toggle, and the things that are only true SOMETIMES appear only
+         then: the standings on a RIVALS dot (where they ARE the goal), a
+         sticker when she actually found one. */
+      #end.lvl #endList { display: none; }
+      #end.lvl.rivals #endList { display: block; }
+      /* the "still hiding" tease is a riddle about a thing she did NOT get; on
+         a ladder that is noise at the moment of a result. A find she DID make
+         still shows — it is the only thing in a run a child keeps. */
+      #end.lvl #endFinds.tease { display: none; }
+      #end.lvl #endStats { display: none; }
+      /* THE DAILY BOARD IS NOT PART OF THIS ANSWER. It is being retired
+         outright (MENU-BRIEF §6 day 6's one commit) — but that is a ~300-line
+         deletion across the pool, the encore logic, four storage keys and the
+         coin bonuses, and on this card it costs exactly one block. Hidden here
+         now so the level card is four questions today; deleted properly on its
+         own day, where a mistake in the economy is visible rather than buried
+         in a menu commit. questEvent() survives either way: the SET goal counts
+         through it. */
+      #end.lvl #endQuests { display: none !important; }
+      #end.lvl #endStats.open { display: flex; }
+      #endMore { display: none; margin: 10px auto 0; padding: 7px 16px; border-radius: 999px;
+        border: 1.5px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.05);
+        color: #b9a6e4; font-size: 11px; font-weight: 700; letter-spacing: 1.6px; }
+      #end.lvl #endMore { display: block; }
+      /* THE HEADLINE, WHEN IT IS A PIP. #end .hd is a 26-44px type block with
+         its own line-height and stroke; a 96px pip inside it inherits none of
+         that usefully and all of it harmfully. So on a level the headline stops
+         being type and becomes a picture with a caption, and the type rules are
+         handed back. */
+      #end .hd.pipHd { font-size: 0; letter-spacing: normal; -webkit-text-stroke: 0;
+        text-shadow: none; line-height: 1; margin-bottom: 2px; }
+      #end .hd.pipHd .pipHW { font-size: 13px; }
+      #end .hd.pipHd .pipHC { font-size: 12px; }
+      /* the next-reward card carries a pip now, so it needs room above the word */
+      #endNext .unlockCard .pip { margin-bottom: 4px; }
       #endQuests { width: min(92%, 380px); margin: 2px auto 0; display: none; flex-direction: column; gap: 6px; }
       #endQuests.on { display: flex; }
       #endQuests .eqh { font-size: 12px; letter-spacing: 2px; font-weight: 700; color: #9a86c8; text-align: left; }
@@ -2270,6 +2383,13 @@
            same scroll context as the content. -->
       <div id="endScroll">
       <div class="hd" id="endHd">TIME!</div>
+      <!-- THE FIVE DOTS OF THIS WORLD, in their new states, painted BEFORE the
+           coin count-up starts so they light first and the money lands on top
+           of progress rather than instead of it. Empty on a match nobody chose
+           a dot for. The caption under it is the 1-30 ordinal, for the grown-up
+           — the child reads the dots. -->
+      <div id="endPips"></div>
+      <div id="endPipsCap"></div>
       <div class="sub" id="endSub"></div>
       <div class="list" id="endList"></div>
       <!-- FINDS FIRST. A sticker is the only thing in a run a child keeps, so
@@ -2279,7 +2399,6 @@
       <div id="endFinds"></div>
       <!-- the run's own numbers, and the next thing to chase. The screen used
            to state an outcome and offer a button; it never stated a goal. -->
-      <div id="endStats"></div>
       <!-- VOID DROPS — the daily reveal ritual (LADDER action #4). Supercell's
            GDC record: a capped, earned, tap-to-reveal reward on the screen you
            cannot miss is what fixed their retention. De-gambled for 4+: three
@@ -2301,6 +2420,14 @@
            talks about was behind the furniture. Measured at 430x932: it moves
            from under the sticky row to roughly 300px clear of it. -->
       <div id="endNext"></div>
+      <!-- FOR THE GROWN-UP, ON A TAP, AND LAST. The four stat tiles are real
+           and dad reads them; they are not what a six-year-old needs in the
+           second after a result. LOOKED AT (qa/_endshot.mjs) they sat between
+           the reward and the next dot, interrupting the one line of thought the
+           card exists to carry: did I do it, where am I, what did I get, what
+           is next. The least important thing takes the lowest slot. -->
+      <button id="endMore">MY NUMBERS ▾</button>
+      <div id="endStats"></div>
       <div id="endQuests"></div>
       <!-- THE WAY BACK IN NEVER SCROLLS AWAY. These were direct children of a
            scrolling #end, so every row added above them pushed them down — and
