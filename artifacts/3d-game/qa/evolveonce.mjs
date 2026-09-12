@@ -35,6 +35,7 @@
 // is still 0 when the bite lands and the re-fire is legitimate rather than
 // the bug.
 import { chromium } from 'playwright';
+import { openPicker } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4177';
 const WORLD = process.argv[3] || 'maple';
@@ -51,7 +52,7 @@ await p.addInitScript(() => { try {
 await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.waitForSelector('#btnPlay', { state: 'visible', timeout: 400000 });
-await p.evaluate(() => document.getElementById('btnPlay').click());
+await openPicker(p);
 await p.waitForSelector(`#worldRow .wCard[data-world="${WORLD}"]`, { state: 'visible', timeout: 400000 });
 await p.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`).click(), WORLD);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });

@@ -42,6 +42,7 @@
 //    background changing at all, and every number below would be fiction.
 import { chromium } from 'playwright';
 import { ALL_WORLDS } from './worlds.mjs';
+import { openPicker } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4177';
 const WORLDS = process.argv.slice(3).length ? process.argv.slice(3)
@@ -79,7 +80,7 @@ for (const wid of WORLDS) {
   // full timeout. The graded pass therefore goes straight to the match.
   if (!R) {
     await p.waitForSelector('#btnPlay', { state: 'visible', timeout: 400000 });
-    await p.evaluate(() => document.getElementById('btnPlay').click());
+    await openPicker(p);
     await p.waitForSelector(`#worldRow .wCard[data-world="${wid}"]`, { state: 'visible', timeout: 400000 });
     await p.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`).click(), wid);
   }

@@ -84,6 +84,7 @@ import { chromium } from 'playwright';
 // parses island.ts's WorldId union) — a probe with its own copy of the world
 // list is how the gate once went green on a world nobody had opened.
 import { ALL_WORLDS, UNLOCK_ALL } from './worlds.mjs';
+import { enterMatch } from './_enter.mjs';
 
 const WORLDS = ALL_WORLDS;
 const flag = (name, dflt) => {
@@ -361,9 +362,12 @@ for (const world of worlds) {
       await pm.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
         if (['daily', 'gift'].includes(e.id)) e.classList.remove('show');
       }));
-      await pm.evaluate(() => document.getElementById('btnPlay')?.click());
-      await pm.waitForSelector(`#worldRow .wCard[data-world="${world}"]`, { state: 'visible', timeout: 400000 }).catch(() => { });
-      await pm.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`)?.click(), world);
+      // PLAY plays (day 7). The old three lines opened a picker that no longer
+      // opens and then clicked a card inside it — the waitForSelector had a
+      // .catch, so this failed SILENTLY: no match, and a "match frame" sample
+      // that was really another menu frame. Exactly the confound this file
+      // exists to avoid.
+      await enterMatch(pm, world);
       // THE INTRO IS A GAME-CLOCK EVENT, NOT A WALL ONE. dt is clamped at
       // 0.05/frame and the sandbox renders about a frame a second, so a 2.2 s
       // establishing shot is a couple of minutes of wall time. Wait on the

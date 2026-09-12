@@ -28,6 +28,7 @@
 // all-unlocked view every other probe seeds.
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { openPicker } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4177';
 
@@ -61,7 +62,7 @@ await p.addInitScript(() => { try {
 await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 300000 });
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.waitForSelector('#btnPlay', { state: 'visible', timeout: 400000 });
-await p.evaluate(() => document.getElementById('btnPlay').click());
+await openPicker(p);
 await p.waitForSelector('#worldRow .wCard[data-world="maple"]', { state: 'visible', timeout: 400000 });
 await p.waitForTimeout(2200);
 

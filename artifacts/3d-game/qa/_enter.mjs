@@ -42,6 +42,28 @@ const clearOverlays = async (p) => {
   })).catch(() => { });
 };
 
+/** OPEN THE PICKER, for the probes whose subject IS the picker.
+ *
+ *  A second ritual existed alongside the two-click one and broke the same way:
+ *
+ *      await p.click('#btnPlay');
+ *      await p.waitForSelector('#worldRow .wCard[data-world="maple"]', ...);
+ *
+ *  — no card click at all, because these probes only ever wanted the screen.
+ *  PLAY no longer opens it, so they waited four hundred seconds for something
+ *  that was never coming; pickerfit's gate step timed out at 300s against a
+ *  27s baseline. Twenty-two files, two of them gate steps.
+ *
+ *  Opened directly rather than through any button: what these probes measure is
+ *  the picker's own layout and contrast, and routing that through whichever
+ *  control happens to open it this month is how they broke in the first place. */
+export async function openPicker(p) {
+  await clearOverlays(p);
+  await p.evaluate(() => document.getElementById('worlds')?.classList.add('show'));
+  await p.waitForSelector('#worldRow .wCard[data-world="maple"]',
+    { state: 'visible', timeout: 400000 });
+}
+
 /**
  * Start a match from the menu.
  *

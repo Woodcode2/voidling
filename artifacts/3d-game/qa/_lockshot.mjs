@@ -2,6 +2,7 @@
 // one Maple match (session 1 auto-plays, prototype3d.ts:5561), so Pirate is
 // open and Game Day / Lantern / Powder are locked (unlocks.ts:83).
 import { chromium } from 'playwright';
+import { openPicker } from './_enter.mjs';
 const PORT = process.argv[2] || '4188';
 const OUT  = process.argv[3];
 const UNLOCKED = process.argv[4] || 'maple,pirate';
@@ -19,7 +20,7 @@ await p.addInitScript(([u]) => { try {
 await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil:'domcontentloaded', timeout:300000 });
 await p.waitForFunction(() => !!window.__voidState, null, { timeout:400000 });
 await p.waitForSelector('#btnPlay', { state:'visible', timeout:400000 });
-await p.evaluate(() => document.getElementById('btnPlay').click());
+await openPicker(p);
 await p.waitForSelector('#worldRow .wCard[data-world="maple"]', { state:'visible', timeout:400000 });
 await p.waitForTimeout(2500);
 await p.screenshot({ path: OUT, fullPage: false });

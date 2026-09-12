@@ -1090,11 +1090,29 @@ function leaveMenu(): void {
   if (!menuMode) return;
   menuMode = false;
   stageCam = null;
-  // HIS PLAY SIZE BACK. The menu scales him to the stage so he reads as a
-  // character at eighty units; without this the match begins with a void the
-  // size of a house, eating the town on the first frame. MEASURED by
-  // qa/levels.mjs (k): PLAY started a match at r 3.22 against a start of 0.9.
+  // ── THE MENU PUTS EVERYTHING BACK ────────────────────────────────────────
+  // HIS PLAY SIZE. The menu scales him to the stage so he reads as a character
+  // at eighty units; without this the match begins with a void the size of a
+  // house, eating the town on the first frame. MEASURED by qa/levels.mjs (k):
+  // PLAY started a match at r 3.22 against a start of 0.9.
   voidling.setRadius(START_R);
+  // …AND HIS PLACE. This one is worse, and the gate is what found it.
+  // enterMenu parks him on the camera's stage, which is a corner of the island
+  // chosen for how it PHOTOGRAPHS. `voidState = island.spawn` lives in
+  // resetMatch(), not beginMatch() — and startFresh() only calls resetMatch
+  // when a match has already been played. So the FIRST match of every page,
+  // which is the one a child's whole first impression is made of, began
+  // wherever the menu's camera happened to be looking.
+  //
+  // The spawn is hand-authored per world and identical on every load by the
+  // owner's own standing rule — the opening is choreographed against it, the
+  // first bite is placed against it, and qa/opening.mjs measures the whole
+  // establishing shot from it. The menu borrowed the void; the menu gives him
+  // back.
+  voidState.x = island.spawn.x; voidState.z = island.spawn.z;
+  voidling.group.position.set(island.spawn.x, voidling.group.position.y, island.spawn.z);
+  velX = 0; velZ = 0;
+  wander.set(island.spawn.x, 0, island.spawn.z);
   document.body.classList.remove('diorama');
 }
 
@@ -7294,6 +7312,22 @@ function showGuide(text: string, dur = 5) {
 }
 let _revalQueue: number[] = [];
 function beginMatch(solo = false) {
+  // ── FIRST LINE, AND THE POSITION IS WHY ──────────────────────────────────
+  // leaveMenu() gives back everything the menu borrowed: the camera, the
+  // void's play radius, and his place on the authored spawn. All three have to
+  // be back BEFORE the rest of this function runs, and the first version of
+  // this call sat fifty lines down — after ensureFirstBite().
+  //
+  // ensureFirstBite centres the ring on voidState and sizes it on
+  // voidling.radius, and its own comment records this exact failure from the
+  // world-switch path: "the void sits wherever boot left it, while the ring was
+  // being built somewhere else entirely… maple 0.42 of the descent; the reload
+  // worlds 0.60-0.71." With the call misplaced, the ring was built around the
+  // MENU's camera stage from props up to r 3.55 — and then the void was moved
+  // to the spawn at r 0.9, nowhere near it, unable to eat most of it.
+  // MEASURED (qa/opening.mjs A9, twice): the first bite landed at 0.73 and 0.78
+  // of the descent against a bar of 0.30-0.60.
+  leaveMenu();
   clearRun();            // last match's finds are not this match's finds
   placeStickersOnce();   // hidden curios go in before the world is validated
   validateWorld();   // covers late async-registered GLB props on every start
@@ -7411,7 +7445,6 @@ function beginMatch(solo = false) {
   // early-tap and late-tap descents differing by 250-291 ms, on a bar that asks
   // for 100. The idle camera is parked, so it is snapped, not sprung — see the
   // lerp below, which now takes the authored position exactly while armed.
-  leaveMenu();   // whatever opened this match, the stage camera does not survive it
   arriveT = 0; arriveLanded = false;
   goalCardT = 0;
   // ── THE LESSON AND THE TARGET WERE TALKING AT ONCE ────────────────────────

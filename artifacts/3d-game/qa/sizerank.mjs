@@ -3,6 +3,7 @@
 //   node refute_board.mjs <port> <shotdir>
 import { chromium } from 'playwright';
 import fs from 'fs';
+import { openPicker } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4177';
 const SHOTS = process.argv[3] || '.';
@@ -30,7 +31,7 @@ await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => { if ([
 const boardInDom = await p.evaluate(() => ({ board: !!document.getElementById('board'), timer: !!document.getElementById('timer') }));
 console.log('dom:', JSON.stringify(boardInDom));
 await p.waitForSelector('#btnPlay', { state: 'visible' });
-await p.evaluate(() => document.getElementById('btnPlay').click());
+await openPicker(p);
 await p.waitForSelector('#worldRow .wCard[data-world="maple"]', { state: 'visible' });
 await p.evaluate(() => document.querySelector('#worldRow .wCard[data-world="maple"]').click());
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 600000 });

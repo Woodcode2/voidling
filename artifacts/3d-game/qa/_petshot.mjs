@@ -2,6 +2,7 @@
 // camera. Rexling's snout and Drako's muzzle were seated on the belly.
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
+import { openPicker } from './_enter.mjs';
 const PORT = process.argv[2] || '4177';
 const TAG = process.argv[3] || 'now';
 const OUT = `qa/out/pets/${TAG}`;
@@ -18,7 +19,7 @@ await p.addInitScript(()=>{ try{
 await p.goto(`http://127.0.0.1:${PORT}/?w=maple`,{waitUntil:'domcontentloaded',timeout:300000});
 await p.waitForFunction(()=>!!window.__voidState,null,{timeout:400000});
 await p.waitForSelector('#btnPlay',{state:'visible',timeout:400000});
-await p.evaluate(()=>document.getElementById('btnPlay').click());
+await openPicker(p);
 await p.waitForSelector('#worldRow .wCard[data-world="maple"]',{state:'visible',timeout:400000});
 await p.evaluate(()=>document.querySelector('#worldRow .wCard[data-world="maple"]').click());
 await p.waitForFunction(()=>(window.__matchState?.().t??0)>0.2,null,{timeout:400000});

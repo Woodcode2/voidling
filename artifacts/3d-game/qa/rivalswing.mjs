@@ -173,6 +173,7 @@
 // kid-mercy rails, not fails-before claims.
 import { chromium } from 'playwright';
 import { readFileSync } from 'fs';
+import { openPicker } from './_enter.mjs';
 
 const WORLD = process.argv[2] || 'maple';
 const PORT = process.argv[3] || '4177';
@@ -220,7 +221,7 @@ await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show');
 }));
 await p.waitForSelector('#btnPlay', { state: 'visible', timeout: 400000 });
-await p.evaluate(() => document.getElementById('btnPlay')?.click());
+await openPicker(p);
 await p.waitForSelector(`#worldRow .wCard[data-world="${WORLD}"]`, { state: 'visible', timeout: 400000 });
 await p.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`)?.click(), WORLD);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });

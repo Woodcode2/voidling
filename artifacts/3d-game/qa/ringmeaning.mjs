@@ -83,6 +83,7 @@
 // SCREENSHOTS THE CANVAS and never renders anything itself.
 import { readFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
+import { openPicker } from './_enter.mjs';
 
 const ARGS = process.argv.slice(2);
 const AUTHORED_ONLY = ARGS.includes('--authored');
@@ -317,7 +318,7 @@ if (AUTHORED_ONLY) {
   await p.goto(`http://127.0.0.1:${PORT}/?w=maple`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.waitForSelector('#btnPlay', { state: 'visible', timeout: 400000 });
-  await p.evaluate(() => document.getElementById('btnPlay').click());
+  await openPicker(p);
   await p.waitForSelector('#worldRow .wCard[data-world="maple"]', { state: 'visible', timeout: 400000 });
   await p.evaluate(() => document.querySelector('#worldRow .wCard[data-world="maple"]').click());
   // MATCH seconds, not wall seconds: under swiftshader the clock runs 14-40x

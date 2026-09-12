@@ -27,6 +27,7 @@
 // clock runs ~14x slower under the software renderer — qa/_clockrate.mjs).
 import { chromium } from 'playwright';
 import { readFileSync } from 'fs';
+import { openPicker } from './_enter.mjs';
 
 // ── READ THE THRESHOLD OFF THE SOURCE, DO NOT CARRY A COPY ────────────────
 // This probe's decomposition hard-coded 0.85 while the shipped gate moved to
@@ -79,7 +80,7 @@ for (const wid of WORLDS) {
   await p.goto(`http://127.0.0.1:${PORT}/?w=${wid}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.waitForSelector('#btnPlay', { state: 'visible', timeout: 400000 });
-  await p.evaluate(() => document.getElementById('btnPlay').click());
+  await openPicker(p);
   await p.waitForSelector(`#worldRow .wCard[data-world="${wid}"]`, { state: 'visible', timeout: 400000 });
   await p.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`).click(), wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 400000 });

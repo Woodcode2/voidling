@@ -46,6 +46,7 @@
 import { chromium } from 'playwright';
 import { ALL_WORLDS, initScript } from './worlds.mjs';
 import { DRIVE_NEAREST } from './_drive.mjs';
+import { openPicker } from './_enter.mjs';
 
 const pos = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const WORLD = pos[0] || 'maple';
@@ -85,7 +86,7 @@ const leaveBy = async (exit) => {
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show');
   }));
-  await p.evaluate(() => document.getElementById('btnPlay')?.click());
+  await openPicker(p);
   await p.waitForSelector(`#worldRow .wCard[data-world="${WORLD}"]`, { state: 'visible', timeout: 400000 });
   await p.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`)?.click(), WORLD);
   await p.waitForFunction(() => (window.__matchState?.().armed ?? false) === true, null, { timeout: 400000 });

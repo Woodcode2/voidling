@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import { openPicker } from './_enter.mjs';
 const PORT = process.argv[2] || '4177';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox','--use-gl=angle','--use-angle=swiftshader'] });
@@ -12,7 +13,7 @@ await p.addInitScript(()=>{ try{
 await p.goto(`http://127.0.0.1:${PORT}/?w=maple`,{waitUntil:'domcontentloaded',timeout:300000});
 await p.waitForFunction(()=>!!window.__voidState,null,{timeout:400000});
 await p.waitForSelector('#btnPlay',{state:'visible',timeout:400000});
-await p.evaluate(()=>document.getElementById('btnPlay').click());
+await openPicker(p);
 await p.waitForSelector('#worldRow .wCard[data-world="maple"]',{state:'visible',timeout:400000});
 await p.evaluate(()=>document.querySelector('#worldRow .wCard[data-world="maple"]').click());
 await p.waitForFunction(()=>(window.__matchState?.().t??0)>0.2,null,{timeout:400000});

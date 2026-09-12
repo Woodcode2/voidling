@@ -28,6 +28,7 @@
 // the call list — if a site moves, the slice moves with it.
 import { chromium } from 'playwright';
 import { readFileSync } from 'fs';
+import { openPicker } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4177';
 const WORLD = process.argv[3] || 'maple';
@@ -64,7 +65,7 @@ await p.addInitScript(() => { try {
 await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.waitForSelector('#btnPlay', { state: 'visible', timeout: 400000 });
-await p.evaluate(() => document.getElementById('btnPlay').click());
+await openPicker(p);
 await p.waitForSelector(`#worldRow .wCard[data-world="${WORLD}"]`, { state: 'visible', timeout: 400000 });
 await p.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`).click(), WORLD);
 await p.waitForFunction((t) => (window.__matchState?.().t ?? 0) > t, START, { timeout: 400000 });

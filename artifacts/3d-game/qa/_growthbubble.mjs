@@ -8,6 +8,7 @@
 // MATCH clock (the software renderer runs it ~14x slow — qa/_clockrate.mjs).
 // Nothing here is transcribed from source; if #growth is missing it throws.
 import { chromium } from 'playwright';
+import { openPicker } from './_enter.mjs';
 const PORT = process.argv[2] || '4177';
 const WORLDS = process.argv.slice(3).length ? process.argv.slice(3) : ['maple', 'gameday'];
 const START_AT = 8, SPAN = 14, SAMPLE_MS = 150;
@@ -26,7 +27,7 @@ for (const wid of WORLDS) {
   await p.goto(`http://127.0.0.1:${PORT}/?w=${wid}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.waitForSelector('#btnPlay', { state: 'visible', timeout: 400000 });
-  await p.evaluate(() => document.getElementById('btnPlay').click());
+  await openPicker(p);
   await p.waitForSelector(`#worldRow .wCard[data-world="${wid}"]`, { state: 'visible', timeout: 400000 });
   await p.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`).click(), wid);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
