@@ -25,6 +25,20 @@
 // day's amount and that `voidDailyLast` rolled — so "we removed the card" can
 // never quietly mean "we removed the reward".
 //
+// AND THE FIRST VERSION OF BAR 3b PASSED FOR THE WRONG REASON, recorded here
+// rather than quietly fixed. It asserted `wallet grew by >= 90`, 90 being what a
+// day-1 claim pays — and a finished match pays its own coins. MEASURED on the
+// shipped build, where the calendar was never claimed at all: wallet 500 -> 909,
+// "+409", green. Every one of those 409 was match money — COMBO KING, trophies,
+// levels — and the calendar had paid nothing, which bar 3a said in the very next
+// line. A bar that goes green on a build where the thing it guards did not
+// happen is not a bar.
+//
+// It now asks the game what today OWES before the match (`__dailyDue()`, the
+// same arithmetic the calendar page renders from) and holds the wallet against
+// THAT number, names it in the output, and checks the end card said so. On a
+// build with no such hook it fails by absence, which is the point.
+//
 // NO NAVIGATION, EITHER. `window.__marker` is set before the click and read
 // after: PLAY launches the built world in place (§1.2), and a reload would lose
 // the diorama, the ladder's last picture and about four seconds of a child's
@@ -164,6 +178,10 @@ if (want(3)) {
   // ?len=8 sets DEBUG_HARNESS, which sets AUTO_START — the match starts itself,
   // so this measures the finish rather than the tap (bars 1 and 2 own the tap).
   const p = await open(ctx, { last: YESTERDAY, q: '&len=8&g=1', coins: '500' });
+  // WHAT TODAY OWES, asked BEFORE the match so the answer cannot be coloured by
+  // it. Null on a build that has no such hook — which is itself the finding.
+  const owed = await p.evaluate(() => (typeof window.__dailyDue === 'function'
+    ? window.__dailyDue() : null)).catch(() => null);
   const ran = await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.5,
     null, { timeout: 300000 }).then(() => true).catch((e) => String(e.message || e));
   if (ran !== true) {
@@ -185,12 +203,24 @@ if (want(3)) {
         dailyShown: !!document.getElementById('daily')?.classList.contains('show'),
         endSub: (document.getElementById('endSub')?.textContent || '').trim(),
       }));
-      // DAILY[0] is 90 at week 1; any honest claim is at least that
       const grew = w.coins - 500;
       if (w.last === TODAY) ok(`#3a the day rolled without a modal: voidDailyLast is today, life=${w.life}`);
       else no(`#3a the day never rolled — voidDailyLast is still "${w.last}", so tomorrow she is asked again`);
-      if (grew >= 90) ok(`#3b and the coins were actually paid: 500 → ${w.coins} (+${grew}), "${w.endSub.slice(0, 60)}"`);
-      else no(`#3b the reward went missing with the card: wallet 500 → ${w.coins} (+${grew}), under the 90 a day-1 claim pays`);
+      // THE OWED AMOUNT, FROM THE GAME, BEFORE THE MATCH. See the header: the
+      // first version of this held the wallet against a flat 90 and went green
+      // on match money while the calendar paid nothing.
+      if (owed === null) {
+        no(`#3b __dailyDue() is missing — this build cannot say what today owes, `
+          + `so "the coins were paid" cannot be checked against anything but match earnings`);
+      } else if (grew >= owed.coins) {
+        ok(`#3b and the day's own coins were paid: owed ${owed.coins}✦ for day ${owed.day + 1}, `
+          + `wallet 500 → ${w.coins} (+${grew}, match money included)`);
+      } else {
+        no(`#3b the reward went missing with the card: today owed ${owed.coins}✦ and the wallet `
+          + `moved 500 → ${w.coins} (+${grew}) — less than the calendar alone should have paid`);
+      }
+      if (owed !== null && /DAY\s*\d/i.test(w.endSub)) ok(`#3d and the end card says so: "${w.endSub.slice(0, 70)}"`);
+      else if (owed !== null) no(`#3d the coins arrived with nothing naming them — #endSub reads "${w.endSub.slice(0, 70)}"`);
       if (!w.dailyShown) ok(`#3c and #daily never took the screen`);
       else no(`#3c #daily still took the screen`);
     }

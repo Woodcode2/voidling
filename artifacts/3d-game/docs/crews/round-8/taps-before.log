@@ -1,0 +1,11 @@
+  ok   #1 one tap plays, with voidDailyLast today: armed, menu gone, no overlay, no navigation  [33s]
+  BAD  #2 it is NOT one tap with voidDailyLast a day stale — PLAY could not be clicked AT ALL (page.click: Timeout 60000ms exceeded.); #daily was covering it  [117s]
+  BAD  #3a the day never rolled — voidDailyLast is still "Fri Sep 11 2026", so tomorrow she is asked again  [336s]
+  ok   #3b and the coins were actually paid: 500 → 909 (+409), "🏆 COMBO KING EARNED!+349✦ · +2💎 · +50 XP"  [336s]
+  ok   #3c and #daily never took the screen  [336s]
+
+  · #2 it is NOT one tap with voidDailyLast a day stale — PLAY could not be clicked AT ALL (page.click: Timeout 60000ms exceeded.); #daily was covering it
+  · #3a the day never rolled — voidDailyLast is still "Fri Sep 11 2026", so tomorrow she is asked again
+
+FAIL — 2 of 5 bar(s) [338s]
+EXIT=1
