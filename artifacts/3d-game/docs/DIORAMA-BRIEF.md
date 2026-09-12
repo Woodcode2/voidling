@@ -1,6 +1,11 @@
 # THE MENU AS A FLOATING DIORAMA — findings, numbers and open questions
 
-**Status: UNREFUTED.** The adversarial pass that was supposed to attack this
+**Status: REFUTED AND SALVAGED (2026-09-12, 21:30).** The three adversarial
+agents ran. **The picture survives; the mechanism does not.** Four of the things
+this brief asserted are wrong, two of them numbers I reported to the owner as
+fact. They are corrected in §11, which is the first section to read.
+
+**Previous status line, kept because it was true when written: UNREFUTED.** The adversarial pass that was supposed to attack this
 design never ran — all three refuters died on a session limit. Everything below
 is a design plus measurements taken by the agent that produced it. Nothing here
 has been attacked, and today alone this stream shipped four things that looked
@@ -212,3 +217,104 @@ exist, does the frame geometry actually produce the described picture, and what
 does it really cost. The script is
 `workflows/scripts/menu-diorama-wf_b167e9f0-1a7.js` and it resumes from cache —
 only the three refuters would re-run.
+
+---
+
+## 11 · WHAT THE REFUTATION KILLED — read this first
+
+### 11.1 The void cannot be placed the way §6 places him
+
+`void3d.ts:2046` — `group.position.set(s.x, lift + arriveLift, s.z)` — runs inside
+`voidling.update()`, called every frame from `prototype3d.ts:12082` with
+`{ x: voidState.x, z: voidState.z }`. **Any write to `voidling.group.position` is
+overwritten within one frame.** Found independently twice: by the refuter reading
+the code, and by me watching five probe runs photograph a void floating beside
+the block and misreading it as "he is too big".
+
+**Salvage:** move him through the STAGE POINT, not the group. `enterMenu` already
+writes `voidState.x = st.x; voidState.z = st.z` at `prototype3d.ts:1130-1131`.
+Make the authored block centre plus the front-right offset BE the stage point.
+
+### 11.2 Making him bigger fires an EVOLUTION on the menu — and my kill test hit it
+
+`FORM_MIN = [0, 1.6, 2.5, 3.6, 5.5, 8.0, 13.5]` (`prototype3d.ts:4757`),
+`VISUAL_STAGE = [0, 1, 2, 3, 3, 4, 4]` (`:4761`), `stageFor` at `:4762`.
+
+- Today's menu: `menuVoidR` caps at 3.8 → bucket 3 → **visual stage 3**.
+- §6's proposed `half*0.17` at half 48 = 8.16 ≥ `FORM_MIN[5]` = 8.0 → **stage 4**.
+- **My own kill test used r = 12** → bucket 5 → **visual stage 4.**
+
+So `docs/crews/round-8/diorama-void-r12.png` is a picture of a **different form of
+the creature** from the one the menu shows. The frame is real and he does read at
+67 px — but the question "does the MENU void read on a diorama" is **not** the
+question that shot answers. Reported to the owner as settled; it is not.
+
+**Salvage:** cap his menu radius below `FORM_MIN[4] = 5.5`. `half*0.11` on a
+48-half block is **5.28** — still 2.8x today's on-screen size and it keeps
+`stageFor` in bucket 3. **And that reopens the kill test**, because the sweep
+measured r=5 at 20.8 px and r=8 at 34.7 px, and by looking, 34.7 px is "a blob,
+no face". Keeping his form means keeping him small. That tension is unresolved
+and it is now the single open question.
+
+### 11.3 The frame arithmetic is wrong by sqrt(2)
+
+At azimuth 225 the square plinth is **corner-on**, so the frame must hold its
+DIAGONAL — 96 * 1.414 = **135.8 units**, not 96 — against a 113.8-unit frame.
+Measured off our own published PNG with pngjs: the widest diorama row spans
+**810 of 860 px, 94.2% of the frame width**. It does not fit; it nearly
+overflows. The "84% with air on both sides" in §4 is wrong.
+
+### 11.4 The cost table was in a unit that excludes 54% of the frame
+
+The probe priced the menu as one direct `renderer.render()`. That call contains
+**no shadow pass** (`shadowMap.autoUpdate = false`, `prototype3d.ts:150`) and no
+composer. Re-measured in the day-9 unit (composer/2 + shadow/4, validated against
+the live frame to within 4%):
+
+| | design claimed | actually |
+|---|---|---|
+| Maple, block + cast list | 1.17x | **165 calls — 0.72x the match, 0.59x today's menu** |
+| Lantern | 1.13x | **~168 calls — 0.26x the match** |
+
+**It undersold itself by roughly 2x.** I reported "256 calls vs 219 baseline" to
+the owner; both figures are in the wrong unit.
+
+Two consequences the design did not know about:
+- **The shadow box.** `fitShadow` (`prototype3d.ts:1545-1565`) is 63.8 units on
+  Maple today and 96.8 on Lantern; the pull-back opens it to the 220 cap — a
+  **6.7x shadow pass**. It must be pinned in the same statement as the pull-back,
+  not at step 5.
+- **A geometry upload leak.** MEASURED via `renderer.info.memory.geometries`: one
+  uncalled pulled-back frame takes Maple 734 → **4,580** (+3,846) and Lantern
+  1,727 → **6,358**, and applying the cast list afterwards **does not give them
+  back**. So the cull must happen BEFORE the first pulled-back frame ever renders.
+
+### 11.5 `scene.fog = null` deletes the only place `camera.far` is set
+
+`prototype3d.ts:12366-12391`: the entire fog law **and** the
+`const wantFar = … ; if (camera.far !== wantFar)` write live inside
+`if (scene.fog) { … }`. Null the fog for a flat card and `camera.far` is never
+assigned in the `stageCam` branch at all.
+
+### 11.6 The camera that took the shots is not the camera the game has
+
+The probe sets `C.position.set(CX + sin*dist, dist*0.60, CZ + cos*dist)` — but in
+the shipped branch (`prototype3d.ts:12362`) `dist` is the **slant range**, not the
+horizontal one. The same numbers through the shipped code give a **38.2 degree**
+elevation, not 31 — outside the reference's 30-35 band and 18% different in
+frame. **Author the camera as (elevation, fill) and derive dist and h**, rather
+than as (dist, h-fraction).
+
+### 11.7 What survives, verbatim from the refutation
+
+> KEEP THE BLOCK. The reference is a block, the shot in `qa/out/plinth2-maple.png`
+> genuinely reads as the reference done better, and the plinth's shared-bake UV
+> trick is verified exact to six figures. Nothing in this refutation touches the
+> core idea, only four of its mechanisms.
+
+Also surviving: the one-time AABB cast list (**but as an `Object3D.layers` bit
+assigned at build time during `breathe()`, not `visible = false` over 14,456
+meshes — that is what fixes the geometry leak**), the flat `Color` card, an
+absolute far plane, the `crowdGate` clamp, and `fadeOccluders` suspended under
+`menuMode`.
+
