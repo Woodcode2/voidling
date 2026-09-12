@@ -50,16 +50,42 @@ const fails = [];
     localStorage.setItem('voidStreakDay', threeDaysAgo);
   } catch { /* private */ } });
   await p.goto(`http://127.0.0.1:${PORT}/?w=maple`, { waitUntil: 'domcontentloaded', timeout: 300000 });
-  await p.waitForSelector('#daily.show', { timeout: 400000 });
-  const claim = await p.evaluate(() => ({
-    btn: document.getElementById('dailyClaim')?.textContent ?? '',
-    today: document.querySelector('#dailyGrid .dCell.now b')?.textContent ?? '',
-  }));
-  const amt = Number((claim.btn.match(/(\d+)/) ?? [])[1] ?? 0);
-  const dayNo = Number((claim.today.match(/(\d+)/) ?? [])[1] ?? 0);
-  console.log(`  missed-2-days, week 4: claim=${amt}✦ (old cliff paid 90)  cell="${claim.today}"`);
+  // THE ARITHMETIC, ASKED DIRECTLY. This used to wait for `#daily.show` and read
+  // the amount off the CLAIM button's text — which worked only while the card
+  // rose full-screen on its own, over PLAY, on a child's second morning. It no
+  // longer does (the day is claimed silently on the first finish; the card lives
+  // in the scrapbook), so that wait sat for its full 400 s and then threw, and
+  // the gate step this probe IS went red.
+  //
+  // Reading __dailyDue() is the better test anyway: what this section is about
+  // is the money a returning player is owed, and that was being inferred from a
+  // rendering of a button. Now it asks the function the claim itself uses, and
+  // then checks the card still AGREES with it — which is one more thing covered,
+  // not one fewer.
+  await p.waitForFunction(() => typeof window.__dailyDue === 'function', null, { timeout: 400000 });
+  const due = await p.evaluate(() => window.__dailyDue());
+  if (!due) {
+    fails.push('nothing owing on a profile three days stale — the calendar is not counting at all');
+  }
+  const amt = due ? due.coins : 0;
+  const dayNo = due ? due.life + 1 : 0;
+  // …and the CARD still renders what the arithmetic says. #btnDaily lives inside
+  // #book; click() fires its handler whether or not the book is open.
+  const card = await p.evaluate(() => {
+    document.getElementById('btnDaily')?.click();
+    return {
+      shown: !!document.getElementById('daily')?.classList.contains('show'),
+      today: document.querySelector('#dailyGrid .dCell.now b')?.textContent ?? '',
+      btn: document.getElementById('dailyClaim')?.textContent ?? '',
+    };
+  });
+  const cardDay = Number((card.today.match(/(\d+)/) ?? [])[1] ?? 0);
+  console.log(`  missed-2-days, week 4: owed=${amt}✦ (old cliff paid 90)  day=${dayNo}  `
+    + `card="${card.today}" btn="${card.btn}" shown=${card.shown}`);
   if (amt < 140) fails.push(`cliff not dead — returning claim is ${amt}✦, the week ladder reset`);
-  if (dayNo < 28) fails.push(`day number went backwards — cell says ${dayNo}, lifetime is 27 claims`);
+  if (dayNo < 28) fails.push(`day number went backwards — arithmetic says ${dayNo}, lifetime is 27 claims`);
+  if (!card.shown) fails.push('the calendar cannot be opened from the scrapbook — it is now unreachable');
+  if (cardDay !== dayNo) fails.push(`the card and the arithmetic disagree — card says day ${cardDay}, owed says ${dayNo}`);
   await p.close();
 }
 
