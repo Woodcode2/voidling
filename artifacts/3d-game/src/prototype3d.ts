@@ -817,12 +817,286 @@ const PLAY_DIST = 29;
  *  distance to the LOD band, the shadow box and the crowd gate that the real
  *  menu will hand them — otherwise the number would be the stage's angle with
  *  the spawn frame's culling, which is a fourth thing nobody is shipping.
- *  Nothing reads it unless __menuCam has been called; the shipped path is
- *  bit-identical while it is null. It is replaced by the real menuMode branch
- *  when that lands, and this block goes with it. */
-type QaCam = { x: number; z: number; az: number; dist: number; h: number;
+ *
+ *  DAY 8: THIS IS THAT LANDING. The block above used to end "it is replaced by
+ *  the real menuMode branch when that lands, and this block goes with it". The
+ *  branch has landed and the block did NOT go — because the mechanism was
+ *  right all along and only its owner was temporary. enterMenu() writes this
+ *  same parked camera now; __menuCam still writes it for the measuring rig.
+ *  One camera path, two callers, no second implementation to drift. Renamed
+ *  from qaCam to stageCam for the same reason. */
+type StageCam = { x: number; z: number; az: number; dist: number; h: number;
   lookX: number; lookZ: number; lookY: number };
-let qaCam: QaCam | null = null;
+let stageCam: StageCam | null = null;
+
+// ── THE MENU IS THE WORLD SHE IS ON ────────────────────────────────────────
+// The owner's ask: "I want the background menu picture to sort of match the
+// level we're at right. Would be cool for it to be animation of high level. So
+// like maple we see maple. Once we're at pirate bay that level etc."
+//
+// So the menu stops being a painting of a generic floating island and becomes a
+// WINDOW onto the world she is actually playing — the same island, the same
+// town, the same weather, alive, with the void sitting in the middle of it
+// waiting. Nothing is loaded for it: the world is already built, because it is
+// the world the next match runs in. The menu is a camera, not an asset.
+//
+// WHY A PARKED CAMERA AND NOT THE PLAY CAMERA. The play camera is a follow
+// spring at a distance driven by the void's radius; pointed at a stationary
+// void it renders the same flat overhead plate the match opens on, which is a
+// picture of gameplay rather than a place. A parked low camera at 32° fov,
+// looking slightly up at a town, is a DIORAMA — and a diorama is what makes a
+// child want to be in it.
+//
+// WHY IT DRIFTS AND DOES NOT ORBIT. A full orbit is a screensaver: it says
+// "nothing is happening, look at the scenery". A slow pendulum a few degrees
+// wide says "this place is alive and it is waiting for you", and it costs
+// almost nothing — the frustum barely changes, so the draw call count barely
+// changes with it. Measured on day 1 and it is why the amplitude is small:
+// azimuth alone swings the frame bill 2.7x on Pirate and 11.5x on Lantern at
+// rung 3, so a WIDE sweep would make the menu's cost a function of the clock.
+interface MenuStage {
+  /** where the void sits, and what the camera looks at */
+  x: number; z: number;
+  /** the centre azimuth in degrees, and how far either side it drifts */
+  az: number; amp: number;
+  /** seconds for one there-and-back */
+  period: number;
+  /** camera distance and height; lookY lifts the aim off the floor */
+  dist: number; h: number; lookY: number;
+  /** how many bodies stand between the camera and the shot at this azimuth */
+  blocked: number;
+}
+
+// ── THE STAGE IS DERIVED, NOT TYPED ───────────────────────────────────────
+// The first version of this was a hand-written table of six coordinates and it
+// put Pirate Bay's camera behind a building — a dark slab across half the
+// screen with the town nowhere in it. The coordinates were invented; the island
+// was never asked.
+//
+// It knows. Every world already carries the points the GAME frames itself with:
+// COPY.hero is what the establishing shot flies to, island.spawn is where the
+// void lands, and the props are right there to be counted. MEASURED with
+// qa/_stages.mjs — every hero point has exactly ONE large thing standing on it
+// (r 10, 11, 11, 10.5, and Skylark's tethered whale at 18), which is the
+// landmark itself. That is the SUBJECT of the shot, and the first table stood
+// close enough to be looking at the back of it.
+//
+// So the stage is computed from the world, once, when the menu opens:
+//   AIM    the hero point, or the spawn on a world with no authored hero
+//          (Maple: its "hero" is the town itself, and the spawn is in it)
+//   SUBJECT the biggest prop standing at the aim point
+//   DIST   proportional to the subject, so an 11-unit clock tower and a 4-unit
+//          barn both fill about the same share of the frame
+//   AZIMUTH the side with the most town BEHIND the subject and nothing large
+//          parked on the lens — a diorama wants depth behind its subject, and
+//          the one thing that ruins it is geometry between camera and stage
+//
+// It cannot be wrong about a world it has never seen, which also means world
+// seven gets a stage for free. Day 9 re-scores the azimuth against day 1's
+// cost series (§2.9.2) — the choice is a performance decision too, and this
+// one is made on framing alone.
+const STAGE_SAMPLES = 24;   // azimuths tried, 15° apart
+
+function deriveStage(): MenuStage {
+  const aim = COPY.hero ? { x: COPY.hero[0], z: COPY.hero[1] }
+    : { x: island.spawn.x, z: island.spawn.z };
+  // one pass over the island; everything below works on this list
+  const pts: { x: number; z: number; r: number }[] = [];
+  let subjR = 0;
+  for (const e of edibles) {
+    if (e.eaten || !e.mesh.visible || e.mesh.userData.departed) continue;
+    const x = e.mesh.position.x, z = e.mesh.position.z, r = e.radius || 0;
+    pts.push({ x, z, r });
+    if (r > subjR && Math.hypot(x - aim.x, z - aim.z) <= 20) subjR = r;
+  }
+  // ── AND THE THINGS THAT ARE NOT FOOD ────────────────────────────────────
+  // `edibles` is what the void can EAT. The first version of the lens test used
+  // only that list, and Maple's menu came back with an autumn tree filling the
+  // middle of the frame — because a tree is scenery, not a meal, and was
+  // invisible to the check. Anything with a body can stand between the camera
+  // and the shot, so the blocker list is taken from the SCENE, with each
+  // object's real world-space size rather than its prop radius.
+  const blockers: { x: number; z: number; r: number; top: number }[] = [];
+  {
+    const bb = new THREE.Box3(), sz = new THREE.Vector3(), ctr = new THREE.Vector3();
+    scene.traverse((o3) => {
+      const m = o3 as THREE.Mesh;
+      if (!m.isMesh || !m.visible || !m.geometry) return;
+      // the ground, the sea and the sky are not blockers; they are the picture
+      if (m.userData.noBlock) return;
+      // the void is the SUBJECT of this shot, never an obstruction in it, and
+      // he is a Group of meshes rather than one — so exclude by ancestry
+      for (let a: THREE.Object3D | null = m; a; a = a.parent) if (a === voidling.group) return;
+      bb.setFromObject(m);
+      if (!isFinite(bb.min.x)) return;
+      bb.getSize(sz); bb.getCenter(ctr);
+      const rr = Math.max(sz.x, sz.z) * 0.5;
+      // big enough to matter, small enough not to be terrain
+      if (rr < 3 || rr > 60) return;
+      blockers.push({ x: ctr.x, z: ctr.z, r: rr, top: bb.max.y });
+    });
+  }
+  /** How many bodies actually stand in the SIGHT LINE — which is a line in
+   *  three dimensions, not a line on a map.
+   *
+   *  The first version of this tested the ground plan only, and Game Day came
+   *  back blocked at every one of its twenty-four azimuths: the stadium is a
+   *  ring, so from anywhere on the outside there is a wall between the camera
+   *  and the pitch — on paper. In the air there is not, because the camera is
+   *  fifty-five units up and looking over it. A flat test cannot see the
+   *  difference between a wall in the way and a wall being flown over, and the
+   *  whole point of the shot is that it is high.
+   *
+   *  So: the sight line descends from the camera's height to the aim's, and a
+   *  blocker counts only where its TOP is above the line at the point it
+   *  crosses. The last third of the segment is skipped either way — a body
+   *  standing on the aim point is the subject. */
+  const blocksShot = (cx: number, cz: number, camY: number, aimY: number): number => {
+    const vx = aim.x - cx, vz = aim.z - cz;
+    const len2 = vx * vx + vz * vz || 1;
+    let hits = 0;
+    for (const q of blockers) {
+      let t = ((q.x - cx) * vx + (q.z - cz) * vz) / len2;
+      if (t < 0.04 || t > 0.72) continue;           // behind the lens, or at the subject
+      t = Math.max(0, Math.min(1, t));
+      const px = cx + vx * t, pz = cz + vz * t;
+      if (Math.hypot(q.x - px, q.z - pz) >= q.r + 1.5) continue;
+      // …and does it reach the line? 1.5 of slack, so a roof that grazes the
+      // sight line does not count as a wall across it.
+      if (q.top > camY + (aimY - camY) * t + 1.5) hits++;
+    }
+    return hits;
+  };
+  // 7.5x the subject frames a landmark with room around it; the floor keeps a
+  // world with no big thing at its aim point (Maple) from putting the lens in
+  // somebody's window, and the ceiling keeps Skylark's 18-unit whale from
+  // pushing the camera into the next county
+  // TOWN SCALE, NOT STREET SCALE. At a floor of 42 Maple's menu was a bench,
+  // two signs and somebody's hat — true to the world and not a picture OF it.
+  // The owner asked for "animation of high level", and the floor is what
+  // decides whether a small world reads as a place or as a close-up.
+  const dist = Math.min(92, Math.max(58, (subjR || 5) * 8));
+  // ── HIGH ENOUGH TO BE A DIORAMA ─────────────────────────────────────────
+  // The owner asked for "animation of high level", and he is describing the
+  // thing that makes a model village read as a model village: you are ABOVE it.
+  // At h = 0.40 x dist (a 22° elevation) Lantern Night filled the entire frame
+  // with a flat wall of market stalls — no sky, no horizon, no depth, a texture
+  // rather than a place. LOOKED AT, six worlds, qa/_dioshot.mjs.
+  //
+  // 0.62 is a 32° elevation: high enough that the ground plane opens out and
+  // the far side of the town is visible over the near side, low enough that
+  // buildings still have faces rather than roofs. The aim lifts with the
+  // subject so the horizon sits in the upper third instead of off the top.
+  const h = dist * 0.62;
+  const lookY = Math.max(3.2, subjR * 0.55);
+
+  let bestAz = 0, bestScore = -Infinity;
+  for (let i = 0; i < STAGE_SAMPLES; i++) {
+    const a = (i / STAGE_SAMPLES) * 360;
+    const rad = a * Math.PI / 180;
+    // where the camera would stand, and the wedge it would be looking THROUGH
+    const cx = aim.x + Math.sin(rad) * dist, cz = aim.z + Math.cos(rad) * dist;
+    const bx = aim.x - Math.sin(rad) * dist * 0.7, bz = aim.z - Math.cos(rad) * dist * 0.7;
+    let depth = 0;
+    for (const q of pts) {
+      // TOWN BEHIND THE SUBJECT: weighted by size, because a frame full of
+      // traffic cones is not a frame full of town
+      if (Math.hypot(q.x - bx, q.z - bz) < dist * 0.75) depth += 1 + Math.min(4, q.r);
+    }
+    // one thing across the shot is not a trade against scenery, it is the shot
+    // being wrong — so a blocked line costs more than any amount of density can
+    // buy back
+    const score = depth - blocksShot(cx, cz, h, lookY) * 400;
+    if (score > bestScore) { bestScore = score; bestAz = a; }
+  }
+  // …and it remembers whether the line it chose is actually clear, because
+  // "something is standing in front of the shot" is the failure this whole
+  // function exists to avoid and it has shipped twice: a hand-typed table put
+  // the camera behind a building, and an edibles-only lens test let a tree fill
+  // the frame. A number nobody can read is a number nobody can hold.
+  const radB = bestAz * Math.PI / 180;
+  const blocked = blocksShot(aim.x + Math.sin(radB) * dist, aim.z + Math.cos(radB) * dist, h, lookY);
+  return { x: aim.x, z: aim.z, az: bestAz, amp: 7, period: 28, dist, h, lookY, blocked };
+}
+
+/** How big the void reads ON THE MENU, which is not how big he is in a match.
+ *  In play he starts at 0.9 and the camera is 26 units away; on a stage 60-90
+ *  units back the same 0.9 is four pixels of purple — the STAR of the game,
+ *  rendered as a speck, on the screen whose job is to make a child want to
+ *  play. He is scaled to the stage instead, so he reads as a character at every
+ *  distance, and the match resets him (beginMatch -> START_R) so nothing about
+ *  play is touched. */
+function menuVoidR(dist: number): number {
+  // dist/13 made him the whole frame on Game Day — the star, but standing in
+  // front of the world instead of in it. dist/18 reads as a character sitting
+  // in a place, which is the thing being sold.
+  return Math.min(3.8, Math.max(1.8, dist / 18));
+}
+
+/** Computed once per world per session — the island does not move, and a scan
+ *  of three thousand props at twenty-four azimuths is not a thing to do on
+ *  every trip back to the menu. */
+let menuStage: MenuStage | null = null;
+
+/** True while the menu owns the screen. The freeze list, the camera branch and
+ *  the crowd all read it; nothing else may write it but enterMenu/leaveMenu. */
+let menuMode = false;
+/** The pendulum's own clock, in seconds. Reset on every entry so the drift
+ *  always starts from the authored centre — a menu that resumes mid-swing
+ *  reads as a camera that was left running, which it is, but it should not
+ *  look like it. */
+let menuT = 0;
+
+/** Put the camera on this world's stage and the void in front of it. Idempotent:
+ *  every path back to the menu calls it, and several of them call it twice. */
+function enterMenu(): void {
+  const st = (menuStage ??= deriveStage());
+  if (!menuMode) menuT = 0;
+  menuMode = true;
+  // THE AIM SITS IN FRONT OF HIM, not on him. A camera pointed straight at the
+  // void puts him at the exact centre of the frame — which is where the ladder
+  // panel is. Pulling the look point 22% back toward the camera lifts him into
+  // the clear band of the window, above the panel and below the name, which is
+  // the only part of this screen nothing else is using.
+  const rad0 = st.az * Math.PI / 180;
+  const lookX = st.x + Math.sin(rad0) * st.dist * 0.22;
+  const lookZ = st.z + Math.cos(rad0) * st.dist * 0.22;
+  stageCam = { x: st.x, z: st.z, az: st.az, dist: st.dist, h: st.h,
+    lookX, lookZ, lookY: st.lookY };
+  // THE VOID SITS IN THE SHOT. He is parked at the stage's own point, which is
+  // also what the crowd's near-set, the sun and the shadow box centre on — so
+  // parking him is not decoration, it is what makes the frame coherent. His
+  // idle (blink, breathe, the occasional look-around) is already running; the
+  // attract-mode wander is gated off while stageCam is set, so he stays put.
+  voidState.x = st.x; voidState.z = st.z;
+  voidling.group.position.set(st.x, voidling.group.position.y, st.z);
+  voidling.setRadius(menuVoidR(st.dist));
+  // …AND ON THE GROUND. arriveY is the opening's drop-in offset and it is
+  // wherever the last thing that touched it left it — LOOKED AT on Powder Pass,
+  // the void was hanging in mid-air in front of the lodge like a balloon.
+  voidling.arriveY(0);
+  velX = 0; velZ = 0;
+  wander.set(st.x, 0, st.z);
+  // …and the town behind him is a town, not an evacuation. calm(Infinity)
+  // suppresses panic contagion; without it the menu is a crowd running from a
+  // void that has stopped chasing them.
+  life.calm(Infinity);
+  document.body.classList.add('diorama');
+  paintMenuLadder();
+}
+
+/** Hand the camera back to the match. Called before a world is played. */
+function leaveMenu(): void {
+  if (!menuMode) return;
+  menuMode = false;
+  stageCam = null;
+  // HIS PLAY SIZE BACK. The menu scales him to the stage so he reads as a
+  // character at eighty units; without this the match begins with a void the
+  // size of a house, eating the town on the first frame. MEASURED by
+  // qa/levels.mjs (k): PLAY started a match at r 3.22 against a start of 0.9.
+  voidling.setRadius(START_R);
+  document.body.classList.remove('diorama');
+}
 
 /** THE STEERING CAP, in one place. `Math.min(96, 16 * (camDist / 50))` was
  *  written out at three call sites — the input block, the shore recovery and
@@ -2272,6 +2546,7 @@ const _dbg = new Proxy(_dbgStore, {
   __menuCam: (c: { x: number; z: number; az: number; dist?: number; h?: number;
     lookX?: number; lookZ?: number; lookY?: number } | null) => void;
   __heroPoint: () => { x: number; z: number } | null;
+  __menuState: () => Record<string, unknown>;
   __kindTally: () => Record<string, number>;
   __levels: () => unknown[];
   __levelSpec: () => unknown;
@@ -2599,34 +2874,66 @@ _dbg.__frameInfo = () => ({
   shadowSize: sun.shadow.mapSize.x,
   pr: renderer.getPixelRatio(),
   qLevel, qPinned, qShadowLatch,
-  dist: qaCam ? qaCam.dist : camDist,
-  menuCam: !!qaCam,
+  dist: stageCam ? stageCam.dist : camDist,
+  menuCam: !!stageCam,
 });
-// QA: park the camera at a candidate diorama stage (see qaCam). Angles in
+// QA: park the camera at a candidate diorama stage (see stageCam). Angles in
 // degrees, clockwise from +z; dist is from the stage point, h is eye height.
 // __menuCam(null) hands the camera back to the game.
 _dbg.__menuCam = (c) => {
-  qaCam = c ? {
+  stageCam = c ? {
     x: c.x, z: c.z, az: c.az,
     dist: c.dist ?? 22, h: c.h ?? 9,
     lookX: c.lookX ?? c.x, lookZ: c.lookZ ?? c.z, lookY: c.lookY ?? 2,
   } : null;
   // PARK THE VOID WITH IT, because the menu will. Attract mode drives him
   // around the island four seconds after the world appears (the branch that
-  // does it is gated on qaCam for exactly this reason), and the crowd's
+  // does it is gated on stageCam for exactly this reason), and the crowd's
   // near-set, the sun and the shadow box all centre on voidState, not on the
   // camera. A stage sampled while he wanders is a camera pinned to one place
   // reading another place's crowd — a confound invisible in the number and
   // fatal to it.
-  if (qaCam) {
-    voidState.x = qaCam.x; voidState.z = qaCam.z;
-    voidling.group.position.set(qaCam.x, voidling.group.position.y, qaCam.z);
+  if (stageCam) {
+    voidState.x = stageCam.x; voidState.z = stageCam.z;
+    voidling.group.position.set(stageCam.x, voidling.group.position.y, stageCam.z);
     velX = 0; velZ = 0;
-    wander.set(qaCam.x, 0, qaCam.z);
+    wander.set(stageCam.x, 0, stageCam.z);
   }
 };
 // QA: the world's authored hero landmark, read off the copy table rather than
 // transcribed into a probe. Maple's is null — it has no hero landmark.
+// ── QA (day 8): WHAT THE MENU IS ACTUALLY SHOWING ────────────────────────
+// The menu's whole claim is "this is the world you are on, alive". Every half
+// of that is checkable and none of it is checkable from a screenshot: which
+// world is built, where the camera is standing, whether the void is in the
+// shot, whether the drift is moving, and what the frame costs. A probe that
+// took a picture and called it done would pass on a still image of the right
+// island.
+_dbg.__menuState = () => {
+  const ms = menuStage ?? { az: 0, amp: 0, period: 1, x: 0, z: 0, dist: 0, h: 0, lookY: 0, blocked: -1 };
+  return {
+    menuMode, world: pickedWorld, goal: levelCurrent(pickedWorld),
+    stageAt: { x: +ms.x.toFixed(1), z: +ms.z.toFixed(1) }, stageH: +ms.h.toFixed(1),
+    blocked: ms.blocked, voidY: +voidling.group.position.y.toFixed(2),
+    // the authored stage, and where the pendulum currently is within it
+    a0: ms.az, amp: ms.amp, period: ms.period, menuT: +menuT.toFixed(2),
+    azimuth: stageCam ? +stageCam.az.toFixed(2) : null,
+    menuDist: stageCam ? stageCam.dist : null,
+    // the void: where he is, and how big he reads on screen. `voidPx` is the
+    // thing a child actually sees, so it is measured rather than inferred from
+    // the radius — a parked camera and a follow camera give very different
+    // answers for the same r.
+    voidAt: { x: +voidState.x.toFixed(2), z: +voidState.z.toFixed(2) },
+    voidR: +voidling.radius.toFixed(2),
+    onStage: Math.hypot(voidState.x - ms.x, voidState.z - ms.z) < 1.5,
+    fogNear: scene.fog ? +(scene.fog as THREE.Fog).near.toFixed(1) : null,
+    // what it costs to draw — day 9 sets the menu rung against these
+    drawCalls: renderer.info.render.calls,
+    tris: renderer.info.render.triangles,
+    frame: renderer.info.render.frame,
+    idleTier: 0,
+  };
+};
 _dbg.__heroPoint = () => (COPY.hero ? { x: COPY.hero[0], z: COPY.hero[1] } : null);
 // QA (day 2): this match's eats by kind, from the eat handler's own
 // classification. Cleared at beginMatch, so it is per match, not per session.
@@ -4680,7 +4987,7 @@ function questEvent(kind: string, n = 1) {
   }
 }
 renderQuests();
-paintMenuLadder();   // the first screen a child sees already shows her ladder
+enterMenu();   // the first screen a child sees IS her world, with her ladder on it
 
 // ── MAPLE ISLE NEWS — the island reacts to how much of it still exists ──────
 // ── LIVE STATE the newsroom reports on ─────────────────────────────────────
@@ -6449,7 +6756,7 @@ function endMatch(result: GoalResult = null) {
         track('shop_view', { coins, from: 'end' });
         endEl.classList.remove('show');
         document.body.classList.add('menu');
-        menuEl.style.display = ''; paintMenuLadder();   // the states changed while she was in there
+        menuEl.style.display = ''; enterMenu();   // her ladder, and the world behind it
         el('shop').classList.add('show');
         // …AND PAINT IT. The cards are live renders that only start when
         // __shopTab() runs, and #btnShop has called it since the day the
@@ -7104,6 +7411,7 @@ function beginMatch(solo = false) {
   // early-tap and late-tap descents differing by 250-291 ms, on a bar that asks
   // for 100. The idle camera is parked, so it is snapped, not sprung — see the
   // lerp below, which now takes the authored position exactly while armed.
+  leaveMenu();   // whatever opened this match, the stage camera does not survive it
   arriveT = 0; arriveLanded = false;
   goalCardT = 0;
   // ── THE LESSON AND THE TARGET WERE TALKING AT ONCE ────────────────────────
@@ -7487,6 +7795,7 @@ document.getElementById('mlWorld')?.addEventListener('click', () => {
 let pendingLaunch = false;
 // …and the picker is what actually starts the match.
 function launchWorld() {
+  leaveMenu();   // the camera goes back to the match before the match starts
   el('worlds').classList.remove('show');
   menuEl.style.display = 'none';
   // the one-time teach card that used to live here is gone; the danger loop is
@@ -8706,7 +9015,7 @@ el('btnHome').addEventListener('click', () => {
   track('home_tap', { played: stats.matches });
   el('end').classList.remove('show');
   document.body.classList.add('menu');
-  menuEl.style.display = ''; paintMenuLadder();   // the states changed while she was in there
+  menuEl.style.display = ''; enterMenu();   // her ladder, and the world behind it
   renderRank();
 });
 // in-game HOME (⌂): confirm first — a kid's stray tap must not eat the match.
@@ -8804,7 +9113,7 @@ el('btnHome').addEventListener('click', () => {
     life.calm(Infinity);
     audio.stopMusic();
     document.body.classList.add('menu');
-    menuEl.style.display = ''; paintMenuLadder();   // the states changed while she was in there
+    menuEl.style.display = ''; enterMenu();   // her ladder, and the world behind it
     renderRank();
   };
   // ── ONE STRAY TAP MUST NOT EAT A RUN ────────────────────────────────────
@@ -10969,7 +11278,7 @@ function animate() {
     // drove itself away four seconds after the world appeared. Attract mode is
     // for the menu backdrop and the demo harness; an armed, untouched world sits
     // still and waits.
-    } else if (!qaCam && (!armed || DEBUG_HARNESS) && tClock - lastInput > 4) {
+    } else if (!stageCam && (!armed || DEBUG_HARNESS) && tClock - lastInput > 4) {
       // attract mode: menu backdrop + demo harness ONLY — a real match never
       // self-drives; an idle player's void just sits there being cute
       wanderT -= dt;
@@ -11397,7 +11706,7 @@ function animate() {
   // its full-rate population is the LOWEST in the game (119–211), and
   // swallowing the whole visible band lands it at ~280–340 updates a frame —
   // still under the 384 the owner just called dialed on Maple.
-  const crowdGate = (introT > 0 ? Infinity : (qaCam ? qaCam.dist : camDist) * 2.2 + 90)
+  const crowdGate = (introT > 0 ? Infinity : (stageCam ? stageCam.dist : camDist) * 2.2 + 90)
     * (pickedWorld === 'pirate' ? 2 : 1);
   _dbg.__crowdGate = crowdGate;
   perfBeat('crowd');
@@ -11613,6 +11922,23 @@ function animate() {
   // camera — the 2D game's zoom-band model: within a form the void keeps a
   // constant (small!) on-screen size; each evolution zooms the world out a
   // step, so growth READS. Start: void ≈ 6% of screen height, hole.io style.
+  // ── THE MENU'S SLOW DRIFT ───────────────────────────────────────────────
+  // On menuT, which is the game's own clock, so the swing takes 27 seconds on a
+  // phone at 60fps and 27 seconds on a software renderer at 1fps. Wall time
+  // would make the menu look frantic on a fast device and frozen on a slow one,
+  // and dt is already clamped at 0.05 so a backgrounded tab cannot jump it.
+  if (menuMode && stageCam) {
+    menuT += dt;
+    const ms = menuStage;
+    if (ms) {
+      stageCam.az = ms.az + ms.amp * Math.sin((menuT / ms.period) * Math.PI * 2);
+      // the look point rides the drift, or the aim swings out from under the
+      // void and he walks across the frame while standing still
+      const rd = stageCam.az * Math.PI / 180;
+      stageCam.lookX = ms.x + Math.sin(rd) * ms.dist * 0.22;
+      stageCam.lookZ = ms.z + Math.cos(rd) * ms.dist * 0.22;
+    }
+  }
   if (ASSETVIEW) {
     camera.position.set(0, 716, 138);
     camera.lookAt(0, 588, -6);
@@ -11620,22 +11946,22 @@ function animate() {
     if (camera.far < 1400) { camera.far = 1400; camera.updateProjectionMatrix(); }   // island sits past the default far plane
     camera.position.set(0, 1120, 0.001);
     camera.lookAt(0, 0, 0);
-  } else if (qaCam) {
+  } else if (stageCam) {
     // The stage frustum, written straight — no camOffset, no camDist, no
     // follow spring, so nothing here can be mistaken for the shipped camera.
     // The fog uses the match's own law on the stage's distance, because a
     // draw-call count taken under a different fog is a count of a different
     // frustum.
-    const rad = qaCam.az * Math.PI / 180;
-    const rise = qaCam.h - qaCam.lookY;
-    const hd = Math.sqrt(Math.max(1, qaCam.dist * qaCam.dist - rise * rise));
-    camera.position.set(qaCam.x + Math.sin(rad) * hd, qaCam.h, qaCam.z + Math.cos(rad) * hd);
-    camera.lookAt(qaCam.lookX, qaCam.lookY, qaCam.lookZ);
+    const rad = stageCam.az * Math.PI / 180;
+    const rise = stageCam.h - stageCam.lookY;
+    const hd = Math.sqrt(Math.max(1, stageCam.dist * stageCam.dist - rise * rise));
+    camera.position.set(stageCam.x + Math.sin(rad) * hd, stageCam.h, stageCam.z + Math.cos(rad) * hd);
+    camera.lookAt(stageCam.lookX, stageCam.lookY, stageCam.lookZ);
     if (camera.fov !== 32) { camera.fov = 32; camera.updateProjectionMatrix(); }
     camera.updateMatrixWorld();
     if (scene.fog) {
-      (scene.fog as THREE.Fog).near = 60 + qaCam.dist * 1.4;
-      (scene.fog as THREE.Fog).far = 260 + qaCam.dist * 4;
+      (scene.fog as THREE.Fog).near = 60 + stageCam.dist * 1.4;
+      (scene.fog as THREE.Fog).far = 260 + stageCam.dist * 4;
     }
   } else {
     // CONTINUOUS zoom (hole.io): distance ∝ R^0.78 — the void visibly gains
@@ -12052,8 +12378,8 @@ function animate() {
 
   if (SHOW_WALLS) paintWalls();
   // LOD band + shadow frustum track the camera
-  updateLodBias(qaCam ? qaCam.dist : camDist);
-  fitShadow(qaCam ? qaCam.dist : camDist);
+  updateLodBias(stageCam ? stageCam.dist : camDist);
+  fitShadow(stageCam ? stageCam.dist : camDist);
   fadeOccluders(dt);
 
   // adaptive quality: step down fast when fps dips, climb back slowly.

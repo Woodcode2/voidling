@@ -59,3 +59,6 @@ qa/out/endshot/
 
 # menu + pip diagnostic shots — regenerated on demand
 qa/out/menushot/
+
+# diorama + stage diagnostic shots — regenerated on demand
+qa/out/dioshot/

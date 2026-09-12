@@ -1081,6 +1081,34 @@
           radial-gradient(ellipse at 78% 12%, rgba(240,111,176,0.16), transparent 42%),
           radial-gradient(ellipse at 18% 30%, rgba(94,200,216,0.10), transparent 40%),
           radial-gradient(ellipse at 50% 34%, #33175e 0%, #1c0f3d 46%, #0d0821 100%); }
+      /* ── THE MENU BECOMES A WINDOW ─────────────────────────────────────
+         The owner: "I want the background menu picture to sort of match the
+         level we're at right… like maple we see maple. Once we're at pirate bay
+         that level etc." So the splash stops being a painting over the canvas
+         and becomes a frame around it: two bands of the house violet at the top
+         and bottom, holding the logo and the ladder, with the MIDDLE LEFT
+         OPEN — and behind that middle is the live world, the one the next match
+         runs in, on a slow drifting camera (enterMenu / MENU_STAGE).
+
+         The bands are not decoration either. Everything a child has to read on
+         this screen has to survive a moving 3D background, and the two places
+         she reads are exactly the top (the name) and the bottom (her ladder and
+         PLAY). The window is what is between them.
+
+         The key art, the star field and the menu orb go with it: they are a
+         picture of a generic island in front of the actual island. */
+      body.diorama #menu { background:
+          linear-gradient(180deg, #1c0f3d 0%, rgba(28,15,61,0.92) 15%, rgba(20,11,45,0.38) 30%,
+            rgba(13,8,33,0) 44%, rgba(13,8,33,0) 54%, rgba(13,8,33,0.55) 68%,
+            rgba(13,8,33,0.93) 82%, #0d0821 100%); }
+      body.diorama #menu::before,
+      body.diorama #menu::after,
+      body.diorama #menuOrb { display: none; }
+      /* the spacer is what used to make room for the orb; with the window open
+         it is the window */
+      body.diorama #menu .spacer { flex: 1 1 auto; min-height: 12vh; }
+      /* the name sits on the top band and stops needing a shadow to fight art */
+      body.diorama #menu .logo, body.diorama #menu .tag { position: relative; z-index: 3; }
       #menu::before { content: ''; position: absolute; inset: 0; pointer-events: none;
         background-image: radial-gradient(circle, rgba(255,255,255,0.9) 0.6px, transparent 1.2px),
           radial-gradient(circle, rgba(216,200,255,0.55) 0.5px, transparent 1px);

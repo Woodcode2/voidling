@@ -567,9 +567,53 @@ they're locked and as we progress they unlock like angry birds as well."
 `levels` now runs (a)(b)(c)(d)(e)(f)(g)(h)(i)(j) in the push gate — about
 1,050 s of measured legs, timeout re-sized to 2,400 s.
 
-**Next: day 8 — the menu IS the world she is on** (the owner's second ask): the
-background stops being key art and becomes the live world, animated, matching
-whichever world she is playing.
+**Day 8 is DONE (2026-09-12): the menu IS the world she is on.** The owner's
+second ask — "I want the background menu picture to sort of match the level
+we're at right… like maple we see maple. Once we're at pirate bay that level
+etc."
+
+The splash stops being a painting of a generic floating island and becomes a
+WINDOW: two bands of house violet holding the name at the top and her ladder at
+the bottom, with the middle left open onto the live world — the same island the
+next match runs in, the town alive, the void sitting in it on a slow drifting
+camera. Nothing is loaded for it. The menu is a camera, not an asset.
+
+- **The stage is DERIVED, never typed.** The first version was a hand-written
+  table of six coordinates and it put Pirate Bay's camera behind a building. The
+  island already knows: `COPY.hero` is what the establishing shot flies to,
+  `island.spawn` is where the void lands, and `qa/_stages.mjs` measured that
+  every hero point has exactly one large body standing on it (r 10, 11, 11, 10.5,
+  and Skylark's tethered whale at 18) — the landmark, which is the SUBJECT. So
+  the stage is computed: aim at the authored point, stand off at 8x the subject,
+  32° up, at the azimuth with the most town behind the subject and **nothing in
+  the sight line**. It cannot be wrong about a world it has never seen, which
+  means world seven gets a stage for free.
+- **The sight-line test is three-dimensional, and it had to learn that twice.**
+  Version one tested only edible props and let an autumn tree fill Maple's frame
+  — a tree is scenery, not a meal. Version two tested the ground plan and
+  reported Game Day blocked at all 24 azimuths, because a stadium is a ring and
+  on paper there is always a wall between the camera and the pitch. In the air
+  there is not: the camera is 55 units up looking over it. The line now descends
+  from camera height to aim height and a body counts only where its top is above
+  it.
+- **The void is the star of his own menu.** In play he starts at r 0.9 with the
+  camera 26 units away; on an 80-unit stage that is four pixels of purple. He is
+  scaled to the stage (`menuVoidR`, dist/18), grounded, and the aim sits 22% in
+  front of him so he lands in the clear band of the window rather than behind the
+  ladder panel.
+- **The menu's size leaked into the match.** `qa/levels.mjs` (k) caught PLAY
+  starting a match at **r 3.22** against a start of 0.9 — a void the size of a
+  house eating the town on the first frame. `leaveMenu()` restores `START_R`.
+- **`levels.mjs` (k)**, 32 bars over all six worlds: the right world, the aim on
+  the world's own authored point, a clear sight line, the void on stage and on
+  the ground and readable, the drift alive and inside its authored swing, and
+  the camera handed back on PLAY.
+
+**Next:** day 9 is the menu's performance rung — day 1 measured that 72–92% of
+today's menu frame is the half-rate shadow pass and that azimuth alone swings
+the bill up to 11.5x, so the derived azimuth should be re-scored against that
+cost series rather than on framing alone.
+
 
 **Next: day 6** — the end card: the pip headline, `#endPips`, the caption,
 CONTINUE / TRY AGAIN, the shop door only when affordable; **one commit** retires

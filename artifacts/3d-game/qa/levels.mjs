@@ -49,7 +49,7 @@ import { ALL_WORLDS, UNLOCK_ALL } from './worlds.mjs';
 
 const flag = (n, d) => { const h = process.argv.find((a) => a.startsWith(`--${n}=`)); return h ? h.slice(n.length + 3) : d; };
 const PORT = process.argv.slice(2).filter((a) => !a.startsWith('--'))[0] || '4177';
-const ONLY = flag('only', 'a,b,c,d,e,f,g,h,i,j').split(',');
+const ONLY = flag('only', 'a,b,c,d,e,f,g,h,i,j,k').split(',');
 
 const fails = [];
 const bad = (m) => { fails.push(m); console.log(`  BAD  ${m}`); };
@@ -1196,6 +1196,101 @@ if (ONLY.includes('j')) {
     if (r.cards.every((c) => c.drawn.join(',') === (r.truth[c.w] || []).join(','))) ok('(j) every world card agrees with the ladder');
     if (r.skew.length) bad(`(j) ${r.skew.length} pip(s) in the picker are not square — ${JSON.stringify(r.skew.slice(0, 3))}`);
     else ok('(j) every pip in the picker is square');
+  }
+}
+
+// ── (k) THE MENU IS THE WORLD SHE IS ON ────────────────────────────────────
+// The owner's second ask: "I want the background menu picture to sort of match
+// the level we're at right. Would be cool for it to be animation of high level.
+// So like maple we see maple. Once we're at pirate bay that level etc."
+//
+// The claim has four halves and a screenshot proves none of them: that it is
+// the RIGHT world, that it is ALIVE, that the void is IN the shot, and that
+// nothing is standing in front of it. The last one has shipped wrong twice —
+// a hand-typed stage table put Pirate Bay's camera behind a building, and a
+// lens test that only knew about edible props let a tree fill Maple's frame —
+// so it is a number the build has to hold, not a thing to look at and hope.
+if (ONLY.includes('k')) {
+  for (const w of ['maple', 'pirate', 'gameday', 'lantern', 'powder', 'skylark']) {
+    const p = await open({ voidUnlocked: UNLOCK_ALL }, `?w=${w}&manual=1`);
+    await p.waitForFunction(() => !!window.__menuState, null, { timeout: 420000 }).catch(() => { });
+    const m0 = await p.evaluate(() => (window.__menuState ? window.__menuState() : null));
+    if (!m0) { bad(`(k) ${w}: __menuState() is missing — the diorama cannot be checked`); await p.close(); continue; }
+
+    if (!m0.menuMode) bad(`(k) ${w}: the menu is up and menuMode is false — the background is still a painting`);
+    if (m0.world !== w) bad(`(k) ${w}: the menu is showing "${m0.world}" — it must be the world she is on`);
+    // THE AIM IS THE WORLD'S OWN POINT. Derived from COPY.hero / island.spawn,
+    // never a coordinate typed into a table: that is what made the first
+    // version put a camera inside a building.
+    const authored = await p.evaluate(() => ({
+      hero: window.__heroPoint ? window.__heroPoint() : null,
+      spawn: window.__spawn ? window.__spawn() : null,
+    }));
+    const want = authored.hero ?? authored.spawn;
+    if (!want) bad(`(k) ${w}: the world publishes neither a hero point nor a spawn`);
+    else if (Math.hypot(m0.stageAt.x - want.x, m0.stageAt.z - want.z) > 1.5) {
+      bad(`(k) ${w}: the stage aims at (${m0.stageAt.x}, ${m0.stageAt.z}) but the world's authored point is (${want.x.toFixed(1)}, ${want.z.toFixed(1)}) — the stage is derived from the island, never typed at it`);
+    } else ok(`(k) ${w}: the stage aims at the world's own authored point`);
+
+    // NOTHING BETWEEN THE CAMERA AND THE SHOT.
+    if (m0.blocked !== 0) bad(`(k) ${w}: ${m0.blocked} bod${m0.blocked === 1 ? 'y' : 'ies'} stand between the camera and the stage — this is the failure that shipped a wall across Pirate Bay and a tree across Maple`);
+    else ok(`(k) ${w}: the line from the camera to the shot is clear`);
+
+    // THE VOID IS IN IT, on the ground, and big enough to be a character
+    if (!m0.onStage) bad(`(k) ${w}: the void is not on the stage — the crowd, the sun and the shadow box all centre on him, so an off-stage void is an incoherent frame`);
+    else ok(`(k) ${w}: the void is on the stage`);
+    if (Math.abs(m0.voidY) > m0.voidR * 1.2) bad(`(k) ${w}: the void is at y ${m0.voidY} with r ${m0.voidR} — he is hanging in the air`);
+    if (!(m0.voidR >= 1.7 && m0.voidR <= 4)) bad(`(k) ${w}: the menu void is r ${m0.voidR} — at a stage distance of ${m0.menuDist} that is a speck or a wall`);
+    else ok(`(k) ${w}: the void reads as a character (r ${m0.voidR} at ${m0.menuDist} units)`);
+
+    // IT IS ALIVE. The drift is on GAME time, so it is sampled on the game's
+    // clock — under a software renderer wall time would time out before the
+    // pendulum had moved a degree.
+    const t0 = m0.azimuth;
+    const moved = await p.evaluate((a0) => new Promise((res) => {
+      const start = window.__menuState().menuT;
+      const tick = () => {
+        const m = window.__menuState();
+        if (m.menuT - start > 1.2) return res({ az: m.azimuth, t: m.menuT - start });
+        setTimeout(tick, 120);
+      };
+      tick();
+    }), t0).catch(() => null);
+    if (!moved) bad(`(k) ${w}: the drift never advanced`);
+    else if (moved.az === t0) bad(`(k) ${w}: the azimuth is still ${t0} after ${moved.t.toFixed(1)} game-seconds — the menu is a still photograph of the right world`);
+    else {
+      const off = Math.abs(moved.az - m0.a0);
+      if (off > m0.amp + 0.5) bad(`(k) ${w}: the drift reached ${off.toFixed(1)}° off centre against an authored amplitude of ${m0.amp}° — a wide sweep makes the menu's cost a function of the clock (day 1: azimuth swings the frame bill up to 11.5x)`);
+      else ok(`(k) ${w}: alive — the camera drifted ${(moved.az - t0).toFixed(2)}° in ${moved.t.toFixed(1)} game-seconds, inside its ${m0.amp}° swing`);
+    }
+    await p.close();
+  }
+
+  // ── AND THE MATCH GETS ITS CAMERA BACK ──────────────────────────────────
+  {
+    const p = await open({ voidUnlocked: UNLOCK_ALL }, '?w=maple&manual=1');
+    await p.waitForFunction(() => !!window.__menuState, null, { timeout: 420000 }).catch(() => { });
+    await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
+      if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
+    const before = await p.evaluate(() => window.__menuState().menuMode);
+    await p.click('#btnPlay');
+    await p.waitForFunction(() => window.__matchState?.().armed === true, null, { timeout: 120000 })
+      .catch(() => { });
+    const after = await p.evaluate(() => ({
+      menuMode: window.__menuState().menuMode,
+      azimuth: window.__menuState().azimuth,
+      r: window.__matchState().r,
+      diorama: document.body.classList.contains('diorama'),
+    }));
+    await p.close();
+    if (!before) bad('(k) the menu was not in diorama mode before PLAY');
+    if (after.menuMode || after.azimuth !== null) bad('(k) the stage camera survived PLAY — a match played from a parked corner of the island');
+    else ok('(k) PLAY hands the camera back to the match');
+    if (after.diorama) bad('(k) body.diorama survived PLAY — the menu window is still open over a live match');
+    // the menu scales him up to read at stage distance; a match must not start
+    // with a void the size of a house
+    if (!(after.r > 0 && after.r < 1.6)) bad(`(k) the match started with the void at r ${after.r} — the menu's stage size leaked into play`);
+    else ok(`(k) the match starts at the void's own size (r ${after.r})`);
   }
 }
 
