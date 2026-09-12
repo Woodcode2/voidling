@@ -89,6 +89,13 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
  *  the ladder" IS. */
 const open = async (ctx, { levels = null, extra = {}, q = '' } = {}) => {
   const p = await ctx.newPage();
+  // WHY a thing did not happen, not just that it did not. Bar 7 came back "the
+  // match never reached the end card" 33 s into a 600 s wait — which is a
+  // rejection, not a timeout, and with nothing listening there was no way to
+  // tell a thrown page from a slow one.
+  p.__errs = [];
+  p.on('pageerror', (e) => p.__errs.push(`pageerror ${String(e && e.message || e).split('\n')[0]}`));
+  p.on('crash', () => p.__errs.push('the page CRASHED'));
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
   await p.addInitScript(([lv, ex]) => {
     try {
@@ -435,8 +442,30 @@ if (want(7)) {
   // a real MISS, which is the case this bar is about. No input at all: a miss is
   // what happens when nothing happens.
   const p = await open(ctx, { levels: SEED_OPEN, q: '&len=8&g=1' });
-  const ended = await p.waitForSelector('#end.show', { timeout: 600000 }).then(() => true).catch(() => false);
-  if (!ended) { no(`#7 the 8-second match never reached the end card — nothing to come home from`); }
+  // TWO WAITS, NOT ONE. The match has to START before it can END, and the two
+  // fail for completely different reasons: AUTO_START never firing is a boot
+  // problem, a clock that never reaches the buzzer is a match problem. Rolled
+  // into one wait they are the same sentence, and this bar printed that sentence
+  // 33 s into a 600 s timeout — a rejection wearing a timeout's words.
+  const ran = await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.5,
+    null, { timeout: 300000 }).then(() => true).catch((e) => String(e.message || e));
+  if (ran !== true) {
+    no(`#7 the harness match never started (AUTO_START did not fire): ${String(ran).split('\n')[0]}`
+      + (p.__errs.length ? ` · page said: ${p.__errs.join(' | ')}` : ''));
+  } else {
+  const ended = await p.waitForSelector('#end.show', { timeout: 600000 })
+    .then(() => true).catch((e) => String(e.message || e));
+  if (ended !== true) {
+    const st2 = await p.evaluate(() => {
+      const m = window.__matchState?.() || {};
+      return { t: m.t, armed: m.armed, started: m.started, outroT: m.outroT,
+        endInDom: !!document.getElementById('end'),
+        endClass: document.getElementById('end')?.className || '(none)' };
+    }).catch(() => null);
+    no(`#7 the 8-second match never reached the end card — nothing to come home from. `
+      + `${String(ended).split('\n')[0]} · state ${JSON.stringify(st2)}`
+      + (p.__errs.length ? ` · page said: ${p.__errs.join(' | ')}` : ''));
+  }
   else {
     const trace = await p.evaluate(async () => {
       const out = [];
@@ -465,6 +494,7 @@ if (want(7)) {
     else no(`#7b the ring moved off a dot she has not passed (here=${end.here}, ringIn=${hopped ? hopped.ringIn : -1}) — §3.2 says a miss keeps it`);
     if (truth === 'fin,locked,locked,locked,locked') ok(`#7c and dot 2 is still locked: ${truth}`);
     else no(`#7c the win gate leaked: ${truth}`);
+  }
   }
   await ctx.close();
 }
