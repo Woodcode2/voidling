@@ -91,3 +91,7 @@ qa/out/locked/
 qa/out/bgflat/
 qa/out/plinth*.png
 
+# the void kill-test sweep — qa/_diovoid.mjs regenerates it; the two frames that
+# answered the question are in docs/crews/round-8/diorama-void-r*.png
+qa/out/diovoid/
+

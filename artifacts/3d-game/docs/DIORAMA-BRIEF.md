@@ -125,8 +125,37 @@ the one thing this game may never show. The rule is geometric, not by eye: the
 camera ray through his centre must land on the plinth **top face** with at least
 8 world units of face beyond him on every side.
 
-**This is step 2 of the build order and it is the kill test.** If he cannot read
-as a character at that size, the composition is wrong however good the frame is.
+**ANSWERED, 2026-09-12: HE SURVIVES.** `qa/_diovoid.mjs` sweeps his world radius
+at the diorama camera and measures his on-screen height by projecting his real
+`Box3`, then shoots a frame at each. Evidence:
+`docs/crews/round-8/diorama-void-r12.png` (reads) and `-r8.png` (does not).
+
+| target radius | px tall | % of 932 | clearance to plinth edge (world units) | reads? |
+|---|---|---|---|---|
+| 3 | 14.9 | 1.6% | 24.6 - 61.4 | no — a dot |
+| 5 | 20.8 | 2.2% | 22.6 - 59.4 | no |
+| 8 | 34.7 | 3.7% | 19.6 - 56.4 | barely — a purple blob, no face |
+| **12** | **67.1** | **7.2%** | **15.6 - 52.4** | **YES — eyes, blush and mouth all read** |
+| 17 | 94.1 | 10.1% | 10.6 - 47.4 | yes, but a third of the block wide |
+
+**r = 12 is the answer**: he stands in the town among the maples at 67 px, still
+plainly a creature, and the 8-unit silhouette rule holds with 15.6 units to
+spare on the tightest side. The composition survives its own kill test.
+
+**SIX ERRORS IN THAT ONE PROBE, recorded because every one produced a confident
+number first.** (1) `window.__voidRadius?.() ?? 1` — a hook that does not exist,
+so every figure would have been against a radius of 1. (2) `VG.scale.setScalar`
+plus `rw = voidR * sc`, which assumes the rig's base mesh is unit-radius; it is
+not, and the "42.8 px" void overflowed a 220 px crop. (3) `rw = sc` printed as
+"r built", a tautology dressed as a measurement. (4) The camera was set once, and
+the game's own `animate()` re-rendered with the MENU camera between the evaluate
+and the screenshot — five runs shot a void alone in the dark and I read it as
+"too big" rather than "not my frame". (5) A patch script asserted and threw
+before writing, so two edits I believed were applied never were. (6) His POSITION
+had the same fault as the camera: `voidling.update()` writes the group position
+from `voidState` every frame, so a one-time `VG.position.set` was overwritten and
+he floated beside the block. Both the camera and the position now re-assert
+inside the redraw loop.
 
 ## 7 · The design's own named weakness, visible in the shot
 
