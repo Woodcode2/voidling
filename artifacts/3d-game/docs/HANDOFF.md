@@ -823,11 +823,23 @@ match. (2) A blocked click used to be reported and then followed by 300 s of
 waiting against a page that had gone, so the run ended on a sentence about
 Playwright rather than about the game.
 
-**Still to verify at the time of writing:** the after-run. Three probe runs in
-this session died on "Target page, context or browser has been closed", every one
-of them while a full gate was rendering swiftshader on the other cores — so the
-after-reading is taken with nothing else running, and `qa/taps.mjs` now names a
-dead browser as a machine result rather than a verdict on the build.
+**The after-reading** (`docs/crews/round-8/taps-after.log`, taken with nothing
+else rendering — three probe runs in this session died on "Target page, context
+or browser has been closed", every one while a full gate was on the other cores,
+so `qa/taps.mjs` now names a dead browser as a machine result rather than a
+verdict on the build):
+
+| bar | before | after |
+|---|---|---|
+| one tap, date = today | ok | ok |
+| one tap, date ONE DAY STALE | **PLAY unclickable**, 60 s timeout, `#daily` covering it | **ok** — armed, menu gone, no overlay, no navigation |
+| the day rolls after a finished match | **no** — still yesterday's date | **ok** — `voidDailyLast` is today, `life=2` |
+| the day's own coins paid | not isolable (the old bar passed on match money) | **ok** — owed 110✦ for day 2, wallet 500 → 1022 |
+| the end card names them | — | **ok** — `🏆 COMBO KING EARNED!+352✦ · +2💎 · +51 XP` **`🎁 DAY 2 · +110✦`** |
+| `#daily` never takes the screen | — | **ok** |
+
+`PASS — 6 bars, one tap plays on both sides of midnight and the day is still
+paid [177s]`. Registered in the push profile at a 900 s timeout.
 
 **Next: day 11's `qa/idiomguard.mjs`** — the last unbuilt piece of day 10's
 row, and §1.2 already decided it: `#daily` rises full-screen at module init

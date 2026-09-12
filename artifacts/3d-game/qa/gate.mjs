@@ -375,6 +375,24 @@ const SUITE = [
     cmd: ['node', 'qa/levels.mjs', String(PORT), '--only=a,b,c,d,e,f,g,h,i,j'], verdict: pf,
     why: 'the ladder agrees with itself about where a child is — thirty dots, one green ring per world, a dot opened only by a goal MET rather than a match merely finished, and a goal the child can actually see on screen while she plays for it' },
 
+  // ── HOW MANY TAPS FROM OPENING THE APP TO PLAYING, ON BOTH SIDES OF MIDNIGHT
+  // The bar is ONE, and it was one on the day any probe ran and not on the day
+  // after: 383 files in this directory seed voidDailyLast to today, so the
+  // daily calendar was a screen this suite did not have. MEASURED on the build
+  // before the fix — with the date one day stale PLAY could not be CLICKED AT
+  // ALL (page.click, 60s timeout, #daily covering it), and after a full
+  // finished match voidDailyLast was still yesterday's, so the day never rolled
+  // without somebody pressing a word a five-year-old cannot read.
+  //
+  // The third bar guards the MONEY, and it is the reason this step exists at
+  // all rather than a one-line assertion somewhere: the daily reward and the
+  // match reward land in the same wallet, so "she still gets paid" is only
+  // checkable against what the calendar itself says today owes (__dailyDue()).
+  // Measured at 177s.
+  { id: 'taps', tier: 'feel', profiles: ['push', 'live'], timeout: 900,
+    cmd: ['node', 'qa/taps.mjs', String(PORT)], verdict: pf,
+    why: 'it is ONE tap from opening the app to playing, on her second morning as much as her first — and the day she is owed is paid without her having to read the word CLAIM' },
+
   // ── THE LADDER'S TWO MOMENTS OF MOTION, AND ITS STILLNESS ────────────────
   // Day 10. Two of these bars could not have been written earlier and one of
   // them fails the build that shipped before it: the menu's "you are here" ring

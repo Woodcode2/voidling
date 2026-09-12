@@ -1,0 +1,9 @@
+  ok   #1 one tap plays, with voidDailyLast today: armed, menu gone, no overlay, no navigation  [24s]
+  ok   #2 one tap plays, with voidDailyLast a day stale: armed, menu gone, no overlay, no navigation  [46s]
+  ok   #3a the day rolled without a modal: voidDailyLast is today, life=2  [177s]
+  ok   #3b and the day's own coins were paid: owed 110✦ for day 2, wallet 500 → 1022 (+522, match money included)  [177s]
+  ok   #3d and the end card says so: "🏆 COMBO KING EARNED!+352✦ · +2💎 · +51 XP🎁 DAY 2 · +110✦"  [177s]
+  ok   #3c and #daily never took the screen  [177s]
+
+PASS — 6 bars, one tap plays on both sides of midnight and the day is still paid [177s]
+EXIT=0
