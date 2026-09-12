@@ -14,6 +14,7 @@
 // → reload → gate → match. Asserts the gate is up, the world track was on the
 // wire early, the tap starts the match, and the match has a score promptly.
 import { chromium } from 'playwright';
+import { openPicker } from './_enter.mjs';
 
 const WORLD = process.argv[2] || 'pirate';
 const PORT = process.argv[3] || '4177';
@@ -42,7 +43,17 @@ await p.evaluate(() => document.querySelectorAll('.show')
   .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
 if (await p.$('#tapGate.show')) await p.click('#tapGate');
 await p.waitForTimeout(600);
-await p.click('#btnPlay'); await p.waitForTimeout(900);
+// THE PICKER, OPENED DIRECTLY. This used to be `click('#btnPlay')` and a 900ms
+// wait, from the days when PLAY opened the world picker. From day 7 PLAY PLAYS,
+// so that click started a match on the world already built and the card tap
+// below landed inside a closed overlay — thirty seconds of Playwright waiting
+// for something invisible, then a throw.
+//
+// It survived the day-11 migration because this probe is registered in the LIVE
+// profile only (`switch:${w}`), and the push gate is what the migration was
+// measured against: broken for five days, in a step nothing routine runs. Found
+// by qa/idiomguard.mjs, which is the entire reason that file exists.
+await openPicker(p);
 
 // tap the OTHER world's card — this is the reload
 const tReload = Date.now();
