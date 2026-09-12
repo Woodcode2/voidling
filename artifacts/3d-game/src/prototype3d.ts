@@ -2632,6 +2632,7 @@ const _dbg = new Proxy(_dbgStore, {
   __menuState: () => Record<string, unknown>;
   __menuOptim: (on: boolean) => boolean;
   __kindTally: () => Record<string, number>;
+  __dailyDue: () => unknown;
   __levels: () => unknown[];
   __ladderState: () => Record<string, unknown>;
   __paintLadder: () => void;
@@ -3031,6 +3032,13 @@ _dbg.__kindTally = () => ({ ...kindTally });
 // read storage directly would be asserting against its own parser rather than
 // against the game, which is how qa/_distinct.mjs ended up unable to see a CSS
 // change at all.
+// ── QA: WHAT TODAY OWES ───────────────────────────────────────────────────
+// The same pure arithmetic the silent claim and the calendar page both read.
+// qa/taps.mjs asks this BEFORE the match it is about to measure, because the
+// daily reward and the match reward land in the same wallet: a bar that checks
+// "did she get paid" without knowing what the calendar owed passes on match
+// money, which is exactly what the first version of that bar did.
+_dbg.__dailyDue = () => dailyDue();
 _dbg.__levels = () => allLevels();
 // ── QA (day 10): THE LADDER AS IT IS ON SCREEN, THIS FRAME ────────────────
 // Not the ladder — __levels() is the ladder. This is the PICTURE of it: which
@@ -6397,7 +6405,16 @@ function openDrop(n: number) {
 }
 function celebrateEnd(coins: number, xpGain: number, lead: string, won = false, gemGain = 0) {
   offerDrop();
-  endSub.innerHTML = `${lead}<br><b class="endCnt">+0✦</b>${gemGain ? ` · +${gemGain}💎` : ''} · +${xpGain} XP`;
+  // THE DAY'S COINS GET THEIR OWN LINE, under the match's. Not folded into the
+  // count-up: a child who opened the app on a new day is owed a reason for the
+  // bigger number, and a parent is owed a way to see the calendar still works
+  // now that nothing announces itself. One glyph she already knows from the
+  // grid, the day she is on, and the amount — no sentence to read.
+  const dailyLine = dailyPaid
+    ? `<i class="endDaily">🎁 DAY ${dailyPaid.life + 1} · +${dailyPaid.coins}✦${dailyPaid.gem ? ` · +${dailyPaid.gem}💎` : ''}</i>`
+    : '';
+  dailyPaid = null;   // one match, one mention
+  endSub.innerHTML = `${lead}<br><b class="endCnt">+0✦</b>${gemGain ? ` · +${gemGain}💎` : ''} · +${xpGain} XP${dailyLine}`;
   if (won) {
     // champion confetti: two dozen falling sparks over the end screen
     for (let i = 0; i < 24; i++) {
@@ -6753,6 +6770,17 @@ function endMatch(result: GoalResult = null) {
   // called audio.win() unconditionally, so a child who finished 5th read
   // "OUT-NOMMED!" while the island cheered for them, and first place owned
   // nothing. The ear and the headline have to agree.
+  // ── THE DAY'S OWN COINS, PAID WITHOUT ASKING ─────────────────────────────
+  // The first finish of the day claims the calendar. Here, and BEFORE
+  // bumpStreak(), because that is exactly where it happened before: the old
+  // CLAIM button wrote voidStreakDay and bumpStreak stood down, and a child who
+  // claimed before playing got the same numbers a child who claimed after did.
+  // Moving the claim off the button must not quietly move the streak.
+  //
+  // It is silent by design and NOT invisible: celebrateEnd names it under the
+  // count-up a moment later, on the one screen that is already telling her what
+  // she earned. What she never has to do again is read a word to be paid.
+  dailyPaid = claimDaily();
   bumpStreak();
   if (soloMode) {
     // SOLO RUN: the goal is the island itself — beat your best %
@@ -8082,7 +8110,6 @@ document.getElementById('mlWorld')?.addEventListener('click', () => {
 // to wait for it: the card is z-index 45 and takes the whole screen, so
 // starting the match underneath means a timed run playing on with every drag
 // swallowed by a modal backdrop. closeDaily() below picks this back up.
-let pendingLaunch = false;
 // …and the picker is what actually starts the match.
 function launchWorld() {
   leaveMenu();   // the camera goes back to the match before the match starts
@@ -8505,18 +8532,23 @@ if (localStorage.getItem('voidAutoPlay') === '1') {
     tapGateEl.classList.remove('show');
     document.body.classList.remove('gated');
     requestAnimationFrame(() => {
-      // THE DAILY CARD GOES FIRST. It is built further down this same module
-      // evaluation, so by the time this frame runs it is already on screen —
-      // and launching under it starts a three-minute timed match behind a
-      // full-screen modal that eats every pointer event. Let closeDaily()
-      // start the match once the card is done. (coverRelease for a hold
-      // nobody took is a Set delete and a size check — kept so a straggling
-      // boot hold can never wedge the card.)
-      if (el('daily').classList.contains('show')) {
-        pendingLaunch = true;
-        coverRelease('pack');
-        return;
-      }
+      // THE DAILY CARD USED TO GO FIRST, and this deferred the launch until it
+      // closed: the card was built further down this same module evaluation, so
+      // by the time this frame ran it was already on screen, and launching under
+      // it would have started a three-minute timed match behind a full-screen
+      // modal that ate every pointer event.
+      //
+      // It no longer rises on its own (see the calendar's own note), so this
+      // cannot be reached from the boot path any more. It is kept because the
+      // card IS still openable — from the scrapbook — and a modal over PLAY is
+      // a modal over PLAY whatever opened it. What changed is the answer: the
+      // launch is no longer PARKED waiting for somebody to press a word. The
+      // card is closed and the match starts, which is what the tap asked for.
+      // (Parking it was safe only while closeDaily() existed to un-park it;
+      // that function went with the auto-show, and a deferral with nothing left
+      // to resume it is a hang.)
+      const card = el('daily');
+      if (card.classList.contains('show')) card.classList.remove('show');
       launchWorld();
     });
   });
@@ -9584,133 +9616,198 @@ renderRank();
 // climbs without running away. The true consecutive-day count is kept and shown
 // separately, so a child on day 23 is told they are on day 23 rather than
 // day 7 for the seventeenth time.
-{
-  // Flatter than [50,75,100,125,150,200,300], which made day 7 a 6x spike over
-  // day 1 and therefore a 5x fall on the morning after. A cyclical calendar
-  // always dips at the roll-over — the fix is to make the dip small and to
-  // label the day honestly, not to pretend it is not there.
-  const DAILY = [90, 110, 130, 160, 190, 230, 300];
-  const today = new Date().toDateString();
-  const last = localStorage.getItem('voidDailyLast');
-  if (last !== today && menuEl.style.display !== 'none' && !DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW) {
-    const yd = new Date(Date.now() - 86400000).toDateString();
-    const kept = last === yd;                                  // did they come back yesterday?
-    const prevDay = Number(localStorage.getItem('voidDailyDay') || 0);
-    // day 0-6 inside the week; finishing 6 rolls the week over
-    const day = kept ? (prevDay + 1) % 7 : 0;
-    // THE CLIFF IS DEAD (AAA-BRIEF §4.4 item 4). A missed day used to reset
-    // the week multiplier to 1 — a week-4 child came back to 90✦ where
-    // yesterday paid 570✦, a 6.3× loss-aversion penalty pointed at a
-    // six-year-old for having a birthday party. Missing now steps the ladder
-    // down ONE rung and restarts the seven-day cycle there: reward returning,
-    // never punish missing. The streak count still resets — that is what
-    // "consecutive" means and the streak skins already earned stay earned —
-    // but the MONEY only ever dips gently.
-    const week = kept
-      ? Number(localStorage.getItem('voidDailyWeek') || 1) + (prevDay === 6 ? 1 : 0)
-      : Math.max(1, Number(localStorage.getItem('voidDailyWeek') || 1) - 1);
-    // ONE STREAK, NOT TWO. `voidStreak` (bumped when a match ends) and
-    // `voidDailyStreak` (bumped when the calendar is claimed) counted the same
-    // idea separately and drifted apart: measured, the calendar header read
-    // "🔥 22 DAY STREAK!" while the rank chip beside it read "🥉 BRONZE · LVL 1"
-    // with no flame at all, and the shop still gated Prism behind "7-DAY
-    // STREAK". A child was on three different streaks at once.
-    //
-    // The daily calendar is the honest one — it counts days the game was
-    // OPENED, which is what a streak means and what the streak skins are
-    // promising. It now writes the shared counter that the chip and the shop
-    // already read.
-    // …off the SHARED gate, not `kept`. `kept` asks whether the CARD was
-    // claimed yesterday, which is the right question for the reward index and
-    // the week rollover and the wrong one for the streak: a match finished
-    // yesterday also counts, and a match finished earlier TODAY has already
-    // counted. Reading voidStreakDay makes this and bumpStreak() the same
-    // decision made twice rather than two decisions that disagree.
-    const sDay = localStorage.getItem('voidStreakDay');
-    const streak = sDay === today ? Number(localStorage.getItem('voidDailyStreak') || 1)
-      : sDay === yd ? Number(localStorage.getItem('voidDailyStreak') || 0) + 1
-      : 1;
-    // +20% a week, capped at 3x. Day 7 of week 4 pays 900 instead of 300.
-    const mult = Math.min(3.5, 1 + 0.3 * (week - 1));   // week 2 already pays 30% more
-    const amount = (i: number) => Math.round(DAILY[i] * mult / 5) * 5;
-    const modal = el('daily');
-    // each day is a PRIZE, not a table cell: claimed days stamp a green tick,
-    // today's cell is a big bouncing gift, day 7 is the gold treasure chest
-    // THE ICONS MUST NOT LIE ABOUT CURRENCIES. The first version of this rule
-    // said "one currency" because there WAS one and days 5–6 wore 💎 anyway —
-    // the owner read "diamonds and stuff" where only coins existed. Gems are
-    // REAL now (the owner's two-currency design: voidGems, spent on premium
-    // colourways), so the rule's current form: every CELL pays ✦ and says so
-    // in one escalating idea, and 💎 appears exactly where a gem is actually
-    // paid — the day-7 chest, labelled +1💎 on the claim button.
-    const ICON = ['🪙', '🪙', '💰', '💰', '🌟', '🌟', '🏆'];
-    // LIFETIME day numbers, not day-of-week. On the morning after a child
-    // finished day 7 for 300 coins, the card reset to a cell labelled "DAY 1"
-    // paying 60 — the single most important morning in the whole retention
-    // loop, and it read as a demotion for coming back. The prizes still cycle
-    // (they have to; that is what a calendar is) but the number never goes
-    // backwards, so day 8 is day 8 and the WEEK 2 header explains why the
-    // prizes are bigger this time round.
-    // voidDailyLife counts CLAIMS, monotone for the life of the profile — the
-    // week number can now step down after a miss, so (week-1)*7 would re-show
-    // day numbers a child has already seen, and "the number never goes
-    // backwards" is this card's oldest promise. Seeded once from the old
-    // arithmetic for existing installs.
-    const life = Number(localStorage.getItem('voidDailyLife') || (week - 1) * 7 + day);
-    el('dailyGrid').innerHTML = DAILY.map((_amt, i) =>
-      `<div class="dCell ${i < day ? 'past' : i === day ? 'now' : ''} ${i === 6 ? 'mega' : ''}">` +
-      `<b>DAY ${life - day + i + 1}</b><span class="dIcon">${i < day ? '✅' : i === day ? '🎁' : ICON[i]}</span>` +
-      `<span class="dAmt">${amount(i)}<i>✦</i></span></div>`).join('');
-    // the streak is the LIFETIME consecutive-day count, and the week is stated,
-    // so the card is different on day 8 from how it was on day 7
-    el('dailyStreak').textContent = streak > 1
-      ? `🔥 ${streak} DAY STREAK!${week > 1 ? ` · WEEK ${week}` : ''}`
-      : 'welcome back!';
-    el('dailyTitle').textContent = week > 1 ? `WEEK ${week} REWARD` : 'DAILY REWARD';
-    // ONE WAY OUT, whichever way they take it — claim or tap the backdrop — so
-    // a world switch that had to wait for this card is never forgotten.
-    const closeDaily = () => {
-      modal.classList.remove('show');
-      if (!pendingLaunch) return;
-      pendingLaunch = false;
-      launchWorld();
-    };
-    (el('dailyClaim') as HTMLButtonElement).innerHTML =
-      `CLAIM ${amount(day)}<i>✦</i>${day === 6 ? ' +1💎' : ''}`;
-    (el('dailyClaim') as HTMLButtonElement).onclick = () => {
-      addCoins(amount(day));
-      if (day === 6) addGems(1);   // the chest: the week's loyalty pays a gem
-      localStorage.setItem('voidDailyLast', today);
-      localStorage.setItem('voidDailyLife', String(life + 1));
-      localStorage.setItem('voidDailyDay', String(day));
-      localStorage.setItem('voidDailyWeek', String(week));
-      localStorage.setItem('voidDailyStreak', String(streak));
-      localStorage.setItem('voidStreakDay', today);   // counted — bumpStreak stands down
-      // …and the one the rank chip and the streak skins read
-      setStreak(streak);
-      track('daily_claim', { day: day + 1, week, streak, coins: amount(day) });
-      // payoff: the prize bursts, coins rain across the card, THEN it closes
-      const cell = modal.querySelector('.dCell.now');
-      if (cell) { cell.classList.add('pop'); cell.querySelector('.dIcon')!.textContent = '✅'; }
-      for (let i = 0; i < 14; i++) {
-        const c = document.createElement('div');
-        c.className = 'endConf'; c.textContent = i % 3 === 0 ? '✦' : i % 3 === 1 ? '🪙' : '⭐';
-        c.style.left = `${Math.random() * 100}%`;
-        c.style.animationDelay = `${Math.random() * 0.35}s`;
-        modal.appendChild(c);
-        setTimeout(() => c.remove(), 3000);
-      }
-      audio.evolve(); buzz(40);
-      setTimeout(closeDaily, 750);
-    };
-    // …and it must be DISMISSIBLE. It fires on menu open, covers the whole
-    // screen and intercepts every button behind it — a playtest harness could
-    // not reach PLAY at all until it learned to claim first. CLAIM is still the
-    // reward, but tapping the backdrop now gets you out.
-    modal.onclick = (ev) => { if (ev.target === modal) closeDaily(); };
-    modal.classList.add('show');
-  }
+// ── AND IT IS NOT ON THE WAY TO PLAY ANY MORE ─────────────────────────────
+// This card used to rise FULL SCREEN at module init on any day whose date did
+// not match voidDailyLast, with one button on it reading "CLAIM 90✦".
+//
+// MEASURED (qa/taps.mjs, on the build before this one; the run is filed as
+// docs/crews/round-8/taps-before.log):
+//
+//   with voidDailyLast a day stale, PLAY could not be CLICKED AT ALL —
+//   page.click timed out after sixty seconds against a button behind #daily
+//
+// Not "two taps instead of one". Unreachable. And on her second morning — the
+// single most important morning in the whole retention loop — the first thing
+// this game asked a five-year-old to press was a word.
+//
+// WORSE, AND THE REASON THIS IS NOT JUST A UI MOVE: the same run showed that
+// after a FULL FINISHED MATCH on a day-stale profile, voidDailyLast was still
+// yesterday's date. The day does not roll unless the button is pressed. So she
+// is asked again tomorrow, and the day after, and every day after that, until
+// somebody who can read presses it. The calendar's bookkeeping was welded to
+// that button, which is why taking the modal off the screen is not enough —
+// the CLAIM has to come off it too.
+//
+// WHY NO PROBE EVER SAW ANY OF THIS: 383 probe files in qa/ seed voidDailyLast
+// to today. Every one of them, because anyone who did not had their first click
+// eaten by this modal and added the seed rather than asking why. In QA terms
+// the card was a screen this game did not have.
+//
+// SO (MENU-BRIEF §1.2): PLAY is never behind it. The day's coins are claimed
+// SILENTLY on the first finish of the day and counted up on the end card, where
+// the ceremony already lives and where a child is already being told what she
+// earned. The card itself stays — it is a good screen and the grid is how a
+// child sees a week — reachable from the scrapbook, where looking at things is
+// the whole point.
+//
+// Nothing about the MONEY changes: same table, same multiplier, same cap, same
+// gem on day 7, same streak bookkeeping in the same order (the claim still runs
+// before bumpStreak, so voidStreakDay is written first and bumpStreak stands
+// down exactly as it did when a child claimed before playing).
+const DAILY_STEPS = [90, 110, 130, 160, 190, 230, 300];
+
+/** What the calendar paid on THIS match's finish, for the end card to name.
+ *  Set in endMatch, spent by celebrateEnd, and null on every match after the
+ *  first of the day — which is the whole point of a daily. */
+let dailyPaid: DailyDue | null = null;
+
+/** What one day of the calendar is worth, and where in the week she is. */
+interface DailyDue {
+  /** 0-6 inside the week */
+  day: number;
+  week: number;
+  streak: number;
+  /** LIFETIME claim count — the number the card prints, which never goes
+   *  backwards even when the week does */
+  life: number;
+  coins: number;
+  /** gems, which only the day-7 chest pays */
+  gem: number;
+  /** all seven of this week's amounts, for the grid */
+  amounts: number[];
+  today: string;
 }
+
+/** WHAT TODAY OWES — or null when today has already been counted.
+ *
+ *  PURE. It reads storage and computes; it pays nothing, shows nothing and
+ *  writes nothing. That matters more than it sounds: this arithmetic used to
+ *  exist only inside the branch that built the modal, so the only way to find
+ *  out what a day was worth was to put a full-screen card in front of a child.
+ *  Now the claim, the card and the probe all ask the same function. */
+function dailyDue(): DailyDue | null {
+  const today = new Date().toDateString();
+  let last: string | null = null;
+  try { last = localStorage.getItem('voidDailyLast'); } catch { return null; }
+  if (last === today) return null;
+  const rd = (k: string, d = 0) => {
+    try { return Number(localStorage.getItem(k) || d); } catch { return d; }
+  };
+  const yd = new Date(Date.now() - 86400000).toDateString();
+  const kept = last === yd;                                  // did they come back yesterday?
+  const prevDay = rd('voidDailyDay');
+  // day 0-6 inside the week; finishing 6 rolls the week over
+  const day = kept ? (prevDay + 1) % 7 : 0;
+  // THE CLIFF IS DEAD (AAA-BRIEF §4.4 item 4). A missed day used to reset the
+  // week multiplier to 1 — a week-4 child came back to 90✦ where yesterday paid
+  // 570✦, a 6.3× loss-aversion penalty pointed at a six-year-old for having a
+  // birthday party. Missing now steps the ladder down ONE rung and restarts the
+  // seven-day cycle there: reward returning, never punish missing.
+  const week = kept
+    ? rd('voidDailyWeek', 1) + (prevDay === 6 ? 1 : 0)
+    : Math.max(1, rd('voidDailyWeek', 1) - 1);
+  // ONE STREAK, NOT TWO. voidStreak (bumped when a match ends) and
+  // voidDailyStreak (bumped when the calendar is claimed) counted the same idea
+  // separately and drifted: measured, the card read "🔥 22 DAY STREAK!" while
+  // the rank chip beside it read "🥉 BRONZE · LVL 1" with no flame at all, and
+  // the shop still gated Prism behind "7-DAY STREAK". A child was on three
+  // different streaks at once. Off the SHARED gate, because `kept` asks whether
+  // the CARD was claimed yesterday — the right question for the reward index
+  // and the week rollover, the wrong one for the streak.
+  let sDay: string | null = null;
+  try { sDay = localStorage.getItem('voidStreakDay'); } catch { /* private mode */ }
+  const streak = sDay === today ? rd('voidDailyStreak', 1)
+    : sDay === yd ? rd('voidDailyStreak') + 1
+    : 1;
+  // +30% a week, capped at 3.5x. Week 2 already pays 30% more.
+  const mult = Math.min(3.5, 1 + 0.3 * (week - 1));
+  const amounts = DAILY_STEPS.map((v) => Math.round(v * mult / 5) * 5);
+  // LIFETIME day numbers, not day-of-week. On the morning after a child
+  // finished day 7 for 300 coins, the card used to reset to a cell labelled
+  // "DAY 1" paying 60 — and it read as a demotion for coming back. voidDailyLife
+  // counts CLAIMS and is monotone for the life of the profile; seeded once from
+  // the old arithmetic for existing installs.
+  const life = rd('voidDailyLife', (week - 1) * 7 + day);
+  return { day, week, streak, life, coins: amounts[day], gem: day === 6 ? 1 : 0,
+    amounts, today };
+}
+
+/** The day's own coins, paid. Returns what it paid, or null when there was
+ *  nothing owing — so a caller can say so on screen without asking twice.
+ *
+ *  Idempotent through dailyDue()'s own date check: the second call on the same
+ *  day returns null because the first wrote voidDailyLast. */
+function claimDaily(): DailyDue | null {
+  const d = dailyDue();
+  if (!d) return null;
+  addCoins(d.coins);
+  if (d.gem) addGems(d.gem);   // the chest: the week's loyalty pays a gem
+  try {
+    localStorage.setItem('voidDailyLast', d.today);
+    localStorage.setItem('voidDailyLife', String(d.life + 1));
+    localStorage.setItem('voidDailyDay', String(d.day));
+    localStorage.setItem('voidDailyWeek', String(d.week));
+    localStorage.setItem('voidDailyStreak', String(d.streak));
+    localStorage.setItem('voidStreakDay', d.today);   // counted — bumpStreak stands down
+  } catch { /* private mode */ }
+  // …and the one the rank chip and the streak skins read
+  setStreak(d.streak);
+  track('daily_claim', { day: d.day + 1, week: d.week, streak: d.streak,
+    coins: d.coins, silent: 1 });
+  return d;
+}
+
+/** THE CARD, as a thing to LOOK AT. No claim button: by the time she can open
+ *  this, the day is already hers. Which cell is "now" comes from the last
+ *  CLAIMED day when today is spent, and from what is owing when it is not — so
+ *  the grid answers "where am I" either way. */
+function paintDailyCard(): void {
+  const modal = document.getElementById('daily');
+  if (!modal) return;
+  const due = dailyDue();
+  const rd = (k: string, d = 0) => {
+    try { return Number(localStorage.getItem(k) || d); } catch { return d; }
+  };
+  const day = due ? due.day : rd('voidDailyDay');
+  const week = due ? due.week : rd('voidDailyWeek', 1);
+  const streak = due ? due.streak : rd('voidDailyStreak', 1);
+  const life = due ? due.life : Math.max(0, rd('voidDailyLife') - 1);
+  const mult = Math.min(3.5, 1 + 0.3 * (week - 1));
+  const amounts = due ? due.amounts : DAILY_STEPS.map((v) => Math.round(v * mult / 5) * 5);
+  // past days are ticked, today is the gift, the rest are prizes ahead. THE
+  // ICONS MUST NOT LIE ABOUT CURRENCIES: every cell pays ✦ and says so, and 💎
+  // appears exactly where a gem is actually paid — the day-7 chest.
+  const ICON = ['🪙', '🪙', '💰', '💰', '🌟', '🌟', '🏆'];
+  const done = due ? day : day + 1;   // today is claimed already when nothing is due
+  const grid = document.getElementById('dailyGrid');
+  if (grid) grid.innerHTML = amounts.map((amt, i) =>
+    `<div class="dCell ${i < done ? 'past' : i === day && due ? 'now' : ''} ${i === 6 ? 'mega' : ''}">`
+    + `<b>DAY ${life - day + i + 1}</b>`
+    + `<span class="dIcon">${i < done ? '✅' : i === day && due ? '🎁' : ICON[i]}</span>`
+    + `<span class="dAmt">${amt}<i>✦</i></span></div>`).join('');
+  const st = document.getElementById('dailyStreak');
+  if (st) st.textContent = streak > 1
+    ? `🔥 ${streak} DAY STREAK!${week > 1 ? ` · WEEK ${week}` : ''}`
+    : 'welcome back!';
+  const ti = document.getElementById('dailyTitle');
+  if (ti) ti.textContent = week > 1 ? `WEEK ${week} REWARD` : 'DAILY REWARD';
+  // THE BUTTON IS A DOOR NOW, NOT A TOLL. It said CLAIM and it stood between a
+  // child and her game; it says DONE and it closes a page she chose to open.
+  const claim = document.getElementById('dailyClaim') as HTMLButtonElement | null;
+  if (claim) {
+    claim.innerHTML = due ? `PLAY TO CLAIM ${due.coins}<i>✦</i>` : 'DONE';
+    claim.onclick = () => modal.classList.remove('show');
+  }
+  modal.onclick = (ev) => { if (ev.target === modal) modal.classList.remove('show'); };
+}
+
+/** Opened from the scrapbook. Never over PLAY, and never by itself. */
+function openDailyCard(): void {
+  paintDailyCard();
+  document.getElementById('daily')?.classList.add('show');
+  track('daily_open', { from: 'book' });
+}
+el('btnDaily')?.addEventListener('click', openDailyCard);
 // ── SETTINGS: sound + rumble toggles, persisted. A parent (and an App Store
 // reviewer) expects to be able to silence a kids' game in one tap.
 {

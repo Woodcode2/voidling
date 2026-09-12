@@ -762,6 +762,12 @@
          handed back. */
       #end .hd.pipHd { font-size: 0; letter-spacing: normal; -webkit-text-stroke: 0;
         text-shadow: none; line-height: 1; margin-bottom: 2px; }
+      /* THE DAY'S COINS, named under the match's. Its own line and its own
+         (smaller, warmer) weight: it is not what she just did, it is what the
+         calendar owed her for turning up — and a child who cannot read still
+         gets the gift glyph she knows from the grid and a number. */
+      .endDaily { display: block; margin-top: 6px; font-size: 13px; font-style: normal;
+        letter-spacing: 1.2px; color: #ffd9a8; }
       #end .hd.pipHd .pipHW { font-size: 13px; }
       #end .hd.pipHd .pipHC { font-size: 12px; }
       /* the next-reward card carries a pip now, so it needs room above the word */
@@ -941,6 +947,11 @@
         padding: 6px 0 12px; position: relative; }
       .bkHd button { position: absolute; right: 0; top: -2px; width: 44px; height: 44px;
         border: 0; border-radius: 12px; background: rgba(255,255,255,0.1); color: #fff; font-size: 19px; }
+      /* THE CALENDAR'S DOOR, on the other side of the title from the way out.
+         `.bkHd button` parks everything at right:0, so a second button would sit
+         exactly on top of the close — and the one that lost would be invisible
+         and still tappable. */
+      .bkHd #btnDaily { right: auto; left: 0; }
       .bkTabs { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; padding-bottom: 10px; }
       .bkTabs button { border: 0; border-radius: 999px; padding: 8px 13px; font-size: 12.5px;
         font-weight: 600; letter-spacing: 0.6px; background: rgba(255,255,255,0.09); color: #cbb8e8; }
@@ -2328,7 +2339,7 @@
 
     <!-- ── THE SCRAPBOOK ── every hidden thing, found and not yet found ── -->
     <div id="book">
-      <div class="bkHd">SCRAPBOOK<button id="bookClose">✕</button></div>
+      <div class="bkHd">SCRAPBOOK<button id="btnDaily" title="the calendar">🎁</button><button id="bookClose">✕</button></div>
       <div class="bkTabs" id="bookTabs"></div>
       <div class="bkGrid" id="bookGrid"></div>
       <div class="bkFoot" id="bookFoot"></div>
