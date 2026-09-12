@@ -65,3 +65,19 @@ qa/out/menushot/
 
 # diorama + stage diagnostic shots — regenerated on demand
 qa/out/dioshot/
+
+# ── THE ONE qa/out SUBDIR THAT WAS NOT IGNORED, AND SHOULD HAVE BEEN ────────
+# lockedcards.mjs WRITES qa/out/locked/picker.png (:79) and nothing anywhere
+# READS it — not the lookbook, not the ledger, not another probe. It is the
+# probe's own working shot, a 1.3 MB binary, and because it alone among the
+# qa/out subdirectories was tracked it churned a fresh 1.3 MB blob into history
+# on EVERY gate run: eight commits carry a different copy of the same picture of
+# the same screen.
+#
+# The rule this directory already follows, stated at the top of this block and
+# again beside the shippedlook exception: evidence the STUDIO reviews ships in
+# the repo, because that pack died with every container restart and silently
+# reverted to an August snapshot. A probe's own diagnostic does not. This is the
+# second kind. If it is ever wanted as evidence, it belongs in the lookbook's
+# shot list (qa/lookbook.mjs) where something actually points at it.
+qa/out/locked/
