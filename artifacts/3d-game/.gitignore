@@ -81,3 +81,13 @@ qa/out/dioshot/
 # second kind. If it is ever wanted as evidence, it belongs in the lookbook's
 # shot list (qa/lookbook.mjs) where something actually points at it.
 qa/out/locked/
+
+# Exploration scratch from the menu-diorama workflow (2026-09-12). The probes
+# that made these live in the session scratchpad, not the repo, so nothing here
+# regenerates them — but they are working frames from an exploration, not
+# evidence anybody reviews. The two shots that DID decide something were copied
+# to docs/crews/round-8/diorama-*.png, where the round's evidence lives and
+# where something points at them and says what they are for.
+qa/out/bgflat/
+qa/out/plinth*.png
+
