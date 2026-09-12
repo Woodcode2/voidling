@@ -1,0 +1,13 @@
+
+  LEVELS — the ladder's state @ :4177
+  The gate is a WIN (owner, §8.1): goal k+1 opens on 'done', never on 'fin'.
+
+  ok   (h) a rival at r 5.63 is over the family's eat line for the barn (needs 4.5)
+  ok   (h) dot 3 reserves the landmark
+  BAD  (h) the family ate the barn on dot 3 after 20.1s — the child is now playing for a prop that is not there
+  ok   (h) dot 1 leaves the landmark on the family's menu
+  ok   (h) the family took the barn on dot 1, which is what makes dot 3's refusal mean something
+  · (h) the family ate the barn on dot 3 after 20.1s — the child is now playing for a prop that is not there
+
+FAIL — the ladder does not hold its own state (1 finding(s)) [79s]
+EXIT=1

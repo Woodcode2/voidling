@@ -1,0 +1,27 @@
+
+  LEVELS — the ladder's state @ :4177
+  The gate is a WIN (owner, §8.1): goal k+1 opens on 'done', never on 'fin'.
+
+  ok   (b) the goal card unrolled at frame 26 (0.43 game-s after the probe took the clock)
+  ok   (b) the goal card was raised exactly once
+  ok   (b) the card fired at 0.5s after arming, on the authored mark (last frame before: 0.483s)
+  ok   (b) the card carries this level's own line: "EAT 18,000 OF THE TOWN"
+  ok   (b) the card names the dot: LEVEL 1
+  ok   (b) the goal card is never up while the ghost hand is (1 card-up state(s) sampled)
+  ok   (b) met: the match ended with 59.24s still on the clock (t=0.76)
+  ok   (b) met: no hot countdown on a won match
+  ok   (b) met: no EAT FASTER banner on a won match
+  ok   (b) met: the match resolved as a win
+  ok   (b) met: maple dot 1 rose open → done
+  ok   (b) met: maple dot 2 opened
+  ok   (b) met: one match counted as one attempt (1)
+  ok   (b) met: level_win fired exactly once
+  ok   (h) a rival at r 5.63 is over the family's eat line for the barn (needs 4.5)
+  ok   (h) dot 3 reserves the landmark
+  ok   (h) the barn is still standing on dot 3 after 19.9s with an oversized rival on top of it
+  ok   (h) dot 1 leaves the landmark on the family's menu
+  BAD  (h) the same oversized rival did NOT take the barn on dot 1 after 19.7s — a rule that refuses everything is not an exclusion
+  · (h) the same oversized rival did NOT take the barn on dot 1 after 19.7s — a rule that refuses everything is not an exclusion
+
+FAIL — the ladder does not hold its own state (1 finding(s)) [127s]
+EXIT=1

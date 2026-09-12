@@ -1868,6 +1868,20 @@ in (c) reads a pixel) the same match cranks in **34 s**. Recorded because §5.2 
 the virtualised clock for the level probe without saying what it costs, and the next probe
 to use it will hit the same wall.
 
+**Correction 11, day 5: (h)'s own trap caught the build that fixed it.** §5.2 (h)
+already records why draft 1's landmark bar could not fail — non-hunter rivals never reach
+the radius a landmark needs — and prescribes the replacement: plant a capable rival and
+watch the rule refuse it. The first build of that replacement passed on dot 3 and was
+STILL wrong, for the same reason one layer down: `softCap` (`rivals.ts:990`) runs every
+frame before the swallow loop, so the hook's `rv.r = 5.63` was clawed back to **1.30**
+and the barn survived because nothing capable was ever standing on it. The bar now prints
+the rival's real radius and fails when it is under the line; the runs use `?r=8`, which
+lifts the cap through the game's own law (`pr * 0.80`) instead of exempting anyone from
+it — and that is the real scenario anyway, since a player at r 8 is exactly when the
+family can reach a 5.0 barn. Deleting the exclusion and rebuilding: the family ate it in
+20.1 s. A bar that cannot be shown failing is not a bar, and "it passed" was true twice
+here for two different wrong reasons.
+
 A seventh item is a gap this brief did not know it had: **Maple has no stage to measure.** `WORLD_COPY.maple.hero` is null, so there is nothing for a hero-framed
 sweep to stand off, and §2.3's Maple stage (the waterfall lip) is a module-local const in
 `island.ts` that no probe may transcribe. Day 2 exposes it and re-runs Maple (§2.9.7).

@@ -1,0 +1,21 @@
+
+  LEVELS — the ladder's state @ :4177
+  The gate is a WIN (owner, §8.1): goal k+1 opens on 'done', never on 'fin'.
+
+  ok   (b) the goal card unrolled at frame 26 (0.43 game-s after the probe took the clock)
+  ok   (b) the goal card was raised exactly once
+  ok   (b) the card fired at 0.5s after arming, on the authored mark (last frame before: 0.483s)
+  ok   (b) the card carries this level's own line: "EAT 18,000 OF THE TOWN"
+  ok   (b) the card names the dot: LEVEL 1
+  ok   (b) the goal card is never up while the ghost hand is (1 card-up state(s) sampled)
+  BAD  (b) met: the match ended at clock -0.61 — that is the buzzer, not a win on the spot
+  ok   (b) met: no hot countdown on a won match
+  ok   (b) met: no EAT FASTER banner on a won match
+  BAD  (b) met: the match resolved as undefined — a met goal is a win
+  BAD  (b) met: maple dot 1 is "fin" after a win — a met goal raises it to done (or clear with the CLEAR number)
+  BAD  (b) met: maple dot 2 is "locked" after dot 1 was won — a pass opens the next dot
+  BAD  (b) met: attempts went undefined → undefined — one match is one attempt
+  BAD  (b) met: level_win fired 0 time(s) — the funnel counts matches, not frames
+
+FAIL — levels threw: page.evaluate: TypeError: window.__rivalOnLandmark is not a function
+EXIT=1

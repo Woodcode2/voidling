@@ -1653,8 +1653,38 @@ interface ActiveGoal {
   /** EAT's high-water mark, for the same reason: the number stays honest but
    *  the progress bar never goes backwards under a child's hand. */
   hi: number;
+  /** How the match ended, written ONCE. null until the win or the buzzer
+   *  claims it — see the first-writer guard beside the buzzer. */
+  result: 'win' | 'time' | null;
 }
 let goal: ActiveGoal | null = null;
+/** The prop dot 3 is asking for, resolved once at arm. Held rather than
+ *  re-scanned: goalMet() runs every frame and a scan of three thousand edibles
+ *  per frame is not a thing to do for a boolean. */
+let goalProp: Edible | null = null;
+
+/** ── IS THE DOT WON, RIGHT NOW? ───────────────────────────────────────────
+ *  Read off the game's own numbers, never off the HUD chip's text — the chip
+ *  refreshes at 5 Hz and this is asked every frame.
+ *
+ *  RIVALS is the one kind that cannot answer early and returns false always:
+ *  a rank is only true at the buzzer, because the family is still eating.
+ *  §4.2 — "resolves at the buzzer only". The buzzer resolves it. */
+function goalMet(): boolean {
+  if (!goal) return false;
+  const sp = LEVEL_SPEC[pickedWorld];
+  switch (goal.n) {
+    case 1: return playerScore >= sp.eat;
+    // every line of the triple, not the total: three separate promises
+    case 2: return setOrder(pickedWorld).every((x) => (kindTally[x.kind] ?? 0) >= x.n);
+    // BY HER, not merely gone. byPlayer is the same flag the DEVOURED meter
+    // splits you-vs-family on, and the family cannot take this prop at all
+    // while dot 3 is being played (see the reservation in beginMatch).
+    case 3: return !!goalProp && !!goalProp.mesh.userData.byPlayer;
+    case 4: return false;
+    default: return devouredPct >= sp.clear;
+  }
+}
 /** The five kinds in dot order. levels.ts owns the same list; this is the
  *  render side's copy of the NAME only, never of the rule. */
 const GOAL_KIND_NAMES = ['eat', 'set', 'landmark', 'rivals', 'clear'] as const;
@@ -2255,6 +2285,8 @@ const _dbg = new Proxy(_dbgStore, {
   __eatLandmark: () => { name: string; radius: number; voidR: number } | null;
   __setRivalScores: (scores: number[]) => number;
   __devourAll: (pct?: number) => number;
+  __rivalOnLandmark: () => Record<string, unknown> | null;
+  __landmarkState: () => Record<string, unknown> | null;
   __events: (clear?: boolean) => unknown[];
   __landmarkProbe: () => { biggest: { x: number; z: number; radius: number; needR: number; qk: string } | null;
     nearHero: { x: number; z: number; radius: number; needR: number; qk: string } | null; eatRatio: number;
@@ -2789,6 +2821,53 @@ _dbg.__setRivalScores = (scores: number[]): number => {
     if (n < scores.length) { r.score = Math.max(0, Math.round(scores[n])); n++; }
   }
   return n;
+};
+
+/** LANDMARK, THE OTHER SIDE OF IT. Puts one rival on top of this world's
+ *  tagged landmark, big enough to swallow it by the family's own rule
+ *  (radius <= r * EAT_RATIO), and joined. Returns what it set up so a probe can
+ *  assert against the game's numbers rather than its own.
+ *
+ *  This exists because the obvious bar could not fail. Draft 1 proposed "after
+ *  60 match-seconds of autopilot the landmark is uneaten" — but non-hunter
+ *  rivals are capped at softCap and never reach the radius a landmark needs in
+ *  a minute, so that bar was green on a build with no exclusion at all. The
+ *  only honest test is to MAKE the rival capable and then watch the rule
+ *  refuse it: taken on dot 1, refused on dot 3. */
+_dbg.__rivalOnLandmark = (): Record<string, unknown> | null => {
+  let lm: Edible | null = null;
+  for (const e of edibles) {
+    if (e.eaten || !e.mesh.visible) continue;
+    if (e.mesh.userData.landmark) { lm = e; break; }
+  }
+  if (!lm) return null;
+  const rv = rivals.list[0];
+  if (!rv) return null;
+  const priv = rv as unknown as { joinAt: number };
+  if (typeof priv.joinAt === 'number') priv.joinAt = -1;   // the real arrival path, next update()
+  rv.joined = true;
+  // comfortably over the family's own eat line, so nothing here turns on a
+  // rounding edge: their rule is target.radius <= rv.r * EAT_RATIO
+  rv.r = (lm.radius / EAT_RATIO) * 1.25;
+  rv.x = lm.mesh.position.x; rv.z = lm.mesh.position.z;
+  return { name: rv.name, rivalR: +rv.r.toFixed(2),
+    landmark: String(lm.mesh.userData.landmark), landmarkR: +lm.radius.toFixed(2),
+    needR: +(lm.radius / EAT_RATIO).toFixed(2),
+    reserved: !!lm.mesh.userData.reserved,
+    canEatByTheirRule: lm.radius <= rv.r * EAT_RATIO };
+};
+
+/** Is this world's tagged landmark still standing, and who took it? The one
+ *  read dot 3 turns on, straight off the meshes. */
+_dbg.__landmarkState = (): Record<string, unknown> | null => {
+  for (const e of edibles) {
+    if (!e.mesh.userData.landmark) continue;
+    return { name: String(e.mesh.userData.landmark),
+      eaten: !!(e.eaten || e.mesh.userData.eaten), byPlayer: !!e.mesh.userData.byPlayer,
+      reserved: !!e.mesh.userData.reserved, visible: !!e.mesh.visible,
+      radius: +e.radius.toFixed(2) };
+  }
+  return null;
 };
 
 /** CLEAR. Marks props consumed BY THE PLAYER until the accounting sweep would
@@ -5904,7 +5983,11 @@ function celebrateEnd(coins: number, xpGain: number, lead: string, won = false, 
   requestAnimationFrame(tick);
 }
 
-function endMatch() {
+/** How this match resolved AS A LEVEL. null on every match nobody chose a dot
+ *  for — which is every harness match and every match before the ladder is
+ *  touched — and on those nothing below behaves differently. */
+type GoalResult = 'win' | 'time' | null;
+function endMatch(result: GoalResult = null) {
   document.body.classList.remove('intro');
   // the crowd stops fleeing behind the results panel — the world back there
   // should look alive, not mid-evacuation with nothing chasing it
@@ -5912,6 +5995,28 @@ function endMatch() {
   ended = true;
   localStorage.setItem('voidPlayed', '1');
   audio.stopMusic();
+  // ── THE LADDER MOVES HERE, AND ONLY HERE ─────────────────────────────────
+  // ABOVE the solo branch's own `return` 40 lines down. That return is why a
+  // child who only ever played BY MYSELF never unlocked world 2, and it would
+  // have swallowed every level result the same way — a bug already paid for
+  // once, recorded in levels.ts's own header so it is not paid for twice.
+  //
+  // The star and the tick are one call: 'win' raises the dot to done, or to
+  // clear when the world's CLEAR number came up in the same run, and ONLY a
+  // pass opens the next dot (§8.1, the owner's gate). A miss raises it to fin
+  // — attempted, still current, nothing taken away.
+  let levelOpened: Goal | null = null;
+  if (goal) {
+    const sp = LEVEL_SPEC[pickedWorld];
+    levelOpened = recordLevelResult({
+      world: pickedWorld, goal: goal.n, kind: goal.kind as never,
+      result: result === 'win' ? 'win' : 'time',
+      cleared: result === 'win' && devouredPct >= sp.clear,
+      score: Math.round(playerScore), pct: devouredPct,
+      rank: lastRank, secs: Math.round(elapsed()),
+    }).opened;
+  }
+  void levelOpened;   // the end card reads it on day 6; recorded now so the pip is right
   // the whistle's SOUND is chosen below, once the result is known — this
   // called audio.win() unconditionally, so a child who finished 5th read
   // "OUT-NOMMED!" while the island cheered for them, and first place owned
@@ -5922,8 +6027,11 @@ function endMatch() {
     const best = Number(localStorage.getItem('voidBestPct') || 0);
     const newBest = devouredPct > best;
     // no opponent means no defeat: a new best gets the cheer, anything else
-    // gets the soft chime — never the "aww" notes, there is nobody to lose to
-    if (newBest) audio.win(); else audio.ready();
+    // gets the soft chime — never the "aww" notes, there is nobody to lose to.
+    // Under a level the ear follows the GOAL rather than the percentage: a dot
+    // won is a cheer even on a poor run, and a dot missed is still the soft
+    // chime, never a loss sting (§4.3, "audio.ready(), never audio.lose()").
+    if (goal ? result === 'win' : newBest) audio.win(); else audio.ready();
     if (newBest) localStorage.setItem('voidBestPct', String(devouredPct));
     const lvl2Before = rankInfo(xp).lvl;
     const gain2 = 8 + (newBest ? 8 : 0);
@@ -5943,6 +6051,17 @@ function endMatch() {
         : newBest ? 'NEW BEST!!' : `best: ${Math.max(best, devouredPct)}%`, false, troPay2.gems);
     endList.innerHTML = '';
     endEl.classList.add('show');
+    // ── BY MYSELF IS STILL PLAYING THE GAME ──────────────────────────────
+    // completeWorld() lives 120 lines down, past this branch's own return, so
+    // a child who only ever pressed BY MYSELF finished match after match and
+    // never opened world 2. The unlock is a FINISH, not a placement — there is
+    // nobody to place against here — so it belongs on both paths. The end
+    // card's own NEW WORLD panel is the rivals branch's; solo gets the unlock
+    // silently today and the panel on day 6 with the rest of that screen.
+    {
+      const openedW = completeWorld(pickedWorld);
+      if (openedW) track('world_unlocked', { world: openedW, after: pickedWorld, total: unlockedCount(), solo: true });
+    }
     countMatch();
     track('match_end', {
       solo: true, sec: elapsed(), score: Math.round(playerScore),
@@ -5963,7 +6082,14 @@ function endMatch() {
   // first place OWNS the cheer — with eyes closed a child can tell whether
   // they won, which is what makes them want the cheer back next match. The
   // loss sting is two soft falling notes, gentle by the no-dread rule.
-  if (myRank === 1) audio.win(); else audio.lose();
+  //
+  // AND THERE IS NO LOSS STING INSIDE A LEVEL. §4.3: on a miss nothing is lost
+  // and nothing stops — the dot stays hers to replay, so the sound is the soft
+  // chime, not the falling notes. A child who finished 4th but MET her goal
+  // gets the cheer; one who came 1st on a dot asking for something else does
+  // not get told she lost.
+  if (goal) { if (result === 'win') audio.win(); else audio.ready(); }
+  else if (myRank === 1) audio.win(); else audio.lose();
   // everyone leaves with something; winning is 5x last place, not infinity-x
   const today = new Date().toDateString();
   // The score term was min(60, score/50) — SATURATED at 3,000 points, which a
@@ -6742,8 +6868,27 @@ function beginMatch(solo = false) {
   // goal-free match — which is every harness match, and every match before a
   // human has chosen a dot.
   goal = playingGoal ? { n: playingGoal, kind: GOAL_KIND_NAMES[playingGoal - 1],
-    line: goalLine(pickedWorld, playingGoal), met: false, hi: 0 } : null;
+    line: goalLine(pickedWorld, playingGoal), met: false, hi: 0, result: null } : null;
   if (goal) trackLevelStart(pickedWorld, goal.n);
+  // ── THE FAMILY MAY NOT TAKE THE THING SHE WAS ASKED TO EAT ───────────────
+  // The rivals eat by the same rule the player does and have never had an
+  // exclusion, so on dot 3 a rival could swallow the barn and the child would
+  // be left playing for a prop that is not there. There is no 'stolen' state
+  // and there should not be one: a goal a child can lose through no act of
+  // her own is a goal that teaches her the game is unfair.
+  //
+  // `reserved` joins `departed` and `tethered` in rivals.ts's own off-the-menu
+  // predicate (:460) — one clause, so all four of its scan and swallow sites
+  // are covered at once rather than three of four. Cleared every match first,
+  // because a reservation that outlived dot 3 would quietly make the landmark
+  // immortal on every other dot.
+  goalProp = null;
+  for (const e of edibles) if (e.mesh.userData.reserved) e.mesh.userData.reserved = false;
+  for (const e of edibles) {
+    if (!e.mesh.userData.landmark) continue;
+    if (!goalProp) goalProp = e;
+    if (goal?.n === 3) e.mesh.userData.reserved = true;
+  }
   {
     const tl = document.querySelector('#titlecard .lvl');
     const ts = document.querySelector('#titlecard .sub');
@@ -8408,6 +8553,17 @@ el('btnHome').addEventListener('click', () => {
       form: curStage, bites: rivalEv.bites, ...fpsSummary(),
     });
     started = false; armed = false; ended = true;
+    // ── LEAVING IS AN ATTEMPT, NEVER A FINISH ───────────────────────────────
+    // n += 1 and nothing else: recordLevelResult raises no state on 'quit'
+    // (levels.ts), so the dot keeps whatever it had. A child who walks away
+    // has not met a goal — and counting a quit as a finish would let a
+    // frustrated tap through a gate the owner set as a WIN.
+    if (goal && !goal.result) {
+      recordLevelResult({ world: pickedWorld, goal: goal.n, kind: goal.kind as never,
+        result: 'quit', score: Math.round(playerScore), pct: devouredPct,
+        rank: lastRank, secs: Math.round(elapsed()) });
+    }
+    goal = null;   // the match is over; nothing downstream may still read a live dot
     // ── AND THE TOWN GOES BACK TO BEING A TOWN ──────────────────────────────
     // endMatch calls life.calm(Infinity) so the crowd settles behind the
     // results card — panic contagion off, nobody running from a void that has
@@ -10124,7 +10280,7 @@ function animate() {
   perfFrame(dtRaw);
   frameTime(dtRaw);
   let dtw = dt;
-  if (outroT > 0) { outroT -= dt; if (outroT <= 0) endMatch(); else dtw = dt * 0.3; }
+  if (outroT > 0) { outroT -= dt; if (outroT <= 0) endMatch(goal?.result ?? null); else dtw = dt * 0.3; }
   stopCd = Math.max(0, stopCd - dt);
   if (stopT > 0) { stopT = Math.max(0, stopT - dt); dtw *= 0.06; }
   tClock += dt;
@@ -10344,7 +10500,15 @@ function animate() {
       // Nothing is removed from the ending — it is the same ritual in the
       // other colour, which is what "no timers that pressure" has to mean when
       // the timer is still there.
-      const hurry = !goal || goal.met;
+      // `goal.met` used to be an escape hatch here, on the reasoning that a met
+      // goal is a finish and a finish may be celebrated. Day 5 removed it,
+      // because day 5 is what made it wrong: a goal met now ENDS the match on
+      // the spot, and for the two seconds of outro that follow, `started` is
+      // still true and this block still runs — so the one frame a child won on
+      // would have turned the clock red and fired EAT FASTER at her. Under a
+      // level there is never anything to hurry for: unmet, the nag is the
+      // pressure the owner's floor forbids; met, the match is already over.
+      const hurry = !goal;
       const bell = hurry || (goal !== null && goal.n === 4 && lastRank === 1);
       if (hurry) timerEl.style.color = '#ff8a8a';
       // The warning used to fire at 30s — the exact frame the TREASURE FEAST
@@ -10380,7 +10544,36 @@ function animate() {
           voidling.radius * (1.5 + (10 - cs) * 0.07), 0.55);
       }
     }
+    // ── THE WIN LANDS THE MOMENT IT IS EARNED ────────────────────────────
+    // A goal met is the end of the match, not a note taken for the buzzer: a
+    // child who has done the thing should be told so while she is still
+    // holding the moment. It ends through the SAME door the buzzer uses —
+    // outroT = 2.0, the slow-mo push-in, the rings, endMatch() off the outro —
+    // so nothing about the ceremony is duplicated or special-cased.
+    //
+    // FIRST WRITER WINS, and the guard is `outroT <= 0` on both blocks. During
+    // the two-second outro the eat loop, the rivals and the score all keep
+    // running at dtw = dt x 0.3, so an unguarded threshold can cross AFTER the
+    // buzzer has already resolved the match as TIME and overwrite it with a
+    // win — and at matchClock <= 0.6 the two can land in the same frame. This
+    // block runs first and takes outroT; the buzzer below then reads it as
+    // taken. Whichever gets there first owns the result and the other is a
+    // no-op, which is the only honest way to settle a tie.
+    if (goal && !goal.met && !ended && outroT <= 0 && goalMet()) {
+      goal.met = true; goal.result = 'win';
+      outroT = 2.0;
+      fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 5, 1);
+      fx.ring(voidState.x, voidState.z, 0xb875ff, voidling.radius * 3.4, 0.8);
+      audio.evolve();
+    }
     if (matchClock <= 0 && !ended && outroT <= 0) {
+      // RIVALS is the one dot the clock itself decides: the rank is only true
+      // when the family has stopped eating, which is now. Everything else that
+      // reaches this line has already been asked every frame and said no.
+      if (goal && !goal.result) {
+        const won = goal.n === 4 && lastRank === 1;
+        goal.met = won; goal.result = won ? 'win' : 'time';
+      }
       outroT = 2.0;   // slow-mo push-in beat before the results panel
       fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 5, 1);
       fx.ring(voidState.x, voidState.z, 0xb875ff, voidling.radius * 3.4, 0.8);

@@ -457,7 +457,14 @@ export function createRivals(
   const rivals: R[] = [];        // THIS match's cast (api.list points at it)
   // …or DEPARTED: a balloon in the air is not on anybody's menu, and a rival
   // chasing the ground under it is a rival chasing nothing
-  const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible || m.userData.departed || m.userData.tethered;
+  // OFF THE FAMILY'S MENU. Not all four of these mean "eaten" — `departed` is a
+  // balloon that went up, `tethered` is the pegged-down whale, and `reserved`
+  // is the prop a LEVEL has asked the player for (prototype3d.ts, beginMatch:
+  // dot 3 names a landmark, and a rival taking it would lose the child a goal
+  // through no act of her own). One predicate, so every scan and every swallow
+  // site below honours all four — the three eat loops and the target check.
+  const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible
+    || m.userData.departed || m.userData.tethered || m.userData.reserved;
 
   // the family wears LEGENDARIES ONLY — the 3D-accessory hero skins (unicorn
   // horn, dino spikes, wizard hat, crown…). Aspirational: every family member

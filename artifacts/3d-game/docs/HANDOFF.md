@@ -463,11 +463,46 @@ geometry bar belongs to day 12, where the brief already plans the viewport
 pass). **The branch tip carrying this CSS is NOT yet gate-green**; the last
 green build is `3d8b414` and the next full run covers days 4 and 5 together.
 
-**Next: day 5** — `goalMet()` with the `outroT <= 0` first-writer guard,
-`endMatch(result)`, `recordLevelResult` at the buzzer, `completeWorld` in the
-solo branch, the landmark exclusion and the quit path; `levels.mjs` (h), and
-(b)'s "goal already met → no countdown" half. **Re-baseline
-`newsfeed`/`faceparity`/`econ` on that build and record it.**
+**Day 5 is DONE (2026-09-12): a level can now be won, and lost without
+punishment.** `goalMet()` beside the buzzer with the `outroT <= 0` first-writer
+guard, `endMatch(result)`, `recordLevelResult` above the solo return,
+`completeWorld` on the solo path, the quit path, and the landmark exclusion.
+`qa/levels.mjs` (h) and (b)'s goal-met half. Measured, before → after:
+
+- **A met goal ends the match on the spot.** Before: the goal was met and the
+  match ran on to the buzzer, ending at clock **-0.61**; the dot read `fin` and
+  the next one stayed `locked`. After: the match ends with **59.24 s still on the
+  clock**, maple dot 1 rises `open → done`, dot 2 opens, one match counts as one
+  attempt, and `level_win` fires exactly once.
+- **The nag is gone from inside a level entirely.** Day 4 let `goal.met` turn the
+  ritual back on; day 5 is what made that wrong, because a met goal now ends the
+  match and `started` stays true through the two-second outro — so the one frame
+  a child won on would have turned the clock red and fired EAT FASTER at her.
+- **The family may no longer take the prop dot 3 asks for.** `reserved` joins
+  `departed` and `tethered` in the rivals' own off-the-menu predicate
+  (`rivals.ts:460`), which covers all four of their scan and swallow sites in one
+  clause instead of three of four.
+- **MY FIRST VERSION OF THAT BAR PASSED FOR THE WRONG REASON, and the probe said
+  so.** The hook plants an oversized rival on the landmark; the family's size law
+  (`softCap = max(min(START_R + 0.02t, 1.6), pr*0.80)`) runs every frame before
+  the swallow loop and clawed it from **r 5.63 back to r 1.30**, so the barn
+  survived dot 3 because the rival was never capable — not because of the
+  exclusion. This is the exact trap MENU-BRIEF §5.2 (h) records against draft 1's
+  version of the bar, and the first build of it walked straight in. The bar now
+  reports the rival's REAL radius and fails when it is under the line, and the
+  run uses `?r=8` so the cap lifts through the game's own law rather than by
+  exempting anyone from it. Verified by deleting the exclusion and rebuilding:
+  the family ate the barn on dot 3 in 20.1 s (`levels-day5-h-before.log`).
+
+**Next: day 6** — the end card: the pip headline, `#endPips`, the caption,
+CONTINUE / TRY AGAIN, the shop door only when affordable; **one commit** retires
+the quest board and ports `questable` into `levels.mjs` (e); `levels.mjs` (d);
+`endfit2` registered.
+
+**Day 5's leftover:** re-baseline `newsfeed`/`faceparity`/`econ` on this build
+and record their numbers, so a later drift has something to be measured against.
+
+
 
 **HARNESS, read this before running anything:** the repo declares neither
 `playwright` nor `pngjs`, and `qa/` imports both — so on a fresh container the

@@ -43,13 +43,13 @@
 // coverage after the hair was raised; both passed. GOVERNOR.md rule 4: parse
 // the real thing and throw if the call site has moved.
 //
-//   node qa/levels.mjs [port] [--only=a,b,c,e,f,g,i]
+//   node qa/levels.mjs [port] [--only=a,b,c,e,f,g,h,i]
 import { chromium } from 'playwright';
 import { ALL_WORLDS, UNLOCK_ALL } from './worlds.mjs';
 
 const flag = (n, d) => { const h = process.argv.find((a) => a.startsWith(`--${n}=`)); return h ? h.slice(n.length + 3) : d; };
 const PORT = process.argv.slice(2).filter((a) => !a.startsWith('--'))[0] || '4177';
-const ONLY = flag('only', 'a,b,c,e,f,g,i').split(',');
+const ONLY = flag('only', 'a,b,c,e,f,g,h,i').split(',');
 
 const fails = [];
 const bad = (m) => { fails.push(m); console.log(`  BAD  ${m}`); };
@@ -444,6 +444,170 @@ if (ONLY.includes('b')) {
     if (!ups.length) bad('(b) the card was raised but never read as ON SCREEN — __matchState() is not publishing titleUntil, so the clash bar below has nothing to test');
     if (clash.length) bad(`(b) the goal card and the ghost hand shared the screen for ${clash.length} of ${ups.length} sampled states — the lesson and the target are two teachers talking at once`);
     else ok(`(b) the goal card is never up while the ghost hand is (${ups.length} card-up state(s) sampled)`);
+  }
+}
+
+// ── (b), THE OTHER HALF: A GOAL MET ENDS THE MATCH ─────────────────────────
+// §4.7 bar 2's last clause and §4.3. Day 4 could only test the unmet side,
+// because nothing could end a match early. Now: drive the counter over the
+// line with the §3.1 hooks and the match has to STOP — with clock left on it,
+// with the cheer rather than the loss sting, and with the ladder moved.
+//
+// The ladder assertions ride along here rather than waiting for (d) because
+// day 5 is the commit that writes them: recordLevelResult would otherwise land
+// with nothing watching it. (d) covers how the END CARD presents this on day 6.
+if (ONLY.includes('b')) {
+  const p = await open({ voidUnlocked: UNLOCK_ALL }, '?w=maple&g=1&len=60');
+  await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0, null, { timeout: 600000 })
+    .catch(() => { });
+  await VIRTUALISE(p);
+  const before = await p.evaluate(() => ({
+    levels: window.__levels().filter((r) => r.world === 'maple').map((r) => ({ n: r.goal, st: r.st, tries: r.n })),
+    clock: window.__matchState().clock, spec: window.__levelSpec(),
+  }));
+  // cross the line on the spot, then keep cranking: the match must end itself
+  const r = await p.evaluate(([n, step]) => {
+    const cEl = document.getElementById('count')?.firstElementChild;
+    const bEl = document.getElementById('banner');
+    window.__setScore(window.__levelSpec().eat + 1);
+    let hot = 0, banner = null, endedAt = null, framesAfter = 0;
+    for (let i = 0; i < n; i++) {
+      const due = window.__q; window.__q = [];
+      if (!due.length) return { broke: true, i };
+      window.__virt += step;
+      for (const cb of due) cb(window.__virt);
+      if (cEl?.classList.contains('hot')) hot++;
+      const bt = bEl?.textContent ?? '';
+      if (/FASTER|SECONDS/.test(bt) && banner === null) banner = bt;
+      const ms = window.__matchState();
+      // the score is held over the line: the hunters can steal it back, and a
+      // win that un-wins itself is the exact thing the latch exists to stop
+      if (!endedAt) window.__setScore(window.__levelSpec().eat + 1);
+      if (document.getElementById('end')?.classList.contains('show') && !endedAt) {
+        endedAt = { clock: +ms.clock.toFixed(2), t: +ms.t.toFixed(2), frame: i };
+      } else if (endedAt) framesAfter++;
+      if (framesAfter > 120) break;
+    }
+    const ms = window.__matchState();
+    return { hot, banner, endedAt, timer: document.getElementById('timer')?.textContent ?? '',
+      goal: window.__goalState ? window.__goalState() : 'hook missing',
+      clock: +ms.clock.toFixed(2),
+      levels: window.__levels().filter((x) => x.world === 'maple').map((x) => ({ n: x.goal, st: x.st, tries: x.n })),
+      ev: (window.__events ? window.__events(false) : []).map((e) => e.event),
+      endHd: document.getElementById('endHd')?.textContent ?? '' };
+  }, [60 * 90, 1000 / 60]);
+  await p.close();
+
+  if (r.broke) bad(`(b) met: the rAF chain broke at frame ${r.i}`);
+  else if (!r.endedAt) {
+    bad(`(b) met: the goal was met and the match did not end — she did the thing and the game kept going (clock ${r.clock}, goal ${JSON.stringify(r.goal)})`);
+  } else {
+    // THE POINT OF THE WHOLE DAY: clock still on it.
+    if (!(r.endedAt.clock > 0)) bad(`(b) met: the match ended at clock ${r.endedAt.clock} — that is the buzzer, not a win on the spot`);
+    else ok(`(b) met: the match ended with ${r.endedAt.clock}s still on the clock (t=${r.endedAt.t})`);
+    if (r.hot) bad(`(b) met: #count went hot on ${r.hot} frames of a match she WON`);
+    else ok('(b) met: no hot countdown on a won match');
+    if (r.banner !== null) bad(`(b) met: the banner read "${r.banner}" on a match she WON`);
+    else ok('(b) met: no EAT FASTER banner on a won match');
+    if (!r.goal || r.goal === 'hook missing' || r.goal.result !== 'win') bad(`(b) met: the match resolved as ${JSON.stringify(r.goal && r.goal.result)} — a met goal is a win`);
+    else ok('(b) met: the match resolved as a win');
+  }
+  // ── AND THE LADDER MOVED, ONCE ─────────────────────────────────────────
+  const row = (rows, n) => (rows || []).find((x) => x.n === n) || {};
+  const b1 = row(before.levels, 1), a1 = row(r.levels, 1), a2 = row(r.levels, 2);
+  if (!['done', 'clear'].includes(a1.st)) bad(`(b) met: maple dot 1 is "${a1.st}" after a win — a met goal raises it to done (or clear with the CLEAR number)`);
+  else ok(`(b) met: maple dot 1 rose ${b1.st} → ${a1.st}`);
+  if (a2.st !== 'open') bad(`(b) met: maple dot 2 is "${a2.st}" after dot 1 was won — a pass opens the next dot`);
+  else ok('(b) met: maple dot 2 opened');
+  if (a1.tries !== (Number(b1.tries) || 0) + 1) bad(`(b) met: attempts went ${b1.tries} → ${a1.tries} — one match is one attempt`);
+  else ok(`(b) met: one match counted as one attempt (${a1.tries})`);
+  const wins = (r.ev || []).filter((e) => String(e).includes('level_win'));
+  if (wins.length !== 1) bad(`(b) met: level_win fired ${wins.length} time(s) — the funnel counts matches, not frames`);
+  else ok('(b) met: level_win fired exactly once');
+}
+
+// ── (h) THE FAMILY MAY NOT TAKE HER LANDMARK ───────────────────────────────
+// §4.2: "The landmark prop is excluded from the rivals' eat rule on goal 3";
+// there is no 'stolen' state and there must not be one — a goal a child can
+// lose through no act of her own teaches her the game is unfair.
+//
+// THE BAR DRAFT 1 PROPOSED COULD NOT FAIL. "After 60 match-seconds of autopilot
+// the landmark is uneaten" is green on a build with no exclusion at all,
+// because non-hunter rivals are capped at softCap and never reach the radius a
+// landmark needs inside a minute. So this MAKES a rival capable — oversized,
+// joined, standing on the prop — and watches the rule decide: refused on dot 3,
+// taken on dot 1. Both halves, because a rule that refuses everything is not an
+// exclusion, it is a bug.
+if (ONLY.includes('h')) {
+  // ?r=8 IS LOAD-BEARING, and the first version of this bar did not have it.
+  // The family's size law is `softCap = max(min(START_R + 0.02t, 1.6), pr*0.80)`
+  // (rivals.ts:990) and it runs every frame BEFORE the swallow loop — so a hook
+  // that writes rv.r = 5.63 has it clawed straight back to 1.3 while the player
+  // is small, and MEASURED it was: r 5.63 in, r 1.30 out, the barn untouched on
+  // BOTH dots. The dot-3 half then "passed" for the wrong reason entirely — the
+  // rival was never capable, so the exclusion was never tested. Exactly the
+  // trap §5.2 (h) records against draft 1's version of this bar.
+  //
+  // ?r=8 starts the void at radius 8 and turns the clock-bound growth law off
+  // (prototype3d.ts:4348, :10583, :11893), which lifts softCap to 6.4 through
+  // the game's OWN law rather than exempting anyone from it. And it is the real
+  // scenario: late in a match the player IS r 8, the family is at 0.80x, and a
+  // 5.0 barn is squarely on their menu. That is when this exclusion matters.
+  const run = async (g) => {
+    const p = await open({ voidUnlocked: UNLOCK_ALL }, `?w=maple&g=${g}&len=60&r=8`);
+    await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0, null, { timeout: 600000 })
+      .catch(() => { });
+    await VIRTUALISE(p);
+    const setup = await p.evaluate(() => (window.__rivalOnLandmark ? window.__rivalOnLandmark() : 'hook missing'));
+    const out = await p.evaluate(([n, step]) => {
+      for (let i = 0; i < n; i++) {
+        const due = window.__q; window.__q = [];
+        if (!due.length) return { broke: true, i };
+        window.__virt += step;
+        for (const cb of due) cb(window.__virt);
+        // hold the rival on the prop: their steering will walk them off it
+        // otherwise, and "it wandered away" is not the same finding as
+        // "the rule refused it"
+        if (i % 10 === 0 && typeof window.__rivalOnLandmark === 'function') window.__rivalOnLandmark();
+      }
+      const ms = window.__matchState();
+      const rv = ms.rivals[0] || {};
+      return { state: window.__landmarkState ? window.__landmarkState() : 'hook missing',
+        t: +ms.t.toFixed(1),
+        // what the rival ACTUALLY is by the end, not what the hook asked for:
+        // the family's own size law runs every frame and may have taken the
+        // radius straight back off it
+        rival: { r: +(rv.r ?? 0).toFixed(2), joined: !!rv.joined,
+          d: Math.round(Math.hypot((rv.x ?? 0) - (window.__landmarkState?.()?.x ?? rv.x ?? 0),
+            (rv.z ?? 0) - (window.__landmarkState?.()?.z ?? rv.z ?? 0))) } };
+    }, [60 * 20, 1000 / 60]);
+    await p.close();
+    return { setup, ...out };
+  };
+
+  const dot3 = await run(3);
+  if (dot3.setup === 'hook missing' || dot3.state === 'hook missing') {
+    bad('(h) the landmark hooks are missing — __rivalOnLandmark / __landmarkState');
+  } else if (!dot3.setup) {
+    bad('(h) maple has no tagged landmark, so dot 3 has nothing to ask for');
+  } else {
+    // the rival really was capable — otherwise the bar below proves nothing
+    if (!dot3.setup.canEatByTheirRule) bad(`(h) the planted rival (r ${dot3.setup.rivalR}) could not eat the ${dot3.setup.landmark} (r ${dot3.setup.landmarkR}) by the family's own rule — the test never applied pressure`);
+    else ok(`(h) a rival at r ${dot3.setup.rivalR} is over the family's eat line for the ${dot3.setup.landmark} (needs ${dot3.setup.needR})`);
+    if (!dot3.setup.reserved) bad('(h) the landmark is not reserved on dot 3 — nothing is stopping the family');
+    else ok('(h) dot 3 reserves the landmark');
+    if (dot3.state.eaten) bad(`(h) the family ate the ${dot3.setup.landmark} on dot 3 after ${dot3.t}s — the child is now playing for a prop that is not there`);
+    else if (dot3.rival.r < dot3.setup.needR) bad(`(h) the ${dot3.setup.landmark} survived dot 3, but the rival ended at r ${dot3.rival.r} — under the ${dot3.setup.needR} it needed, so the world's own size law refused it and this bar proved nothing about the exclusion`);
+    else ok(`(h) the ${dot3.setup.landmark} is still standing on dot 3 after ${dot3.t}s with a rival at r ${dot3.rival.r} on top of it (it needed ${dot3.setup.needR})`);
+  }
+
+  const dot1 = await run(1);
+  if (dot1.setup && dot1.state !== 'hook missing') {
+    if (dot1.setup.reserved) bad('(h) the landmark is reserved on dot 1 — the exclusion belongs to dot 3 only, or the world grows an immortal prop');
+    else ok('(h) dot 1 leaves the landmark on the family\'s menu');
+    if (!dot1.state.eaten) bad(`(h) the same oversized rival did NOT take the ${dot1.setup.landmark} on dot 1 after ${dot1.t}s — a rule that refuses everything is not an exclusion. The rival ended at r ${dot1.rival.r} against the ${dot1.setup.landmarkR} it had to swallow (needed ${dot1.setup.needR}); the hook set it to ${dot1.setup.rivalR}`);
+    else if (dot1.state.byPlayer) bad('(h) the landmark went to the PLAYER on dot 1 — the run measured the wrong eater');
+    else ok(`(h) the family took the ${dot1.setup.landmark} on dot 1, which is what makes dot 3's refusal mean something`);
   }
 }
 
