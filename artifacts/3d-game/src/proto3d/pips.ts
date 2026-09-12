@@ -74,6 +74,26 @@ export const PIP_WORD: Record<PipState, string> = {
  *  missed dot is still the current one under the win gate (§3.2). */
 export const pipHere = (s: PipState): boolean => s === 'open' || s === 'fin';
 
+/** ── THE THREE TIMINGS THE LADDER MOVES ON ────────────────────────────────
+ *  Here, not in the stylesheet and not in the caller, because THREE places read
+ *  each one: the CSS animation that plays it, the JS that schedules the next
+ *  beat after it, and the probe that measures whether it happened. A number
+ *  written three times is a number that will disagree with itself the first
+ *  time one of the three is tuned.
+ *
+ *  The CSS side gets them as custom properties on :root (see index.html) and
+ *  they are asserted equal by qa/reveal.mjs, so the stylesheet cannot drift
+ *  away from the schedule that drives it.
+ *
+ *  FLIP then HOP, in that order and never together: the dot she just played
+ *  changes first, so the eye is already on it, and only then does the ring
+ *  leave for the next one. Both at once and there is nothing to follow. */
+export const PIP_FLIP_MS = 180;
+/** the ring's travel to the dot the win opened */
+export const PIP_HOP_MS = 220;
+/** the gap between one pip's arrival and the next during the first reveal */
+export const PIP_REVEAL_STEP_MS = 80;
+
 /** THE SVG DEFS. Injected once into the document by ensurePipDefs(); every pip
  *  after that is a <use href="#ic-…">, which the browser shares.
  *
@@ -134,6 +154,11 @@ export interface PipOpts {
    *  numeral is the one bit of text a five-year-old learning to count CAN read,
    *  and it is how a grown-up says "do level three". */
   n?: number;
+  /** 0-based position in its row, published as `--pipI`. The staggered reveal
+   *  is then one CSS rule with a calc()'d delay rather than five timers and
+   *  five class writes — which matters because the alternative version of this
+   *  animates five nodes from JS on a screen whose whole job is to be still. */
+  idx?: number;
   /** px. 28 in a row, 96 as the end card's headline. */
   size?: number;
   /** extra classes, e.g. 'pop' to run the flip animation once */
@@ -146,9 +171,10 @@ export interface PipOpts {
  *  by innerHTML on the end card, by the menu's row builder, and by a probe's
  *  fixture. */
 export function pip(state: PipState, opts: PipOpts = {}): string {
-  const { n, size, cls, label } = opts;
+  const { n, size, cls, label, idx } = opts;
   const g = PIP_GLYPH[state];
-  const style = size ? ` style="--pipSize:${size}px"` : '';
+  const vars = (size ? `--pipSize:${size}px;` : '') + (idx !== undefined ? `--pipI:${idx};` : '');
+  const style = vars ? ` style="${vars}"` : '';
   const ring = pipHere(state) ? ' here' : '';
   const aria = label ? ` role="img" aria-label="${label}"` : ' aria-hidden="true"';
   // the numeral shows only where there is no glyph to collide with it
@@ -165,7 +191,7 @@ export function pip(state: PipState, opts: PipOpts = {}): string {
 export function pipRow(states: PipState[], opts: { size?: number; popAt?: number } = {}): string {
   const { size = 28, popAt } = opts;
   return `<div class="pipRow">` + states.map((s, i) =>
-    pip(s, { n: i + 1, size, cls: popAt === i + 1 ? 'pop' : '' })).join('') + `</div>`;
+    pip(s, { n: i + 1, idx: i, size, cls: popAt === i + 1 ? 'pop' : '' })).join('') + `</div>`;
 }
 
 /** The headline pip: one dot, big, with its word underneath at 12 px.

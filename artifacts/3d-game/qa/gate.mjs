@@ -375,6 +375,27 @@ const SUITE = [
     cmd: ['node', 'qa/levels.mjs', String(PORT), '--only=a,b,c,d,e,f,g,h,i,j'], verdict: pf,
     why: 'the ladder agrees with itself about where a child is — thirty dots, one green ring per world, a dot opened only by a goal MET rather than a match merely finished, and a goal the child can actually see on screen while she plays for it' },
 
+  // ── THE LADDER'S TWO MOMENTS OF MOTION, AND ITS STILLNESS ────────────────
+  // Day 10. Two of these bars could not have been written earlier and one of
+  // them fails the build that shipped before it: the menu's "you are here" ring
+  // carried `animation: … infinite` from day 7, which MENU-BRIEF §5.1 bar 4
+  // (zero changed pixels inside the pips on a settled menu) can never pass. The
+  // same class of motion had already cost a gate step once — the end card's copy
+  // of the ring kept Playwright from finding two stable frames to click PLAY
+  // AGAIN on (econ, 30s timeout, "element is not stable") — so this is the
+  // second time an endless animation on this game's furniture has been paid for,
+  // and the first time anything measures it.
+  //
+  // Seven bars over seven page loads, one of them a real 8-second match, and the
+  // hop's own beats are sampled over a window sized for this sandbox's 0.4-2.9
+  // fps rather than a phone's 60. Measured at 441 s on an idle box — of which 200 s
+  // is bar 7's real 8-second match, which at this sandbox's ~14x clock is nearly
+  // two wall minutes of play plus the whole end card. 1800 leaves room for a box
+  // under load without hiding a probe that has actually hung.
+  { id: 'reveal', tier: 'feel', profiles: ['push', 'live'], timeout: 1800,
+    cmd: ['node', 'qa/reveal.mjs', String(PORT)], verdict: pf,
+    why: 'the ladder moves exactly twice — the dot she played flips, then the ring hops to the one she opened — and is otherwise perfectly still, because a menu that animates forever is a menu a child never finishes reading and a button Playwright can never find stable' },
+
   { id: 'stickerreg', tier: 'quality', profiles: ['push', 'live'], timeout: 30,
     cmd: ['node', 'qa/stickerreg.mjs'], verdict: pf,
     why: 'every world hides things worth finding and every season is something a child can hunt — a world with no stickers ships a picker card whose invitation reads "✨ 0 SECRETS"' },

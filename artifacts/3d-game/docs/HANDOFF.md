@@ -680,6 +680,90 @@ measured 49%.
    doing together with day 9's azimuth re-scoring, since both change the same
    loop.
 
+**Day 10 is DONE (2026-09-12): the ladder moves exactly twice, and is otherwise
+perfectly still.** Day 7 put the thirty dots on the menu; day 8 put the world
+behind them. This is the two moments the row is allowed to move — and, the part
+that mattered more, the fact that it must not move the rest of the time.
+`qa/reveal.mjs` is the probe, seven bars, registered in push at 441 s;
+`docs/crews/round-8/reveal-before.log` and `reveal-after.log` are the runs.
+
+**What a child gets:**
+- **The hop (§3.3).** She comes HOME after a win and the row does not simply
+  appear rearranged: the dot she just played flips to its tick (180 ms), and THEN
+  the green ring hops to the dot the win opened (220 ms) with a chime and a
+  nudge. Flip first, because her eye is already on the dot she spent ninety
+  seconds on; the ring second, because that is the news. A MISS flips and keeps
+  the ring — under the owner's win gate a missed dot is still where she is, so
+  nothing moves away from her. Measured end to end from a real 8-second match
+  (bar 7): `fin,locked,locked,locked,locked`, ring still on dot 1, dot 2 still
+  locked.
+- **The first reveal (§4.6).** The first session shows no menu at all, so her
+  first sight of the ladder is after her first match. The five dots arrive left
+  to right 80 ms apart with dot 1 already wearing what she earned; the void looks
+  DOWN at the row for 1.4 s; the ring breathes three times; PLAY glows once. No
+  words, and never again — `voidLevels.seen` is one bit, and bar 1 holds both
+  halves (it ran; it does not run on the second load).
+- **Calm is a hard cut.** Every state is carried by colour and glyph, so a child
+  who cannot have motion still gets the whole ladder — she just gets it at once.
+
+**The hop is DIFFED, not announced.** `endMatch()` could have handed the menu a
+message saying "dot 1 became done and dot 2 opened"; then there would be two
+descriptions of the ladder's motion, free to disagree the first time anything
+else changed a state. `paintMenuLadder()` instead compares what the row IS with
+what it last SHOWED, so the animation cannot describe a move the ladder did not
+make — and `__recordLevel` + `__paintLadder` is then enough for a probe to drive
+it, because that pair of calls is exactly what coming HOME does.
+
+**Two live bugs, both older than this day, both found by measuring:**
+
+1. **The menu's "you are here" ring never stopped pulsing.** Day 7 shipped it
+   `infinite`. MEASURED with the same method on both builds, canvas
+   `display:none` so only CSS could move: **865 of 18,480 px of the ladder
+   (4.7%) changing every 150 ms, forever → 0 after**. The probe's animation
+   census names it outright: `pipHere@pip s-open here::after`. MENU-BRIEF §5.1
+   bar 4 asks for zero changed pixels there and an infinite animation can never
+   satisfy it, so the bar went unwritten for three days while the code it would
+   have failed was already shipped. The same class of motion had ALREADY cost a
+   gate step once — the end card's copy of that ring kept Playwright from
+   finding two stable frames to click PLAY AGAIN on (`econ`, 30 s timeout). §3.3
+   asked for three pulses on the reveal all along.
+2. **BIG MOTION off did nothing until a parent opened Settings.**
+   `reduceMotion()` sets `body.calm` on its FIRST call, and nothing called it at
+   boot — the only callers were the settings panel's paint, the pause sheet's,
+   and the flash cap. So a parent who had turned motion off got a menu and a HUD
+   carrying every animation the switch exists to stop, and `body.calm` governs
+   about fifteen rules in `index.html`. Found by bar 5, which seeds
+   `voidMotion=0` and then checks that what it is about to measure is actually
+   calm. One idempotent call at the top of `createFx`. (Checked for fallout:
+   `prefers-reduced-motion: reduce` is **false** in this Chromium, so the ~380
+   probe files that do not seed the key see no change.)
+
+**Three errors of mine, all caught before the commit, two of them only by
+looking at the thing rather than at the number:**
+- **PLAY glowed green, and wiped its own plinth doing it.** `box-shadow`
+  animates the whole stack, so a keyframe listing only a halo deletes the
+  button's shape — and PLAY is pink (`#ff5d7e`), not the ladder's green. The
+  plinth is now a named custom property the halo is added to.
+- **The stillness bar cropped the ring it was testing.** The clip was the row's
+  own bounding box; the ring is an `::after` at `inset: -16%`, 6.4 px outside its
+  dot. Padded by 12 px.
+- **`visibility: hidden` does not remove a canvas from a `backdrop-filter`'s
+  backdrop.** `#menuLadder` blurs what is behind it, so with the 3D scene at
+  0.4–2.9 fps the same build measured **0 of 18,480 px on one run and 3,107
+  (16.8%) on the next**, depending on whether four shots 150 ms apart landed
+  inside one slow frame or straddled two. `display: none` now. The earlier
+  "before" figure of 308/10,752 px was taken through both faults and is
+  superseded by the 865/18,480 above; both were measuring the right defect and
+  only the second was measuring it soundly.
+
+**And a qualifier §5.1 bar 4 did not have.** With the world live behind a
+72%-opaque panel the settled ladder changes 18.9%, 26.4%, 35.5% and 51.2% of its
+pixels across four runs of the SAME build. The spread is the finding: that
+number reads the town, not the ladder, and no animation fix will ever bring it
+to zero. It is printed as a report beside the bar rather than dropped, because it
+is the honest answer to "is this box still on a real phone" — and the answer is
+no, by design.
+
 **Still open after day 9** (both were day 8's, and day 9 did not reach them):
 day 9's own headline was the menu's frame cost and that is done; the azimuth
 re-scoring against day 1's cost series — day 1 measured that 72–92% of
@@ -688,10 +772,15 @@ the bill up to 11.5x, so the derived azimuth should be re-scored against that
 cost series rather than on framing alone.
 
 
-**Next: day 6** — the end card: the pip headline, `#endPips`, the caption,
-CONTINUE / TRY AGAIN, the shop door only when affordable; **one commit** retires
-the quest board and ports `questable` into `levels.mjs` (e); `levels.mjs` (d);
-`endfit2` registered.
+**Next: the calendar off the PLAY path** — the last unbuilt piece of day 10's
+row, and §1.2 already decided it: `#daily` rises full-screen at module init
+whenever `voidDailyLast !== today`, with a text button reading "CLAIM 90✦", so on
+her second day the first thing a non-reader is asked to press is a word. It moves
+to the end card — the day's coins claimed silently on the first finish of the day
+and counted up in `#endSub`, where the ceremony already lives; the calendar page
+itself becomes a chapter in `#book`. Then day 11's `qa/idiomguard.mjs` and day
+12's viewports + `qa/lookbook.mjs` (folding `qa/_chipfit.mjs` in as a registered
+bar).
 
 **Day 5's re-baseline is recorded** (`docs/crews/round-8/rebaseline-day5.log`,
 run on `1682897`). These three pair their runs, so a level that can end early was

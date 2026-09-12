@@ -1,0 +1,27 @@
+  ok   #1 first reveal ran: reveal=true seen=true shown=open,locked,locked,locked,locked  [27s]
+  ok   #1b second load: reveal=false (absent, as it must be) seen=true  [59s]
+  ·    #2 report: with the world live behind the panel, 3497 of 18480 px (18.9%) change in 150ms — the panel is 72% opaque over a moving camera, so this can never be 0 and is not what the bar measures
+  BAD  #2 the settled ladder is MOVING with the canvas hidden — 3107 of 18480 px (16.8%) changed between shots 2->3, 150ms apart, 3.5s after the menu came up. Nothing but a CSS animation can do that, and MENU-BRIEF §5.1 bar 4 asks for 0  [107s]
+  ok   #3a the first paint is the ladder she left: +0ms shown=open,locked,locked,locked,locked here=0 pop=-1 ringIn=-1  [135s]
+  ok   #3b the flip: the dot she won changes, the ring waits. +2950ms shown=done,open,locked,locked,locked here=0 pop=0 ringIn=-1  [135s]
+  ok   #3c the hop: the ring lands on the dot the win opened. +3051ms shown=done,open,locked,locked,locked here=1 pop=-1 ringIn=1  [135s]
+  ok   #3d it settles, with no one-shot class left behind: +3307ms shown=done,open,locked,locked,locked here=1 pop=-1 ringIn=-1  [135s]
+  ok   #3e the ladder itself says done,open,locked,locked,locked  [135s]
+  ok   #4 timings agree: flip 180ms hop 220ms step 80ms  [159s]
+  ok   #5a calm cuts straight to the new ladder: shown=done,open,locked,locked,locked here=1  [188s]
+  ok   #5b and nothing is animating inside the row (0)  [188s]
+  ok   #6a he looks down at the row on the reveal: 1.34s left of 1.4  [215s]
+  ok   #6b and he stops looking — the gaze is a beat, not a state  [238s]
+  ok   #7a a missed dot flips to fin: +766ms shown=fin,locked,locked,locked,locked  [440s]
+  ok   #7b and the ring stays hers: here=0, no arrival played  [440s]
+  ok   #7c and dot 2 is still locked: fin,locked,locked,locked,locked  [440s]
+
+  · #2 the settled ladder is MOVING with the canvas hidden — 3107 of 18480 px (16.8%) changed between shots 2->3, 150ms apart, 3.5s after the menu came up. Nothing but a CSS animation can do that, and MENU-BRIEF §5.1 bar 4 asks for 0
+
+FAIL — 1 of 16 bar(s) [441s]
+EXIT=1
+  ·    #2 report: with the world live behind the panel, 9466 of 18480 px (51.2%) change in 150ms — the panel is 72% opaque over a moving camera, so this can never be 0 and is not what the bar measures
+  ok   #2 the settled ladder is still: 0 of 18480 px changed across 4 shots 150ms apart, canvas hidden  [48s]
+
+PASS — 1 bars (--only=2, NOT a full run), the ladder moves twice and is still otherwise [48s]
+EXIT=0

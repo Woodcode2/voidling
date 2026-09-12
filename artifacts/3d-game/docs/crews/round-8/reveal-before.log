@@ -1,0 +1,7 @@
+  ·    #2 report: with the world live behind the panel, 4877 of 18480 px (26.4%) change in 150ms — the panel is 72% opaque over a moving camera, so this can never be 0 and is not what the bar measures
+  BAD  #2 the settled ladder is MOVING with the canvas hidden — 865 of 18480 px (4.7%) changed between shots 1->2, 150ms apart, 3.5s after the menu came up. Nothing but a CSS animation can do that, and MENU-BRIEF §5.1 bar 4 asks for 0. Running: pipHere@pip s-open here::after  [43s]
+
+  · #2 the settled ladder is MOVING with the canvas hidden — 865 of 18480 px (4.7%) changed between shots 1->2, 150ms apart, 3.5s after the menu came up. Nothing but a CSS animation can do that, and MENU-BRIEF §5.1 bar 4 asks for 0. Running: pipHere@pip s-open here::after
+
+FAIL — 1 of 1 bar(s) [43s]
+EXIT=1

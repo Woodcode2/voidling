@@ -1479,7 +1479,7 @@ once under swiftshader and the ratio bar passes for the wrong reason).
 | 1 | window share | `#menuWindow.getBoundingClientRect().height / innerHeight`; canvas hidden vs shown screenshots of the window box | 45–53%; disjoint from `#btnPlay`, `.pips`, `.tabs`; ≥ 60% of the box's pixels differ (the curtain has a hole) |
 | 2 | void size | `__menuState().voidPx`, cross-checked once by projecting `__voidGroup` through `__cam` | 28–42% of window height; centre in the lower 60%; hit radius ≥ 60 px; both numbers printed |
 | 3 | pendulum | `__menuState().azimuth` over **1,000 cranked frames** against the exposed `{a0, amp, period}`; camera motion = a fixed world point (`MENU_STAGE.look`) projected through `__cam` per frame | max error vs the authored sine ≤ 0.2°; amplitude 5–7°, period 15–17 s; projected point median 0.2–1.0 px/frame, max ≤ 2 px |
-| 4 | UI still | 1-frame-apart screenshots after 120 frames | 0 changed pixels inside `#btnPlay`, `.pips`, `.tabs`, `#coins`, `.logo` |
+| 4 | UI still | **canvas hidden** (firstframe's freeze), four shots 150 ms apart after the menu has settled 3.5 s — see correction 12: with the world live behind a 72%-opaque panel this box changes 26.4% of its pixels every 150 ms and no animation fix can reach 0 | 0 changed pixels inside `#btnPlay`, `.pips`, `.tabs`, `#coins`, `.logo`. **Live (report, not a bar):** the same number with the canvas visible, printed |
 | 5 | taps to play | `/?manual=1`, `voidDailyLast` = today and = yesterday, count clicks until `armed`; `window.__marker` before the click | exactly 1 in both runs; `#worlds` and `#daily` never `.show`; marker survives; `__menuState().world === pickedWorld`; then one pointerdown → `started`, clock from 0 |
 | 6 | frame ratio (REPORT) | `__frameTimes()` medians, 600 frames menu vs 600 in-match, same page, `__pinQuality(0)` + `__pinMenuRung(0)`, pixel ratio pinned 1 both sides; JS ms / draw calls / triangles per side; run twice | printed with the spread and "sandbox, not device"; armed as a ≤ 1.15 bar on JS ms and draw calls once the spread is known |
 | 7 | draw calls | `renderer.info` with `autoReset=false`, two consecutive frames at every 10° of the pendulum, bloom off both sides; bloom/shadows/DPR printed per line | max of pair ≤ 1.3× in-match r = 12 pair and ≤ 2,000, per world |
@@ -1493,7 +1493,7 @@ once under swiftshader and the ratio bar passes for the wrong reason).
 | 15 | calm | seed `voidMotion='0'` | azimuth variance 0; `getAnimations()` in `#menu` empty |
 | 16 | menu rung hysteresis | crank at 16.7 ms, then 25 ms, then 16.7 ms for 10 s | no step at 16.7; `menuRung` 0→1→2→3 in order at 25; back one step after 10 s; `__quality().level` unchanged |
 | 17 | layout | the splash step's six views + 393×700 + 932×430 | no horizontal overflow; window ≥ 40%; PLAY ≥ 72; pips ≥ 44; every `#menu` control ≥ 44×44 |
-| 18 | first reveal | seed `voidPlayed=1`, no `voidLevels` | `.pips.reveal` once; absent on the second load |
+| 18 | first reveal | seed `voidPlayed=1`, no `voidLevels`; the class lands on `#mlPips`, which also carries `class="pips"` so this brief's selector and the code name the same element and the check runs one rAF after the paint, because the boot branch that hides the menu for a first-ever session runs after `enterMenu()` | `#mlPips.reveal` once and `voidLevels.seen` written; absent on the second load of the same profile |
 | 19 | locked tap | click a locked pip | wiggle class set for ≤ 220 ms, no text node added, `__levels()` unchanged, `voidling.faceState()` never `'scared'`/`'hurt'` for 2 s |
 | 20 | ground colour | four 8×8 boxes at the PLAY band's corners on a cranked frame, HSV value/chroma as `chroma.py` | value 0.45–0.65, chroma 0.35–0.55, the four values printed |
 | 21 | shop shield | open `#btnShop` with no gate passed; end a match, read the doors | zero visible text nodes matching `/[$€£]|\d,\d\d/` in `#shop`; no LEGENDARY tier node; OPEN SHOP absent on the end card unless a skin is affordable |
@@ -1881,6 +1881,51 @@ it — and that is the real scenario anyway, since a player at r 8 is exactly wh
 family can reach a 5.0 barn. Deleting the exclusion and rebuilding: the family ate it in
 20.1 s. A bar that cannot be shown failing is not a bar, and "it passed" was true twice
 here for two different wrong reasons.
+
+**Correction 12, day 10: §5.1 bar 4 was unsatisfiable, and the code it would have failed
+had already shipped.** Bar 4 asks for "0 changed pixels inside `#btnPlay`, `.pips`, `.tabs`,
+`#coins`, `.logo`" on a settled menu. Day 7 shipped the menu's "you are here" ring with
+`animation: pipHere 2.2s ease-in-out infinite`, on the argument that a ring pointing at a
+button should keep asking — which no value of bar 4 can ever accept. The bar went unwritten
+for three days while the thing it existed to catch sat in the build. MEASURED
+(`qa/reveal.mjs` bar 2, the same method on both builds; logs in
+`docs/crews/round-8/reveal-before.log` and `reveal-after.log`): four shots of the ladder
+150 ms apart, 3.5 s after the menu came up, with the canvas `display:none` so only CSS could
+move — **865 of 18,480 pixels (4.7%) on `a200af9`, 0 after**, and the probe's animation
+census names the offender outright: `pipHere@pip s-open here::after`. It changed every
+150 ms for as long as the menu was up. The same class of motion had already cost a gate step
+once:
+the end card's copy of this ring kept Playwright from finding two stable frames to click
+PLAY AGAIN on (`econ`, 30 s timeout, "element is not stable"), which is why day 7 scoped it
+to the menu. Scoping moved it; it did not fix it. §3.3's own text asked for the right thing
+all along — "the current pip's ring pulses three times **on this reveal only**" — and the
+infinite version was the build's, not the brief's. It is now three pulses on the reveal,
+three more on a hop, and stillness in between.
+
+**And bar 4 itself needs a qualifier it did not have.** It was written on day 1, when the
+menu was a still splash. From day 8 the menu is a live 3D world and `#menuLadder`'s panel is
+`rgba(18,9,38,0.72)` with a 9 px backdrop blur, so 28% of every pixel in that box is a
+blurred photograph of a drifting camera. Measured the same way with the canvas VISIBLE, the
+settled ladder changes **18.9%, 26.4%, 35.5% and 51.2% of its pixels every 150 ms across
+four runs of the same build** — the spread IS the finding: that number is a reading of the
+town, not of the ladder, and no fix to any animation will ever bring it to zero. Day 10's
+first attempt at this bar measured exactly that, reported 78.9%, and would have read as a
+pass for the fix at any value below it. Bar 4 is a bar on **CSS motion**, and it is only
+measurable with the canvas taken out of the picture.
+
+**Two method corrections inside that, both mine, both of which produced a confident wrong
+number first.** (1) The clip was the row's own bounding box, and the ring is an `::after` at
+`inset: -16%` — 6.4 px outside its dot at 40 px — so the box cropped the top and bottom of
+the one element the bar exists to catch. Padded by 12 px. (2) The freeze used
+`visibility: hidden`, copied from `firstframe.mjs`, which needs the layout it is measuring
+to stay put. `#menuLadder` carries `backdrop-filter: blur(9px)`, and a visibility-hidden
+canvas is still in the backdrop root: with the 3D scene at 0.4–2.9 fps here, four shots
+150 ms apart sometimes all land inside one slow frame and sometimes straddle two, so **the
+same build measured 0 of 18,480 px on one run and 3,107 (16.8%) on the next**. It is
+`display: none` now, which takes the canvas out of the layer tree. The first "before" figure
+this section carried — 308 of 10,752 px, 2.9% — was taken through the cropped box and the
+leaky freeze and is superseded by the 865/18,480 above; both were measuring the right
+defect, and only the second was measuring it soundly.
 
 A seventh item is a gap this brief did not know it had: **Maple has no stage to measure.** `WORLD_COPY.maple.hero` is null, so there is nothing for a hero-framed
 sweep to stand off, and §2.3's Maple stage (the waterfall lip) is a module-local const in

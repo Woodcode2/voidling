@@ -52,8 +52,10 @@ import { STICKERS_BY_WORLD, STICKERS, collectInRun, hasSticker, TIER_POINTS,
 import { liveEvents, eventForWorld, eventEndLabel, type SeasonEvent } from './game/seasons';
 import { isUnlocked, gateFor, completeWorld, WORLD_LABEL, unlockedCount, type WorldKey } from './game/unlocks';
 import { allLevels, current as levelCurrent, recordLevelResult, trackLevelStart,
-  ordinal as levelOrdinal, type Goal, type LevelState } from './game/levels';
-import { ensurePipDefs, pipRow, pipHead, pip, PIP_WORD } from './proto3d/pips';
+  ordinal as levelOrdinal, ladderSeen, markLadderSeen,
+  type Goal, type LevelState } from './game/levels';
+import { ensurePipDefs, pipRow, pipHead, pip, PIP_WORD,
+  PIP_FLIP_MS, PIP_HOP_MS, PIP_REVEAL_STEP_MS } from './proto3d/pips';
 import { recentEvents } from './proto3d/telemetry';
 import { bumpMatch, deal, type Deal } from './game/matchdeck';
 // the district ids this world's newsroom knows, so a biome from another world
@@ -1067,6 +1069,43 @@ let menuMode = false;
  *  look like it. */
 let menuT = 0;
 
+// ── THE LADDER'S OWN LITTLE STATE MACHINE ──────────────────────────────────
+/** What the menu ladder SHOWED last time, so the next paint can animate the
+ *  difference. Day 10. Not a record of the ladder — allLevels() is that — but a
+ *  record of the last PICTURE of it, which is the only thing an animation is
+ *  allowed to be a difference from. */
+let lastLadder: { world: string; states: LevelState[] } | null = null;
+/** Has the first-reveal check been scheduled? Released again if it fires while
+ *  the menu turns out to be hidden, so the next path that shows it gets it. */
+let revealArmed = false;
+/** Seconds the void still owes the ladder a look downward (§4.6). Counted down
+ *  in the render tail, where the gaze is written. */
+let menuLook = 0;
+/** Every timer and frame request the ladder owns. A repaint cancels them all:
+ *  the hop is a two-beat schedule over five nodes, and a second schedule
+ *  started while the first is mid-flight animates a row that no longer exists.
+ *  leaveMenu() cancels them too — she taps PLAY 200ms into a hop and the world
+ *  should not be carrying a pending class write into the match. */
+const ladderJobs: { t: number[]; r: number[] } = { t: [], r: [] };
+function ladderCancel(): void {
+  for (const id of ladderJobs.t) clearTimeout(id);
+  for (const id of ladderJobs.r) cancelAnimationFrame(id);
+  ladderJobs.t.length = 0; ladderJobs.r.length = 0;
+}
+function ladderLater(fn: () => void, ms: number): void {
+  ladderJobs.t.push(window.setTimeout(fn, ms));
+}
+function ladderRaf(fn: () => void): void {
+  ladderJobs.r.push(requestAnimationFrame(fn));
+}
+/** Has a match ever been finished on this device? §4.6 gates the ladder's
+ *  introduction on it: a profile that has never played has nothing to be
+ *  introduced TO, and every DEBUG_HARNESS probe that seeds voidPlayed is a
+ *  profile the reveal is legitimately for. */
+function hasPlayed(): boolean {
+  try { return !!localStorage.getItem('voidPlayed'); } catch { return false; }
+}
+
 /** Put the camera on this world's stage and the void in front of it. Idempotent:
  *  every path back to the menu calls it, and several of them call it twice. */
 function enterMenu(): void {
@@ -1133,6 +1172,12 @@ function leaveMenu(): void {
   voidling.group.position.set(island.spawn.x, voidling.group.position.y, island.spawn.z);
   velX = 0; velZ = 0;
   wander.set(island.spawn.x, 0, island.spawn.z);
+  // …AND THE LADDER'S PENDING BEATS. She can tap PLAY 200ms into a hop; the
+  // ring's arrival must not land a class write on a row that is being torn
+  // down, and the void must not carry the reveal's downward look into the
+  // opening shot.
+  ladderCancel();
+  menuLook = 0;
   document.body.classList.remove('diorama');
 }
 
@@ -2588,6 +2633,8 @@ const _dbg = new Proxy(_dbgStore, {
   __menuOptim: (on: boolean) => boolean;
   __kindTally: () => Record<string, number>;
   __levels: () => unknown[];
+  __ladderState: () => Record<string, unknown>;
+  __paintLadder: () => void;
   __levelSpec: () => unknown;
   __goalPools: () => Record<string, unknown>;
   __levelCurrent: (w: string) => number;
@@ -2985,6 +3032,55 @@ _dbg.__kindTally = () => ({ ...kindTally });
 // against the game, which is how qa/_distinct.mjs ended up unable to see a CSS
 // change at all.
 _dbg.__levels = () => allLevels();
+// ── QA (day 10): THE LADDER AS IT IS ON SCREEN, THIS FRAME ────────────────
+// Not the ladder — __levels() is the ladder. This is the PICTURE of it: which
+// state each of the five dots is wearing right now, where the ring is, and
+// which one-shot animation classes are live. The hop is a two-beat sequence
+// over 180 + 220ms and the only honest way to measure it is to read the row on
+// each beat; a MutationObserver cannot help, because the beats are frames apart
+// and the earlier version of this stream already learned that an observer
+// cannot fire inside a synchronous crank (qa/levels.mjs's header).
+//
+// The three timings come back too, from the module that owns them, so a probe
+// can assert the stylesheet's custom properties equal the constants the
+// schedule runs on — two clocks 40ms apart show a ring hopping off a dot that
+// has not finished changing.
+_dbg.__ladderState = () => {
+  const pips = document.getElementById('mlPips');
+  const nodes = pips ? [...pips.querySelectorAll('.pip')] as HTMLElement[] : [];
+  const stateOf = (n: HTMLElement) =>
+    ([...n.classList].find((c) => c.startsWith('s-')) || 's-?').slice(2);
+  const idxOf = (cls: string) => nodes.findIndex((n) => n.classList.contains(cls));
+  return {
+    world: pickedWorld,
+    shown: nodes.map(stateOf),
+    truth: allLevels().filter((r) => r.world === pickedWorld).map((r) => r.st),
+    here: idxOf('here'), pop: idxOf('pop'), ringIn: idxOf('ringIn'),
+    reveal: !!pips?.classList.contains('reveal'),
+    // THE TWO LINES AROUND THE ROW. A repaint rewrites all three elements, and
+    // the goal line is derived per dot — goalLine(w, 2) joins that world's SET
+    // order, so a world with an empty set would silently paint a blank sentence
+    // under the pips. Published so a probe can hold them non-empty on every beat
+    // of the hop instead of a reader having to notice it in a screenshot.
+    label: document.getElementById('mlWorld')?.textContent || '',
+    line: document.getElementById('mlGoal')?.textContent || '',
+    glow: !!document.getElementById('btnPlay')?.classList.contains('glow1'),
+    seen: ladderSeen(), look: +menuLook.toFixed(2),
+    menuShown: getComputedStyle(menuEl).display !== 'none',
+    calm: document.body.classList.contains('calm'),
+    flipMs: PIP_FLIP_MS, hopMs: PIP_HOP_MS, stepMs: PIP_REVEAL_STEP_MS,
+    css: {
+      flip: getComputedStyle(document.documentElement).getPropertyValue('--pipFlip').trim(),
+      hop: getComputedStyle(document.documentElement).getPropertyValue('--pipHop').trim(),
+      step: getComputedStyle(document.documentElement).getPropertyValue('--pipStep').trim(),
+    },
+  };
+};
+// Repaint the ladder on demand. The hop is DIFFED against the last picture, so
+// a probe that wants to see the animation without playing a ninety-second match
+// records a result through the game's own recordLevelResult (__recordLevel) and
+// then asks the menu to look again — which is exactly what coming HOME does.
+_dbg.__paintLadder = () => { paintMenuLadder(); };
 // This world's five goals, read off the table the game plays from rather than
 // transcribed into a probe — the one rule qa/questable.mjs's header exists to
 // teach.
@@ -6350,31 +6446,62 @@ function paintMenuLadder(): void {
   const host = document.getElementById('menuLadder');
   if (!host) return;
   ensurePipDefs();
+  // Every repaint owns the animation: a paint that lands mid-hop cancels the
+  // hop rather than letting two schedules fight over the same five nodes.
+  ladderCancel();
   const rows = allLevels().filter((r) => r.world === pickedWorld);
   const states = rows.map((r) => r.st as LevelState);
   const cur = levelCurrent(pickedWorld);
   const w = document.getElementById('mlWorld');
   if (w) w.textContent = (WORLD_LABEL[pickedWorld as WorldKey] ?? pickedWorld).toUpperCase();
   const pips = document.getElementById('mlPips');
-  if (pips) {
-    pips.innerHTML = pipRow(states, { size: 40 });
+  const line = document.getElementById('mlGoal');
+  if (line) line.textContent = goalLine(pickedWorld, cur);
+  if (!pips) return;
+  // THE REVEAL CLASS COMES OFF ON THE NEXT PAINT. It lives on #mlPips, which
+  // survives every repaint, while the pips themselves are replaced wholesale —
+  // and a CSS animation restarts on a fresh node. Left on, the introduction
+  // would replay on every repaint for the rest of that page load: after a
+  // match, after a locked tap's 1.8s apology, after a world switch. Cleared
+  // here and re-added only by armFirstReveal(), which is a no-op once the bit
+  // is written, so it can run exactly once ever.
+  pips.classList.remove('reveal');
+
+  // ── ONE DRAW, USED THREE TIMES ──────────────────────────────────────────
+  // The hop needs the row drawn twice in 180ms — once as she left it, once as
+  // it now is — and re-rendering innerHTML throws away the click handlers with
+  // the markup. So the handlers are attached by whoever draws, against the
+  // states THAT DRAW is showing: during the flip the row is briefly the old
+  // ladder, and a tap landing in that window must do what the dot she can see
+  // says, not what the dot she cannot see yet says.
+  const draw = (sts: LevelState[], mark?: { pop?: number; ring?: number; arrive?: boolean }) => {
+    pips.innerHTML = pipRow(sts, { size: 40, popAt: mark?.pop !== undefined ? mark.pop + 1 : undefined });
+    const nodes = [...pips.querySelectorAll('.pip')] as HTMLElement[];
+    // THE RING, FORCED. pip() derives `here` from the state, which is right for
+    // every still frame and wrong for exactly one: the flip, where the dot has
+    // already changed but the ring has not left yet. Forcing it here keeps the
+    // derivation as the default and makes the override visible in one place.
+    if (mark?.ring !== undefined) {
+      nodes.forEach((n, i) => n.classList.toggle('here', i === mark.ring));
+      if (mark.arrive) nodes[mark.ring]?.classList.add('ringIn');
+    }
     // TAPPING A DOT PLAYS IT. A row of dots a child cannot touch is a picture
     // of a ladder rather than a ladder — and she will touch them, because they
     // look exactly like the buttons they are.
-    [...pips.querySelectorAll('.pip')].forEach((node, i) => {
+    nodes.forEach((node, i) => {
       const g = (i + 1) as Goal;
       node.addEventListener('click', () => {
-        if (states[i] === 'locked') {
+        if (sts[i] === 'locked') {
           // never silent, and never a scold: the answer is the dot before it,
           // said on the thing she tapped — the same shake the locked world
           // cards use, for the same reason.
           track('level_locked_tap', { world: pickedWorld, goal: g, at: cur });
-          node.classList.remove('shake'); void (node as HTMLElement).offsetWidth;
+          node.classList.remove('shake'); void node.offsetWidth;
           node.classList.add('shake');
           const gl = document.getElementById('mlGoal');
           if (gl) {
             gl.textContent = `FINISH LEVEL ${cur} FIRST`;
-            setTimeout(() => paintMenuLadder(), 1800);
+            ladderLater(() => paintMenuLadder(), 1800);
           }
           audio.alert(); buzz(30);
           return;
@@ -6384,9 +6511,116 @@ function paintMenuLadder(): void {
         startFresh(false);
       });
     });
+    return nodes;
+  };
+
+  // ── WHAT CHANGED SINCE SHE LAST LOOKED ──────────────────────────────────
+  // The hop is DIFFED, not announced. endMatch() could have handed the menu a
+  // message saying "dot 1 became done and dot 2 opened" — and then there would
+  // be two descriptions of the ladder's motion, one in the message and one in
+  // the ladder, free to disagree the first time anything else changed a state
+  // (a replay, a migration, a world switch, the day-6 quest retirement). This
+  // reads the difference between what the row IS and what it last SHOWED, so
+  // the animation cannot describe a move the ladder did not make.
+  const was = lastLadder && lastLadder.world === pickedWorld
+    && lastLadder.states.length === states.length ? lastLadder.states : null;
+  const moved: number[] = [];
+  if (was) for (let i = 0; i < states.length; i++) if (states[i] !== was[i]) moved.push(i);
+  lastLadder = { world: pickedWorld, states: states.slice() };
+
+  const hereOf = (sts: LevelState[]) => {
+    const i = sts.findIndex((st) => st === 'open' || st === 'fin');
+    return i < 0 ? sts.length - 1 : i;
+  };
+
+  // THE FIRST REVEAL WINS OVER THE HOP, and they collide on exactly one screen:
+  // the very first menu a child ever sees, which under §4.6 is the one right
+  // after her first match — so the row is arriving for the first time AND dot 1
+  // has just changed. §4.6 asks for both ("the pips fade in left to right… pip 1
+  // flips to its real state"), but layering a flip on a node that is already
+  // fading in is two animations on one dot, which §2.5's motion budget refuses
+  // and a six-year-old reads as a glitch. So on that one screen dot 1 simply
+  // ARRIVES wearing what she earned, which is the whole point of the flip.
+  const firstEver = !ladderSeen() && hasPlayed();
+  if (!moved.length || firstEver) {
+    draw(states);
+    armFirstReveal();
+    return;
   }
-  const line = document.getElementById('mlGoal');
-  if (line) line.textContent = goalLine(pickedWorld, cur);
+
+  // FLIP, THEN HOP. The dot she played changes first — her eye is already on
+  // it, because it is the one she just spent ninety seconds on — and only then
+  // does the ring leave for the dot the win opened. Both at once and there is
+  // nothing to follow; the ring first and the flip reads as a correction.
+  const h0 = hereOf(was as LevelState[]);
+  const h1 = hereOf(states);
+  const flipped = moved[0];
+  const hard = reduceMotion();
+  if (hard) { draw(states, { pop: undefined, ring: h1 }); return; }
+  draw(was as LevelState[]);
+  // one frame of the old ladder, so the change is a change and not the initial
+  // condition. requestAnimationFrame rather than a timer: what has to have
+  // happened first is a PAINT, and only rAF is defined against one.
+  ladderRaf(() => {
+    draw(states, { pop: flipped, ring: h0 });
+    // The flip is SILENT. The end card already told her the result with a
+    // whistle and a headline; the ladder's job here is to show, not to announce
+    // it a second time. The one sound in this sequence is the hop, because the
+    // hop is the only part that is news: a dot she could not play before.
+    if (h1 === h0) return;   // a miss keeps the ring: nothing to hop (§3.2)
+    ladderLater(() => {
+      const nodes = draw(states, { pop: undefined, ring: h1, arrive: true });
+      audio.ready(); buzz(18);
+      // AND THE ONE-SHOT CLASS COMES BACK OFF. It changes nothing on this page —
+      // every later paint rebuilds the row from scratch — but a one-shot marker
+      // left standing is a lie about what the screen is doing, and
+      // __ladderState() publishes it: a probe asking "has the ladder settled?"
+      // would be told no, forever. MEASURED: bar 3's own early exit never fired
+      // and the trace ran its full twelve seconds waiting for it.
+      ladderLater(() => nodes[h1]?.classList.remove('ringIn'), PIP_HOP_MS + 60);
+    }, PIP_FLIP_MS);
+  });
+}
+
+/** ── THE FIRST TIME SHE EVER SEES THE THIRTY ──────────────────────────────
+ *  §4.6. The first session shows no menu at all (`:7911` splashes straight into
+ *  Maple), so her first sight of the ladder is after her first match — and a row
+ *  of dots that simply APPEARS, already arranged, reads as a picture of somebody
+ *  else's progress. Shown once, left to right, with her own dot flipping to what
+ *  she just earned and the void looking down at it, it reads as hers.
+ *
+ *  WHY IT RUNS ONE FRAME LATE. paintMenuLadder() is called during boot from
+ *  enterMenu(), and the branch that hides the menu for a first-ever session runs
+ *  AFTER it in module order. A check at paint time would therefore spend the
+ *  introduction on a screen the child never sees, and session two would hand her
+ *  an already-arranged row — the exact failure this is for. One rAF puts the
+ *  check after module evaluation, where `#menu`'s computed display is the truth.
+ *  If the menu turns out to be hidden the arm is released, so the next path that
+ *  actually shows it gets the reveal. */
+function armFirstReveal(): void {
+  if (revealArmed || ladderSeen()) return;
+  if (!hasPlayed()) return;   // §4.6: the ladder is introduced to a child who has played
+  revealArmed = true;
+  ladderRaf(() => {
+    const pips = document.getElementById('mlPips');
+    if (!pips) { revealArmed = false; return; }
+    if (getComputedStyle(menuEl).display === 'none') { revealArmed = false; return; }
+    markLadderSeen();
+    track('ladder_reveal', { world: pickedWorld, at: levelCurrent(pickedWorld) });
+    pips.classList.add('reveal');
+    // HE LOOKS DOWN AT IT. Not a head turn — the rig has no aim for that — but
+    // the pupils, which are the whole face at this size. 1.4s is §4.6's number
+    // and it is long enough to read as attention rather than a twitch.
+    if (!reduceMotion()) menuLook = 1.4;
+    // …and PLAY glows once at the end of the row's arrival: the last beat of the
+    // introduction and the only one that is an instruction. No words — a child
+    // who cannot read gets a green button lighting up after her dots land.
+    const play = document.getElementById('btnPlay');
+    if (play && !reduceMotion()) ladderLater(() => {
+      play.classList.remove('glow1'); void play.offsetWidth; play.classList.add('glow1');
+      ladderLater(() => play.classList.remove('glow1'), 1000);
+    }, PIP_REVEAL_STEP_MS * 5 + 240);
+  });
 }
 
 /** The picker's six rows — small, untappable, and the whole point of the
@@ -11731,8 +11965,18 @@ function animate() {
   const gX = (camOffset.z * vx - camOffset.x * vz) / (gFl * gS);   // screen right
   const gY = (-camOffset.x * vx - camOffset.z * vz) / (gFl * gS);  // screen up
   perfBeat('hero');
+  // ── HE LOOKS DOWN AT THE LADDER ───────────────────────────────────────
+  // §4.6's beat, and the rig's own gaze is the only way to say it: there is no
+  // head aim in void3d, and the pupils ARE the face at menu size. Only on the
+  // menu, only while the reveal owes the look, and never in a match — where gX
+  // and gY are the steering and anything overriding them would be a bug.
+  let gYUse = THREE.MathUtils.clamp(gY, -1, 1);
+  if (menuMode && menuLook > 0) {
+    menuLook = Math.max(0, menuLook - dtw);
+    gYUse = -0.72;
+  }
   voidling.update(dtw, { t: tClock, x: voidState.x, z: voidState.z, vx, vz,
-    lookX: THREE.MathUtils.clamp(gX, -1, 1), lookY: THREE.MathUtils.clamp(gY, -1, 1) });
+    lookX: THREE.MathUtils.clamp(gX, -1, 1), lookY: gYUse });
   // ── HOW FAR THE CROWD MATTERS ──────────────────────────────────────────
   // Everything past this runs on a stagger rather than every frame (see the
   // dispatch in life.ts). It is derived from the CAMERA, not from a constant,

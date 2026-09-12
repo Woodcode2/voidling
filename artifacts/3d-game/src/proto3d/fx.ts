@@ -68,6 +68,26 @@ export function setReduceMotion(on: boolean) {
 interface Ring { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; t: number; dur: number; maxR: number; }
 
 export function createFx(scene: THREE.Scene): Fx {
+  // ── APPLY THE PARENT'S CHOICE BEFORE THE FIRST FRAME ─────────────────────
+  // reduceMotion() is lazy — it reads storage and sets `body.calm` on its FIRST
+  // call, and until day 10 nothing called it at boot. The only callers were the
+  // settings panel's paint(), the pause sheet's, and the flash cap. So a parent
+  // who had turned BIG MOTION off got a menu and a HUD carrying every animation
+  // the switch exists to stop, until they happened to open Settings again — and
+  // `body.calm` governs about fifteen rules in index.html, which is most of what
+  // that switch means now.
+  //
+  // FOUND BY qa/reveal.mjs bar 5, which seeds voidMotion=0 and then asserts that
+  // what it is about to measure is actually calm: "voidMotion=0 did not put the
+  // body in calm". The note fourteen lines above this one — "a control that calms
+  // a third of the motion teaches a parent it is broken" — was written about the
+  // CSS this class governs and was itself only true from the second time the
+  // panel was opened.
+  //
+  // Here rather than at the call site because this module owns the class; one
+  // call, idempotent, before anything can paint.
+  reduceMotion();
+
   const rings: Ring[] = [];
   const RING_POOL = 12;
   for (let i = 0; i < RING_POOL; i++) {

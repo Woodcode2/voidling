@@ -86,7 +86,7 @@ export interface LevelRow {
 const KEY = 'voidLevels';
 export const LEVELS_VER = 1;
 
-type Saved = { v?: number; w?: Record<string, Record<string, Partial<LevelRow>>>; [k: string]: unknown };
+type Saved = { v?: number; seen?: 1; w?: Record<string, Record<string, Partial<LevelRow>>>; [k: string]: unknown };
 
 const blank = (): LevelRow => ({ st: 'locked', best: 0, pct: 0, first: '', n: 0 });
 
@@ -211,6 +211,34 @@ export function current(world: string): Goal {
   const rows = allLevels().filter((r) => r.world === world);
   for (const r of rows) if (!passed(r.st)) return r.goal;
   return 5;
+}
+
+/** ── HAS SHE EVER SEEN THE LADDER? ────────────────────────────────────────
+ *  One bit, stored beside the rows rather than in its own key, because it is a
+ *  fact ABOUT the ladder and a second key is a second thing that can be wiped
+ *  out of step with the first.
+ *
+ *  Why it exists: the first session never shows the menu at all (the boot
+ *  auto-plays Maple with no menu), so a child's first sight of the thirty dots
+ *  is after her first match — and a row of dots that simply APPEARS, already
+ *  arranged, reads as a picture of somebody else's progress. Shown once, left
+ *  to right, with her own dot 1 flipping to whatever she just earned, it reads
+ *  as hers. Once is the whole point: the reveal is an introduction, and an
+ *  introduction that happens every time is a stutter.
+ *
+ *  Deliberately NOT a count. There is no "third time she saw it" behaviour to
+ *  write, and a number invites one. */
+export function ladderSeen(): boolean {
+  return !!readRaw().seen;
+}
+
+/** Remember that the reveal has run. Idempotent and never un-set: nothing in
+ *  this file can lower a state and nothing here can un-see a screen. */
+export function markLadderSeen(): void {
+  const d = readRaw();
+  if (d.seen) return;
+  d.seen = 1;
+  writeRaw(d);
 }
 
 /** The level's ordinal for the end card — "LEVEL 8 OF 30". Never shown on the
