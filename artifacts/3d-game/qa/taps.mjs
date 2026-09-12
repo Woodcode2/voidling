@@ -91,9 +91,25 @@ const open = async (ctx, { last, q = '', coins = '500' } = {}) => {
         w: { maple: { 1: { st: 'open', best: 0, pct: 0, first: '', n: 0 } } } }));
     } catch { }
   }, [last, coins]);
-  await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}&manual=1${q}`,
-    { waitUntil: 'domcontentloaded', timeout: 300000 });
-  await p.waitForFunction(() => !!window.__matchState && !!window.__menuState, null, { timeout: 420000 });
+  // BOOTING IS ITS OWN FAILURE, AND ONE OF ITS CAUSES IS NOT THE GAME. Three
+  // runs in this session died on "Target page, context or browser has been
+  // closed", every one of them while a full gate was rendering swiftshader on
+  // the other cores. A probe that lets that reach the top as an uncaught throw
+  // reports a sentence about Playwright and leaves the reader to guess whether
+  // the build is broken. Asked directly: if the browser is gone, the browser is
+  // gone, and that is an environment result, not a verdict on the game.
+  const booted = await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}&manual=1${q}`,
+    { waitUntil: 'domcontentloaded', timeout: 300000 })
+    .then(() => p.waitForFunction(() => !!window.__matchState && !!window.__menuState,
+      null, { timeout: 420000 }))
+    .then(() => true).catch((e) => String(e.message || e).split('\n')[0]);
+  if (booted !== true) {
+    const why = b.isConnected()
+      ? `the page never finished booting: ${booted}`
+      : `THE BROWSER DIED — this is the machine, not the build (${booted}). `
+        + `Re-run with nothing else rendering.`;
+    throw new Error(why + (p.__errs.length ? ` · page said: ${p.__errs.join(' | ')}` : ''));
+  }
   return p;
 };
 

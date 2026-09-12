@@ -772,7 +772,64 @@ the bill up to 11.5x, so the derived azimuth should be re-scored against that
 cost series rather than on framing alone.
 
 
-**Next: the calendar off the PLAY path** — the last unbuilt piece of day 10's
+**The calendar is OFF the PLAY path (2026-09-12).** `qa/taps.mjs` is the probe,
+`docs/crews/round-8/taps-before.log` the run that justified it.
+
+**What the before-reading found, on the shipped build:**
+
+| bar | result |
+|---|---|
+| one tap plays, `voidDailyLast` = today | **ok** — the case all 383 probe files already cover |
+| one tap plays, the date ONE DAY STALE | **PLAY could not be clicked AT ALL** — `page.click` timed out after 60 s; `#daily` was covering it |
+| the day rolls after a finished match | **no** — after a FULL match on a stale profile, `voidDailyLast` was still yesterday's date |
+
+The second row is worse than the "two taps instead of one" the bar was written
+to catch: the button is unreachable. On her second morning — the single most
+important morning in the retention loop — the first thing this game asked a
+five-year-old to press was a full-screen modal reading CLAIM.
+
+The third row is why this was never only a UI move. **The calendar's bookkeeping
+was welded to that button.** The day does not roll unless it is pressed, so she
+is asked again tomorrow, and the day after, forever, until somebody who can read
+presses it. Taking the modal off the screen without taking the claim off the
+button would have left a child permanently owed a day she can never collect.
+
+**And no probe had ever seen any of it:** 383 files in `qa/` seed
+`voidDailyLast` to today — every one, because anyone who did not had their first
+click eaten and added the seed rather than asking why. In QA terms the card was
+a screen this game did not have.
+
+**What shipped:** `dailyDue()` (the week's arithmetic, pure — it used to exist
+only inside the branch that built the modal, so the only way to learn what a day
+was worth was to put a card in front of a child); `claimDaily()` called in
+`endMatch` immediately **before** `bumpStreak()`, which is exactly where it
+happened before, so the streak bookkeeping is untouched; the end card naming it
+on its own line (`🎁 DAY 8 · +130✦`) because silent must not mean invisible; and
+the card itself surviving behind a 🎁 in the scrapbook header. Same table, same
++30%/week capped at 3.5×, same day-7 gem.
+
+**A latent hang removed on the way past.** The tap gate deferred `launchWorld()`
+by setting `pendingLaunch` when `#daily` was up, and `closeDaily()` was the only
+thing that ever un-parked it — and `closeDaily` lived inside the deleted block. A
+deferral with nothing left to resume it is a hang.
+
+**Two corrections of mine, both recorded in the files that carried them.** (1)
+Bar 3b asserted "the wallet grew by ≥ 90" and went green on the shipped build:
+500 → 909, "+409" — every coin of it MATCH money, while the calendar paid
+nothing, which the line above it said. The daily reward and the match reward land
+in the same wallet, so any check on "did she get paid" that does not isolate them
+passes on the wrong money; it now asks `__dailyDue()` what today owes before the
+match. (2) A blocked click used to be reported and then followed by 300 s of
+waiting against a page that had gone, so the run ended on a sentence about
+Playwright rather than about the game.
+
+**Still to verify at the time of writing:** the after-run. Three probe runs in
+this session died on "Target page, context or browser has been closed", every one
+of them while a full gate was rendering swiftshader on the other cores — so the
+after-reading is taken with nothing else running, and `qa/taps.mjs` now names a
+dead browser as a machine result rather than a verdict on the build.
+
+**Next: day 11's `qa/idiomguard.mjs`** — the last unbuilt piece of day 10's
 row, and §1.2 already decided it: `#daily` rises full-screen at module init
 whenever `voidDailyLast !== today`, with a text button reading "CLAIM 90✦", so on
 her second day the first thing a non-reader is asked to press is a word. It moves

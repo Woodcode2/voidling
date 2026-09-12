@@ -1927,6 +1927,29 @@ this section carried — 308 of 10,752 px, 2.9% — was taken through the croppe
 leaky freeze and is superseded by the 865/18,480 above; both were measuring the right
 defect, and only the second was measuring it soundly.
 
+**Correction 13, day 10: §1.2 said the calendar was a UI problem. It was a
+BOOKKEEPING problem wearing a modal.** §1.2 describes `#daily` as a card that
+"rises full-screen at module init" and prescribes moving it to the end card. Both
+true, and both incomplete. MEASURED (`qa/taps.mjs`, log in
+`docs/crews/round-8/taps-before.log`): with `voidDailyLast` one day stale, **PLAY
+could not be clicked at all** — `page.click` timed out after sixty seconds — and,
+the part no reading of the brief would have predicted, **after a FULL FINISHED
+MATCH on that same profile `voidDailyLast` was still yesterday's date.** The day
+does not roll unless the button is pressed. Moving the card to the end card while
+leaving the claim on the button would have left a child permanently owed a day
+she cannot collect, and the brief's own bar (§4.7.1, `#daily` never gains
+`.show`) would have gone green over it. The claim is now a function
+(`claimDaily()`) called on the first finish of the day; the button is a door.
+
+**And §4.7 bar 1's two seeds were the right instinct for the wrong reason.** The
+brief asks for the bar to run with `voidDailyLast` seeded to today *and* to
+yesterday because "383 probe files seed today, so no probe ever met the
+calendar". Correct — and the reason it matters is not that the bar would be
+incomplete, it is that **the whole calendar was untested code shipping to
+children**, including the fact that its own state machine never advanced without
+a tap. One seed tests the game; the other tests the day after, and nothing in
+this repo had ever run the second.
+
 A seventh item is a gap this brief did not know it had: **Maple has no stage to measure.** `WORLD_COPY.maple.hero` is null, so there is nothing for a hero-framed
 sweep to stand off, and §2.3's Maple stage (the waterfall lip) is a module-local const in
 `island.ts` that no probe may transcribe. Day 2 exposes it and re-runs Maple (§2.9.7).
