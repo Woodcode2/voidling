@@ -536,8 +536,40 @@ one block — which is now hidden. It gets its own day, where a mistake in the
 economy is visible rather than buried in a menu commit. `questEvent()` survives
 either way: the SET goal counts through it.
 
-**Next: day 7 — the menu ladder** (the owner's first ask): all thirty dots on
-the menu, locked ones visible and dimmed, unlocking as she goes.
+**Day 7 is DONE (2026-09-12): all thirty dots are visible, and PLAY plays.**
+The owner's first ask, in his words — "like hole.io we see them right but
+they're locked and as we progress they unlock like angry birds as well."
+
+- **The menu carries her ladder.** The five dots of the world she is on, the
+  green ring on hers, and one line saying what this dot wants. Tapping a dot
+  plays it; tapping a locked one shakes and says "FINISH LEVEL 3 FIRST" rather
+  than doing nothing.
+- **The picker carries all thirty.** Six world cards, five dots each, read off
+  the same `allLevels()` — so a child can see the whole shape of the game from
+  one screen: `★★✓✓✓` on a finished Maple, `★✓↻🔒🔒` where she is, four padlocks
+  on the worlds ahead.
+- **PLAY plays.** It used to open the world picker, so the first thing a child
+  who wanted to play got was another screen asking her to choose. It now
+  launches the dot the ring is on — same world, no reload, no picker. The world
+  NAME above the dots is the door to the picker, and picking a world lands on
+  HER dot there, not on its first one.
+- **`qa/levels.mjs` (j)**, 16 bars, including the two a screenshot cannot check:
+  the dots must AGREE with `allLevels()` on both surfaces, and PLAY and the ring
+  may never point at different dots (both read `levelCurrent`).
+- **A pip is a circle wherever it is put.** `#worlds .wCard span { min-height:
+  2.5em }` — a rule written for the world tagline — reached the pips, which
+  render as spans, and made every one of the thirty **18 x 30** and visibly
+  elliptical. Measured with `qa/_pipbox.mjs`. The rule is scoped to the direct
+  child it was always about, and the pip now refuses an inherited floor and
+  takes its height from `aspect-ratio`, because it will be dropped into surfaces
+  that do not exist yet. (j) checks squareness on every pip on both surfaces.
+
+`levels` now runs (a)(b)(c)(d)(e)(f)(g)(h)(i)(j) in the push gate — about
+1,050 s of measured legs, timeout re-sized to 2,400 s.
+
+**Next: day 8 — the menu IS the world she is on** (the owner's second ask): the
+background stops being key art and becomes the live world, animated, matching
+whichever world she is playing.
 
 **Next: day 6** — the end card: the pip headline, `#endPips`, the caption,
 CONTINUE / TRY AGAIN, the shop door only when affordable; **one commit** retires

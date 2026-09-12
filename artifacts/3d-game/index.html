@@ -535,8 +535,16 @@
            done    the tick, in the house green
            clear   the star, in gold, and it glows — this is the one a child
                    shows somebody */
+      /* A PIP IS A CIRCLE WHEREVER IT IS PUT. It renders as a <span> and is
+         dropped into the end card, the menu, the world cards — and, from day 8,
+         whatever else needs to show a ladder. Any ambient `span` rule in any of
+         those hosts can reach it, and one did. `min-height: 0` refuses the
+         inherited floor and `aspect-ratio` makes the dot square from its width
+         alone, so the shape survives a host that has opinions about text. */
       .pip { --pipSize: 28px; display: inline-flex; flex-direction: column; align-items: center;
-        width: var(--pipSize); height: var(--pipSize); flex: 0 0 auto; position: relative; }
+        width: var(--pipSize); height: var(--pipSize); min-height: 0; flex: 0 0 auto;
+        position: relative; }
+      .pipDot { aspect-ratio: 1 / 1; }
       .pipDot { width: 100%; height: 100%; border-radius: 50%; display: grid; place-items: center;
         box-sizing: border-box; position: relative;
         border: max(2px, calc(var(--pipSize) * 0.075)) solid rgba(255,255,255,0.22);
@@ -582,6 +590,42 @@
       .pipHC { font-size: 12px; font-style: normal; letter-spacing: 1.4px; color: #b9a6e4; }
       /* the five dots on the end card, and the ordinal under them for dad */
       #endPips { width: min(92%, 380px); margin: 10px auto 0; }
+      /* ── THE MENU'S LADDER ─────────────────────────────────────────────
+         Five dots, the ring on hers, and the line under them. Sized bigger
+         than the end card's row (40px against 34px) because this is a TARGET:
+         tapping a dot plays it, and 40px plus the gap clears the 44px minimum
+         a small hand needs. */
+      /* IT CARRIES ITS OWN GROUND. LOOKED AT (qa/_menushot.mjs) the row sat
+         straight over #menuOrb's white eyes and dots 4 and 5 were unreadable —
+         and that is the EASY case: from day 8 the background behind this is a
+         live 3D world with a moving camera. Anything a child has to read on
+         this screen needs its own backing, so the ladder gets the same dark
+         pill every other chip in the game uses, and sits above the orb. */
+      #menuLadder { display: flex; flex-direction: column; align-items: center; gap: 8px;
+        margin: 0 auto 14px; width: min(94%, 420px); position: relative; z-index: 3;
+        padding: 12px 16px 13px; box-sizing: border-box; border-radius: 22px;
+        background: rgba(18, 9, 38, 0.72); backdrop-filter: blur(9px);
+        border: 1.5px solid rgba(184, 117, 255, 0.28);
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); }
+      #mlWorld { font-size: 12px; font-weight: 700; letter-spacing: 3px; color: #cbb6f5;
+        cursor: pointer; padding: 2px 10px; border-radius: 999px; }
+      #mlWorld::after { content: ' ▾'; opacity: 0.65; }
+      #mlPips .pipRow { gap: 14px; }
+      #mlPips .pip { cursor: pointer; }
+      #mlGoal { font-size: 14px; font-weight: 700; letter-spacing: 0.8px; color: #fff6df;
+        text-align: center; text-wrap: balance; min-height: 18px;
+        text-shadow: 0 2px 8px rgba(0,0,0,0.6); }
+      /* a locked dot that is tapped says why, in the same shake the locked
+         world cards use — a padlock with no answer is a broken button */
+      .pip.shake { animation: wShake 420ms ease; }
+      /* ── ALL THIRTY, AT A GLANCE ───────────────────────────────────────
+         The picker's own row, small and untappable: the card is the target
+         here, and what these five are for is showing the SHAPE of the world —
+         three ticks and two padlocks tells a child more about where she is
+         than any number would. */
+      .wPips { margin: 5px 0 2px; }
+      .wPips .pipRow { gap: 7px; justify-content: flex-start; margin: 0; }
+      .wCard.locked .wPips { opacity: 0.5; }
       #endPipsCap { text-align: center; font-size: 12px; letter-spacing: 1.4px;
         color: #b9a6e4; margin-top: 7px; }
       /* ── A CELEBRATION, NOT A DASHBOARD ───────────────────────────────
@@ -1236,7 +1280,13 @@
          gives — the ratio is glyph against halo, so lifting the glyph widens
          it on every poster at once instead of trading one world against
          another. #f4efff was already close; the last step is free. */
-      #worlds .wCard span { font-size: 12px; opacity: 1; letter-spacing: 1.4px;
+      /* `> span`, NOT `span`. This is the world's TAGLINE and the min-height
+         reserves the two lines a locked string needs — but as a descendant
+         selector it also caught the ladder's pips, which render as spans, and
+         gave every one of them min-height 2.5em = 30px against an 18px width.
+         MEASURED (qa/_pipbox.mjs): 18 x 30, visibly elliptical on all six world
+         cards. Scoped to the direct child it was always about. */
+      #worlds .wCard .wBody > span { font-size: 12px; opacity: 1; letter-spacing: 1.4px;
         min-height: 2.5em; color: #fff; }
       /* YOUR BEST, on the card. It existed only on the results overlay — a
          screen you leave and never see again — so the picker gave a returning
@@ -2123,6 +2173,23 @@
         <ellipse cx="140" cy="114" rx="10" ry="6.5" fill="#ff7da8" opacity="0.65"/>
         <path d="M87 122 Q101 136 115 122" stroke="#1a0b33" stroke-width="5.5" fill="none" stroke-linecap="round"/>
       </svg></div>
+      <!-- ── HER LADDER, ON THE FIRST SCREEN ──────────────────────────────
+           The owner's ask, in his words: "like hole.io we see them right but
+           they're locked and as we progress they unlock like angry birds as
+           well." This is the near half of it — the five dots of the world she
+           is on, with the green ring on hers and the padlocks ahead of it, and
+           under them the one line saying what this dot wants. The far half is
+           the picker, where all thirty are visible at once.
+
+           It sits directly above PLAY because PLAY launches exactly the dot the
+           ring is on: the button and the ring can never point at different
+           things (see levelCurrent). No 1-30 ordinal here — that number is the
+           grown-up's and belongs on the end card (§4.7 bar 6). -->
+      <div id="menuLadder">
+        <div id="mlWorld"></div>
+        <div id="mlPips"></div>
+        <div id="mlGoal"></div>
+      </div>
       <button id="btnPlay">PLAY</button>
       <!-- the season ribbon: only exists while a world is in season (events.ts).
            A date, never a countdown — the pull is the repaint, not a timer. -->
@@ -2222,27 +2289,27 @@
         <div class="wCard sel" data-world="maple">
           <div class="wArt"></div><div class="wNum">WORLD 1</div>
           <div class="wBody"><b>MAPLE FALLS</b><span>SLEEPY LITTLE TOWN</span>
-            <div class="wBest"></div><div class="wGo">▶ PLAY</div></div>
+            <div class="wBest"></div><div class="wPips"></div><div class="wGo">▶ PLAY</div></div>
         </div>
         <div class="wCard" data-world="pirate">
           <div class="wArt"></div><div class="wNum">WORLD 2</div>
           <div class="wBody"><b>PIRATE BAY</b><span>SUN, SAND, SNACKS</span>
-            <div class="wBest"></div><div class="wGo">▶ PLAY</div></div>
+            <div class="wBest"></div><div class="wPips"></div><div class="wGo">▶ PLAY</div></div>
         </div>
         <div class="wCard" data-world="gameday">
           <div class="wArt"></div><div class="wNum">WORLD 3</div>
           <div class="wBody"><b>GAME DAY</b><span>THE WHOLE TOWN IS HERE</span>
-            <div class="wBest"></div><div class="wGo">▶ PLAY</div></div>
+            <div class="wBest"></div><div class="wPips"></div><div class="wGo">▶ PLAY</div></div>
         </div>
         <div class="wCard" data-world="lantern">
           <div class="wArt"></div><div class="wNum">WORLD 4</div>
           <div class="wBody"><b>LANTERN NIGHT</b><span>YOU ARE THEIR GUEST</span>
-            <div class="wBest"></div><div class="wGo">▶ PLAY</div></div>
+            <div class="wBest"></div><div class="wPips"></div><div class="wGo">▶ PLAY</div></div>
         </div>
         <div class="wCard" data-world="powder">
           <div class="wArt"></div><div class="wNum">WORLD 5</div>
           <div class="wBody"><b>POWDER PASS</b><span>SCHOOL'S SHUT. SLIDE.</span>
-            <div class="wBest"></div><div class="wGo">▶ PLAY</div></div>
+            <div class="wBest"></div><div class="wPips"></div><div class="wGo">▶ PLAY</div></div>
         </div>
         <!-- WORLD 6 exists in WorldId, WORLDS, WORLD_NAMES, WORLD_COPY,
              WORLD_LIGHT, the newsroom, the crowd and the prop kit — and had no
@@ -2253,7 +2320,7 @@
         <div class="wCard" data-world="skylark">
           <div class="wArt"></div><div class="wNum">WORLD 6</div>
           <div class="wBody"><b>SKYLARK FIELD</b><span>BEFORE THEY ALL GO UP</span>
-            <div class="wBest"></div><div class="wGo">▶ PLAY</div></div>
+            <div class="wBest"></div><div class="wPips"></div><div class="wGo">▶ PLAY</div></div>
         </div>
       </div>
       <!-- AFTER the grid, so it docks below it instead of floating on top of

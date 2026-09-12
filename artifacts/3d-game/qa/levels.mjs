@@ -43,13 +43,13 @@
 // coverage after the hair was raised; both passed. GOVERNOR.md rule 4: parse
 // the real thing and throw if the call site has moved.
 //
-//   node qa/levels.mjs [port] [--only=a,b,c,d,e,f,g,h,i]
+//   node qa/levels.mjs [port] [--only=a,b,c,d,e,f,g,h,i,j]
 import { chromium } from 'playwright';
 import { ALL_WORLDS, UNLOCK_ALL } from './worlds.mjs';
 
 const flag = (n, d) => { const h = process.argv.find((a) => a.startsWith(`--${n}=`)); return h ? h.slice(n.length + 3) : d; };
 const PORT = process.argv.slice(2).filter((a) => !a.startsWith('--'))[0] || '4177';
-const ONLY = flag('only', 'a,b,c,d,e,f,g,h,i').split(',');
+const ONLY = flag('only', 'a,b,c,d,e,f,g,h,i,j').split(',');
 
 const fails = [];
 const bad = (m) => { fails.push(m); console.log(`  BAD  ${m}`); };
@@ -1044,6 +1044,158 @@ if (ONLY.includes('d')) {
     if (inMenu === null) bad('(d) there is no #menu to check');
     else if (inMenu) bad('(d) "N OF 30" appears in #menu — the 1-30 ordinal is the grown-up\'s number and belongs on the end card only (§4.7 bar 6)');
     else ok('(d) the 1-30 ordinal stays off the menu');
+  }
+}
+
+// ── (j) THE LADDER ON THE MENU ─────────────────────────────────────────────
+// The owner's ask, in his words: "like hole.io we see them right but they're
+// locked and as we progress they unlock like angry birds as well."
+//
+// Two surfaces. The MENU shows the world she is on — her five dots, the ring on
+// hers, the line saying what this one wants, and a PLAY that launches exactly
+// the dot the ring is on. The PICKER shows all thirty at once, so the shape of
+// the whole game is visible from one screen.
+//
+// The bars that matter are the ones a screenshot cannot check: that the dots
+// AGREE with the ladder's own state, that PLAY and the ring can never point at
+// different dots, and that a locked dot refuses without punishing.
+if (ONLY.includes('j')) {
+  // a profile part-way through Maple and part-way through Pirate, so the row
+  // has every state in it at once and a pass cannot be a pass on all-locked
+  const SEED = JSON.stringify({ v: 1, w: {
+    maple: { 1: { st: 'clear', best: 24100, pct: 31, n: 3 },
+      2: { st: 'done', best: 3, pct: 22, n: 2 },
+      3: { st: 'fin', best: 0, pct: 18, n: 4 } },
+    pirate: { 1: { st: 'clear', n: 1 } },
+  } });
+  const SQUARE = `[...document.querySelectorAll('.pip')].map((e) => {
+    const b = e.getBoundingClientRect();
+    return { w: Math.round(b.width), h: Math.round(b.height) };
+  }).filter((b) => b.w !== b.h)`;
+
+  // ── the menu's own row ──────────────────────────────────────────────────
+  {
+    const p = await open({ voidUnlocked: UNLOCK_ALL, voidLevels: SEED }, '?w=maple&manual=1');
+    const r = await p.evaluate(`(() => {
+      const rows = window.__levels().filter((x) => x.world === 'maple');
+      const pips = [...document.querySelectorAll('#mlPips .pip')];
+      return {
+        truth: rows.map((x) => x.st),
+        drawn: pips.map((e) => (e.className.match(/s-(\\w+)/) || [])[1] ?? ''),
+        here: pips.map((e, i) => (e.classList.contains('here') ? i + 1 : 0)).filter(Boolean),
+        cur: window.__levelCurrent('maple'),
+        world: document.getElementById('mlWorld')?.textContent ?? '',
+        goal: document.getElementById('mlGoal')?.textContent ?? '',
+        play: (document.getElementById('btnPlay')?.textContent ?? '').trim(),
+        skew: ${SQUARE},
+        menuVisible: getComputedStyle(document.getElementById('menuLadder')).display !== 'none',
+      };
+    })()`);
+    await p.close();
+    if (!r.menuVisible) bad('(j) #menuLadder is not visible on the menu');
+    if (r.drawn.length !== 5) bad(`(j) the menu shows ${r.drawn.length} dots, not 5`);
+    else if (r.drawn.join(',') !== r.truth.join(',')) bad(`(j) the menu draws ${r.drawn.join('·')} but the ladder says ${r.truth.join('·')} — the pips must never disagree with the rule that lifts them`);
+    else ok(`(j) the menu's five dots match the ladder: ${r.drawn.join(' · ')}`);
+    if (r.here.length !== 1) bad(`(j) ${r.here.length} dots wear the here-ring — there is exactly one current dot per world by construction`);
+    else if (r.here[0] !== r.cur) bad(`(j) the here-ring is on dot ${r.here[0]} but current() says ${r.cur}`);
+    else ok(`(j) the here-ring is on dot ${r.cur}, where current() says she is`);
+    if (!/MAPLE/i.test(r.world)) bad(`(j) the ladder names the world "${r.world}"`);
+    else ok(`(j) the ladder names her world: ${r.world}`);
+    if (!r.goal || r.goal.length < 4) bad(`(j) the goal line reads "${r.goal}"`);
+    else ok(`(j) the line under the dots says what this one wants: "${r.goal}"`);
+    if (r.skew.length) bad(`(j) ${r.skew.length} pip(s) are not square — ${JSON.stringify(r.skew.slice(0, 3))}. A host's own text rules can reach a pip; it has to keep its shape anyway`);
+    else ok('(j) every pip on the menu is square');
+  }
+
+  // ── PLAY launches the dot the ring is on, with no navigation ────────────
+  {
+    const p = await open({ voidUnlocked: UNLOCK_ALL, voidLevels: SEED }, '?w=maple&manual=1');
+    await p.evaluate(() => { window.__marker = 'here'; });
+    const cur = await p.evaluate(() => window.__levelCurrent('maple'));
+    await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
+      if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
+    await p.click('#btnPlay');
+    await p.waitForFunction(() => window.__matchState?.().armed === true, null, { timeout: 120000 })
+      .catch(() => { });
+    const r = await p.evaluate(() => ({
+      armed: !!window.__matchState?.().armed,
+      started: (window.__matchState?.().t ?? 0) > 0,
+      playing: typeof window.__levelPlaying === 'function' ? window.__levelPlaying() : 'hook missing',
+      survived: window.__marker === 'here',
+      worlds: !!document.getElementById('worlds')?.classList.contains('show'),
+      menuHidden: getComputedStyle(document.getElementById('menu')).display === 'none',
+    }));
+    await p.close();
+    if (!r.survived) bad('(j) PLAY navigated — the page reloaded to start a match on the world already built');
+    else ok('(j) PLAY did not reload the page');
+    if (r.worlds) bad('(j) PLAY opened the world picker — she has a world and a dot on it, and the ring above the button is pointing at it');
+    else ok('(j) PLAY did not stop to ask which world');
+    if (!r.armed) bad('(j) one tap on PLAY did not arm a match');
+    else ok('(j) one tap on PLAY armed a match');
+    if (r.playing !== cur) bad(`(j) PLAY launched dot ${JSON.stringify(r.playing)} but the ring is on ${cur} — the button and the ring must never point at different dots`);
+    else ok(`(j) PLAY launched dot ${cur}, the dot the ring is on`);
+    if (!r.menuHidden) bad('(j) the menu is still up after PLAY');
+    if (r.started) bad('(j) the match STARTED on the PLAY tap — the clock waits for her first touch (?manual=1)');
+  }
+
+  // ── a dot she can reach plays; a dot she cannot refuses, and says why ───
+  {
+    const p = await open({ voidUnlocked: UNLOCK_ALL, voidLevels: SEED }, '?w=maple&manual=1');
+    await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
+      if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
+    // dot 5 is locked on this profile
+    await p.evaluate(() => document.querySelectorAll('#mlPips .pip')[4]?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    await p.waitForTimeout(400);
+    const locked = await p.evaluate(() => ({
+      armed: !!window.__matchState?.().armed,
+      playing: typeof window.__levelPlaying === 'function' ? window.__levelPlaying() : 'hook missing',
+      said: document.getElementById('mlGoal')?.textContent ?? '',
+      shook: !!document.querySelectorAll('#mlPips .pip')[4]?.classList.contains('shake'),
+    }));
+    if (locked.armed) bad('(j) tapping a LOCKED dot started a match on it — the padlock has to mean something');
+    else ok('(j) a locked dot does not start');
+    if (!locked.shook) bad('(j) a locked dot was tapped and nothing moved — a padlock with no answer is a broken button');
+    else ok('(j) a locked dot shakes when tapped');
+    if (!/FINISH LEVEL/i.test(locked.said)) bad(`(j) the locked dot said "${locked.said}" — it must say what opens it`);
+    else ok(`(j) it says what opens it: "${locked.said}"`);
+    // …and dot 2, which she has already done, replays
+    await p.evaluate(() => document.querySelectorAll('#mlPips .pip')[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    await p.waitForFunction(() => window.__matchState?.().armed === true, null, { timeout: 120000 })
+      .catch(() => { });
+    const open2 = await p.evaluate(() => ({
+      armed: !!window.__matchState?.().armed,
+      playing: typeof window.__levelPlaying === 'function' ? window.__levelPlaying() : 'hook missing',
+    }));
+    await p.close();
+    if (!open2.armed || open2.playing !== 2) bad(`(j) tapping dot 2 (already done) gave playing=${JSON.stringify(open2.playing)} armed=${open2.armed} — an earned dot is replayable`);
+    else ok('(j) tapping a dot she has already done replays it');
+  }
+
+  // ── all thirty, in the picker ───────────────────────────────────────────
+  {
+    const p = await open({ voidUnlocked: UNLOCK_ALL, voidLevels: SEED }, '?w=maple&manual=1');
+    await p.evaluate(() => document.getElementById('worlds')?.classList.add('show'));
+    await p.waitForTimeout(600);
+    const r = await p.evaluate(`(() => {
+      const truth = {};
+      for (const x of window.__levels()) (truth[x.world] ??= []).push(x.st);
+      const cards = [...document.querySelectorAll('#worldRow .wCard[data-world]')].map((c) => ({
+        w: c.dataset.world,
+        drawn: [...c.querySelectorAll('.wPips .pip')].map((e) => (e.className.match(/s-(\\w+)/) || [])[1] ?? ''),
+      }));
+      return { truth, cards, total: document.querySelectorAll('#worldRow .wPips .pip').length,
+        skew: ${SQUARE} };
+    })()`);
+    await p.close();
+    if (r.total !== 30) bad(`(j) the picker shows ${r.total} dots — the game is thirty, and seeing all of them is the point`);
+    else ok('(j) all thirty dots are on the picker at once');
+    for (const c of r.cards) {
+      const t = (r.truth[c.w] || []).join(',');
+      if (c.drawn.join(',') !== t) bad(`(j) ${c.w}'s card draws ${c.drawn.join('·')} but the ladder says ${t}`);
+    }
+    if (r.cards.every((c) => c.drawn.join(',') === (r.truth[c.w] || []).join(','))) ok('(j) every world card agrees with the ladder');
+    if (r.skew.length) bad(`(j) ${r.skew.length} pip(s) in the picker are not square — ${JSON.stringify(r.skew.slice(0, 3))}`);
+    else ok('(j) every pip in the picker is square');
   }
 }
 

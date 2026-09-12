@@ -4680,6 +4680,7 @@ function questEvent(kind: string, n = 1) {
   }
 }
 renderQuests();
+paintMenuLadder();   // the first screen a child sees already shows her ladder
 
 // ── MAPLE ISLE NEWS — the island reacts to how much of it still exists ──────
 // ── LIVE STATE the newsroom reports on ─────────────────────────────────────
@@ -5984,6 +5985,73 @@ function celebrateEnd(coins: number, xpGain: number, lead: string, won = false, 
   requestAnimationFrame(tick);
 }
 
+/** ── THE LADDER, ON THE MENU ──────────────────────────────────────────────
+ *  The owner's ask: "like hole.io we see them right but they're locked and as
+ *  we progress they unlock like angry birds as well."
+ *
+ *  Two surfaces, one renderer. The menu shows the world she is ON — five dots,
+ *  the ring on hers, and the line saying what this one wants. The picker shows
+ *  all six worlds' rows at once, so the whole thirty are visible in one place.
+ *  Both read allLevels(), which DERIVES `open` from the dot before it, so the
+ *  padlocks can never disagree with the rule that lifts them.
+ *
+ *  Called on every menu paint rather than once at boot: the states change when
+ *  a match ends, and a menu that shows yesterday's ladder is worse than no
+ *  ladder at all. */
+function paintMenuLadder(): void {
+  const host = document.getElementById('menuLadder');
+  if (!host) return;
+  ensurePipDefs();
+  const rows = allLevels().filter((r) => r.world === pickedWorld);
+  const states = rows.map((r) => r.st as LevelState);
+  const cur = levelCurrent(pickedWorld);
+  const w = document.getElementById('mlWorld');
+  if (w) w.textContent = (WORLD_LABEL[pickedWorld as WorldKey] ?? pickedWorld).toUpperCase();
+  const pips = document.getElementById('mlPips');
+  if (pips) {
+    pips.innerHTML = pipRow(states, { size: 40 });
+    // TAPPING A DOT PLAYS IT. A row of dots a child cannot touch is a picture
+    // of a ladder rather than a ladder — and she will touch them, because they
+    // look exactly like the buttons they are.
+    [...pips.querySelectorAll('.pip')].forEach((node, i) => {
+      const g = (i + 1) as Goal;
+      node.addEventListener('click', () => {
+        if (states[i] === 'locked') {
+          // never silent, and never a scold: the answer is the dot before it,
+          // said on the thing she tapped — the same shake the locked world
+          // cards use, for the same reason.
+          track('level_locked_tap', { world: pickedWorld, goal: g, at: cur });
+          node.classList.remove('shake'); void (node as HTMLElement).offsetWidth;
+          node.classList.add('shake');
+          const gl = document.getElementById('mlGoal');
+          if (gl) {
+            gl.textContent = `FINISH LEVEL ${cur} FIRST`;
+            setTimeout(() => paintMenuLadder(), 1800);
+          }
+          audio.alert(); buzz(30);
+          return;
+        }
+        track('level_tap', { world: pickedWorld, goal: g, from: cur });
+        playingGoal = g;
+        startFresh(false);
+      });
+    });
+  }
+  const line = document.getElementById('mlGoal');
+  if (line) line.textContent = goalLine(pickedWorld, cur);
+}
+
+/** The picker's six rows — small, untappable, and the whole point of the
+ *  screen after the posters: three ticks and two padlocks says where she is in
+ *  a world faster than any sentence could. */
+function paintCardLadder(card: Element, world: string): void {
+  const host = card.querySelector('.wPips') as HTMLElement | null;
+  if (!host) return;
+  ensurePipDefs();
+  const states = allLevels().filter((r) => r.world === world).map((r) => r.st as LevelState);
+  host.innerHTML = pipRow(states, { size: 18 });
+}
+
 /** ── THE LADDER, ON THE ONE SCREEN THAT SAYS WHAT JUST HAPPENED ───────────
  *  Paints the end card's progression furniture and returns true when it took
  *  the screen. Returns false on a match nobody chose a dot for — every harness
@@ -6322,6 +6390,10 @@ function endMatch(result: GoalResult = null) {
         track('world_pick', { pick: opened, from: pickedWorld, rebuild: true, via: 'unlock' });
         localStorage.setItem('voidWorld', opened);
         localStorage.setItem('voidAutoPlay', '1');
+        // …and land on HER dot in the new world, not on its first one by
+        // default. voidPlayGoal is the cross-reload channel (§3.1) and it is
+        // consumed once at boot.
+        localStorage.setItem('voidPlayGoal', String(levelCurrent(opened)));
         location.href = location.pathname;
       });
       // the same falling sparks a payout and a championship use — a new world
@@ -6377,7 +6449,7 @@ function endMatch(result: GoalResult = null) {
         track('shop_view', { coins, from: 'end' });
         endEl.classList.remove('show');
         document.body.classList.add('menu');
-        menuEl.style.display = '';
+        menuEl.style.display = ''; paintMenuLadder();   // the states changed while she was in there
         el('shop').classList.add('show');
         // …AND PAINT IT. The cards are live renders that only start when
         // __shopTab() runs, and #btnShop has called it since the day the
@@ -7389,7 +7461,23 @@ function startFresh(solo: boolean) {
 // get returned to the splash, then press PLAY — which asks the player to make
 // the same decision twice and lands them back where they started.
 el('btnPlay').addEventListener('click', () => {
-  track('play_tap', { played: stats.matches, lvl: rankInfo(xp).lvl });
+  // ── ONE TAP ─────────────────────────────────────────────────────────────
+  // PLAY used to open the world picker, so the first thing a child who wanted
+  // to play got was another screen asking her to choose. She has a world — the
+  // one she is on — and she has a dot on it, and the ring above this button is
+  // pointing at it. So PLAY launches THAT: same world, no reload, no picker,
+  // straight into the level the ring is on.
+  //
+  // Changing world is still one tap, on the world's NAME above the dots, where
+  // "I want to go somewhere else" is the thing you are already looking at.
+  const g = levelCurrent(pickedWorld);
+  track('play_tap', { played: stats.matches, lvl: rankInfo(xp).lvl, world: pickedWorld, goal: g });
+  playingGoal = g;
+  startFresh(false);
+});
+// the world's name IS the door to the picker
+document.getElementById('mlWorld')?.addEventListener('click', () => {
+  track('worlds_open', { from: pickedWorld });
   el('worlds').classList.add('show');
 });
 // A world switch that lands on a day the daily card has not been claimed has
@@ -7603,6 +7691,7 @@ const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) 
     const id = (c as HTMLElement).dataset.world!;
     const art = c.querySelector('.wArt') as HTMLElement | null;
     if (art) paintWorldCard(art, id);
+    paintCardLadder(c, id);
     // …and the thing to beat. Best score per world was never stored and never
     // shown anywhere a player looks BEFORE a match, so "play again" could not
     // become "beat 12,045".
@@ -7660,11 +7749,16 @@ const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) 
         audio.alert(); buzz(30);
         return;
       }
-      track('world_pick', { pick: id, from: pickedWorld, rebuild: id !== pickedWorld });
-      if (id === pickedWorld) { launchWorld(); return; }   // already built: just go
+      const dot = levelCurrent(id);
+      track('world_pick', { pick: id, from: pickedWorld, rebuild: id !== pickedWorld, goal: dot });
+      // …into HER dot on that world, never its first one. levelCurrent is the
+      // same function the ring on the menu reads, so the card and the ring
+      // cannot send her to different places.
+      if (id === pickedWorld) { playingGoal = dot; launchWorld(); return; }   // already built: just go
       // a different world needs the island rebuilt, so come back playing
       localStorage.setItem('voidWorld', id);
       localStorage.setItem('voidAutoPlay', '1');
+      localStorage.setItem('voidPlayGoal', String(dot));
       location.href = location.pathname;
     });
   });
@@ -8612,7 +8706,7 @@ el('btnHome').addEventListener('click', () => {
   track('home_tap', { played: stats.matches });
   el('end').classList.remove('show');
   document.body.classList.add('menu');
-  menuEl.style.display = '';
+  menuEl.style.display = ''; paintMenuLadder();   // the states changed while she was in there
   renderRank();
 });
 // in-game HOME (⌂): confirm first — a kid's stray tap must not eat the match.
@@ -8710,7 +8804,7 @@ el('btnHome').addEventListener('click', () => {
     life.calm(Infinity);
     audio.stopMusic();
     document.body.classList.add('menu');
-    menuEl.style.display = '';
+    menuEl.style.display = ''; paintMenuLadder();   // the states changed while she was in there
     renderRank();
   };
   // ── ONE STRAY TAP MUST NOT EAT A RUN ────────────────────────────────────
