@@ -1,8 +1,31 @@
-// Does the goal chip touch the clock? #goal is parked at top 58px and is 44px
-// tall; #timer's font-size is clamp(26px, 8vw, 40px), so its line box grows
-// with the viewport and at the clamp ceiling may reach past 58. Measured rather
-// than reasoned about: the real rects, at the three widths that matter.
+// ── DOES THE HUD'S TOP BAND CLEAR ITSELF, AT EVERY WIDTH? ───────────────────
+//
+// MENU-BRIEF §6 day 12. Promoted from a diagnostic (`qa/_chipfit.mjs`) to a
+// registered bar, because the hole it found is still open in the suite: NOTHING
+// in the push gate measures top-band geometry at more than one width.
+//
+// WHAT IT CAUGHT WHEN IT WAS WRITTEN. Day 4 shipped a #goal chip parked at a
+// flat `top: 58px`, a number read off one 430px phone. #timer's font-size is
+// clamp(26px, 8vw, 40px), so its line box GROWS with the viewport and stops
+// growing at the clamp ceiling. MEASURED, four viewports: the clock's bottom
+// edge is 47 / 54 / 60 / 60 at 360 / 430 / 834 / 1024 px wide — so the chip
+// cleared by 11px and 4px on the phones and OVERLAPPED BY 2px on both tablets.
+// Fixed by deriving the offset from --timer-bottom instead of a constant.
+//
+// A number read off one screen is a guess about every other screen, and this is
+// the one bar that says so.
+//
+//   node qa/chipfit.mjs [port]
 import { chromium } from 'playwright';
+
+// A THROW MUST BECOME A VERDICT. gate.mjs judges a `pf` step by scanning stdout
+// for the two tokens, so a probe that dies silently is read as neither — and a
+// probe that prints a PASS and then dies is read as a PASS. See
+// qa/idiomguard.mjs guard 2.
+process.on('uncaughtException', (e) => {
+  console.log(`\nFAIL — chipfit threw: ${String(e && e.message || e).split('\n')[0]}`); process.exit(1); });
+process.on('unhandledRejection', (e) => {
+  console.log(`\nFAIL — chipfit rejected: ${String(e && e.message || e).split('\n')[0]}`); process.exit(1); });
 const PORT = process.argv[2] || '4177';
 const VIEWS = [[360, 780, 'small phone'], [430, 932, 'iPhone 16 Pro Max'],
   [834, 1194, 'iPad 11"'], [1024, 1366, 'iPad Pro landscape-ish']];
@@ -38,5 +61,8 @@ for (const [w, h, name] of VIEWS) {
 }
 await b.close();
 console.log('');
-if (bad) console.log(`FAIL — the goal chip collides on ${bad} of ${VIEWS.length} viewports (tightest gap ${worst}px)`);
-else console.log(`PASS — the goal chip clears the clock on all ${VIEWS.length} viewports (tightest gap ${worst}px)`);
+if (bad) {
+  console.log(`FAIL — the goal chip collides on ${bad} of ${VIEWS.length} viewports (tightest gap ${worst}px)`);
+  process.exit(1);
+}
+console.log(`PASS — the goal chip clears the clock on all ${VIEWS.length} viewports (tightest gap ${worst}px)`);

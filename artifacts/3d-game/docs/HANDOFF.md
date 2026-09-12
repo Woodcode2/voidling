@@ -457,7 +457,7 @@ bottom edge moves with the viewport — 47 / 54 / 60 / 60 px at 360 / 430 / 834 
 It cleared by 11 px and 4 px on phones and **overlapped by 2 px on both
 tablets**. The clock's top and type are now declared once on `:root` and the
 chip sits at `--timer-bottom + 6px`, so it tracks the clock instead of a
-transcribed number: **7-8 px of air at every width**. `qa/_chipfit.mjs` is the
+transcribed number: **7-8 px of air at every width**. `qa/chipfit.mjs` (promoted to a registered bar on day 12) is the
 measurement (a scratch diagnostic, not gate-registered — the multi-viewport
 geometry bar belongs to day 12, where the brief already plans the viewport
 pass). **The branch tip carrying this CSS is NOT yet gate-green**; the last
@@ -848,7 +848,7 @@ her second day the first thing a non-reader is asked to press is a word. It move
 to the end card — the day's coins claimed silently on the first finish of the day
 and counted up in `#endSub`, where the ceremony already lives; the calendar page
 itself becomes a chapter in `#book`. Then day 11's `qa/idiomguard.mjs` and day
-12's viewports + `qa/lookbook.mjs` (folding `qa/_chipfit.mjs` in as a registered
+12's viewports + `qa/lookbook.mjs` (`qa/chipfit.mjs` is already folded in as a registered
 bar).
 
 **Day 5's re-baseline is recorded** (`docs/crews/round-8/rebaseline-day5.log`,
