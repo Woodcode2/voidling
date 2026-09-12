@@ -104,9 +104,18 @@ const tapOnce = async (p, label) => {
     world: window.__menuState().world,
     menuShown: getComputedStyle(document.getElementById('menu')).display !== 'none',
   }));
-  await p.click('#btnPlay', { timeout: 60000 }).catch((e) => {
-    no(`${label}: PLAY could not be clicked at all — ${String(e.message).split('\n')[0]}`);
-  });
+  // A CLICK THAT CANNOT LAND IS THE END OF THE ATTEMPT, not a step in it. The
+  // first version of this reported the failure and then carried on waiting 300s
+  // for a match to arm and evaluating against a page that was no longer there —
+  // so the run ended on "Target page, context or browser has been closed", which
+  // says nothing about the game. The interesting failure is the FIRST one.
+  const clicked = await p.click('#btnPlay', { timeout: 60000 })
+    .then(() => true).catch((e) => String(e.message).split('\n')[0]);
+  if (clicked !== true) {
+    await p.evaluate(() => clearInterval(window.__overlayTimer)).catch(() => { });
+    const over = await p.evaluate(() => window.__sawOverlay || []).catch(() => []);
+    return { blocked: clicked, overlays: over, before };
+  }
   const armed = await p.waitForFunction(() => window.__matchState().armed === true,
     null, { timeout: 300000 }).then(() => true).catch(() => false);
   const after = await p.evaluate(() => {
@@ -128,11 +137,18 @@ for (const [n, last, when] of [[1, TODAY, 'today'], [2, YESTERDAY, 'a day stale'
   const p = await open(ctx, { last });
   const r = await tapOnce(p, `#${n}`);
   const why = [];
-  if (!r.armed) why.push('the match never armed');
-  if (r.after.menuShown) why.push('#menu is still on screen');
-  if (r.after.marker !== 'kept') why.push('the page NAVIGATED (a reload, not a launch)');
-  if (r.after.world !== r.before.world) why.push(`the world changed ${r.before.world} → ${r.after.world}`);
-  for (const o of r.after.overlays) why.push(`#${o} took the screen`);
+  if (r.blocked) {
+    why.push(`PLAY could not be clicked AT ALL (${r.blocked})`);
+    for (const o of r.overlays) why.push(`#${o} was covering it`);
+    if (!r.overlays.length) why.push('and nothing named itself as the thing covering it');
+  }
+  if (!r.blocked && !r.armed) why.push('the match never armed');
+  if (!r.blocked) {
+    if (r.after.menuShown) why.push('#menu is still on screen');
+    if (r.after.marker !== 'kept') why.push('the page NAVIGATED (a reload, not a launch)');
+    if (r.after.world !== r.before.world) why.push(`the world changed ${r.before.world} → ${r.after.world}`);
+    for (const o of r.after.overlays) why.push(`#${o} took the screen`);
+  }
   if (!why.length) ok(`#${n} one tap plays, with voidDailyLast ${when}: armed, menu gone, no overlay, no navigation`);
   else no(`#${n} it is NOT one tap with voidDailyLast ${when} — ${why.join('; ')}`
     + (p.__errs.length ? ` · page said: ${p.__errs.join(' | ')}` : ''));
