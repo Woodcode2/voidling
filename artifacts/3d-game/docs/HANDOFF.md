@@ -841,7 +841,74 @@ verdict on the build):
 `PASS — 6 bars, one tap plays on both sides of midnight and the day is still
 paid [177s]`. Registered in the push profile at a 900 s timeout.
 
-**Next: day 11's `qa/idiomguard.mjs`** — the last unbuilt piece of day 10's
+**`qa/idiomguard.mjs` (day 11) — and on its first honest run it found a live step
+broken for five days.** Six static guards, under a second, no browser:
+
+| # | guard |
+|---|---|
+| 0 | the registry parses WHOLE — 65 steps read, 58 running a probe file |
+| 1 | no REGISTERED probe still opens the picker with PLAY |
+| 2a | every `pf`-judged probe can print both verdict tokens |
+| 3 | every probe that finishes a match and reads the wallet says which side of midnight it is on |
+| 4 | every registered probe file exists |
+| 5 | no registered probe waits for `#daily` to rise on its own |
+
+**What it found:** `qa/switch.mjs` still clicked `#btnPlay` expecting the picker,
+waited 900 ms, then clicked another world's card. PLAY has *played* since day 7,
+so that tap landed inside a closed overlay. It survived the day-11 migration
+because it is registered as `switch:${w}` in the **live** profile only, and the
+migration was measured against the push gate. Broken for five days in a step
+nothing routine runs.
+
+**Three times the guard caught itself**, which is the part worth keeping: (1) it
+applied the "must print both tokens" rule to all steps and reported NINE broken
+probes — every one fine, because the gate has three verdict kinds and `iapdoc` is
+judged by regex, `opening` by exit code; (2) its registry parser used `[^}]*?`
+gaps and four steps carry `env: { SEED: '7' }` between `cmd` and `verdict`, so it
+dropped them IN SILENCE and announced "all 52 registered probe files exist" over
+a registry of 59 — that blindness was what had been hiding `switch.mjs`, and
+guard 0 exists so a parser can never again lie about the rows it read; (3) guard
+0 then asked whether every step names a probe FILE and flagged `typecheck`,
+`build` and the four `selftest:*` steps, which run `tsc`, `vite` and `node -e` by
+design.
+
+**Two REPORTS rather than bars**, printed every run so the numbers can only go
+down: 21 unregistered diagnostics still carry the dead ritual, and 43 of 46
+`pf`-judged probes do not turn a throw into a FAIL line. A bar that fails on
+forty historical files the day it is written is a bar somebody switches off.
+
+**PLAY AGAIN has been a coin-flip for every probe that ever pressed it.**
+`econ`'s click timed out for thirty seconds against a button it could see.
+MEASURED (`qa/_endstill.mjs`, five samples over twelve seconds):
+
+    againPulse@btnAgain (1600ms xInfinity)   still running at +12s
+    box   x 116.75 → 116.60   w 196.48 → 196.79   h 49.00 → 49.08
+
+`#end.show #btnAgain` carried a continuous `transform: scale()` with `infinite`.
+Playwright wants two consecutive frames with an IDENTICAL box before it will
+click, and a continuous scale only offers that at the curve's flat extremes — so
+`econ` passed at 176 s, 183 s and 271 s and then did not. Nothing broke it; it
+was never fixed, and twice before the timeout was diagnosed as something else.
+Both infinite pulses (`#btnAgain`, `#dailyClaim`) are now three breaths and
+still. **That is the third infinite animation on a control this stream has
+found**, and the pattern deserves a name: an endless animation on anything
+clickable is a latent test flake and a design smell at once, and the two symptoms
+look so different that nobody connects them.
+
+**And one of my own, recorded because the gate caught it:** moving the daily
+claim broke `econ`, and my blast-radius audit had asked the wrong question —
+"does this probe seed `voidDailyLast` and read coins" rather than "does this
+probe wait for the modal to appear". `econ` waits, unguarded, for 400 s. Guard 5
+now names that class. The repair left `econ` better than it was: it had been
+inferring a returning player's reward by reading digits out of a **button's
+text**, and now asks `__dailyDue()` and checks the card agrees.
+
+**Owed:** three unregistered probes (`dailyrace`, `streakdrift`, `streakunlock`)
+still drive the claim through the retired button. They need a `__claimDaily()`
+hook — the same tool `__recordLevel` is, for the same reason — which is a source
+change held until the gate in flight finishes.
+
+**Next: day 12's viewports + `qa/lookbook.mjs`** — the last unbuilt piece of day 10's
 row, and §1.2 already decided it: `#daily` rises full-screen at module init
 whenever `voidDailyLast !== today`, with a text button reading "CLAIM 90✦", so on
 her second day the first thing a non-reader is asked to press is a word. It moves

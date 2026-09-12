@@ -207,6 +207,47 @@ for (const c of chunks) {
   }
 }
 
+// ═══ GUARD 5 · WAITING FOR A MODAL THAT NO LONGER RISES ════════════════════
+// #daily used to appear full-screen at module init on any day whose date did not
+// match voidDailyLast. It does not any more: the day is claimed silently on the
+// first finish and the card lives in the scrapbook. Six probes were waiting for
+// it when that changed, and the two ways they broke are worth separating.
+//
+//   UNGUARDED — `await p.waitForSelector('#daily.show', { timeout: 400000 })`.
+//   econ.mjs had exactly this. It sat for the full four hundred seconds and then
+//   threw, and econ is a PUSH GATE STEP: a change to the game turned a
+//   seven-minute gate step into a seven-minute hang with a crash at the end.
+//
+//   GUARDED — the same wait with `.catch(() => {})` after it. Those do not hang.
+//   They carry on and assert against a card that is not on the screen, which is
+//   worse in the only way that matters: it is quiet.
+//
+// Both are failures of the same kind — a probe describing a screen the game no
+// longer has — and neither is visible in a passing run. Named here so the next
+// person to move a modal finds out in a second rather than in an afternoon.
+{
+  const WAITS = /waitForSelector\(\s*[`'"][^`'"]*#daily[.\[]/;
+  const hits = [];
+  for (const [f, body] of src) {
+    if (!WAITS.test(body)) continue;
+    const line = body.split('\n').find((l) => WAITS.test(l)) || '';
+    const guarded = /\.catch\(/.test(line) || /\.catch\(/.test(body.split(line)[1]?.slice(0, 40) || '');
+    const reg = [...registered.values()].some((r) => r.file === f);
+    hits.push({ f, guarded, reg });
+  }
+  const inGate = hits.filter((h) => h.reg);
+  if (!inGate.length) {
+    ok(`#5 no REGISTERED probe waits for #daily to rise on its own (${hits.length} unregistered still do)`);
+  } else {
+    no(`#5 ${inGate.length} registered probe(s) wait for #daily to rise on its own, and it does not: `
+      + inGate.map((h) => `${h.f}${h.guarded ? ' (guarded — quietly asserts against a missing card)' : ' (UNGUARDED — hangs for its full timeout, then throws)'}`).join('; '));
+  }
+  if (hits.length - inGate.length) {
+    console.log(`  ·    #5b ${hits.length - inGate.length} unregistered probe(s) still wait for it (REPORT): `
+      + hits.filter((h) => !h.reg).map((h) => h.f).join(', '));
+  }
+}
+
 const secs = ((Date.now() - t0) / 1000).toFixed(1);
 if (bad.length) {
   console.log('');
