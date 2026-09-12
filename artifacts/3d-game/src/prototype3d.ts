@@ -7597,6 +7597,13 @@ function showGuide(text: string, dur = 5) {
 }
 let _revalQueue: number[] = [];
 function beginMatch(solo = false) {
+  // ONE MATCH, ONE MENTION. dailyPaid carries the day's claim from endMatch to
+  // the end card, and celebrateEnd is what clears it — so a match that ends
+  // without one (the quit path records a result and leaves) would strand the
+  // line and the NEXT end card would tell her she had been paid again. She was
+  // not: claimDaily() is idempotent per day. Cleared here so the carrier can
+  // only ever describe the match that is about to happen.
+  dailyPaid = null;
   // ── FIRST LINE, AND THE POSITION IS WHY ──────────────────────────────────
   // leaveMenu() gives back everything the menu borrowed: the camera, the
   // void's play radius, and his place on the authored spawn. All three have to
