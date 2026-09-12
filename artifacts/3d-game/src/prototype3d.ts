@@ -2664,6 +2664,7 @@ const _dbg = new Proxy(_dbgStore, {
   __setMood: (m: string | null) => void;
   __faceState: () => { mood: string; maw: number; smile: boolean; biting: boolean };
   __stages: () => { cur: number; best: number; ceremonies: number };
+  __voidSetMenuR: (r: number) => void;
   __bite: (hunter?: boolean) => void;
   __pinMouth: (shut: boolean) => void;
   __pinGape: (v: number) => void;
@@ -2897,6 +2898,22 @@ _dbg.__spawn = () => ({ x: island.spawn.x, z: island.spawn.z });
 // QA: force the hero to a size so the renderer can be shot at every form
 // without playing a whole match. Sets the visual stage too, so the void looks
 // exactly as it would if a player had grown into it.
+/** QA: THE MENU'S RADIUS, AND ONLY THE RADIUS.
+ *
+ *  __setVoidR below cannot be used for this: it sets curStage and calls
+ *  setStage() itself, so a probe asking "does changing his size change the
+ *  creature" through that setter would be reading its own write. This one
+ *  touches nothing but the size, which is exactly what the menuMode branch in
+ *  animate() is supposed to make safe — and if that branch is ever removed, the
+ *  frame loop will promote him within a frame or two and qa/menuform.mjs bar 3
+ *  says so.
+ *
+ *  Menu only. In a match the growth law owns the radius and would walk this back
+ *  on the next frame; the probe would then be measuring the clamp. */
+_dbg.__voidSetMenuR = (r: number) => {
+  if (!menuMode) { console.warn('__voidSetMenuR: not on the menu — the growth law owns the radius in a match'); return; }
+  voidling.setRadius(r);
+};
 _dbg.__setVoidR = (r: number) => {
   frozenR = true;             // …and hold it there against the growth law
   voidling.setRadius(r); lastR = r;
@@ -4760,6 +4777,24 @@ const FORM_MIN = [0, 1.6, 2.5, 3.6, 5.5, 8.0, 13.5];
 // unique to WORLD ENDER and arriving there looks like something.
 const VISUAL_STAGE = [0, 1, 2, 3, 3, 4, 4];   // TITAN wears WORLD ENDER's dressing, at scale
 const stageFor = (r: number) => { let s = 0; for (let i = 0; i < FORM_MIN.length; i++) if (r >= FORM_MIN[i]) s = i; return s; };
+/** ── THE MENU'S CREATURE, CHOSEN INSTEAD OF COMPUTED ─────────────────────────
+ *  A VISUAL stage (the setStage/soundtrack scale of five), not a FORMS index.
+ *
+ *  The level picker is the screen that decides whether a child taps PLAY, and
+ *  the hero on it should be the same hero every time — on every world, at every
+ *  camera distance, whatever the diorama does to his size. Until this constant
+ *  existed the menu's form fell out of stageFor(menuVoidR(dist)), which is to
+ *  say out of how far back a world's photogenic corner happened to be: MEASURED
+ *  by qa/_menuform.mjs, Maple showed GOBBLIN and the other five showed
+ *  CHOMPOSAURUS. Two creatures across six worlds, by accident.
+ *
+ *  3 is what five of the six already showed, so this changes one world's picture
+ *  and pins the rest. It is deliberately NOT the top tier: the menu may not
+ *  spend the arrival that a real WORLD ENDER run is for.
+ *
+ *  Nothing about a match reads this — see the menuMode branch in animate(),
+ *  which is the only place it is used. */
+const MENU_VSTAGE = 3;
 const PLAYER_COLOR = 0x9a5cff;
 
 // ── scale/eat/growth — the 2D game's exact model, through the 0.05 map scale ─
@@ -12575,6 +12610,40 @@ function animate() {
   sun.target.position.set(voidState.x, 0, voidState.z);
   sun.target.updateMatrixWorld();
 
+  // ── THE MENU IS NOT A MATCH, AND THIS BLOCK COULD NOT TELL ────────────────
+  // Everything below decides the hero's FORM from his RADIUS, and it ran on the
+  // menu too. The menu scales him to the stage — menuVoidR is dist/18 clamped
+  // to 1.8-3.8 world units, against a match's START_R of 0.9 — so on the first
+  // menu frame stageFor(radius) was 2 or 3 while curStage and bestStage were
+  // both 0, which is the ceremony branch below. Two things came out of that,
+  // both measured by qa/_menuform.mjs across all six worlds:
+  //
+  //   1. THE MENU FIRED AN EVOLUTION NOBODY PLAYED FOR, 6 worlds of 6, every
+  //      load: audio.evolve(), camPunch(5), camDist *= 1.07, fx.ring, buzz(45),
+  //      townReacts({kind:'evolve'}) and track('evolve') — so the analytics have
+  //      been counting a phantom evolution per menu visit, and any funnel read
+  //      off that event is wrong by one per session. (The EVOLVED card itself is
+  //      usually suppressed by `tClock > titleUntil`, which is why a year of
+  //      looking at this screen never showed it.)
+  //
+  //   2. THE FORM WAS AN ACCIDENT OF CAMERA DISTANCE. FORM_MIN[3] is 3.6 and
+  //      menuVoidR is dist/18, so a world staged closer than 64.8 units shows a
+  //      different creature: Maple (staged 58) showed MUNCHKIN, the other five
+  //      (80-92) showed GOBBLIN. Six worlds, two creatures, nobody's decision.
+  //
+  // So the menu's form is CHOSEN now, and that choice is also what makes the
+  // diorama possible (docs/DIORAMA-BRIEF.md §11.2): with the form pinned, his
+  // RADIUS is free, and a camera 430 units back needs him at r 12-17 to read at
+  // the 128-205 px he reads at today. Without this branch, that radius would
+  // walk him up three forms to WORLD ENDER on the level picker.
+  //
+  // The clamps that would fight a big menu radius all live inside
+  // `if (started && ...)` at the top of this function, so nothing else has to
+  // change: the menu owns his size outright.
+  if (menuMode) {
+    voidling.setStage(MENU_VSTAGE);
+    audio.setMusicStage(MENU_VSTAGE);
+  } else {
   // evolution: form change on growth (with a flash), plus ring/glow via setStage
   const ns = stageFor(voidling.radius);
   if (ns > curStage) {
@@ -12641,6 +12710,7 @@ function animate() {
   // NEVER downgrade: the growth-law clamp can pull radius back under a form
   // threshold the frame after evolving — re-announcing the same form forever
   voidling.setStage(VISUAL_STAGE[curStage] ?? 4);
+  }
 
   // the soundtrack follows you: standing on the dance floor brings in the kick,
   // the stab and the crowd, and ducks the island bed under them

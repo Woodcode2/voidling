@@ -1,0 +1,28 @@
+# qa/_menuform.mjs against the pre-fix coupling.
+# (the menuMode branch in animate() disabled; the __voidSetMenuR hook left in place,
+#  so the six-world table is exactly what shipped before this change)
+
+
+world     dist  camD    r   wR    form(from r)  worn  body px(w x h)  ceremonies
+maple       58  57.8 3.22 3.67  GOBBLIN         2  205.5 x 206.2           1
+pirate      80  81.1  3.8 3.75  CHOMPOSAURUS    3  149.6 x 150.2           1
+gameday     88  89.4  3.8 3.83  CHOMPOSAURUS    3  138.8 x 139.2           1
+lantern     88  89.4  3.8 3.78  CHOMPOSAURUS    3  136.8 x 137.3           1
+powder      84  85.2  3.8 3.76  CHOMPOSAURUS    3  142.8 x 143.4           1
+skylark     92  95.4  3.8 3.83  CHOMPOSAURUS    3    130 x 130.4           1
+
+A. distinct VISUAL stages WORN across six worlds: 2 (2, 3)
+   distinct stages his RADIUS would imply:        2 (GOBBLIN, CHOMPOSAURUS)
+FAIL — the menu shows a DIFFERENT CREATURE per world, decided by camera distance
+
+B. worlds firing an evolution ceremony on the menu: 6 of 6
+FAIL — the menu fires the EVOLVED ceremony for a form nobody played for
+
+C. his BODY's on-screen height today: 130.4-206.2 px of 932
+   D. the px-per-world-unit at the menu camera, which is what §11.2 needs:
+      maple     28.09 px/unit at camD 57.8
+      pirate    20.03 px/unit at camD 81.1
+      gameday   18.17 px/unit at camD 89.4
+      lantern   18.16 px/unit at camD 89.4
+      powder    19.07 px/unit at camD 85.2
+      skylark   17.02 px/unit at camD 95.4

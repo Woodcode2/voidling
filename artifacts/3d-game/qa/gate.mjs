@@ -414,6 +414,28 @@ const SUITE = [
     cmd: ['node', 'qa/reveal.mjs', String(PORT)], verdict: pf,
     why: 'the ladder moves exactly twice — the dot she played flips, then the ring hops to the one she opened — and is otherwise perfectly still, because a menu that animates forever is a menu a child never finishes reading and a button Playwright can never find stable' },
 
+  // THE HERO ON THE SCREEN THAT SELLS THE GAME. Two bugs older than the picker
+  // itself, and a third bar that is the diorama's licence to exist.
+  //
+  // The menu scales the void to the stage and the game derives his FORM from his
+  // RADIUS, so his creature was a function of how far back each world's
+  // photogenic corner happened to sit — Maple wore one animal and the other five
+  // wore another. Worse, the evolution check ran on the menu with curStage at 0,
+  // so every load fired a full ceremony for a form nobody played for: the sound,
+  // the camera punch, the newsroom, the haptic, and track('evolve'), which means
+  // the analytics counted a phantom evolution per session. Neither was visible by
+  // looking, because the EVOLVED card itself is suppressed under the title card.
+  //
+  // Bar 3 is the one that matters going forward: it moves his menu radius to 17
+  // and requires the creature not to change. That is what lets the diorama pull
+  // the camera back to frame a whole block — 178 units against today's 58-95 —
+  // without promoting him to WORLD ENDER on the level picker, flash, shake and
+  // all. Measured 68 s; the 900 is headroom for the display-radius spring, which
+  // this sandbox walks at 0.4-2.9 fps.
+  { id: 'menuform', tier: 'feel', profiles: ['push', 'live'], timeout: 900,
+    cmd: ['node', 'qa/menuform.mjs', String(PORT)], verdict: pf,
+    why: 'a child meets the same hero every time she opens the picker, the menu never congratulates her for an evolution she did not play, and his size can change without changing him' },
+
   { id: 'stickerreg', tier: 'quality', profiles: ['push', 'live'], timeout: 30,
     cmd: ['node', 'qa/stickerreg.mjs'], verdict: pf,
     why: 'every world hides things worth finding and every season is something a child can hunt — a world with no stickers ships a picker card whose invitation reads "✨ 0 SECRETS"' },

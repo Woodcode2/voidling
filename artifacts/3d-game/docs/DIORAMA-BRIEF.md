@@ -116,7 +116,13 @@ pass, nothing per frame — unlike `fadeOccluders` (`prototype3d.ts:1615`), whic
 walks 5,614 edibles every frame for a void who is now 60px tall and cannot be
 occluded; suspend it under `menuMode`.
 
-## 6 · The void — THE OPEN QUESTION, and the one that can still kill it
+## 6 · The void — ANSWERED IN §11.2, read that instead
+
+> **Closed.** His form is pinned on the menu (`MENU_VSTAGE = 3`) and his radius is
+> free, so the answer is **r=12 at a 178-unit camera: 219 px of body, the top of
+> today's measured 135–218 px band, wearing the creature a child already knows.**
+> Everything below is the reasoning that got there, including two pixel figures
+> §11.2 retracts. Do not quote this section's numbers.
 
 In the reference there is no character at all. In this game the void is the
 star, and the further back the camera goes the smaller he gets. **Both shipped
@@ -175,7 +181,14 @@ Second, from looking: **Lantern is dark-on-dark.** The plinth's edges vanish int
 the violet and the floating-object read is lost. Maple works because autumn
 maples are orange.
 
-## 8 · Two bugs found on the way past
+## 8 · Four bugs found on the way past
+
+0. **THE MENU HAS BEEN FIRING AN EVOLUTION CEREMONY, EVERY LOAD, ON EVERY
+   WORLD** — 6 of 6 measured, including `track('evolve')`, so the evolve funnel
+   counts one phantom per session. And **the menu showed two different creatures
+   across six worlds**, decided by how far back each world's camera sits. Both
+   fixed and guarded; see §11.2 for the measurements. Neither has anything to do
+   with the diorama — the diorama work is only what made anyone look.
 
 1. **The ferris wheel is in the sea.** `island.ts:3880-3881` places Maple's
    Higgsfield ferris wheel at `[w(blockCenter(1)) - 120, w(blockCenter(1)) + 260]`
@@ -190,6 +203,8 @@ maples are orange.
    `export const PLAN_GRID = PLAN;` is evaluated once at module load, after
    `setWorld('maple')` at `:174` — so it is always Maple's plan whatever world is
    built.
+
+   *(1 and 2 are still open.)*
 
 ## 9 · Build order, smallest kill test first
 
@@ -235,26 +250,91 @@ the block and misreading it as "he is too big".
 writes `voidState.x = st.x; voidState.z = st.z` at `prototype3d.ts:1130-1131`.
 Make the authored block centre plus the front-right offset BE the stage point.
 
-### 11.2 Making him bigger fires an EVOLUTION on the menu — and my kill test hit it
+### 11.2 Making him bigger fires an EVOLUTION on the menu — ANSWERED, and it was worse than the refutation said
 
 `FORM_MIN = [0, 1.6, 2.5, 3.6, 5.5, 8.0, 13.5]` (`prototype3d.ts:4757`),
 `VISUAL_STAGE = [0, 1, 2, 3, 3, 4, 4]` (`:4761`), `stageFor` at `:4762`.
 
-- Today's menu: `menuVoidR` caps at 3.8 → bucket 3 → **visual stage 3**.
-- §6's proposed `half*0.17` at half 48 = 8.16 ≥ `FORM_MIN[5]` = 8.0 → **stage 4**.
-- **My own kill test used r = 12** → bucket 5 → **visual stage 4.**
+The refutation was right that my r=12 kill test photographed a different form of
+the creature from the one the menu shows. `docs/crews/round-8/diorama-void-r12.png`
+is a real frame of the wrong animal.
 
-So `docs/crews/round-8/diorama-void-r12.png` is a picture of a **different form of
-the creature** from the one the menu shows. The frame is real and he does read at
-67 px — but the question "does the MENU void read on a diorama" is **not** the
-question that shot answers. Reported to the owner as settled; it is not.
+**Then `qa/_menuform.mjs` measured the live menu on all six worlds, and found two
+live bugs that had nothing to do with the diorama.**
 
-**Salvage:** cap his menu radius below `FORM_MIN[4] = 5.5`. `half*0.11` on a
-48-half block is **5.28** — still 2.8x today's on-screen size and it keeps
-`stageFor` in bucket 3. **And that reopens the kill test**, because the sweep
-measured r=5 at 20.8 px and r=8 at 34.7 px, and by looking, 34.7 px is "a blob,
-no face". Keeping his form means keeping him small. That tension is unresolved
-and it is now the single open question.
+| | before | after |
+|---|---|---|
+| distinct creatures worn across six worlds | **2** (Maple visual stage 2, the other five 3) | **1** (stage 3 everywhere) |
+| worlds firing an evolution ceremony on the menu, per load | **6 of 6** | **0 of 6** |
+| his body's on-screen height | 130.4–206.2 px | 134.7–215.2 px |
+
+Logs: `docs/crews/round-8/menuform-before.log`, `menuform-after.log`. The height
+row moves a few px between runs of the same build, because before the fix the
+ceremony's body pop (+16.1% peaking 0.20 s in) is still in flight when the shutter
+opens — 0.7 s of game time is ~10 s of wall clock at this sandbox's frame rate.
+That is noise in the height row and does not touch the two verdicts.
+
+1. **The menu's creature was a function of camera distance.** `menuVoidR` is
+   `dist/18` clamped to 1.8–3.8 and `FORM_MIN[3]` is 3.6, so a world staged closer
+   than 64.8 units shows a different animal. Maple is staged 58 units back and
+   showed GOBBLIN; the other five (80–92) showed CHOMPOSAURUS. Nobody chose that.
+
+2. **The evolution check was not gated on `menuMode` or on `started`.** `curStage`
+   and `bestStage` both start at 0 and the menu's radius implies 2 or 3, so the
+   first menu frame took the ceremony branch: `audio.evolve()`, `camPunch(5)`,
+   `camDist *= 1.07`, `fx.ring`, `buzz(45)`, `townReacts({kind:'evolve'})` and
+   **`track('evolve')`** — so every analytics funnel over the evolve event has been
+   counting one phantom evolution per session. Invisible by looking, because the
+   EVOLVED card itself is suppressed by `tClock > titleUntil` at boot.
+
+**The fix is one branch** (`if (menuMode) { setStage(MENU_VSTAGE) } else { …old
+block… }`) plus `MENU_VSTAGE = 3`, which is what five of the six worlds already
+showed. And that branch **is** the decoupling: on the menu his form is chosen and
+his radius is free. The growth-law clamps that would fight a big menu radius all
+live inside `if (started && !ended && !paused)`, so nothing else had to change.
+
+**Measured with the branch disabled and the hook left in** — the picker at r=17
+wore visual stage 4 and fired **three** ceremonies as the radius climbed, the last
+being the WORLD ENDER finale: `fx.flash('#ffffff', 0.55)`, `fx.shake(1.1)` and
+`buzz(120)`. Camera shake is ZERO by the owner's standing order. Pulling the
+camera back without this branch would have put a white flash and a screen shake on
+the level picker.
+
+Guarded by `qa/menuform.mjs` (registered, push+live, 68 s). All three bars fail on
+the pre-fix build.
+
+#### The size question, answered with the engine's own formula
+
+`void3d.ts:2118` computes the hero's pixel radius for its own LOD ladder:
+`pxR = (innerHeight / (2 * camD * tan(fov/2))) * dispR`. Validated against the
+live menu on four distances — **max error 0.15%**. Against a 92-unit block at
+fov 32 on a 430x932 screen, body **diameter** in px:
+
+| framing | camera back | px/unit | r=3.8 | r=5.28 | r=8 | r=12 | r=17 |
+|---|---|---|---|---|---|---|---|
+| block at 90% of frame height | 178 | 9.12 | 69 | 96 | **146** | **219** | 310 |
+| block at 75% | 214 | 7.60 | 58 | 80 | 122 | **182** | 258 |
+| block at 60% | 267 | 6.08 | 46 | 64 | 97 | **146** | 207 |
+
+**Today's menu reads 135–218 px, measured.** So **r=12 lands in that band at every
+framing under consideration, and r=8 lands in it at the tight one** — with the form
+pinned, so he stays the creature a child knows. **The tension §11.2 called "the
+single open question" is closed: r=12, form pinned at visual stage 3.**
+
+#### Two numbers I gave the owner that this corrects
+
+- **"the void survives at 67 px"** — retracted twice over. The refutation already
+  established the shot was the wrong form. The 67 px *itself* is also void: it came
+  from projecting the eight corners of a `Box3`, which for a ball overstates by up
+  to sqrt(3) (the silhouette of the cube, plus near corners `R*sqrt(3)` closer to
+  the camera), at a radius the probe could not report. `qa/_menuform.mjs` printed
+  289 px for a body that is 204 px before this was caught. Every pixel figure in
+  `qa/_diovoid.mjs` is measured that way and none should be quoted.
+- **"a form-safe void on a block-filling frame is ~30 px across"** — wrong twice.
+  30.1 was a *radius* reported as "across", so 60 px diameter; and it assumed a
+  285-unit camera rather than the 178 a block-filling frame actually needs. The
+  honest figure for r=5.28 is **96 px diameter at 178 units** — and the pin makes
+  5.28 irrelevant anyway.
 
 ### 11.3 The frame arithmetic is wrong by sqrt(2)
 

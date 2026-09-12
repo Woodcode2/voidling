@@ -1,0 +1,24 @@
+
+world     dist  camD    r   wR    form(from r)  worn  body px(w x h)  ceremonies
+maple       58  57.9 3.22 3.83  GOBBLIN         3  214.4 x 215.2           0
+pirate      80  81.1  3.8 3.97  CHOMPOSAURUS    3  158.6 x 159.2           0
+gameday     88  89.4  3.8 3.96  CHOMPOSAURUS    3  143.6 x 144.1           0
+lantern     88  89.4  3.8 3.96  CHOMPOSAURUS    3  143.3 x 143.9           0
+powder      84  85.2  3.8 3.97  CHOMPOSAURUS    3    151 x 151.5           0
+skylark     92  95.4  3.8 3.95  CHOMPOSAURUS    3    134 x 134.7           0
+
+A. distinct VISUAL stages WORN across six worlds: 1 (3)
+   distinct stages his RADIUS would imply:        2 (GOBBLIN, CHOMPOSAURUS)
+PASS — one creature on every world
+
+B. worlds firing an evolution ceremony on the menu: 0 of 6
+PASS — no ceremony on the menu
+
+C. his BODY's on-screen height today: 134.7-215.2 px of 932
+   D. the px-per-world-unit at the menu camera, which is what §11.2 needs:
+      maple     28.09 px/unit at camD 57.9
+      pirate    20.05 px/unit at camD 81.1
+      gameday   18.19 px/unit at camD 89.4
+      lantern   18.17 px/unit at camD 89.4
+      powder    19.08 px/unit at camD 85.2
+      skylark   17.05 px/unit at camD 95.4
