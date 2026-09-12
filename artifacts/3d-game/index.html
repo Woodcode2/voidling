@@ -1151,7 +1151,29 @@
       #btnAgain:active { transform: translateY(3px); box-shadow: inset 0 2px 0 rgba(255,255,255,0.35), 0 3px 0 #b8163a; }
       @keyframes erIn { from { opacity: 0; transform: translateY(14px) scale(0.94); } to { opacity: 1; transform: none; } }
       #end .sub .endCnt { color: #ffd23f; font-weight: 700; display: inline-block; min-width: 3.2em; text-align: left; }
-      #end.show #btnAgain { animation: againPulse 1.6s ease-in-out 1.2s infinite; }
+      /* ── THREE PULSES, THEN STILL ────────────────────────────────────────
+         This was `infinite`, and it is a `transform: scale()` on the button a
+         child taps more than any other in the game.
+
+         MEASURED (qa/_endstill.mjs, five samples over twelve seconds after the
+         card comes up): `againPulse@btnAgain (1600ms xInfinity)` still running
+         at +12s, with the box moving under it —
+             x 116.75 -> 116.60   w 196.48 -> 196.79   h 49.00 -> 49.08
+         Sub-pixel, and decisive: Playwright's stability check wants two
+         consecutive animation frames with an IDENTICAL box before it will
+         click, and a continuous scale only offers that at the curve's flat
+         extremes. So PLAY AGAIN has been a coin-flip for every probe that ever
+         pressed it — econ passed at 176s, 183s and 271s and then timed out for
+         thirty seconds against a button it could see perfectly well. Twice
+         before, that timeout was diagnosed as something else.
+
+         This is the third infinite animation on a control in this game and the
+         same argument retires it as retired the menu's "you are here" ring: a
+         cue that never stops is not a cue. 1.2s of stillness so the card can
+         land, three breaths of "press me", and then a button that sits there
+         and waits — which is also the only version of it a child with
+         `body.calm` set has ever seen. */
+      #end.show #btnAgain { animation: againPulse 1.6s ease-in-out 1.2s 3; }
       @keyframes againPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
       /* 15px, was 22 — the payout confetti was landing ON the stat tiles at
          tile-text size and reading as broken layout rather than celebration */
@@ -1526,7 +1548,11 @@
       #dailyClaim { font-family: inherit; font-size: 19px; font-weight: 700; letter-spacing: 2px; color: #fff;
         background: linear-gradient(180deg, #ff5d7e, #ff2450); border: none; border-radius: 16px; padding: 15px 46px;
         cursor: pointer; box-shadow: 0 6px 0 #b8163a, 0 10px 22px rgba(0,0,0,0.45);
-        animation: againPulse 1.7s ease-in-out infinite; }
+        /* same reasoning as #btnAgain above, and the same three breaths. This
+           button is no longer a toll on the way to PLAY — it closes a page a
+           child chose to open — so an endless "press me" on it is asking for
+           something nobody needs. */
+        animation: againPulse 1.7s ease-in-out 3; }
       #dailyClaim i { font-style: normal; color: #ffe08a; margin-left: 3px; }
       /* skin preview modal */
       #skinPrev { position: fixed; inset: 0; z-index: 40; display: none; align-items: center; justify-content: center;
