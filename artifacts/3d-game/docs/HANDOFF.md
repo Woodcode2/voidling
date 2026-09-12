@@ -499,8 +499,22 @@ CONTINUE / TRY AGAIN, the shop door only when affordable; **one commit** retires
 the quest board and ports `questable` into `levels.mjs` (e); `levels.mjs` (d);
 `endfit2` registered.
 
-**Day 5's leftover:** re-baseline `newsfeed`/`faceparity`/`econ` on this build
-and record their numbers, so a later drift has something to be measured against.
+**Day 5's re-baseline is recorded** (`docs/crews/round-8/rebaseline-day5.log`,
+run on `1682897`). These three pair their runs, so a level that can end early was
+the thing most likely to un-pair them silently. All three green, and these are
+the numbers a later drift is measured against:
+
+| probe | on the day-5 build |
+|---|---|
+| `econ` | missed-2-days week 4 claim **145✦** (the dead cliff paid 90) · trophies **17/17** paid once · wallet 1000 → **1860** · gems 0 → **10** · rematch re-pays nothing (+35✦, +0💎) · gem hat 100 → **65💎**, parental gate not raised |
+| `faceparity` | pirate resting-grin **100%** (133/973 idle), mood-hidden **0%** · powder **100%** (210/952), **0%** · spread **0 pts** against a bar of 35, worst mood-hidden **0%** against a bar of 20% |
+| `newsfeed` | all six worlds **26 cards, 26 distinct, 0 repeats**, longest run of the same opening word **2**, **0** unresolved tokens · two-sentence share 27–35%, question share 0–12% |
+
+The gate's `report.json` keeps step timings only, not the probes' own figures, so
+this had to be a separate run — worth knowing before the next re-baseline day.
+
+Push gate on `1682897`: **PASS 36/36**, 5,105 s. It also covers `aac6a8e`, which
+the day-4 run did not.
 
 
 

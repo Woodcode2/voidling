@@ -1,0 +1,34 @@
+=== RE-BASELINE on the day-5 build (1682897) ===
+2026-09-12T01:30:24Z
+
+########## econ ##########
+  missed-2-days, week 4: claim=145✦ (old cliff paid 90)  cell="DAY 28"
+  trophies paid: 17/17  wallet 1000 → 1860  gems 0 → 10  lead="🏆 REGULAR EARNED!+0✦ · +10💎 · +22 XP"
+  rematch: paid stays 17/17, wallet +35, gems +0
+  gem shelf: tier=true aurora="💎 25" chip=true (10💎) bundleGone=true
+  gem hat: found=true owned=true gems 100→65 gate=false
+
+  PASS — the cliff is dead, the ladder pays once, and gems are real, rare, and spendable
+
+
+########## faceparity ##########
+  pirate    grin  26%   resting-grin 100% (133/973 idle)   mood-hidden   0%   [frenzy 58%, scared 31%, hurt 10%]
+  powder    grin  44%   resting-grin 100% (210/952 idle)   mood-hidden   0%   [frenzy 72%, scared 28%]
+
+PASS — one face in all 2 world(s): resting-grin spread 0 pts (bar 35), worst mood-hidden share 0% (bar 20%)
+
+########## newsfeed ##########
+== maple (26 cards)
+  26 cards, 26 distinct  ·  0 repeat(s)  ·  longest run of the same opening word: 2 ("the")  ·  0 unresolved token(s)  ·  27% exactly two sentences, 4% questions
+== pirate (26 cards)
+  26 cards, 26 distinct  ·  0 repeat(s)  ·  longest run of the same opening word: 2 ("the")  ·  0 unresolved token(s)  ·  35% exactly two sentences, 0% questions
+== gameday (26 cards)
+  26 cards, 26 distinct  ·  0 repeat(s)  ·  longest run of the same opening word: 2 ("the")  ·  0 unresolved token(s)  ·  35% exactly two sentences, 12% questions
+== lantern (26 cards)
+  26 cards, 26 distinct  ·  0 repeat(s)  ·  longest run of the same opening word: 2 ("the")  ·  0 unresolved token(s)  ·  35% exactly two sentences, 8% questions
+== powder (26 cards)
+  26 cards, 26 distinct  ·  0 repeat(s)  ·  longest run of the same opening word: 2 ("the")  ·  0 unresolved token(s)  ·  35% exactly two sentences, 0% questions
+== skylark (26 cards)
+  26 cards, 26 distinct  ·  0 repeat(s)  ·  longest run of the same opening word: 2 ("a")  ·  0 unresolved token(s)  ·  31% exactly two sentences, 0% questions
+PASS — newsfeed: every world's aired sequence is distinct, varied at the opening word, and fully resolved
+=== DONE ===
