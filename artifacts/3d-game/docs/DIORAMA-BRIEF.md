@@ -444,3 +444,58 @@ The plinth, the cast list as an `Object3D.layers` bit, the `crowdGate` clamp, an
 `fadeOccluders` suspended — all of §9 as revised by §11. Step 1 is the smallest
 thing that can be photographed, and the next action is to photograph it on all six
 worlds and look, because that is the only question it can answer.
+
+## 13 · TWO THINGS THAT WILL BREAK STEP 2, MEASURED BEFORE BUILDING THEM
+
+Both were named in §9/§11 as things to handle. Both are now numbers rather than
+worries, and one of the two mechanisms in the brief was described wrongly.
+
+### 13.1 `fadeOccluders` ghosts half the block
+
+`fadeOccluders` (`prototype3d.ts:1676`) fades any prop whose centre lies inside a
+cylinder along the camera→hero axis, of radius `voidling.radius * 1.35 + 1.2` plus
+the prop's own radius. Both of its inputs move on the diorama:
+
+| | hero r | shield | axis length |
+|---|---|---|---|
+| today (Maple) | 3.8 | 6.33 | 57.9 |
+| diorama | 12 | **17.40** | **178.2** |
+
+That is **2.75x the radius (7.56x the cross-section) and 3.08x the length —
+23.3x the volume.** The tube is 35 units across against a 92-unit block: **38% of
+the block's width**, and since a prop's own radius is added, a 6-unit building
+fades from 23.4 units off the axis, which is a **47-unit corridor through a
+92-unit block**. Half the block, ghosted, in a straight line at the camera.
+
+**Suspend it on the diorama**, and the justification is not just the number: it
+exists so nothing stands in front of the hero, and it was written for a low follow
+camera with a small hero. On the diorama he is 219 px seen from 34 degrees above.
+The conditions it was built for do not hold.
+
+### 13.2 The speech bubbles — and the mechanism was stated backwards
+
+The brief said "townspeople speech bubbles enormous at diorama scale". The effect
+is right; the mechanism is the opposite of what that implies, and the mechanism is
+what points at the fix.
+
+**The bubbles do not scale at all.** They are DOM elements positioned by projecting
+a world point to screen space (`bubbles.ts:249`, `:404`), sized in CSS pixels —
+`font-size: 12.5px`, `max-width: min(64vw, 300px)`. They are the same size at every
+camera distance. **It is the world that shrinks under them**, by 3.08x:
+
+| | px per world unit | a 1.8-unit person |
+|---|---|---|
+| today (camD 57.9) | 28.07 | 51 px |
+| diorama (camD 178.2) | 9.12 | **16 px** |
+
+So: a bubble up to **275 px wide over a 16-px person**.
+
+**And the distance gate lets them through**, so this is live rather than
+hypothetical. `gate = max(BUBBLE_MAX_CAMD, camera.position.y * 2.4)`; the diorama
+camera sits at y ≈ 101.7, giving a gate of 244 against a camera-to-subject distance
+of 178.2. They fire.
+
+The fix is a decision the photograph has to inform — a CSS scale of ~0.33 puts a
+275 px bubble at 91 px with 4 px text, which is not readable, so "scale them" may
+not survive contact. Suppressing them on the diorama loses the one thing that says
+the town is alive. **Not decided here on purpose.**
