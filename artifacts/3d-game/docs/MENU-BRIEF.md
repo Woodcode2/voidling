@@ -1571,6 +1571,27 @@ count goes 35 → 43, each timeout sized from a measured run and printed.
 
 ## 6 · Build order — one crew-day per step; what the gate shows green after each
 
+**WHERE THE STREAM ACTUALLY IS (2026-09-13).** Days 1–12 are built and in the push
+gate, which is now **45 steps** rather than the 35/43 the rows below anticipate.
+Day 11's `_enter.mjs` and `idiomguard` shipped; day 12's `chipfit` is registered.
+
+**The diorama is not in this table.** The owner's direction — *"I want a 3d
+animation that looks awesome of each world in the menu background… we can do much,
+much better"* — arrived after this order was written and is tracked separately in
+**`docs/DIORAMA-BRIEF.md`, whose §0 states its current position**. It is inserted
+between days 12 and 13 and is behind `?dio=1` until it has been looked at on all
+six worlds.
+
+Three things shipped alongside it that are NOT diorama work and are in the gate
+unconditionally: the menu shows one creature at one size on every world and no
+longer fires a phantom evolution per session (`qa/menuform.mjs`); the picker no
+longer shows a speech bubble pointing at nobody (`qa/menuquiet.mjs`); and the
+three daily probes that had been asserting against a retired button are repointed
+and registered.
+
+Day 13 onward is unchanged.
+
+
 | day | build | gate after |
 |---|---|---|
 | 1 | **Baseline, honestly read.** `_dbg.__frameTimes()`, `__pinMenuRung`, `autoReset=false` sampling in a new `qa/menuframe.mjs`: menu-idle `dtRaw` / draw calls (both shadow parities) / tris / `moverStats(138)` and `(276)` / heap per world, **one page per rung** pinned by `addInitScript`, at the STAGE frustum (0–360° azimuth series at each candidate stage) **and** today's parked spawn frame, labelled; the 1,241 / 4,694 reference pair re-taken the same way; the boot prefix measured from `performance.timeOrigin` per world (`bootStage` timestamps). Guards: `pickerfit` FAILS on a short picker — zero cards was already guarded at `:285`, the live hole was four-of-six (§9.7); `firstframe` fails on a missing `#menu` selector (`freeze()` unchanged). | push 35/35 green on today's menu; the baseline table in the brief with the two frames side by side |
