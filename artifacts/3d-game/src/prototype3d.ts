@@ -1107,6 +1107,50 @@ function menuVoidR(dist: number): number {
  *  menu uses 0.22 of 58-95 units to lift the void clear of the ladder panel; at
  *  178 the same fraction would be 39 units and the block would slide out of shot,
  *  so the diorama carries its own. */
+/** ── WHERE THE HERO STANDS ON THE DIORAMA ───────────────────────────────────
+ *
+ *  `enterMenu` parks him on the stage point, and `deriveStage` set that to the
+ *  world's landmark (`COPY.hero`) — the lodge on Powder, the pagoda on Lantern.
+ *  At 58-95 units the landmark IS the subject and he stands in front of it; at
+ *  178 units and a 36.93-degree view axis its roof rises into the line of sight
+ *  and the x-ray ghost takes over. MEASURED by qa/_dioocc.mjs on the shipped
+ *  menu: 100% of him is behind something on pirate, lantern and powder, and what
+ *  a child sees there is two eyes on a flat disc rather than her character.
+ *
+ *  So the AIM stays on the landmark — that is what keeps the block centred — and
+ *  the hero steps toward the camera off it.
+ *
+ *  WHY A CONSTANT AND NOT A SEARCH. I wrote the search first: a fan of rays from
+ *  the lens across his disc, at four candidate offsets, picking the first that
+ *  came back clear. It reads better and it is WRONG HERE, because of when it
+ *  would run. The landmarks are GLBs and they stream in after the world is built
+ *  — the game already knows this and re-sweeps twice at +8 s and +22 s AFTER
+ *  beginMatch for exactly that reason (`_revalQueue`). enterMenu runs at boot,
+ *  before those arrive, so the search would sweep a scene that does not yet
+ *  contain the one prop it exists to find, return zero, and do nothing — on the
+ *  first menu, which is the one that matters most. Re-running it later would
+ *  move the hero on a menu that qa/reveal.mjs requires to be perfectly still.
+ *
+ *  The geometry does not need the search. A prop of top height H standing s
+ *  ground-units in front of him clears his FACE when H <= centreY + s*tan(axis),
+ *  and the axis is 36.93 degrees, so tan = 0.752:
+ *
+ *      s = 16  ->  clears anything up to 10.8 + 12.0 = 22.8 units tall
+ *
+ *  Measured landmark heights on the three worlds that fail: Powder's lodge ridge
+ *  18.6 and its chimney 19.8, Lantern's pagoda ~19, Pirate's palm crown ~14. All
+ *  under 22.8, so one constant clears every measured case.
+ *
+ *  AND 16 IS THE WHOLE BUDGET, from the shot rather than from taste: moving him
+ *  s units toward the camera drops him s*sin(36.93) = 0.60s world units down the
+ *  image plane, and there are ~89 CSS px of headroom under him before the ladder
+ *  panel's top edge. 16 spends it.
+ *
+ *  If a world still fails qa/_dioocc.mjs's 5% bar with this, THAT is when a
+ *  search is justified — and it would have to run off the reval beat, not off
+ *  enterMenu. Not before it has been measured. */
+const DIO_MARK = 16;
+
 function dioCam(lookY: number): { dist: number; h: number; lookAhead: number } {
   const frameH = (DIO_HALF * 2) / DIO_FILL;
   const dist = frameH / (2 * Math.tan(32 * Math.PI / 360));
@@ -1118,6 +1162,10 @@ function dioCam(lookY: number): { dist: number; h: number; lookAhead: number } {
  *  of three thousand props at twenty-four azimuths is not a thing to do on
  *  every trip back to the menu. */
 let menuStage: MenuStage | null = null;
+/** How far toward the camera the diorama stepped the hero off the stage point,
+ *  in world units. 0 on the shipped menu, always. Read by the sun/shadow branch
+ *  and by QA; nothing else may write it but enterMenu. */
+let dioMark = 0;
 
 /** ── THE MENU'S COST SAVINGS, AS ONE SWITCH ───────────────────────────────
  *  Three things make the menu cheap: the shadow pass runs at a quarter rate
@@ -1209,15 +1257,22 @@ function enterMenu(): void {
   // parking him is not decoration, it is what makes the frame coherent. His
   // idle (blink, breathe, the occasional look-around) is already running; the
   // attract-mode wander is gated off while stageCam is set, so he stays put.
-  voidState.x = st.x; voidState.z = st.z;
-  voidling.group.position.set(st.x, voidling.group.position.y, st.z);
+  //
+  // ON THE DIORAMA HE STEPS FORWARD OFF IT. The aim stays on the landmark so the
+  // block stays centred; he moves toward the camera until the sight line is
+  // clear. See DIO_MARK for why that is a derived constant and not a search.
+  dioMark = dio ? DIO_MARK : 0;
+  const markX = st.x + Math.sin(rad0) * dioMark;
+  const markZ = st.z + Math.cos(rad0) * dioMark;
+  voidState.x = markX; voidState.z = markZ;
+  voidling.group.position.set(markX, voidling.group.position.y, markZ);
   voidling.setRadius(menuVoidR(st.dist));
   // …AND ON THE GROUND. arriveY is the opening's drop-in offset and it is
   // wherever the last thing that touched it left it — LOOKED AT on Powder Pass,
   // the void was hanging in mid-air in front of the lodge like a balloon.
   voidling.arriveY(0);
   velX = 0; velZ = 0;
-  wander.set(st.x, 0, st.z);
+  wander.set(markX, 0, markZ);
   // …and the town behind him is a town, not an evacuation. calm(Infinity)
   // suppresses panic contagion; without it the menu is a crowd running from a
   // void that has stopped chasing them.
@@ -2799,6 +2854,7 @@ const _dbg = new Proxy(_dbgStore, {
   __faceState: () => { mood: string; maw: number; smile: boolean; biting: boolean };
   __stages: () => { cur: number; best: number; ceremonies: number };
   __voidSetMenuR: (r: number) => void;
+  __dioMark: () => number;
   __bite: (hunter?: boolean) => void;
   __pinMouth: (shut: boolean) => void;
   __pinGape: (v: number) => void;
@@ -3044,6 +3100,9 @@ _dbg.__spawn = () => ({ x: island.spawn.x, z: island.spawn.z });
  *
  *  Menu only. In a match the growth law owns the radius and would walk this back
  *  on the next frame; the probe would then be measuring the clamp. */
+/** QA: how far the diorama stepped the hero off the stage point. 0 when the flag
+ *  is off, which is the shipped menu. */
+_dbg.__dioMark = () => dioMark;
 _dbg.__voidSetMenuR = (r: number) => {
   if (!menuMode) { console.warn('__voidSetMenuR: not on the menu — the growth law owns the radius in a match'); return; }
   voidling.setRadius(r);
@@ -12759,8 +12818,18 @@ function animate() {
   // sunOff.y was used as an ABSOLUTE height while x and z were relative, so the
   // triangle changed shape with distance from the origin. All three are now
   // relative and the sun angle is fixed everywhere on the island.
-  sun.position.set(voidState.x + sunOff.x, sunOff.y, voidState.z + sunOff.z);
-  sun.target.position.set(voidState.x, 0, voidState.z);
+  // ── AND ON THE DIORAMA THEY FOLLOW THE BLOCK, NOT THE HERO ────────────────
+  // The shadow box is pinned to DIO_HALF and centred on whatever this targets, so
+  // the moment DIO_MARK steps him 16 units toward the camera the box's far
+  // edge comes in 16 units with him — and the back row of the block leaves the
+  // shadow frustum, whose symptom is shadows stopping at a straight line across
+  // the diorama. That is the exact artefact fitShadow's cap exists to prevent.
+  // The aim point is the block's centre, so on the diorama the sun centres there
+  // and the +/-46 box still covers what is in frame.
+  const sunAtX = (DIORAMA && menuMode && stageCam) ? stageCam.x : voidState.x;
+  const sunAtZ = (DIORAMA && menuMode && stageCam) ? stageCam.z : voidState.z;
+  sun.position.set(sunAtX + sunOff.x, sunOff.y, sunAtZ + sunOff.z);
+  sun.target.position.set(sunAtX, 0, sunAtZ);
   sun.target.updateMatrixWorld();
 
   // ── THE MENU IS NOT A MATCH, AND THIS BLOCK COULD NOT TELL ────────────────

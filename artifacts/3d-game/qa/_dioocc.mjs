@@ -141,6 +141,10 @@ for (const w of WORLDS) for (const dio of [1, 0]) {
     }
     const worst = Object.entries(by).sort((a, b) => b[1] - a[1])[0];
     return {
+      // HOW FAR THE DIORAMA STEPPED HIM OFF THE STAGE POINT. Reported next to the
+      // coverage it is meant to fix, so a run where the step silently did not
+      // happen reads as "mark 0, still covered" rather than as a mystery.
+      mark: window.__dioMark ? window.__dioMark() : -1,
       camD: +camD.toFixed(1), heroR: +HR.toFixed(2), candidates: cand.length,
       samples: tried, blocked,
       coveredPct: tried ? +(100 * blocked / tried).toFixed(1) : 0,
@@ -149,7 +153,7 @@ for (const w of WORLDS) for (const dio of [1, 0]) {
   });
   rows.push({ w, dio, ...r });
   if (r.error) { console.log(`  ${w.padEnd(8)} dio=${dio}  ERROR ${r.error}`); await p.close(); continue; }
-  console.log(`  ${w.padEnd(8)} dio=${dio}  camD ${String(r.camD).padStart(5)}  r ${String(r.heroR).padStart(5)}  ${String(r.candidates).padStart(3)} things could block  ${String(r.coveredPct).padStart(5)}% of him covered  ${r.worst ? '<- ' + r.worst : ''}`);
+  console.log(`  ${w.padEnd(8)} dio=${dio}  camD ${String(r.camD).padStart(5)}  mark ${String(r.mark).padStart(3)}  ${String(r.candidates).padStart(3)} could block  ${String(r.coveredPct).padStart(5)}% covered  ${r.worst ? '<- ' + r.worst : ''}`);
   await p.close();
 }
 } finally { await b.close(); }
@@ -160,13 +164,15 @@ let bad = 0;
 for (const w of WORLDS) {
   const a = rows.find((r) => r.w === w && r.dio === 1), c = rows.find((r) => r.w === w && r.dio === 0);
   if (!a || !c || a.error || c.error) continue;
-  // A QUARTER. Below that a child still reads the character; above it, the
-  // photographs are the ones that say it looks like a fault.
-  const flag = a.coveredPct > 25;
+  // 5%, not a quarter. The first version of this bar used 25% because that was
+  // where the photographs started to look like a fault — but a bar set at the
+  // point where damage becomes VISIBLE banks the damage below it. docs/
+  // DIORAMA-BRIEF.md §17.2 states the honest target: <= 5% on all six worlds.
+  const flag = a.coveredPct > 5;
   if (flag) bad++;
-  console.log(`${w.padEnd(9)} ${String(a.coveredPct).padStart(5)}% -> ${String(c.coveredPct).padStart(5)}%    ${(a.worst || 'nothing').padEnd(26)}${flag ? ' <-- BROKEN' : ''}`);
+  console.log(`${w.padEnd(9)} ${String(a.coveredPct).padStart(5)}% -> ${String(c.coveredPct).padStart(5)}%   mark ${String(a.mark).padStart(2)}   ${(a.worst || 'nothing').padEnd(24)}${flag ? ' <-- BROKEN' : ''}`);
 }
 console.log(bad
-  ? `\nFAIL — ${bad} world(s) have something across more than a quarter of the hero on the diorama`
-  : '\nPASS — less than a quarter of the hero is behind anything, on every world');
+  ? `\nFAIL — ${bad} world(s) have something across more than 5% of the hero on the diorama`
+  : '\nPASS — under 5% of the hero is behind anything, on all six worlds');
 process.exit(bad ? 1 : 0);
