@@ -6,9 +6,21 @@
 // for the thing those seven mornings were for. The unlock was discoverable
 // only by opening the shop later and noticing a card had changed.
 //
-// This probe drives the REAL path, not a debug hook: it seeds yesterday's
-// daily claim at streak 6, loads the menu, and presses CLAIM. Everything after
-// that is the shipping code.
+// This probe drives the REAL path: it seeds yesterday's daily claim at streak 6,
+// loads the menu, and pays the day. Everything after that is the shipping code.
+//
+// IT USED TO PRESS A BUTTON THAT NO LONGER EXISTS. The daily card had a CLAIM
+// button and the card sat between a child and PLAY; both are gone, and the day is
+// now paid silently inside endMatch. `document.getElementById('dailyClaim')
+// ?.click()` on a null element is a NO-OP, not a failure — so this probe went on
+// printing its header and then asserting against a claim that never happened.
+// It is unregistered, which is the only reason that was not a green lie in the
+// gate. (qa/idiomguard.mjs guard 5 now names any probe that waits for that card.)
+//
+// It calls __claimDaily() instead, which is claimDaily() — the SAME function
+// endMatch calls, not a QA re-implementation of it. What that does not cover: the
+// unlock card now lands while the END CARD is on screen rather than on the menu,
+// and whether it is legible THERE is a separate question this probe does not ask.
 //
 // It asserts four things, in the order a child would experience them:
 //   1. the skin is OWNED             — voidSkinsOwned gained it
@@ -57,19 +69,18 @@ const ok = (cond, label, detail = '') => {
 };
 
 // ── the claim ──────────────────────────────────────────────────────────────
-await p.waitForSelector('#daily.show, #daily[style*="flex"]', { timeout: 30000 }).catch(() => { });
-const head = await p.evaluate(() => ({
-  streak: document.getElementById('dailyStreak')?.textContent || '',
-  claim: document.getElementById('dailyClaim')?.textContent || '',
-}));
-console.log(`daily card: "${head.streak}"  button "${head.claim}"`);
-ok(/7 DAY STREAK/i.test(head.streak), 'the calendar is on day 7', head.streak);
+// WHAT THE DAY OWES, asked before it is paid. The old version read the CLAIM
+// button's own label, which is how it could pass on a button that was not there.
+const due = await p.evaluate(() => window.__dailyDue());
+console.log(`today owes: ${due ? `day ${due.day + 1} of week ${due.week}, streak ${due.streak}, ${due.coins} coins` : 'NOTHING'}`);
+ok(!!due, 'the day is unspent — there is something to claim', due ? '' : 'voidDailyLast seeding did not take');
+ok(!!due && due.streak === 7, 'the claim about to be paid is day 7 of the streak', String(due && due.streak));
 
 const before = await p.evaluate(() => localStorage.getItem('voidSkinsOwned'));
-// .click() rather than p.click(): the claim button pulses on a loop, so
-// Playwright's "element is stable" wait never settles and times out on a
-// button that is perfectly clickable.
-await p.evaluate(() => document.getElementById('dailyClaim').click());
+// claimDaily() itself — see the note in the header. The card the child sees is
+// read-only now, so there is no button to press and nothing to wait for.
+const paid = await p.evaluate(() => window.__claimDaily());
+ok(!!paid, 'the claim paid', paid ? `${paid.coins} coins` : 'claimDaily returned null');
 // The unlock card is deliberately delayed 1400ms so it does not land under the
 // daily card's own close. Then WAIT FOR PAINT rather than asserting at a fixed
 // instant: this sandbox has no GPU, and the menu alone was measured at a 531ms
@@ -192,7 +203,13 @@ const cleared = await p.evaluate(() => ({
 ok(!cleared.fresh.includes('prism'), 'looking at it clears the key', JSON.stringify(cleared.fresh));
 ok(cleared.badges === 0, 'and clears the badge', `${cleared.badges} left`);
 
-if (errs.length) console.log('\nPAGE ERRORS:', errs.slice(0, 4));
-await b.close();
-console.log(fail.length ? `\nFAIL (${fail.length}): ${fail.join(' | ')}` : '\nall checks passed');
-process.exit(fail.length || errs.length ? 1 : 0);
+// PAGE ERRORS ARE A BAR HERE, not a footnote — this probe has always exited
+// nonzero on one. But the gate judges a `pf` step on the PRINTED verdict and
+// ignores the exit code, so an exception in the page used to print "all checks
+// passed", exit 1, and be read as a pass. It says FAIL now.
+if (errs.length) { console.log('\nPAGE ERRORS:', errs.slice(0, 4)); fail.push(`${errs.length} page error(s)`); }
+await b.close().catch(() => { });
+console.log(fail.length
+  ? `\nFAIL — ${fail.length} bar(s): ${fail.join(' | ')}`
+  : '\nPASS — seven mornings running grants Prism, says so on screen, and flags it NEW in the shop');
+process.exit(fail.length ? 1 : 0);

@@ -457,6 +457,40 @@ const SUITE = [
     cmd: ['node', 'qa/idiomguard.mjs'], verdict: pf,
     why: 'the gate can still fail — a suite whose probes have quietly lost the ability to print FAIL is a suite that reports green forever' },
 
+  // ── THE DAILY, NOW THAT IT IS OFF THE PLAY PATH ──────────────────────────
+  // Three probes written against the old calendar, repointed and registered. All
+  // three used to press #dailyClaim, a button that no longer exists — and
+  // `?.click()` on null is a NO-OP, not a failure, so each of them went on
+  // printing bars while asserting against a claim that never ran. They were
+  // unregistered, which is the only reason that was not a green lie in the gate.
+  // They drive __claimDaily() now, which IS claimDaily() — the same call endMatch
+  // makes, not a QA re-implementation of it.
+  //
+  // streakunlock is the one that earns its keep: the seven-day prize (Prism) is
+  // granted inside setStreak, and moving the claim from a button on the MENU to
+  // the end of a MATCH moved where its unlock card has to paint. Measured 67 s,
+  // and it confirms the prize still announces itself.
+  { id: 'streakunlock', tier: 'feel', profiles: ['push', 'live'], timeout: 600,
+    cmd: ['node', 'qa/streakunlock.mjs', String(PORT)], verdict: pf,
+    why: 'a child who comes back seven mornings running is TOLD she won something — the prize used to be granted by a line inside the shop\'s own refresh(), so it arrived only if she happened to open the shop later' },
+
+  // The streak is counted ONCE. Two pages: claim-then-play, and play-then-claim.
+  // Measured 183-468 s — the spread is this sandbox's frame rate, since both
+  // halves play a real match to the buzzer.
+  { id: 'streakdrift', tier: 'feel', profiles: ['push', 'live'], timeout: 1200,
+    cmd: ['node', 'qa/streakdrift.mjs', String(PORT)], verdict: pf,
+    why: 'the streak counts a day once however she spends it — two counters advancing independently is how a child reaches day 7 on day 5, or never' },
+
+  // INVERTED from what it used to assert. The original finding was real: an
+  // unclaimed day put a full-screen card up over a match that had already
+  // started, with the clock running and the load cover on top of the card. The
+  // first fix made the launch WAIT for the card; that fix is gone, because a card
+  // standing between a child and PLAY is a tollbooth. So the bars now say NOTHING
+  // interrupts — and if the tollbooth ever comes back, this fails. Measured 51 s.
+  { id: 'dailyrace', tier: 'feel', profiles: ['push', 'live'], timeout: 600,
+    cmd: ['node', 'qa/dailyrace.mjs', String(PORT)], verdict: pf,
+    why: 'an owed day interrupts nothing — she taps PLAY and plays, and the day is still owed at the buzzer' },
+
   { id: 'stickerreg', tier: 'quality', profiles: ['push', 'live'], timeout: 30,
     cmd: ['node', 'qa/stickerreg.mjs'], verdict: pf,
     why: 'every world hides things worth finding and every season is something a child can hunt — a world with no stickers ships a picker card whose invitation reads "✨ 0 SECRETS"' },

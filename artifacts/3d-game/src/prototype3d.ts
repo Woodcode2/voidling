@@ -2633,6 +2633,7 @@ const _dbg = new Proxy(_dbgStore, {
   __menuOptim: (on: boolean) => boolean;
   __kindTally: () => Record<string, number>;
   __dailyDue: () => unknown;
+  __claimDaily: () => unknown;
   __levels: () => unknown[];
   __ladderState: () => Record<string, unknown>;
   __paintLadder: () => void;
@@ -3056,6 +3057,20 @@ _dbg.__kindTally = () => ({ ...kindTally });
 // "did she get paid" without knowing what the calendar owed passes on match
 // money, which is exactly what the first version of that bar did.
 _dbg.__dailyDue = () => dailyDue();
+/** QA: PAY THE DAY, the way the game pays it.
+ *
+ *  The calendar used to have a CLAIM button and three probes still reach for it
+ *  (qa/dailyrace.mjs, streakdrift.mjs, streakunlock.mjs). It is gone: the day is
+ *  paid silently at the end of a match, because a card between a child and PLAY
+ *  is a tollbooth. A probe clicking a button that no longer exists does not fail
+ *  — `?.click()` on null is a no-op — it just quietly measures nothing, which is
+ *  the worst outcome a probe can have.
+ *
+ *  This is the same claimDaily() endMatch calls, so a probe driving it is driving
+ *  the shipped path rather than a QA re-implementation of it. Returns what was
+ *  paid, or null when today is already spent — so a probe can tell "nothing was
+ *  owed" from "the claim did not work". */
+_dbg.__claimDaily = () => claimDaily();
 _dbg.__levels = () => allLevels();
 // ── QA (day 10): THE LADDER AS IT IS ON SCREEN, THIS FRAME ────────────────
 // Not the ladder — __levels() is the ladder. This is the PICTURE of it: which

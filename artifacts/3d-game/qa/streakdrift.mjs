@@ -23,6 +23,7 @@
 //
 //   node qa/streakdrift.mjs [port]
 import { chromium } from 'playwright';
+import { enterAndStart } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4173';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -63,30 +64,25 @@ const read = () => p.evaluate(() => ({
 }));
 
 // ── the claim: this is day SIX ─────────────────────────────────────────────
-await p.waitForSelector('#daily.show', { timeout: 30000 }).catch(() => { });
-const card = await p.evaluate(() => document.getElementById('dailyStreak')?.textContent || '');
-await p.evaluate(() => document.getElementById('dailyClaim')?.click());
+// THE CARD NO LONGER OPENS ON ITS OWN AND HAS NO CLAIM BUTTON — the day is paid
+// inside endMatch, silently, because a card between a child and PLAY is a
+// tollbooth. `?.click()` on the vanished button is a no-op, so the old version of
+// this block asserted against a claim that never ran. __claimDaily() is
+// claimDaily() itself, the same call endMatch makes.
+const due = await p.evaluate(() => window.__dailyDue());
+const card = due ? `day ${due.day + 1}, streak ${due.streak}` : 'NOTHING DUE';
+await p.evaluate(() => window.__claimDaily());
 await p.waitForTimeout(1500);
 const afterClaim = await read();
-console.log(`daily card said "${card.trim()}"`);
+console.log(`today owed "${card}"`);
 console.log(`after claiming: voidStreak=${afterClaim.streak} voidDailyStreak=${afterClaim.daily}`);
 ok(afterClaim.streak === 6, 'claiming day six sets the streak to 6', String(afterClaim.streak));
 ok(!afterClaim.owned.includes('prism'), 'and the SEVEN-day prize is not given out on day six',
   afterClaim.owned.join(','));
 
 // ── then a match ends, the way one does ────────────────────────────────────
-await p.evaluate(() => {
-  document.getElementById('daily')?.classList.remove('show');
-  document.getElementById('btnPlay')?.click();
-});
-await p.waitForTimeout(1200);
-await p.evaluate(() => {
-  const c = document.querySelector('#worldRow .wCard[data-world="maple"]')
-    || document.querySelector('#worldRow .wCard[data-world]');
-  c?.click();
-});
-await p.waitForFunction(() => (window.__matchState?.().clock ?? 999) < 179, null, { timeout: 300000 })
-  .catch(() => { });
+// The retired two-click ritual, replaced — see the note on the second page below.
+await enterAndStart(p, 'maple');
 await p.evaluate(() => window.__rushClock?.(0.3));
 await p.waitForFunction(() => document.getElementById('end')?.classList.contains('show'),
   null, { timeout: 300000 }).catch(() => { });
@@ -123,19 +119,11 @@ await p2.addInitScript(() => {
 });
 await p2.goto(`http://127.0.0.1:${PORT}/?w=maple`, { waitUntil: 'domcontentloaded', timeout: 300000 });
 await p2.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
-// dismiss the card WITHOUT claiming, play, then come back to it
-await p2.evaluate(() => {
-  document.getElementById('daily')?.classList.remove('show');
-  document.getElementById('btnPlay')?.click();
-});
-await p2.waitForTimeout(1200);
-await p2.evaluate(() => {
-  const c = document.querySelector('#worldRow .wCard[data-world="maple"]')
-    || document.querySelector('#worldRow .wCard[data-world]');
-  c?.click();
-});
-await p2.waitForFunction(() => (window.__matchState?.().clock ?? 999) < 179, null, { timeout: 300000 })
-  .catch(() => { });
+// PLAY WITHOUT CLAIMING FIRST, then come back to the calendar. This used to be
+// the retired two-click ritual — #btnPlay to open the picker, then a card inside
+// it — and on a build where PLAY plays, the second click lands in a closed
+// overlay. qa/_enter.mjs is the one place that knows which of the two it is.
+await enterAndStart(p2, 'maple');
 await p2.evaluate(() => window.__rushClock?.(0.3));
 await p2.waitForFunction(() => document.getElementById('end')?.classList.contains('show'),
   null, { timeout: 300000 }).catch(() => { });
@@ -150,22 +138,33 @@ ok(m1.streak === 6, 'a match on a fresh day counts the day', String(m1.streak));
 // now reload so the daily card rebuilds against the state the match left
 await p2.reload({ waitUntil: 'domcontentloaded', timeout: 300000 });
 await p2.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
-await p2.waitForSelector('#daily.show', { timeout: 30000 }).catch(() => { });
-const card2 = await p2.evaluate(() => document.getElementById('dailyStreak')?.textContent || '');
-await p2.evaluate(() => document.getElementById('dailyClaim')?.click());
+// …and the SAME question as above, asked of a profile the match has already
+// touched: what does the day think it owes now? The old version read the card's
+// header text, which is the one thing that still renders whether or not a claim
+// is possible — so it could agree with the match while the claim beneath it did
+// nothing at all.
+const due2 = await p2.evaluate(() => window.__dailyDue());
+const card2 = due2 ? `${due2.streak} DAY STREAK` : 'nothing due — the match already counted the day';
+await p2.evaluate(() => window.__claimDaily());
 await p2.waitForTimeout(1500);
 const m2 = await p2.evaluate(() => ({
   streak: Number(localStorage.getItem('voidStreak')),
   daily: Number(localStorage.getItem('voidDailyStreak')),
   owned: JSON.parse(localStorage.getItem('voidSkinsOwned') || '[]'),
 }));
-console.log(`then the card said "${card2.trim()}" and claiming left ${m2.streak}`);
-ok(/6 DAY STREAK/i.test(card2), 'the card agrees with the match rather than adding one', card2.trim());
+console.log(`then the day owed "${card2}" and claiming left ${m2.streak}`);
+// EITHER answer is correct here and the old bar only accepted one of them: the
+// match has already paid the day (dailyDue() returns null, "nothing due"), or it
+// has not and what is owed is still day six. What must never happen is the day
+// being counted TWICE, which is the bar below.
+ok(!due2 || due2.streak === 6, 'what the day owes agrees with the match rather than adding one', card2);
 ok(m2.streak === 6 && m2.daily === 6, 'claiming after a match does not count the day twice',
   `voidStreak=${m2.streak} voidDailyStreak=${m2.daily}`);
 ok(!m2.owned.includes('prism'), 'and day six still owes nothing', m2.owned.join(','));
 
 if (errs.length) console.log('\nPAGE ERRORS:', errs.slice(0, 4));
-await b.close();
-console.log(fail.length ? `\nFAIL (${fail.length}): ${fail.join(' | ')}` : '\none streak, counted once');
+await b.close().catch(() => { });
+console.log(fail.length
+  ? `\nFAIL — ${fail.length} bar(s): ${fail.join(' | ')}`
+  : '\nPASS — one streak, counted once, whichever order she claims and plays in');
 process.exit(fail.length ? 1 : 0);
