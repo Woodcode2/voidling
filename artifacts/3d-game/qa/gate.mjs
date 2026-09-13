@@ -436,6 +436,27 @@ const SUITE = [
     cmd: ['node', 'qa/menuform.mjs', String(PORT)], verdict: pf,
     why: 'a child meets the same hero every time she opens the picker, the menu never congratulates her for an evolution she did not play, and his size can change without changing him' },
 
+  // THE GOAL CHIP MUST NOT SIT ON THE CLOCK. Day 4 added a second HUD chip to a
+  // corner that already had the timer in it, and the two are sized by different
+  // rules — the timer's font scales with the viewport, the chip's height does not.
+  // Four viewports from a small phone to an iPad, measuring the real rendered
+  // boxes. Measured 214 s.
+  { id: 'chipfit', tier: 'ui', profiles: ['push', 'live', 'art'], timeout: 600,
+    cmd: ['node', 'qa/chipfit.mjs', PORT], verdict: pf,
+    why: 'the goal chip and the match clock never overlap on any phone or tablet — a child who cannot read the clock cannot feel the ending' },
+
+  // THE GATE'S OWN HOUSEKEEPING, and the only step that judges the other steps.
+  // Static, no browser, ~1 s. Six guards: the registry parses whole (a parser gap
+  // that could not cross `env: { SEED: '7' }` once dropped four steps in silence),
+  // every pf-judged probe can print BOTH verdicts (a probe that can only print
+  // PASS is a probe that cannot fail), no registered probe still drives the
+  // retired PLAY-to-picker ritual or waits for a modal the calendar no longer
+  // raises, every probe that finishes a match and reads the wallet says which
+  // side of midnight it is on, and every registered file exists.
+  { id: 'idiomguard', tier: 'build', profiles: ['push', 'live', 'art'], timeout: 60,
+    cmd: ['node', 'qa/idiomguard.mjs'], verdict: pf,
+    why: 'the gate can still fail — a suite whose probes have quietly lost the ability to print FAIL is a suite that reports green forever' },
+
   { id: 'stickerreg', tier: 'quality', profiles: ['push', 'live'], timeout: 30,
     cmd: ['node', 'qa/stickerreg.mjs'], verdict: pf,
     why: 'every world hides things worth finding and every season is something a child can hunt — a world with no stickers ships a picker card whose invitation reads "✨ 0 SECRETS"' },

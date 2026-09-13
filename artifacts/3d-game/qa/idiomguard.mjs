@@ -50,9 +50,23 @@ const no = (m) => { bars++; bad.push(m); console.log(`  BAD  ${m}`); };
 process.on('uncaughtException', (e) => {
   console.log(`\nFAIL — idiomguard threw: ${String(e && e.message || e).split('\n')[0]}`); process.exit(1); });
 
-const FILES = readdirSync('qa').filter((f) => f.endsWith('.mjs') && f !== 'idiomguard.mjs');
+// TWO LISTS, and the difference matters — conflating them is how this guard
+// reported itself missing the moment it was registered in the gate.
+//
+//   ON_DISK is what exists. Guard 4 (does the registry name a file that is not
+//           there?) must ask THIS.
+//   src     is what gets SCANNED for idioms, and it deliberately excludes this
+//           file: every regex below appears in this file as a literal, so
+//           including it would make this guard find itself in every bar.
+//
+// This is the fourth self-inflicted finding from this one probe. The others: the
+// pf token rule applied to all three verdict kinds (9 false findings), a registry
+// parser whose `[^}]*?` gaps could not cross `env: { SEED: '7' }` (4 steps dropped
+// in silence), and guard 0 asking whether every step names a probe file when seven
+// of them run a tool directly.
+const ON_DISK = new Set(readdirSync('qa').filter((f) => f.endsWith('.mjs')));
 const read = (f) => { try { return readFileSync(`qa/${f}`, 'utf8'); } catch { return ''; } };
-const src = new Map(FILES.map((f) => [f, read(f)]));
+const src = new Map([...ON_DISK].filter((f) => f !== 'idiomguard.mjs').map((f) => [f, read(f)]));
 
 /** Which files the gate actually runs, and under which profiles. Parsed from the
  *  registry rather than listed here, so a probe added to the gate is guarded on
@@ -107,7 +121,9 @@ for (const c of chunks) {
 
 // ═══ GUARD 4 · EVERY REGISTERED PROBE EXISTS ═══════════════════════════════
 {
-  const missing = [...registered].filter(([, r]) => !src.has(r.file));
+  // ON_DISK, not src: src omits this file on purpose (see the note there), so
+  // asking src whether idiomguard.mjs exists answers "no" for a file that does.
+  const missing = [...registered].filter(([, r]) => !ON_DISK.has(r.file));
   if (!missing.length) ok(`#4 all ${registered.size} registered probe files exist`);
   else no(`#4 the gate names ${missing.length} file(s) that are not there — a rename lands as `
     + `"cannot find module", which prints no verdict at all: `
