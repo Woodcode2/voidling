@@ -404,6 +404,14 @@ const style = document.createElement('style');
         // so it catches a bubble arriving by any path including ones nobody has
         // enumerated, and it reuses the grace the banner already defined instead
         // of inventing a third mechanism. 0.6s, no pop-out, family lines stay.
+        //
+        // AND THE ORDER OF THIS CONDITION IS LOAD-BEARING. `onMenu` is first
+        // because `getComputedStyle` forces a style recalculation and the banner
+        // test runs it EVERY FRAME — so short-circuiting on the menu makes the
+        // menu frame slightly cheaper than it was before this line existed, not
+        // dearer. Day 9 halved that frame and the saving is not to be given back.
+        // Swapping these two terms would look identical and quietly reintroduce a
+        // per-frame recalc on the one screen that is measured for it.
         const onMenu = document.body.classList.contains('diorama');
         if (onMenu || (ban && ban.classList.contains('show') && Number(getComputedStyle(ban).opacity) > 0.06)) {
           for (const s of slots) {
