@@ -1048,11 +1048,33 @@ const DIORAMA = (() => { try { return new URLSearchParams(location.search).get('
  *  80 3D units, and STRIDE 1710 makes the pitch 85.5 — 46 is the block plus its
  *  roads, which is the unit the eye reads as "a piece of town". */
 const DIO_HALF = 46;
-/** How much of the frame's HEIGHT the block fills. Under 1 so the wedge has air
- *  above it and the ladder panel has somewhere to sit. */
+/** ── WHAT THESE TWO ACTUALLY DO, WHICH IS NOT WHAT I FIRST WROTE ────────────
+ *
+ *  DIO_FILL is a HEIGHT fill, and the screen is PORTRAIT, so WIDTH is what binds.
+ *  At the resulting 178.2 units the frame is 102.2 world units tall and
+ *  102.2 * (430/932) = 47.2 units WIDE. A 92-unit block is therefore 0.90x the
+ *  frame's height and 1.95x its width: what is actually in shot is HALF A BLOCK
+ *  (51%), not a block. I wrote "a 92-unit block at 90% fill" in the brief and in
+ *  the commit that shipped this, and it was wrong on the axis that matters.
+ *  Verified two ways: the trig above, and by measuring the hero in maple-dio1.png
+ *  — his disc spans 222 of 430 CSS px, and at 2r = 24 units that puts the frame
+ *  at 46.5 units, 1.5% from 47.2.
+ *
+ *  AND THE NUMBERS ARE LEFT ALONE ON PURPOSE. Framing a whole block BY WIDTH at
+ *  90% needs the camera 386 units back, where the hero reads 101 px against the
+ *  131-182 px he reads on today's menu. The block-filling goal and "he reads as a
+ *  character" are in direct conflict, and the photographs already chose: at 178
+ *  Game Day frames its whole stadium and Maple frames a park, a fountain, a
+ *  crowd and a road, with the hero at 222 px. The composition is right and only
+ *  the rationale was wrong. Do not "fix" this toward 92 units without shooting it.
+ *
+ *  DIO_ELEV is the CAMERA'S elevation, not the view axis. The 0.085 lookAhead
+ *  pulls the aim 15.15 units toward the camera along the ground, which steepens
+ *  the axis to 36.93 degrees below horizontal. Distance-invariant, so no change
+ *  of distance alters it — which is why a shallower look cannot be bought by
+ *  moving the camera, and why the island's own wedge can never come into shot
+ *  (see docs/DIORAMA-BRIEF.md §17). */
 const DIO_FILL = 0.90;
-/** The camera's elevation. A diorama is a thing you look DOWN at — the reference
- *  is roughly 35 degrees, low enough that buildings still have faces. */
 const DIO_ELEV = 34;
 /** His radius up there. Not his form: see MENU_VSTAGE. */
 const DIO_VOID_R = 12;

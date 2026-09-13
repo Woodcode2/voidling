@@ -683,3 +683,82 @@ the only fix is not standing him behind a building.
   is 10.8 above them, so at 32° the sight line leaves the prop plane immediately.
   The qualifying *ground* area grows 1.85× for buildings and 4.0× for street props
   — not 23.3×.
+
+---
+
+## 17 · THE WEDGE CAN NEVER COME INTO SHOT — AND TWO MORE OF MY NUMBERS
+
+§12 hoped the islands' existing skirt (`island.ts:3773-3792`, `DEPTH = 9`) might
+already be the floating wedge and the fix might be framing. **It is not, and the
+reason is structural.** Three independent computations, each re-derived and
+confirmed:
+
+1. **The wall is invisible from any camera over the land, on any world, at any
+   distance.** The skirt extrudes straight DOWN from the coast edge at the coast's
+   own (x,z). A ray from a camera on the land side that clears the edge is already
+   at y > 0 when it crosses the wall's plane; any steeper ray hits the land first.
+   Worked at our own camera — 147.8 units back, 99.7 up — the grazing ray passes
+   the wall plane at **y = +0.9**. The wall's screen width is exactly **zero**.
+
+2. **Where the camera does stand over the sea, the near coast is below the bottom
+   of the frame.** The ground visible runs 72.5 units in front of the aim to 112.9
+   beyond it. Nearest coastline to each world's stage aim:
+
+   | pirate | powder | lantern | skylark | gameday |
+   |---|---|---|---|---|
+   | **17.2** | 59.8 | 75.7 | 93.8 | 118.3 |
+
+   **Only pirate's is inside the 72.5-unit near reach — and pirate is precisely the
+   one world whose photograph has the edge in it.** That is the entire explanation
+   for §14's "Pirate already half-reads as the object", and it is not a
+   generalisable win.
+
+3. **On the far side it is beyond reach and beyond the fog** (fog near = 204.9,
+   far = 374.2 at this distance).
+
+**So the plinth has to be built. There is no framing that gets it for free.**
+
+### 17.1 Two errors in the code I shipped in §12
+
+Both found by an adversarial reader, both re-derived here before accepting:
+
+- **`DIO_FILL = 0.90` is a HEIGHT fill and the screen is PORTRAIT, so width binds.**
+  At 178.2 units the frame is 102.2 units tall and **47.2 units wide**. A 92-unit
+  block is 0.90× the height and **1.95× the width** — what is in shot is **half a
+  block (51%)**, not a block. I wrote "a 92-unit block at 90% fill" in this brief
+  and in the commit that shipped it. Independently confirmed by measuring the hero
+  in `maple-dio1.png`: his disc spans 222 of 430 CSS px, putting the frame at 46.5
+  units — 1.5% from the trig's 47.2.
+
+- **`DIO_ELEV = 34` is the CAMERA's elevation, not the view axis.** The 0.085
+  `lookAhead` pulls the aim 15.15 units toward the camera along the ground, which
+  steepens the axis to **36.93°** below horizontal. §11.6's trap — "the camera that
+  took the shots is not the camera the game has" — was still live, in my own code.
+
+**The numbers are deliberately left alone.** Framing a whole block by width at 90%
+needs the camera **386 units** back, where the hero reads **101 px** against
+today's 131–182. The block-filling goal and "he reads as a character" are in direct
+conflict, and the photographs already chose: at 178 Game Day frames its whole
+stadium and Maple frames a park, a fountain, a crowd and a road, with the hero at
+222 px. **The composition is right; only the rationale was wrong.**
+
+### 17.2 The revised order, after the adversarial pass
+
+Nothing survived both lenses unrefuted, and the refutations were mostly of PLANS
+rather than DIAGNOSES. What is left, in order:
+
+1. **Done.** The picker is quiet (§ bubbles, `qa/menuquiet.mjs`).
+2. **The cast list first, before any plinth** — an `Object3D.layers` bit assigned at
+   build time, not `visible=false` (§11.4's geometry leak).
+3. **The hero's mark and the stage re-derive, in ONE change** — they are the only
+   fix for lantern and powder, because the view axis is distance-invariant. The
+   refuter's constraint: do NOT relax `deriveStage`'s shared `blockers`/`blocksShot`
+   constants (`qa/levels.mjs` hard-gates `blocked !== 0`); build a second local list
+   and a `marksClear()` that runs the full segment at the hero's eye height. And
+   recentre the sun on the AIM in the frame loop, or the ±46 shadow box follows him
+   off the block and the back row's shadows stop at a straight line.
+4. **Then the plinth and the flat card.**
+5. **The occlusion bar on all six worlds with a stated target** (≤5%), not only on
+   the three that already pass.
+6. **A "the object has something on it" bar** — skylark passes every test above and
+   is still an empty field.
