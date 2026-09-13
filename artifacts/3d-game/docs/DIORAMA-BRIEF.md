@@ -499,3 +499,79 @@ The fix is a decision the photograph has to inform — a CSS scale of ~0.33 puts
 275 px bubble at 91 px with 4 px text, which is not readable, so "scale them" may
 not survive contact. Suppressing them on the diorama loses the one thing that says
 the town is alive. **Not decided here on purpose.**
+
+---
+
+## 14 · SIX WORLDS, PHOTOGRAPHED — THREE WINS, TWO BROKEN, ONE EMPTY
+
+`qa/_dioshot6.mjs`, every world twice, `?dio=1` against `?dio=0`, same build and
+same seeded profile. **The measured part held exactly:**
+
+| | camD (dio → off) | hero px (dio → off) |
+|---|---|---|
+| maple | 174.1 → 58.2 | **225 → 182** |
+| pirate | — → — | **224 → 153** |
+| gameday | — → — | **224 → 140** |
+| lantern | 175.6 → 89.5 | **224 → 139** |
+| powder | 175.5 → 85.3 | **224 → 146** |
+| skylark | 177.7 → 95.5 | **221 → 131** |
+
+Predicted 178.2 and 219. And note the second column's *spread*: today the hero is
+**131–182 px** depending on world; on the diorama he is **221–225**. The form pin
+plus a fixed radius makes him the same creature at the same size on every world,
+which is what a picker needs and what it has never had.
+
+**But the pictures do not all agree with the numbers, and that is the finding.**
+
+| world | verdict |
+|---|---|
+| **Game Day** | **best of the six.** The whole stadium in frame as an OBJECT, the field inside it, the tailgate lot behind. This is the reference shot. |
+| **Maple** | **win.** A town block: park, fountain, a crowd walking through it, a road with a car, autumn trees. |
+| **Pirate** | **win.** The coastline cuts against deep blue sea and already reads as the wedge's own edge — but a palm frond crosses the hero's face. |
+| **Skylark** | hero reads beautifully; **the frame is an empty green field.** |
+| **Lantern** | **broken.** A pagoda renders across the hero. |
+| **Powder** | **broken.** The lodge's roof renders across the hero's face. |
+
+### 14.1 "Renders across him" is not a rendering fault — he is standing behind the building
+
+The face draws over the roof while the body does not, which is the signature of
+`occludedSilhouette` (`void3d.ts:692`, `depthFunc: GreaterDepth`) — the x-ray ghost
+that exists so he is never invisible. It is working exactly as designed.
+
+The cause is upstream. `enterMenu` parks him **on the stage point**, and the stage
+point was chosen to photograph a subject — Powder's lodge, Lantern's pagoda. At 85
+units and low he stands in front of it; at 178 units and 34 degrees up, its roof
+rises into the line of sight. **The hero has to move off the stage point toward the
+camera on the diorama.** That is §11.1's salvage, unbuilt, and the photographs are
+what proved it is required rather than nice.
+
+So the occluder story is now two things, and neither is "suspend it":
+- `fadeOccluders` must be **replaced** on the diorama, not removed (§13.1 says its
+  shield, sized off hero radius, would ghost a 47-unit corridor through a 92-unit
+  block; the photographs say something still has to clear Pirate's frond).
+- The hero needs his own parking offset.
+
+### 14.2 The stage points were chosen for the wrong camera
+
+`deriveStage()` picks a spot that photographs well **at 58–95 units**. At 178 the
+same spot frames something else entirely: on Skylark, an empty field; on Powder and
+Lantern, the inside of a building. Three worlds got lucky. **The stages need
+re-deriving at the diorama's distance**, which is a change to `deriveStage`'s
+scoring, not a per-world authoring job.
+
+### 14.3 The speech bubbles, confirmed by looking
+
+§13.2 computed a 275 px bubble over a 16 px person. **Four of the six diorama shots
+carry one** — "We are out of the big towels", "Gate C has the short queue.",
+"Nobody wipes their boots. nobody.", "The lodge cocoa is famous in three valleys" —
+each a full-size white slab against a town rendered a third of its former size. The
+prediction was exact.
+
+### 14.4 An instrument that does not work: `__menuState().drawCalls`
+
+It reads **1** on every world on both sides. Not a sampling error — the max over 40
+frames is still 1. `renderer.info.render.calls` after a `composer.render()` reports
+only the LAST pass, and that pass is a fullscreen quad. **Whenever bloom is on, that
+hook returns 1 and means nothing.** No cost figure in this section, because there is
+no honest one to give; the diorama's cost has to be taken in the day-9 unit
+(composer/2 + shadow/4) before anything ships.
