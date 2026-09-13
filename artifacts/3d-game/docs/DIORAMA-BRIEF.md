@@ -631,3 +631,55 @@ PASS, on the world whose photograph plainly shows a lodge across his face.
 
 A probe that disagrees with a screenshot is wrong until proven otherwise. This one now
 agrees with all twelve.
+
+---
+
+## 16 · RETRACTION: THE OCCLUSION FADE HAS NEVER RENDERED A PIXEL
+
+The previous commit fixed `fadeOccluders`' along-axis test — a real bug, and the
+fix stands — but it claimed a visible result and showed a before/after pair of
+Powder's menu to prove it. **The visible claim is withdrawn.**
+
+**The dissolve is inert, deliberately, and has been since an earlier round:**
+- `setDissolve` ends `void fade;` (`island.ts:4672`)
+- `_fadeHook` pins `uFade.value = 1` unconditionally (`island.ts:4553`)
+- the shader dithers only `if (uFade < 0.995 …) discard` (`island.ts:4362`)
+- nothing else reads `userData.fade` for rendering
+
+`island.ts:4545` says it outright: *"the machinery stays wired and INERT —
+fadeOccluders still tracks who is in the way … so the next attempt starts from a
+working selection rather than from nothing."*
+
+So the render **cannot** depend on the value the fix changes. The difference
+between those two screenshots was **the menu's own camera drift**: `menuT`
+accumulates in GAME time, and a 20-second wall-clock wait at this sandbox's
+0.4–2.9 fps is a different amount of game time on every load, so two shots of one
+build sample different phases of the pendulum and the lodge moves relative to the
+hero. The two images have been deleted rather than left to mislead.
+
+**What the fix is worth, honestly:** the selection was wrong and is now right,
+which is precisely what `island.ts:4545` asks to be kept true. Nothing a child can
+see changes today. Found by an adversarial reader, not by me — I had the two lines
+in front of me in §15 and wrote "the candidate reason is eligibility" instead of
+reading them.
+
+**And it moves the real fix.** With the dissolve inert, the x-ray ghost is not a
+fallback — it *is* the guarantee (`island.ts:4663`: *"the guarantee moved to the
+hero: he is drawn over whatever hides him"*). So the faceless hero on pirate,
+lantern and powder is not a fade failure at all. **It is a parking failure**, and
+the only fix is not standing him behind a building.
+
+### 16.1 Two more corrections from the same pass
+
+- **§14.3 undercounted the speech bubbles.** Five of six diorama shots carry one,
+  not four — Maple's is lavender (the `event` palette) and was missed. Measured
+  boxes: powder 258.5×29.5, skylark 213.5×30, lantern 179×29.5, gameday 177×28,
+  maple 172×30.
+- **§14's "a palm frond crosses the hero's face" on Pirate is wrong.** Measured off
+  the PNG: 0.1% of his upper half and 1.35% of his face band carry a frond; 21.8%
+  of his *lower* half does. **His face is clean.** Pirate is a win, and its flaw is
+  somewhere else.
+- **§13.1's 23.3× is a volume of air.** Props sit at y = 0 while the hero's centre
+  is 10.8 above them, so at 32° the sight line leaves the prop plane immediately.
+  The qualifying *ground* area grows 1.85× for buildings and 4.0× for street props
+  — not 23.3×.

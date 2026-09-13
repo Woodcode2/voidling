@@ -1702,6 +1702,27 @@ function fadeOccluders(dt: number): void {
     // classified "behind him" and skipped, with half its bulk still in front of
     // his face.
     //
+    // ── AND IT CHANGES NOT ONE PIXEL TODAY. READ THIS BEFORE BELIEVING THE ──
+    // ── PARAGRAPH BELOW. ─────────────────────────────────────────────────────
+    // The dissolve this selection feeds is INERT and has been since an earlier
+    // round switched it off deliberately: `setDissolve` ends `void fade;`
+    // (island.ts:4672) and `_fadeHook` pins `uFade.value = 1` unconditionally
+    // (island.ts:4553), while the shader's dither only fires
+    // `if (uFade < 0.995 …) discard` (island.ts:4362). Nothing else reads
+    // userData.fade for rendering. island.ts:4545 says so in as many words —
+    // "the machinery stays wired and INERT … so the next attempt starts from a
+    // working selection rather than from nothing."
+    //
+    // So this fix corrects the SELECTION, which is exactly what that note asks
+    // to be kept correct, and changes nothing a child can see. I first committed
+    // it claiming it removed a roof line from the hero's face on Powder, with a
+    // before-and-after pair to prove it. That was wrong: the render cannot
+    // depend on a value the shader never reads, and the difference between those
+    // two shots was the menu's own camera drift — menuT accumulates in GAME time
+    // and this sandbox's 20-second wall-clock wait is a different amount of game
+    // time on every load, so two shots of one build sample different phases of
+    // the pendulum and the lodge moves relative to the hero.
+    //
     // MEASURED on the live menu (qa/_fadeable.mjs), three worlds, one shape:
     //
     //   powder   lodge   r 10.5   t 87.3 vs camToHero 85.3  -> skipped
@@ -1715,7 +1736,11 @@ function fadeOccluders(dt: number): void {
     // fadeTo, userData.fade is armed — and all three measured a fade of exactly
     // 1: fully solid. qa/_dioocc.mjs put numbers on the result: the hero is 100%
     // covered on pirate, lantern and powder on the SHIPPED menu, and what a child
-    // sees there is the x-ray ghost rather than her character.
+    // sees there is the x-ray ghost rather than her character — which, with the
+    // dissolve inert, is the DESIGNED behaviour: island.ts:4663 records that "the
+    // guarantee moved to the hero: he is drawn over whatever hides him". The real
+    // fix for those three worlds is therefore not the fade at all. It is not
+    // standing him behind a building.
     //
     // The near face is at `t - r` and the far face at `t + r`. A prop occludes if
     // any of it lies between the lens and the hero.
