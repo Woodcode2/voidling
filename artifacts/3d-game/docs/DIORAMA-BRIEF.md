@@ -199,12 +199,22 @@ maples are orange.
    landmark floating just off the coast. The Pirate branch on the same line does
    it correctly as `w(6650)`. Intended is almost certainly
    `w(blockCenter(1) - 120)` → 3D (-134.25, -115.25), inside fair block (1,1).
-2. **`PLAN_GRID` is stale by construction.** `island.ts:334`
-   `export const PLAN_GRID = PLAN;` is evaluated once at module load, after
-   `setWorld('maple')` at `:174` — so it is always Maple's plan whatever world is
-   built.
+2. **`PLAN_GRID` was stale by construction — a trap, not a live bug.** `island.ts`
+   `export const PLAN_GRID = PLAN;` was evaluated once at module load, after
+   `setWorld('maple')` at `:174`, so it was always Maple's plan whatever world was
+   built. **This brief called it a bug; it was not one.** All five call sites in
+   `life.ts` are gated on `worldId() === 'maple'` and Maple's plan is exactly what
+   they want, so nothing was ever wrong on screen. It was a trap for the next
+   person, because `PLAN_GRID` reads like "the plan" and silently was not. Now
+   `planGrid()`, a function, which cannot go stale.
 
-   *(1 and 2 are still open.)*
+**Both fixed.** The ferris wheel's two positions were tested against the island's
+own `silhouetteWorld(12)` plus its point-in-polygon test, run outside the browser:
+
+| | 3D | world | grid cell | verdict |
+|---|---|---|---|---|
+| shipped | (-248.25, +131.75) | (1035, 8635) | (0,4) = **the strip** (the highway) | **in the sea**, 0.40 units past the waterline, 286 units from the fair |
+| now | (-134.25, -115.25) | (3315, 3695) | (1,1) = **fair** | on land, 110 units inside the waterline, **on the midway**, 14.3 units from the fairground centre |
 
 ## 9 · Build order, smallest kill test first
 

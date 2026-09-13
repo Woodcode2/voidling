@@ -331,7 +331,18 @@ export const worldTo3D = (v: number) => w(v);
 export const worldLen = (v: number) => wLen(v);
 export const ROAD_CENTERS_3D = ROAD_CENTERS.map((c) => w(c));
 export const blockCenter3D = (gx: number, gy: number): [number, number] => [w(blockCenter(gx)), w(blockCenter(gy))];
-export const PLAN_GRID = PLAN;
+/** THE CURRENT WORLD'S BIOME PLAN — a FUNCTION, not a const.
+ *
+ *  It used to be `export const PLAN_GRID = PLAN`, evaluated once at module load,
+ *  which is after `setWorld('maple')` at :174 — so it was Maple's plan forever,
+ *  whatever world was built. Nothing was wrong today, because every one of the
+ *  five call sites in ./life is gated on `worldId() === 'maple'` and Maple's plan
+ *  is exactly what they wanted. It was a trap for the next person rather than a
+ *  live bug: `PLAN_GRID` reads like "the plan" and silently was not.
+ *
+ *  A function cannot go stale. setWorld reassigns PLAN; this returns whatever it
+ *  is now. */
+export const planGrid = (): Biome[][] => PLAN;
 export const HALF_BLOCK_3D = wLen(BLOCK_SIZE / 2);
 
 // train rail loop around downtown (corner-cut rectangle, world coords)
@@ -3874,8 +3885,25 @@ const QUIET_LEDGER: number[][] = [];
   // The ferris wheel is Pirate Bay's boardwalk-fair prop. On MAPLE FALLS it
   // landed four blocks from the county fairground it belongs to, in hot pink.
   // The fair has its own rides.
+  // …AND THE OFFSETS GO INSIDE w(), NOT OUTSIDE IT. This was a 20x scale error:
+  // w() converts WORLD units to 3D at SCALE 0.05, so `w(c) - 120` subtracts 120
+  // THREE-D units (2,400 world units) from an already-converted coordinate, while
+  // `w(c - 120)` moves the intended 120 world units (6 3D units). The Pirate
+  // branch on the same line has always done it correctly as w(6650).
+  //
+  // MEASURED against the island's own silhouette maths — silhouetteWorld(12) plus
+  // the point-in-polygon test above, run outside the browser:
+  //
+  //   shipped   3D (-248.25, +131.75) = world (1035, 8635)
+  //             IN THE SEA, 0.40 units past the waterline, in grid cell (0,4)
+  //             which is THE STRIP — the highway — and 286 units from the
+  //             fairground the comment says it belongs to. A 16-unit-tall GLB
+  //             landmark, and a 5.6-radius edible, floating off the west shore.
+  //   now       3D (-134.25, -115.25) = world (3315, 3695)
+  //             on land, 110 units inside the waterline, in grid cell (1,1) which
+  //             IS 'fair', on the midway, 14.3 units from the fairground centre.
   const FERRIS: [number, number] = WORLD_ID === 'pirate'
-    ? [w(6650), w(10600)] : [w(blockCenter(1)) - 120, w(blockCenter(1)) + 260];   // MAPLE: the county fairground
+    ? [w(6650), w(10600)] : [w(blockCenter(1) - 120), w(blockCenter(1) + 260)];   // MAPLE: the county fairground
   new GLTFLoader().load('/assets/hf3d/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/f1918f07-d6ac-4589-abe2-eeaf7ca703b2.glb', (gltf) => {
     const model = gltf.scene;
     const box = new THREE.Box3().setFromObject(model);

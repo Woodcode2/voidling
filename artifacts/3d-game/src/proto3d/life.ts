@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { PROPS } from './palette';
 import {
-  ROAD_CENTERS_3D, blockCenter3D, PLAN_GRID, HALF_BLOCK_3D,
+  ROAD_CENTERS_3D, blockCenter3D, planGrid, HALF_BLOCK_3D,
   railPointAt, insideIsland3, inLagoon3, inWater3, worldId, part, mergedProp, nearSpawn,
   type Biome, type AddEdible,
 } from './island';
@@ -3672,8 +3672,9 @@ export function createLife(
     shore: 'lake', woods: 'woods', pines: 'woods', mall: 'strip', diner: 'strip',
     airport: 'strip', military: 'strip', zoo: 'park', green: 'park',
   };
-  const GH = PLAN_GRID.length, GW = PLAN_GRID[0].length;
-  const biomeIdAt = (gx: number, gy: number): string => String(PLAN_GRID[gy][gx]);
+  const PG = planGrid();   // read once per populate(), not once per module
+  const GH = PG.length, GW = PG[0].length;
+  const biomeIdAt = (gx: number, gy: number): string => String(PG[gy][gx]);
   const zoneAt = (gx: number, gy: number): MZone => ZONE_OF[biomeIdAt(gx, gy)] ?? 'burb';
 
   // Which RIBBON a block flies. Still striped, because "that whole street is
@@ -3823,7 +3824,7 @@ export function createLife(
   const towelGeo = new THREE.PlaneGeometry(3.6, 5.4);
   for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
     if (worldId() !== 'maple') break;
-    if (PLAN_GRID[gy][gx] !== 'beach') continue;
+    if (planGrid()[gy][gx] !== 'beach') continue;
     const [bx, bz] = blockCenter3D(gx, gy);
     for (let i = 0; i < 3; i++) {
       const tx = bx + rand(-HALF_BLOCK_3D * 0.55, HALF_BLOCK_3D * 0.55);
@@ -5675,7 +5676,7 @@ export function createLife(
     // resort put "MY STARTUP!!" and "no new voids" on the dance floor.
     if (worldId() !== 'maple') return;
     const [x, z] = blockCenter3D(gx, gy);
-    const evBiome = biomeKey(PLAN_GRID[gy][gx]);
+    const evBiome = biomeKey(planGrid()[gy][gx]);
     build(x, z);
     for (let i = 0; i < pedN; i++) addWanderer(makePerson(evBiome, pedCol), x + rand(-14, 14), z + rand(-14, 14), 16, rand(3, 5), 18, 2.4, 'generic', panic);
     events.push({ x, z, ambient, panic, cd: rand(1, 4), panicked: 0 });
