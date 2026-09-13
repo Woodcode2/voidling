@@ -575,3 +575,59 @@ only the LAST pass, and that pass is a fullscreen quad. **Whenever bloom is on, 
 hook returns 1 and means nothing.** No cost figure in this section, because there is
 no honest one to give; the diorama's cost has to be taken in the day-9 unit
 (composer/2 + shadow/4) before anything ships.
+
+---
+
+## 15 · THE MENU HAS BEEN SHIPPING A FACELESS HERO ON HALF THE WORLDS
+
+`qa/_dioocc.mjs`. §14 called powder and lantern "broken on the diorama". **That was
+wrong, and backwards.** Measured geometrically — a 25×25 grid of rays from the lens
+across the hero's projected disc, asking whether the scene's triangles stop each one
+before it reaches his surface:
+
+| world | % of the hero with something in front of him — **diorama** | **today's shipped menu** |
+|---|---|---|
+| maple | **2.7%** | 46.5% |
+| pirate | **26.1%** | **100%** |
+| gameday | **0.2%** | 0% |
+| lantern | **59.2%** | **100%** |
+| powder | **31.5%** | **100%** |
+| skylark | **0%** | 0% |
+
+**Three of six worlds ship a level picker where the hero is entirely behind
+something**, and a fourth is half behind. Confirmed by looking:
+`powder-dio0.png` is two eyes on a flat dark disc — no mouth, no blush, no face — and
+`pirate-dio0.png` is a palm trunk and fronds drawn straight through a translucent
+disc. What a child sees on those worlds is the **x-ray ghost**
+(`void3d.ts` `occludedSilhouette`), which exists so she never *loses* her character —
+not the character.
+
+**So the diorama camera does not break occlusion. It strictly improves it on every
+world**, and dramatically on the three that were already at 100%. Powder and lantern
+are not "broken by the diorama"; they were broken before and are now merely bad.
+
+### 15.1 Why the fade does not save them
+
+`fadeOccluders` runs every frame on the menu. It is not firing on these, and the
+candidate reason is that only `edibles` carrying a `fadeTo` qualify — a landmark
+building or a palm may not be in that list at all. If that holds, `fadeOccluders` was
+never going to fix pirate, powder or lantern, on the diorama *or* today.
+
+### 15.2 The instrument, and the two ways I got it wrong first
+
+The first version ported `qa/occlusion.mjs`'s O3 — five renders, hero visibility as a
+luminance *contribution* ratio. On powder it reported **102.4% visible** and printed
+PASS, on the world whose photograph plainly shows a lodge across his face.
+
+1. **The denominator hid one mesh.** A raycast names the *first* mesh in the way and
+   the probe switched that off. A lodge is not one mesh. Most of the building was
+   still in the "occluder removed" render, so numerator and denominator were nearly
+   the same frame — and the ratio passed 1, because removing one mesh also changes
+   the backdrop behind him.
+2. **A luminance test cannot see this symptom at all.** The x-ray ghost is working, so
+   he *does* reach the screen through the lodge and "can you see him" is honestly
+   ~100%. The fault is not that he is invisible — it is that a building is drawn
+   **across** him. That is geometry, and no colour test will ever answer it.
+
+A probe that disagrees with a screenshot is wrong until proven otherwise. This one now
+agrees with all twelve.
