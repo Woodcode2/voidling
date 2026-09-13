@@ -491,6 +491,24 @@ const SUITE = [
     cmd: ['node', 'qa/dailyrace.mjs', String(PORT)], verdict: pf,
     why: 'an owed day interrupts nothing — she taps PLAY and plays, and the day is still owed at the buzzer' },
 
+  // NOBODY TALKS ON THE LEVEL PICKER. A speech bubble is a callout and works only
+  // when it points at a legible speaker; on the menu it cannot, and the shipped
+  // picker was showing one anyway. Measured off the menu screenshots: five of six
+  // worlds carried one, 172-258 px wide against a 430 px screen, and four of the
+  // five were pinned against a clamp limit — so the tail pointed at its own box
+  // rather than at anyone. The camera is 58-95 units back, which puts an adult at
+  // 89 px among dozens of identical figures: even a perfectly aimed tail could not
+  // say which dot is talking.
+  //
+  // Bar C is the one that earns its keep. A spawn gate cannot cover a bubble
+  // say() has already returned for, and three paths carry one into the menu —
+  // leaving a match, HOME from the end card, endShop — so the fix needs a
+  // per-frame retire as well, and this reaches the menu the way a child does
+  // after a match rather than only from boot. Measured 219 s.
+  { id: 'menuquiet', tier: 'feel', profiles: ['push', 'live'], timeout: 900,
+    cmd: ['node', 'qa/menuquiet.mjs', String(PORT)], verdict: pf,
+    why: 'the first screen a child sees is not covered by a speech bubble pointing at nobody — and the town still talks everywhere else' },
+
   { id: 'stickerreg', tier: 'quality', profiles: ['push', 'live'], timeout: 30,
     cmd: ['node', 'qa/stickerreg.mjs'], verdict: pf,
     why: 'every world hides things worth finding and every season is something a child can hunt — a world with no stickers ships a picker card whose invitation reads "✨ 0 SECRETS"' },

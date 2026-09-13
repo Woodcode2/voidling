@@ -14,7 +14,11 @@
 //   node qa/_fadeable.mjs [port] [world]
 import { chromium } from 'playwright';
 const PORT = process.argv[2] || '4177';
-const WORLDS = process.argv[3] ? [process.argv[3]] : ['maple', 'pirate', 'lantern', 'powder'];
+// ALL SIX. The first version listed only the four worlds whose centre ray hits
+// something, which is exactly the shortcut qa/worldlists.mjs exists to catch — a
+// probe that never loads gameday or skylark reports green about them. The two
+// clear worlds print "nothing in the centre ray", which is a result, not a gap.
+const WORLDS = process.argv[3] ? [process.argv[3]] : ['maple', 'pirate', 'gameday', 'lantern', 'powder', 'skylark'];
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 try {

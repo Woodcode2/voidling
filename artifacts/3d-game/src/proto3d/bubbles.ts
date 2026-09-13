@@ -220,6 +220,33 @@ const style = document.createElement('style');
         // of a cinematic, from a camera where the speaker is a speck
         // (docs/crews/round-5/firstframe-data/, the bub column).
         if (document.body.classList.contains('intro')) return;
+        // 0b: AND NOBODY TALKS ON THE LEVEL PICKER. body.diorama is set for the
+        // whole of enterMenu (prototype3d.ts:1203) and cleared in leaveMenu
+        // (:1241), so this is the menu and only the menu.
+        //
+        // A speech bubble is a CALLOUT: it works only when it points at a
+        // legible speaker. On the menu it cannot. MEASURED off the menu
+        // screenshots (docs/crews/round-8/dio/): five of six worlds carry one,
+        // the boxes run 172-258 px wide against a 430 px screen, and FOUR OF
+        // THE FIVE are pinned against a clamp limit — halfW saturates at left 8
+        // / right 422 and the top clamp at HUD_TOP + halfH. A clamped bubble's
+        // ::after tail still sits at left:50% of its own BOX, so it points at
+        // the box and not at the person: Skylark's lands on a horizon crowd,
+        // Game Day's on the stadium's outer wall, Powder's on empty snow,
+        // Lantern's on a pagoda roof.
+        //
+        // And the speaker is beneath the resolution of the picture anyway. The
+        // menu camera is 58-95 units back today (178 on the diorama), which puts
+        // an adult at 89 px and 29 px respectively — one of dozens of identical
+        // figures. Even a perfectly aimed tail could not say WHICH dot is
+        // talking. That is why this is a suppression and not a re-anchoring, and
+        // why scaling the bubble down cannot work either: 12.5px * 0.33 is a
+        // 4px font, and the smallest glyph this product ships is 10px and is
+        // three uppercase letters of a name, not a sentence.
+        //
+        // The whole menu, not just ?dio=1: the same speaker-less rectangle is
+        // in today's shipped picker.
+        if (document.body.classList.contains('diorama')) return;
         const ban = document.getElementById('banner');
         if (ban && ban.classList.contains('show') && Number(getComputedStyle(ban).opacity) > 0.06) return;
         if (slots.some((s) => s.active && s.el.classList.contains('rival'))) return;
@@ -364,7 +391,21 @@ const style = document.createElement('style');
       // pop-out; family lines stay, as everywhere else in these rules.
       {
         const ban = document.getElementById('banner');
-        if (ban && ban.classList.contains('show') && Number(getComputedStyle(ban).opacity) > 0.06) {
+        // …AND THE SAME GRACE FOR THE MENU, because a spawn gate structurally
+        // cannot cover it. say() has already returned for a bubble that is
+        // ALREADY in the air, and three real paths carry one into the menu:
+        // leaving a match mid-play (prototype3d.ts:9581), HOME from the end card
+        // (:9483) — the likely one, since life.update deliberately keeps running
+        // behind #end so the world still looks alive, and say() is not gated on
+        // `ended` — and endShop (:7198). bubbles.reset() would cover it but has
+        // exactly one caller, resetMatch, and enterMenu retires nothing.
+        //
+        // Done HERE rather than in enterMenu on purpose: this runs every frame,
+        // so it catches a bubble arriving by any path including ones nobody has
+        // enumerated, and it reuses the grace the banner already defined instead
+        // of inventing a third mechanism. 0.6s, no pop-out, family lines stay.
+        const onMenu = document.body.classList.contains('diorama');
+        if (onMenu || (ban && ban.classList.contains('show') && Number(getComputedStyle(ban).opacity) > 0.06)) {
           for (const s of slots) {
             if (s.active && !s.el.classList.contains('rival')) s.until = Math.min(s.until, clock + 0.6);
           }
