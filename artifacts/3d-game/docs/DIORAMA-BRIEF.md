@@ -1,5 +1,66 @@
 # THE MENU AS A FLOATING DIORAMA — findings, numbers and open questions
 
+## 0 · WHERE THIS ACTUALLY STANDS — read this before anything below
+
+This document grew by accretion and has been corrected five times. **Sections 1–10
+are the original design and several of their numbers are wrong**; §11 onward is
+the record of what survived. If you read only one section, read this one.
+
+### Built and behind `?dio=1`
+
+| | |
+|---|---|
+| the camera pull-back | 178.2 units back, 99.7 up. Camera elevation 34°, **view axis 36.93°** |
+| what is in frame | **half a block (51%)**, 47.2 world units wide — *not* the 92 this brief claimed |
+| the hero | r = 12, form pinned, **239–244 px** on every world (today's menu: 131–181, varying) |
+| his position | steps `DIO_MARK` = 16 units off the landmark toward the camera |
+| the shadow box | pinned to the block, and the sun centres on the **aim**, not on him |
+
+### Shipped unconditionally (not behind the flag)
+
+- **The picker is quiet.** Five of six worlds were showing a speech bubble pointing
+  at nobody. Two mechanisms: a spawn gate, and a per-frame retire for bubbles
+  already in the air. `qa/menuquiet.mjs`.
+- **One creature, one size, on every world**, and no phantom evolution per session.
+  `qa/menuform.mjs`.
+- **`fadeOccluders` tests the prop's near face**, not its centre. Corrects the
+  selection; **changes no pixels** — see §16.
+- The ferris wheel is out of the sea; `planGrid()` cannot go stale.
+
+### Measured, per world
+
+| world | occluded before → after | the frame |
+|---|---|---|
+| gameday | 0% → 0% | the stadium as an object — best of the six |
+| lantern | **100% → 0%** | pagoda, lanterns, market — transformed |
+| maple | 9.3% → 6.1% | park, fountain, crowd, road |
+| pirate | **100% → 7.7%** | coastline reads as the wedge's edge |
+| powder | **100% → 0%** | face recovered, **subject lost** — he covers the lodge |
+| skylark | 0% → 0% | hero fine, **frame is an empty field** |
+
+### Open, in order
+
+1. **The cast list** as an `Object3D.layers` bit assigned at build time — before any
+   plinth, because `visible=false` leaks geometry buffers (§11.4).
+2. **The plinth and the flat card.** The island's own wedge **can never come into
+   shot** — settled three ways in §17.
+3. **A floor for `qa/_dioful.mjs`**, the "is there anything on the object" bar.
+   Skylark and Powder are what it is for. Written, unrun, threshold deliberately
+   unset.
+4. **An honest cost figure.** `qa/_diocost.mjs` is written and unrun. The
+   instrument for this already existed (§18 correction).
+5. **`deriveStage` re-scored** for 178 units — it optimises for a 58–95 unit
+   camera. Do **not** relax its shared `blockers`/`blocksShot` constants:
+   `qa/levels.mjs` hard-gates on the `blocked` they publish.
+
+### Known, measured, out of scope
+
+On the five worlds reached by a world switch, **the match clock runs ~3 s before
+the child's first touch** and the opening descent is ~930 ms against an authored
+1100–1300. Pre-existing, verified against commit `835b90c`. Live profile only. §18.
+
+---
+
 **Status: REFUTED AND SALVAGED (2026-09-12, 21:30).** The three adversarial
 agents ran. **The picture survives; the mechanism does not.** Four of the things
 this brief asserted are wrong, two of them numbers I reported to the owner as
