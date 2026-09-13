@@ -370,10 +370,17 @@ the live frame to within 4%):
 the owner; both figures are in the wrong unit.
 
 Two consequences the design did not know about:
-- **The shadow box.** `fitShadow` (`prototype3d.ts:1545-1565`) is 63.8 units on
-  Maple today and 96.8 on Lantern; the pull-back opens it to the 220 cap — a
-  **6.7x shadow pass**. It must be pinned in the same statement as the pull-back,
-  not at step 5.
+- **The shadow box — and this warning asked the wrong question.** `fitShadow` is
+  63.8 units on Maple today and 96.8 on Lantern, and left alone the pull-back
+  would open it toward the 220 cap: at `dist` 178 the target is `clamp(196, 45,
+  220)` = **196**, a 3.1x linear and **9.4x area** at the same texture.
+  **But the box follows the SUBJECT, not the camera.** It is sized from camera
+  distance because for a follow camera distance *is* how much ground is in shot —
+  on a diorama those come apart for the first time, and the subject is ONE BLOCK.
+  A box of `DIO_HALF` = 46 covers everything in frame, which is **tighter than the
+  63.8 the menu uses today**. So the diorama makes the shadow pass *sharper and
+  cheaper*, not 6.7x dearer. Pinned in the same statement as the pull-back
+  regardless, because the failure mode if anyone removes the pin is silent.
 - **A geometry upload leak.** MEASURED via `renderer.info.memory.geometries`: one
   uncalled pulled-back frame takes Maple 734 → **4,580** (+3,846) and Lantern
   1,727 → **6,358**, and applying the cast list afterwards **does not give them
@@ -408,3 +415,32 @@ meshes — that is what fixes the geometry leak**), the flat `Color` card, an
 absolute far plane, the `crowdGate` clamp, and `fadeOccluders` suspended under
 `menuMode`.
 
+---
+
+## 12 · STEP 1 IS WRITTEN, BEHIND `?dio=1`
+
+The pull-back exists in `prototype3d.ts` and is **inert by default**. Four pieces,
+all of them small because the machinery was already written against
+`stageCam.dist`:
+
+| | |
+|---|---|
+| `DIORAMA` | `?dio=1` only. This is the first screen a child sees; it ships when it has been LOOKED AT, not when it typechecks. Day 8 got its framing wrong four times and every wrong version was arithmetic that checked out. |
+| `dioCam(lookY)` | Pure arithmetic, no scene, no state — a 92-unit block at 90% of frame height at fov 32 needs the camera **178.2 units** back, 99.7 up, 147.8 out. |
+| the drift | `enterMenu` sets the aim bias and the per-frame drift block **recomputes it every frame**, so a bias set once would be undone within one frame. Both now read `stageCam.dist` and the diorama's own 0.085 (today's 0.22 of 178 units would be 39 units, sliding the block out of shot). |
+| `fitShadow` | pinned to the block, in the same statement as the pull-back. |
+
+`menuVoidR` returns `DIO_VOID_R` = 12 under the flag — chosen against the FRAME,
+not derived from the camera, because `dist/18` at 178 units would be 9.9 by
+accident rather than by decision. **The form pin is what makes 12 spendable.**
+
+**With the flag off nothing changes.** The only line touched in the default path
+is the drift's `ms.dist` → `stageCam.dist`, and `stageCam.dist` is assigned from
+`menuStage.dist`, which *is* `ms.dist`.
+
+### What step 1 does NOT have yet
+
+The plinth, the cast list as an `Object3D.layers` bit, the `crowdGate` clamp, and
+`fadeOccluders` suspended — all of §9 as revised by §11. Step 1 is the smallest
+thing that can be photographed, and the next action is to photograph it on all six
+worlds and look, because that is the only question it can answer.

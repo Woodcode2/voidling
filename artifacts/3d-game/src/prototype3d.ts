@@ -1024,6 +1024,39 @@ function deriveStage(): MenuStage {
   return { x: aim.x, z: aim.z, az: bestAz, amp: 7, period: 28, dist, h, lookY, blocked };
 }
 
+/** ── THE MENU AS A FLOATING DIORAMA — STEP 1, BEHIND A FLAG ─────────────────
+ *
+ *  docs/DIORAMA-BRIEF.md. The reference (hole.io's level picker) is a curated
+ *  city block on a wedge of earth against flat colour; today's menu is a camera
+ *  standing IN the town at 58-95 units. This pulls the camera back far enough to
+ *  hold a whole block.
+ *
+ *  `?dio=1` ONLY, and deliberately so: it is a change to the first screen a child
+ *  sees, and it ships when it has been LOOKED AT, not when it typechecks. Day 8
+ *  got its framing wrong four times in a row and each wrong version was arithmetic
+ *  that checked out.
+ *
+ *  The numbers are measured, not guessed (brief §11.2). A sphere's on-screen size
+ *  is an angle: px = (932 / (2 * D * tan(fov/2))) * 2r, validated against the live
+ *  menu on six worlds to within 0.15%. At 90% fill a 92-unit block needs the
+ *  camera 178 units back, where the hero reads 219 px at r=12 — the top of the
+ *  135-218 px band he reads at today. The form pin (MENU_VSTAGE) is what makes
+ *  r=12 spendable: without it, stageFor(12) is 4 and the picker would show a
+ *  creature nobody earned, with a white flash and a screen shake to announce it. */
+const DIORAMA = (() => { try { return new URLSearchParams(location.search).get('dio') === '1'; } catch { return false; } })();
+/** Half a city block in world units. island.ts: BLOCK_SIZE 1600 at SCALE 0.05 is
+ *  80 3D units, and STRIDE 1710 makes the pitch 85.5 — 46 is the block plus its
+ *  roads, which is the unit the eye reads as "a piece of town". */
+const DIO_HALF = 46;
+/** How much of the frame's HEIGHT the block fills. Under 1 so the wedge has air
+ *  above it and the ladder panel has somewhere to sit. */
+const DIO_FILL = 0.90;
+/** The camera's elevation. A diorama is a thing you look DOWN at — the reference
+ *  is roughly 35 degrees, low enough that buildings still have faces. */
+const DIO_ELEV = 34;
+/** His radius up there. Not his form: see MENU_VSTAGE. */
+const DIO_VOID_R = 12;
+
 /** How big the void reads ON THE MENU, which is not how big he is in a match.
  *  In play he starts at 0.9 and the camera is 26 units away; on a stage 60-90
  *  units back the same 0.9 is four pixels of purple — the STAR of the game,
@@ -1032,10 +1065,31 @@ function deriveStage(): MenuStage {
  *  distance, and the match resets him (beginMatch -> START_R) so nothing about
  *  play is touched. */
 function menuVoidR(dist: number): number {
+  // On the diorama his size is chosen against the FRAME, not derived from the
+  // camera — the camera is out at 178 units for reasons that have nothing to do
+  // with him, and dist/18 there would be 9.9 by accident rather than by decision.
+  if (DIORAMA) return DIO_VOID_R;
   // dist/13 made him the whole frame on Game Day — the star, but standing in
   // front of the world instead of in it. dist/18 reads as a character sitting
   // in a place, which is the thing being sold.
   return Math.min(3.8, Math.max(1.8, dist / 18));
+}
+
+/** The diorama's camera, from the block it has to hold. Pure arithmetic: no
+ *  scene, no state, so qa can check it without a browser.
+ *
+ *  Returns the same three numbers a MenuStage carries — `dist` is the 3D distance
+ *  from the aim point to the camera (the stage branch resolves it into a position
+ *  through `rise` and `hd`), `h` is the camera's height, and `lookAhead` is how
+ *  far the aim is pulled back toward the camera as a FRACTION of dist. Today's
+ *  menu uses 0.22 of 58-95 units to lift the void clear of the ladder panel; at
+ *  178 the same fraction would be 39 units and the block would slide out of shot,
+ *  so the diorama carries its own. */
+function dioCam(lookY: number): { dist: number; h: number; lookAhead: number } {
+  const frameH = (DIO_HALF * 2) / DIO_FILL;
+  const dist = frameH / (2 * Math.tan(32 * Math.PI / 360));
+  const rise = dist * Math.sin(DIO_ELEV * Math.PI / 180);
+  return { dist, h: lookY + rise, lookAhead: 0.085 };
 }
 
 /** Computed once per world per session — the island does not move, and a scan
@@ -1118,9 +1172,15 @@ function enterMenu(): void {
   // the clear band of the window, above the panel and below the name, which is
   // the only part of this screen nothing else is using.
   const rad0 = st.az * Math.PI / 180;
-  const lookX = st.x + Math.sin(rad0) * st.dist * 0.22;
-  const lookZ = st.z + Math.cos(rad0) * st.dist * 0.22;
-  stageCam = { x: st.x, z: st.z, az: st.az, dist: st.dist, h: st.h,
+  // THE DIORAMA PULLS THE CAMERA BACK, and takes the aim bias with it — see
+  // dioCam. Everything downstream (the fog law, the far plane, the shadow box)
+  // is already written against stageCam.dist, so setting it here is enough.
+  const dio = DIORAMA ? dioCam(st.lookY) : null;
+  const dist = dio ? dio.dist : st.dist;
+  const ahead = dio ? dio.lookAhead : 0.22;
+  const lookX = st.x + Math.sin(rad0) * dist * ahead;
+  const lookZ = st.z + Math.cos(rad0) * dist * ahead;
+  stageCam = { x: st.x, z: st.z, az: st.az, dist, h: dio ? dio.h : st.h,
     lookX, lookZ, lookY: st.lookY };
   // THE VOID SITS IN THE SHOT. He is parked at the stage's own point, which is
   // also what the crowd's near-set, the sun and the shadow box centre on — so
@@ -12389,8 +12449,13 @@ function animate() {
       // the look point rides the drift, or the aim swings out from under the
       // void and he walks across the frame while standing still
       const rd = stageCam.az * Math.PI / 180;
-      stageCam.lookX = ms.x + Math.sin(rd) * ms.dist * 0.22;
-      stageCam.lookZ = ms.z + Math.cos(rd) * ms.dist * 0.22;
+      // stageCam.dist, not ms.dist, and the diorama's own bias — this line runs
+      // EVERY FRAME, so a bias set once in enterMenu would be undone by the next
+      // one. (The rule this session keeps re-learning: in a live game loop,
+      // anything set once is a suggestion, not a state.)
+      const ah = DIORAMA ? dioCam(ms.lookY).lookAhead : 0.22;
+      stageCam.lookX = ms.x + Math.sin(rd) * stageCam.dist * ah;
+      stageCam.lookZ = ms.z + Math.cos(rd) * stageCam.dist * ah;
     }
   }
   if (ASSETVIEW) {
@@ -12892,7 +12957,18 @@ function animate() {
   if (SHOW_WALLS) paintWalls();
   // LOD band + shadow frustum track the camera
   updateLodBias(stageCam ? stageCam.dist : camDist);
-  fitShadow(stageCam ? stageCam.dist : camDist);
+  // THE SHADOW BOX FOLLOWS THE SUBJECT, NOT THE CAMERA — and on the diorama those
+  // are different things for the first time. fitShadow sizes the box from the
+  // camera distance, which is right for a follow camera because distance IS how
+  // much ground is in shot. Pulled back to 178 it would open the box to 196
+  // against today's 63.8 — a 9.4x AREA at the same texture, which is the brief's
+  // §11.4 warning. But the diorama's subject is ONE BLOCK: a box of DIO_HALF
+  // covers everything in frame, so it is pinned here in the same statement as the
+  // pull-back rather than left to be noticed later. 46 is TIGHTER than the 63.8
+  // the menu uses today, so this makes the shadows sharper and cheaper, not
+  // dearer — the cost the brief feared was an artefact of asking the wrong
+  // question.
+  fitShadow(DIORAMA && menuMode ? DIO_HALF / 1.1 : stageCam ? stageCam.dist : camDist);
   fadeOccluders(dt);
 
   // adaptive quality: step down fast when fps dips, climb back slowly.
