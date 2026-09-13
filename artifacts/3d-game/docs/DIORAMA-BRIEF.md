@@ -771,3 +771,35 @@ rather than DIAGNOSES. What is left, in order:
    the three that already pass.
 6. **A "the object has something on it" bar** — skylark passes every test above and
    is still an empty field.
+
+---
+
+## 18 · A PRE-EXISTING FAILURE THE PUSH GATE HAS NEVER RUN
+
+Chunking the gate surfaced this and then nearly mis-attributed it.
+
+`qa/gate.mjs` registers `opening` on the push profile (maple only) and
+`opening:<world>` for all six on **live** only. Its `--only` filter *replaced* the
+profile filter rather than narrowing it, and a name also matches its per-world
+children — so `--profile=push --only=opening` silently ran six live-only steps.
+**Five failed, and it read as a regression from this branch's work.**
+
+**It is not.** Verified by building commit `835b90c` — the last 44/44 push gate,
+before any of today's changes — in a worktree and running it there:
+
+| bar | at 835b90c | on HEAD |
+|---|---|---|
+| A1 clock ticks before the first touch | **2.996 s** (want 0) | 3.082 s |
+| A5 descent duration | **929 ms** (want 1100–1300) | 932 ms |
+
+Identical. The filter is fixed (`--only` now narrows the profile; use
+`--profile=live` to reach live steps), so this cannot be misread again.
+
+**But the finding is real and should not be lost.** On the five worlds reached by
+a world switch — that is, every world except the one that never reloads — the
+match clock has already run ~3 seconds before the child's first touch, and the
+opening descent is ~930 ms against an authored 1100–1300. She loses three seconds
+of a 180-second match before she can steer, and the establishing shot is a quarter
+too fast. `qa/opening.mjs` was written to catch exactly this and has been saying so
+on the live profile. Out of scope here; recorded so it is not rediscovered a third
+time.

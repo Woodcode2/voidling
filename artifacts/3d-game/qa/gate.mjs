@@ -641,8 +641,21 @@ const SELFTEST = [
     why: 'a probe that hangs is killed and read as a fail, not left to stall the gate' },
 ];
 
+// ── --only NARROWS THE PROFILE. IT DOES NOT REPLACE IT. ─────────────────────
+// This read `ONLY.length ? <name match> : <profile match>`, so naming a step
+// dropped the profile filter entirely — and because a name also matches its
+// per-world children (`opening` matches `opening:pirate`), `--only=opening` on
+// the PUSH profile silently ran six LIVE-only steps the push gate has never run.
+// Five of them failed, on a build where they had always failed, and it read as a
+// regression in the run that pulled them in. That cost a worktree, a second build
+// and a diagnosis to establish "not mine".
+//
+// A profile is the claim being made ("this is what has to be true to push"), and
+// a filter should never widen it. `--profile=live --only=opening` is how you ask
+// for the live ones.
 const chosen = args.includes('--selftest') ? SELFTEST
-  : SUITE.filter(s => (ONLY.length ? ONLY.some(o => s.id === o || s.id.startsWith(o + ':')) : s.profiles.includes(PROFILE)));
+  : SUITE.filter(s => s.profiles.includes(PROFILE)
+      && (!ONLY.length || ONLY.some(o => s.id === o || s.id.startsWith(o + ':'))));
 
 if (LIST) {
   console.log(`\n  GATE — profile "${PROFILE}", ${chosen.length} step(s)\n`);
