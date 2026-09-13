@@ -572,9 +572,18 @@ prediction was exact.
 It reads **1** on every world on both sides. Not a sampling error — the max over 40
 frames is still 1. `renderer.info.render.calls` after a `composer.render()` reports
 only the LAST pass, and that pass is a fullscreen quad. **Whenever bloom is on, that
-hook returns 1 and means nothing.** No cost figure in this section, because there is
-no honest one to give; the diorama's cost has to be taken in the day-9 unit
-(composer/2 + shadow/4) before anything ships.
+hook returns 1 and means nothing.** No cost figure in this section, because none had
+been taken.
+
+**CORRECTION (§18):** I went on to write that no honest cost figure was *possible*
+yet. That was wrong — `qa/menucost.mjs` has solved this since day 1, and its
+header states the exact trap above in as many words: *"on a rung carrying bloom
+the composer makes about fifteen of those per animation frame, so a naive read
+returns the cost of the LAST post pass — usually 1."* It turns `autoReset` off,
+uses `animate()`'s own frame count as the unit, samples both shadow parities, and
+A/Bs on ONE page load via `__menuOptim`. **The instrument existed and I did not
+look for it before declaring there was none.** `qa/_diocost.mjs` borrows its
+method verbatim and changes only the axis — `__dio` instead of `__menuOptim`.
 
 ---
 

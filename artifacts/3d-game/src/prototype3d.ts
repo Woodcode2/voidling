@@ -1043,7 +1043,7 @@ function deriveStage(): MenuStage {
  *  135-218 px band he reads at today. The form pin (MENU_VSTAGE) is what makes
  *  r=12 spendable: without it, stageFor(12) is 4 and the picker would show a
  *  creature nobody earned, with a white flash and a screen shake to announce it. */
-const DIORAMA = (() => { try { return new URLSearchParams(location.search).get('dio') === '1'; } catch { return false; } })();
+let DIORAMA = (() => { try { return new URLSearchParams(location.search).get('dio') === '1'; } catch { return false; } })();
 /** Half a city block in world units. island.ts: BLOCK_SIZE 1600 at SCALE 0.05 is
  *  80 3D units, and STRIDE 1710 makes the pitch 85.5 — 46 is the block plus its
  *  roads, which is the unit the eye reads as "a piece of town". */
@@ -2819,6 +2819,7 @@ const _dbg = new Proxy(_dbgStore, {
   __heroPoint: () => { x: number; z: number } | null;
   __menuState: () => Record<string, unknown>;
   __menuOptim: (on: boolean) => boolean;
+  __dio: (on: boolean) => boolean;
   __kindTally: () => Record<string, number>;
   __dailyDue: () => unknown;
   __claimDaily: () => unknown;
@@ -3208,6 +3209,14 @@ _dbg.__menuCam = (c) => {
 // island.
 // the A/B switch for the menu's three savings — see menuOptim's own note
 _dbg.__menuOptim = (on: boolean): boolean => (menuOptim = !!on);
+/** QA: FLIP THE DIORAMA ON A LIVE PAGE, the same shape as __menuOptim above and
+ *  for the same reason. The island re-rolls its prop scatter and its stage
+ *  azimuth on every load, so two page loads are two different worlds and any
+ *  cost difference smaller than that spread is a claim about the scatter —
+ *  measured, single runs of ONE build came back 233, 269 and 274 calls a frame.
+ *  The A and the B have to be the same page. Re-enters the menu so the camera,
+ *  the hero's mark and the shadow pin all take. */
+_dbg.__dio = (on: boolean): boolean => { DIORAMA = !!on; if (menuMode) enterMenu(); return DIORAMA; };
 _dbg.__menuState = () => {
   const ms = menuStage ?? { az: 0, amp: 0, period: 1, x: 0, z: 0, dist: 0, h: 0, lookY: 0, blocked: -1 };
   return {
