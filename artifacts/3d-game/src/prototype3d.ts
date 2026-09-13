@@ -1694,11 +1694,37 @@ function fadeOccluders(dt: number): void {
     const px = m.position.x - _foCam.x, py = m.position.y - _foCam.y, pz = m.position.z - _foCam.z;
     // distance ALONG the camera->hero axis
     const t = px * _foDir.x + py * _foDir.y + pz * _foDir.z;
-    if (t <= 0 || t >= camToHero) continue;          // behind the camera, or past the hero
+    // ── A PROP'S NEAR FACE IS WHAT OCCLUDES, NOT ITS CENTRE ──────────────────
+    // This read `t <= 0 || t >= camToHero`, testing the prop's CENTRE against the
+    // hero's centre with no allowance for how big the prop is — while the
+    // perpendicular test three lines down has carried a `+ e.radius` allowance
+    // all along. So a LARGE prop whose centre sits just past the hero was
+    // classified "behind him" and skipped, with half its bulk still in front of
+    // his face.
+    //
+    // MEASURED on the live menu (qa/_fadeable.mjs), three worlds, one shape:
+    //
+    //   powder   lodge   r 10.5   t 87.3 vs camToHero 85.3  -> skipped
+    //   lantern  pagoda  r 11.0   t 91.4 vs camToHero 89.5  -> skipped
+    //   pirate   palm    r 10.0   t 83.1 vs camToHero 81.2  -> skipped
+    //
+    // Each centre is about two units past him and each prop is ten units across,
+    // so roughly eight units of building stood between the lens and the hero
+    // while the one mechanism built to prevent that declined to look at it.
+    // Every one of those three props CAN fade — they are in edibles, they carry
+    // fadeTo, userData.fade is armed — and all three measured a fade of exactly
+    // 1: fully solid. qa/_dioocc.mjs put numbers on the result: the hero is 100%
+    // covered on pirate, lantern and powder on the SHIPPED menu, and what a child
+    // sees there is the x-ray ghost rather than her character.
+    //
+    // The near face is at `t - r` and the far face at `t + r`. A prop occludes if
+    // any of it lies between the lens and the hero.
+    const er = e.radius || 1;
+    if (t + er <= 0 || t - er >= camToHero) continue;   // wholly behind the lens, or wholly past the hero
     // perpendicular distance from that axis
     const cx = px - _foDir.x * t, cy = py - _foDir.y * t, cz = pz - _foDir.z * t;
     const perp2 = cx * cx + cy * cy + cz * cz;
-    const reach = shield + (e.radius || 1);
+    const reach = shield + er;
     if (perp2 > reach * reach) continue;
     _foFading.add(e);
   }
