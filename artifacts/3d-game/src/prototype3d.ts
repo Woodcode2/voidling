@@ -1195,6 +1195,34 @@ function menuVoidR(dist: number): number {
  *  enterMenu. Not before it has been measured. */
 const DIO_MARK = 16;
 
+/** ── THE CAST LIST: WHAT THE DIORAMA CAMERA CANNOT RESOLVE ──────────────────
+ *
+ *  MEASURED (qa/_diocost.mjs, A/B on one page load): the diorama frame costs
+ *  2.10x today's menu frame, mean over six worlds — maple 2.14x, pirate 2.75x,
+ *  skylark 2.04x. Day 9 HALVED that frame and the saving is not to be given back,
+ *  so this is not an optimisation looking for a justification; it is the bill.
+ *
+ *  At 178 units the scale is 9.12 px per world unit, so a prop of radius under 1
+ *  is under 18 px across and is street speckle — a bin, a bollard, a cone. It
+ *  costs a draw call and contributes nothing a child can see.
+ *
+ *  A LAYERS BIT, NOT `visible = false`, and the reason is not the one the brief
+ *  gave. Three's `objects.update()` — the geometry upload — sits behind the
+ *  visible check, the layers test AND the frustum test alike, so all three
+ *  suppress the upload equally and `info.memory.geometries` only ever decrements
+ *  on dispose. Layers is right for a different reason: `visible` is live game
+ *  state that deriveStage filters on (it skips `!m.visible` when building its
+ *  blocker list), so borrowing it would silently re-score the shot. Nothing in
+ *  src has ever written a layer bit — it is an unclaimed channel.
+ *
+ *  KNOWN AND ACCEPTED: the layers test in `renderObject` is against the VIEW
+ *  camera, not the shadow camera, so a cast-off prop still casts. At radius < 1
+ *  under a shadow box pinned to 46 units that shadow is sub-pixel, but it is a
+ *  real asymmetry and it is written down rather than discovered later. */
+const DIO_CAST_R = 1.0;
+/** Shared empty, so the 3,200-odd props too big to cast off allocate nothing. */
+const EMPTY_CAST: THREE.Mesh[] = [];
+
 function dioCam(lookY: number): { dist: number; h: number; lookAhead: number } {
   const frameH = (DIO_HALF * 2) / DIO_FILL;
   const dist = frameH / (2 * Math.tan(32 * Math.PI / 360));
@@ -1306,6 +1334,15 @@ function enterMenu(): void {
   // block stays centred; he moves toward the camera until the sight line is
   // clear. See DIO_MARK for why that is a derived constant and not a search.
   dioMark = dio ? DIO_MARK : 0;
+  // ── THE CAST LIST, APPLIED ────────────────────────────────────────────────
+  // Both branches, because __dio(false) re-enters the menu and has to put them
+  // back — and because leaveMenu's own mirror only fires from a match, not from
+  // a runtime flip. Layer 0 is three's default and the only one anything in this
+  // codebase uses, so disabling it takes the mesh off every camera.
+  for (const e of edibles) {
+    if (!e.castOff) continue;
+    for (const m of e.castOff) { if (dio) m.layers.disable(0); else m.layers.enable(0); }
+  }
   const markX = st.x + Math.sin(rad0) * dioMark;
   const markZ = st.z + Math.cos(rad0) * dioMark;
   voidState.x = markX; voidState.z = markZ;
@@ -1335,6 +1372,9 @@ function leaveMenu(): void {
   // at eighty units; without this the match begins with a void the size of a
   // house, eating the town on the first frame. MEASURED by qa/levels.mjs (k):
   // PLAY started a match at r 3.22 against a start of 0.9.
+  // …AND THE CAST LIST. A prop taken off the diorama's camera must be back on the
+  // match's, and this is the one place every path into a match passes through.
+  for (const e of edibles) if (e.castOff) for (const m of e.castOff) m.layers.enable(0);
   voidling.setRadius(START_R);
   // …AND HIS PLACE. This one is worse, and the gate is what found it.
   // enterMenu parks him on the camera's stage, which is a corner of the island
@@ -2032,7 +2072,10 @@ function applyQuality() {
 // ── edibles + island ─────────────────────────────────────────────────────────
 interface Edible { mesh: THREE.Object3D; radius: number; eaten: boolean; t: number; orbit: number; orbitR: number; spin: THREE.Vector3; home: THREE.Vector3; homeScale: THREE.Vector3; homeRotY: number;
   /** the objects that actually carry a fade uniform — see addEdible */
-  fadeTo?: THREE.Object3D[]; }
+  fadeTo?: THREE.Object3D[];
+  /** the MESHES of a prop too small to read at the diorama camera — see
+   *  DIO_CAST_R. Undefined on anything big enough to be in the shot. */
+  castOff?: THREE.Mesh[]; }
 const edibles: Edible[] = [];
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 function addEdible(mesh: THREE.Object3D, radius: number) {
@@ -2051,11 +2094,23 @@ function addEdible(mesh: THREE.Object3D, radius: number) {
   // Resolved once, here, because a per-frame traverse over 5,600 props to find
   // out is the kind of cost this feature was explicitly designed to avoid.
   const fadeTo: THREE.Object3D[] = [];
-  mesh.traverse((o) => { if (o.userData.fade !== undefined) fadeTo.push(o); });
+  // ── AND WHAT THE DIORAMA CAMERA CANNOT RESOLVE ───────────────────────────
+  // Collected in the SAME traverse, because a second walk over ~5,600 props is
+  // the kind of cost this whole feature exists to avoid. See DIO_CAST_R.
+  const castOff: THREE.Mesh[] = radius < DIO_CAST_R ? [] : EMPTY_CAST;
+  mesh.traverse((o) => {
+    if (o.userData.fade !== undefined) fadeTo.push(o);
+    // MESHES, not the group. three's projectObject returns early on
+    // `visible === false` but walks children OUTSIDE that branch, and the
+    // layers test sits beside it — so a bit set on a Group is a no-op and the
+    // subtree renders anyway. Verified against three.module.js:17825-17831.
+    if (castOff !== EMPTY_CAST && (o as THREE.Mesh).isMesh && !(o as THREE.InstancedMesh).isInstancedMesh) castOff.push(o as THREE.Mesh);
+  });
   if (radius >= 2.5 && !mesh.userData.mover) mesh.userData.building = true;   // building-class: may NEVER be translated by FX
   edibles.push({ mesh, radius, eaten: false, t: 0, orbit: 0, orbitR: 0, spin: new THREE.Vector3(),
     home: mesh.position.clone(), homeScale: mesh.scale.clone(), homeRotY: mesh.rotation.y,
-    fadeTo: fadeTo.length ? fadeTo : undefined });
+    fadeTo: fadeTo.length ? fadeTo : undefined,
+    castOff: castOff !== EMPTY_CAST && castOff.length ? castOff : undefined });
 }
 
 // ── WORLD SELECT ────────────────────────────────────────────────────────────
