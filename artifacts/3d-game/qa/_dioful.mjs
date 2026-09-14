@@ -63,6 +63,7 @@ const BAND = 0.55;   // top fraction of the canvas the UI does not cover
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 const rows = [];
+let azBad = 0;
 try {
 for (const w of WORLDS) for (const dio of [1, 0]) {
   const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });
@@ -78,7 +79,16 @@ for (const w of WORLDS) for (const dio of [1, 0]) {
   // so without this the azimuth differs every run — worth more than 5 points of
   // fullness on maple, which is more than the scrim correction below.
   await p.evaluate(() => window.__menuFreeze(0));
-  await p.waitForFunction(() => window.__menuState().menuT === 0, null, { timeout: 120000 });
+  // WAIT FOR THE CAMERA, NOT FOR menuT. __menuFreeze writes menuT synchronously,
+  // so a wait on `menuT === 0` passes before any frame has run and the shot is
+  // taken on the STALE pre-freeze azimuth. That is exactly what happened on the
+  // first attempt: skylark's authored azimuth is 210 and it measured 212.43 and
+  // 212.35, which is 1.5s of drift still applied. With menuT pinned at 0 the
+  // drift term is 7*sin(0), so stageCam.az must equal the authored a0 exactly.
+  await p.waitForFunction(() => {
+    const m = window.__menuState();
+    return m.azimuth !== null && Math.abs(m.azimuth - m.a0) < 0.01;
+  }, null, { timeout: 180000 });
 
   const r = await p.evaluate((band) => {
     const scene = window.__scene, cam = window.__cam;
@@ -141,11 +151,13 @@ for (const w of WORLDS) for (const dio of [1, 0]) {
       inBand++;
       cell.add(Math.min(GX - 1, Math.floor(sx * GX)) + ',' + Math.min(GY - 1, Math.floor((sy / band) * GY)));
     }
-    return { az: window.__menuState().azimuth, propsPct: n ? +(100 * diff / n).toFixed(1) : 0,
+    const _ms = window.__menuState();
+    return { az: _ms.azimuth, azErr: +Math.abs(_ms.azimuth - _ms.a0).toFixed(3), propsPct: n ? +(100 * diff / n).toFixed(1) : 0,
       seenPct: wAll ? +(100 * wDiff / wAll).toFixed(1) : 0, inBand,
       spreadPct: +(100 * cell.size / (GX * GY)).toFixed(0), band: n, edibles: eds.length };
   }, BAND);
   rows.push({ w, dio, ...r });
+  if (r.azErr > 0.01) { console.log(`  !! ${w} dio=${dio} measured at az ${r.az}, authored ${r.az - r.azErr} — THE FREEZE DID NOT HOLD`); azBad++; }
   console.log(`  ${w.padEnd(8)} dio=${dio}  az ${String(r.az).padStart(6)}  area ${String(r.propsPct).padStart(5)}%  SEEN ${String(r.seenPct).padStart(5)}%  count ${String(r.inBand).padStart(4)}  spread ${String(r.spreadPct).padStart(3)}% of 48 cells`);
   await p.close();
 }
@@ -157,6 +169,13 @@ for (const w of WORLDS) {
   const a = rows.find((r) => r.w === w && r.dio === 1), c = rows.find((r) => r.w === w && r.dio === 0);
   if (!a || !c) continue;
   console.log(`${w.padEnd(9)} ${String(a.propsPct).padStart(5)} ${String(c.propsPct).padStart(6)} ${String(a.seenPct).padStart(6)} ${String(c.seenPct).padStart(6)} ${String(a.inBand).padStart(6)} ${String(c.inBand).padStart(6)} ${String(a.spreadPct).padStart(8)} ${String(c.spreadPct).padStart(7)}`);
+}
+// A SHOT TAKEN ON A DRIFTING CAMERA IS NOT A MEASUREMENT. If the freeze did not
+// hold, the numbers above are from an unknown azimuth and comparing them to a
+// floor, or to each other, means nothing. Refuse to grade rather than grade wrong.
+if (azBad) {
+  console.log(`\nFAIL — ${azBad} shot(s) were taken on a camera that was still drifting; the numbers above are not comparable`);
+  process.exit(1);
 }
 // THE FLOOR, on area, at the break the six numbers showed: 35%.
 const FLOOR = 35;
