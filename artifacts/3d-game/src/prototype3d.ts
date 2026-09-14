@@ -1206,6 +1206,20 @@ const DIO_MARK = 16;
  *  is under 18 px across and is street speckle — a bin, a bollard, a cone. It
  *  costs a draw call and contributes nothing a child can see.
  *
+ *  A REFINEMENT THAT WAS TRIED AND MEASURED WORSE, recorded so it is not tried
+ *  again. "Too small to see" ought to mean SCREEN size rather than world radius,
+ *  since a small prop near the lens is larger on screen than a big one far away —
+ *  so the cut was moved to projected pixels (the same formula void3d uses for its
+ *  LOD ladder), keeping near speckle and dropping distant speckle. It performed
+ *  worse on both counts that matter:
+ *
+ *      maple    cost 1.21x -> 1.68x     fullness 37.3% -> 37.6%
+ *      skylark  cost 1.70x -> 1.51x     fullness  39.0% -> 39.0%
+ *
+ *  Maple's frame carries a lot of NEAR speckle, so keeping it gave back half the
+ *  saving for three tenths of a point of picture. The principled rule lost to the
+ *  blunt one, and the blunt one is also less code.
+ *
  *  A LAYERS BIT, NOT `visible = false`, and the reason is not the one the brief
  *  gave. Three's `objects.update()` — the geometry upload — sits behind the
  *  visible check, the layers test AND the frustum test alike, so all three
