@@ -864,3 +864,50 @@ of a 180-second match before she can steer, and the establishing shot is a quart
 too fast. `qa/opening.mjs` was written to catch exactly this and has been saying so
 on the live profile. Out of scope here; recorded so it is not rediscovered a third
 time.
+
+---
+
+## 19 · THE DIORAMA COSTS 2.10x TODAY'S MENU FRAME — AND DAY 9 HALVED IT
+
+`qa/_diocost.mjs`, all six worlds, **A/B on one page load** via `__dio` so the
+island's scatter cannot move between the samples, `info.autoReset` off so the
+composer's ~15 renders per frame accumulate, `animate()`'s own frame count as the
+unit, and OFF → DIORAMA → OFF so the third sample controls the first.
+
+| world | menu | diorama | ratio | tris menu → diorama | control drift |
+|---|---|---|---|---|---|
+| maple | 288 | 617 | **2.14x** | 94,546 → 173,705 | 5.2% |
+| pirate | 284 | 781 | **2.75x** | 110,294 → 221,356 | 0.4% |
+| gameday | 351 | 530 | **1.51x** | 112,658 → 126,943 | 1.1% |
+| lantern | 550 | 979 | **1.78x** | 143,252 → 171,245 | 0.0% |
+| powder | 223 | 536 | **2.40x** | 54,497 → 102,363 | 8.5% |
+| skylark | 540 | 1101 | **2.04x** | 144,050 → 218,430 | 9.4% |
+
+**Mean 2.10x over six stable worlds.** Every control sample returned within 10%, so
+no row is thrown out.
+
+**Day 9 halved this frame and the saving is not to be given back. The diorama gives
+back all of it and a little more.** That is a standing constraint, not a preference,
+and this is the first number that tests it.
+
+### 19.1 What it settles
+
+**The cast list is required, not a premature optimisation.** I deferred it twice on
+the grounds that optimising before measuring is backwards, and asked the design pass
+to argue it either way. The measurement answers it: 2.10x has to come down before
+the diorama can ship off the flag.
+
+**Skylark is paying the most to show the least** — 1101 calls a frame, the highest
+of any world, for the frame that scores 29.7% on the fullness bar and reads as an
+empty field. It is simultaneously the worst picture and the dearest one.
+
+**Gameday is the cheapest ratio at 1.51x** and is also the best frame. Whatever it
+is doing, it is the reference for the other five.
+
+### 19.2 What it does not say
+
+These are **draw calls and triangles** — what the CPU submits, which is
+renderer-independent and meaningful under swiftshader. **Frame TIME is not**, and
+none is quoted. A phone's actual cost also depends on fill rate and shader work,
+which this does not measure. The ratio is the honest claim; a millisecond figure
+needs the device day (MENU-BRIEF §6 day 15).
