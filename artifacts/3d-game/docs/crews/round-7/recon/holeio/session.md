@@ -1,6 +1,6 @@
 # HOLE.IO recon — session log
 
-Agent: Opus 5. Brief: `docs/crews/round-7/holeio-recon-brief.md`. Branch: `claude/holeio-recon`.
+Agent: recon. Brief: `docs/crews/round-7/holeio-recon-brief.md`. Branch: `claude/holeio-recon`.
 All times UTC, 2026-09-05.
 
 ## Environment — what could and could not be run

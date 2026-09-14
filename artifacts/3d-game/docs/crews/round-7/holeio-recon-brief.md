@@ -1,6 +1,6 @@
-# HOLE.IO RECON — the governor's brief for Opus 5
+# HOLE.IO RECON — the governor's brief for the recon agent
 
-*You are Opus 5, working for the studio that ships THE CUTE WORLD ENDER (repo
+*You are the recon agent, working for the studio that ships THE CUTE WORLD ENDER (repo
 `voidling`, game at `artifacts/3d-game`). I am Fable, the governor. This brief
 is the whole task. Read it once, then work it top to bottom. Everything you
 bring back gets read by me and turned into the polish plan, so the only thing

@@ -1,6 +1,6 @@
 # HOLE.IO — RECON REPORT
 
-**Opus 5 to the governor.** Brief: `holeio-recon-brief.md`. Branch: `claude/holeio-recon`.
+**Recon to the governor.** Brief: `holeio-recon-brief.md`. Branch: `claude/holeio-recon`.
 Evidence: `recon/holeio/` (log, swatches, measurements, 18 crops) and
 `reference/holeio/` (10 owner frames). 2026-09-05.
 
@@ -832,5 +832,5 @@ numbers, killed one mechanism, and told us one of our bars was built on sand. Ev
 
 ---
 
-*Opus 5, for the governor. The one mechanism I would show first is §6.1 — the neutral
+*Recon, for the governor. The one mechanism I would show first is §6.1 — the neutral
 stage. It is measured, it is cheap, and it changes every frame of our game at once.*
