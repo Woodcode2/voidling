@@ -91,13 +91,35 @@ for (const w of WORLDS) for (const dio of [1, 0]) {
     for (let i = 0; i < eds.length; i++) eds[i].mesh.visible = was[i];
     RR(scene, cam);
 
+    // THE SCRIM. body.diorama #menu (index.html:1223-1226) is a 180deg gradient
+    // laid over the canvas at z-index 10, inset 0. It is OPAQUE at the top of the
+    // screen and fully clear only between 44% and 54% of the height. Every probe
+    // in this directory grabs gl.readPixels off the bare context, so none of them
+    // has ever seen it. Counting a prop at 5% of screen height the same as one at
+    // 48% credits a world for pixels the child cannot see through violet.
+    // Stops, as (fraction from top, alpha), read straight off the rule:
+    const STOPS = [[0, 1], [0.15, 0.92], [0.30, 0.38], [0.44, 0], [0.54, 0], [0.68, 0.55], [0.82, 0.93], [1, 1]];
+    const seeAt = (f) => {            // transmittance: how much of this row reaches the eye
+      for (let k = 1; k < STOPS.length; k++) {
+        if (f <= STOPS[k][0]) {
+          const [f0, a0] = STOPS[k - 1], [f1, a1] = STOPS[k];
+          const t = f1 === f0 ? 0 : (f - f0) / (f1 - f0);
+          return 1 - (a0 + (a1 - a0) * t);
+        }
+      }
+      return 0;
+    };
+
     // readPixels is bottom-up, so the TOP band of the screen is the HIGH rows
     const y0 = Math.floor(H * (1 - band));
-    let n = 0, diff = 0;
+    let n = 0, diff = 0, wAll = 0, wDiff = 0;
     const D = 10;
-    for (let y = y0; y < H; y++) for (let x = 0; x < W; x++) {
-      const i = (y * W + x) * 4; n++;
-      if (Math.abs(A[i] - B[i]) > D || Math.abs(A[i + 1] - B[i + 1]) > D || Math.abs(A[i + 2] - B[i + 2]) > D) diff++;
+    for (let y = y0; y < H; y++) {
+      const see = seeAt(1 - (y + 0.5) / H);       // same row for the whole scanline
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4; n++; wAll += see;
+        if (Math.abs(A[i] - B[i]) > D || Math.abs(A[i + 1] - B[i + 1]) > D || Math.abs(A[i + 2] - B[i + 2]) > D) { diff++; wDiff += see; }
+      }
     }
     // HOW MANY DISTINCT PROPS ARE IN THE BAND. Projected centres, so a prop is
     // counted once whatever its size — which is the whole point of having this
@@ -114,21 +136,22 @@ for (const w of WORLDS) for (const dio of [1, 0]) {
       inBand++;
       cell.add(Math.min(GX - 1, Math.floor(sx * GX)) + ',' + Math.min(GY - 1, Math.floor((sy / band) * GY)));
     }
-    return { propsPct: n ? +(100 * diff / n).toFixed(1) : 0, inBand,
+    return { propsPct: n ? +(100 * diff / n).toFixed(1) : 0,
+      seenPct: wAll ? +(100 * wDiff / wAll).toFixed(1) : 0, inBand,
       spreadPct: +(100 * cell.size / (GX * GY)).toFixed(0), band: n, edibles: eds.length };
   }, BAND);
   rows.push({ w, dio, ...r });
-  console.log(`  ${w.padEnd(8)} dio=${dio}  area ${String(r.propsPct).padStart(5)}%  count ${String(r.inBand).padStart(4)}  spread ${String(r.spreadPct).padStart(3)}% of 48 cells`);
+  console.log(`  ${w.padEnd(8)} dio=${dio}  area ${String(r.propsPct).padStart(5)}%  SEEN ${String(r.seenPct).padStart(5)}%  count ${String(r.inBand).padStart(4)}  spread ${String(r.spreadPct).padStart(3)}% of 48 cells`);
   await p.close();
 }
 } finally { await b.close(); }
 
-console.log('\nworld         area%        count       spread% (cells of 48 with a prop)');
-console.log('            dio  today    dio  today      dio   today');
+console.log('\nworld         area%       SEEN%        count       spread% (cells of 48 with a prop)');
+console.log('            dio  today    dio  today    dio  today      dio   today');
 for (const w of WORLDS) {
   const a = rows.find((r) => r.w === w && r.dio === 1), c = rows.find((r) => r.w === w && r.dio === 0);
   if (!a || !c) continue;
-  console.log(`${w.padEnd(9)} ${String(a.propsPct).padStart(5)} ${String(c.propsPct).padStart(6)} ${String(a.inBand).padStart(6)} ${String(c.inBand).padStart(6)} ${String(a.spreadPct).padStart(8)} ${String(c.spreadPct).padStart(7)}`);
+  console.log(`${w.padEnd(9)} ${String(a.propsPct).padStart(5)} ${String(c.propsPct).padStart(6)} ${String(a.seenPct).padStart(6)} ${String(c.seenPct).padStart(6)} ${String(a.inBand).padStart(6)} ${String(c.inBand).padStart(6)} ${String(a.spreadPct).padStart(8)} ${String(c.spreadPct).padStart(7)}`);
 }
 // THE FLOOR, on area, at the break the six numbers showed: 35%.
 const FLOOR = 35;
