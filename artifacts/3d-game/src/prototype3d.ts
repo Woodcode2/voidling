@@ -902,8 +902,48 @@ interface MenuStage {
 // one is made on framing alone.
 const STAGE_SAMPLES = 24;   // azimuths tried, 15° apart
 
+/** ── THE DIORAMA'S OWN AIM, WHERE THE LANDMARK IS NOT THE SUBJECT ───────────
+ *
+ *  `COPY.hero` is the FINALE — what a match builds toward — and on four worlds it
+ *  happens to stand in a dense district, so aiming the menu at it frames a place.
+ *  On SKYLARK it does not: the whale lies in her own 0.6-density circle by
+ *  authorial intent, and the diorama frame there is an empty green field.
+ *
+ *  THE NUMBER THAT SETTLES IT, and the one I should have taken first: skylark's
+ *  frame measures **34.4% world with the hero DELETED ENTIRELY**, against
+ *  qa/_dioful.mjs's 35% floor. The ceiling is below the bar. So no hero placement
+ *  can fix it — and I spent a design pass asking for a lateral offset before
+ *  anyone measured that ceiling. On a fullness failure, measure the frame with the
+ *  hero removed FIRST; if that is under the floor, the subject is the problem and
+ *  moving the character is wasted work.
+ *
+ *  So the diorama aims at the block skylark's own file calls its densest — THE
+ *  LAUNCH FIELD (skylark.ts:165, density 1.5). Measured 42.5% ± 0.2 over two
+ *  loads, a 7.5-point margin, and the frame comes out cheaper than the old aim.
+ *
+ *  POWDER IS DELIBERATELY NOT IN THIS TABLE. It fails the same way (28.3% with the
+ *  hero deleted) and the obvious fix does not work: aiming at its village centroid
+ *  puts the BELL TOWER — the village's actual landmark, island.ts:6005 — 3.2x
+ *  outside the frame, so the new aim has no subject either. It needs its own
+ *  search around the tower at local (36.96, 117.3), graded on BOTH _dioful >= 35
+ *  and _dioocc <= 5% across several scatter rolls, and it is not this change.
+ *
+ *  The azimuth is authored with the point because it was measured with it; the
+ *  24-azimuth search below is left alone. */
+const DIO_AIM: Partial<Record<WorldId, { x: number; z: number; az: number }>> = {
+  skylark: { x: 30, z: 30, az: 210 },   // THE LAUNCH FIELD — 42.5% against a 35 floor
+};
+
 function deriveStage(): MenuStage {
-  const aim = COPY.hero ? { x: COPY.hero[0], z: COPY.hero[1] }
+  // The override enters through the SAME variable the authored hero point does,
+  // so everything downstream — subjR, dist, lookY, the blockers traverse,
+  // blocksShot, the published `blocked`, the drift, stageCam, the hero's mark,
+  // the sun and the shadow box — runs unmodified on the new point. No shared
+  // constant is relaxed, and with DIORAMA false this function is byte-identical,
+  // which is what keeps qa/levels.mjs's hard gate on `blocked` untouched.
+  const ov = DIORAMA ? DIO_AIM[pickedWorld] : undefined;
+  const aim = ov ? { x: ov.x, z: ov.z }
+    : COPY.hero ? { x: COPY.hero[0], z: COPY.hero[1] }
     : { x: island.spawn.x, z: island.spawn.z };
   // one pass over the island; everything below works on this list
   const pts: { x: number; z: number; r: number }[] = [];
@@ -1019,6 +1059,10 @@ function deriveStage(): MenuStage {
   // function exists to avoid and it has shipped twice: a hand-typed table put
   // the camera behind a building, and an edibles-only lens test let a tree fill
   // the frame. A number nobody can read is a number nobody can hold.
+  // …and an authored aim carries its own azimuth, because the two were measured
+  // together. Taken here, AFTER the search, so `blocked` below is computed for the
+  // line actually used rather than for one the diorama then discards.
+  if (ov) bestAz = ov.az;
   const radB = bestAz * Math.PI / 180;
   const blocked = blocksShot(aim.x + Math.sin(radB) * dist, aim.z + Math.cos(radB) * dist, h, lookY);
   return { x: aim.x, z: aim.z, az: bestAz, amp: 7, period: 28, dist, h, lookY, blocked };
@@ -3216,7 +3260,16 @@ _dbg.__menuOptim = (on: boolean): boolean => (menuOptim = !!on);
  *  measured, single runs of ONE build came back 233, 269 and 274 calls a frame.
  *  The A and the B have to be the same page. Re-enters the menu so the camera,
  *  the hero's mark and the shadow pin all take. */
-_dbg.__dio = (on: boolean): boolean => { DIORAMA = !!on; if (menuMode) enterMenu(); return DIORAMA; };
+_dbg.__dio = (on: boolean): boolean => {
+  DIORAMA = !!on;
+  // AND THE CACHED STAGE GOES WITH IT. menuStage is computed once per world per
+  // session, and DIO_AIM is read inside deriveStage — so without this a runtime
+  // flip keeps the aim it was first built with and qa/_diocost.mjs's A/B would
+  // silently measure the same camera twice on any world in the table.
+  menuStage = null;
+  if (menuMode) enterMenu();
+  return DIORAMA;
+};
 _dbg.__menuState = () => {
   const ms = menuStage ?? { az: 0, amp: 0, period: 1, x: 0, z: 0, dist: 0, h: 0, lookY: 0, blocked: -1 };
   return {
