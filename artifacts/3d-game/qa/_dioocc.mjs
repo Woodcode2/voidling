@@ -76,7 +76,19 @@ for (const w of WORLDS) for (const dio of [1, 0]) {
     return m.azimuth !== null && Math.abs(m.azimuth - m.a0) < 0.01;
   }, null, { timeout: 180000 });
 
-  const r = await p.evaluate(() => {
+  // OCCLUSION ON THIS MENU IS A DISTRIBUTION, NOT A NUMBER. The crowd is alive
+  // here — prototype3d.ts:1374 exists only to stop it panicking on the menu — so
+  // people walk in front of the hero and away again. With the camera frozen and
+  // the world identical, two runs still disagreed: maple 7.0% then 0%, and on the
+  // shipped menu 47.6% then 16.6%, while skylark's candidate list went 36 then 51.
+  // A frozen camera cannot explain a changing candidate list; a moving crowd can.
+  // So one shot cannot grade this, and a 5% bar on one shot is a coin toss near
+  // the line. Take several within ONE page load and report the spread.
+  const SAMPLES = 5, GAP = 1500;
+  const shots = [];
+  for (let k = 0; k < SAMPLES; k++) {
+    if (k) await p.waitForTimeout(GAP);
+    shots.push(await p.evaluate(() => {
     const T = window.__THREE, cam = window.__cam, scene = window.__scene;
     const vs = window.__voidState(), vg = window.__voidGroup();
 
@@ -173,16 +185,31 @@ for (const w of WORLDS) for (const dio of [1, 0]) {
       coveredPct: tried ? +(100 * blocked / tried).toFixed(1) : 0,
       worst: worst ? `${worst[0]} x${worst[1]}` : null,
     };
-  });
+  }));
+  }
+  const err = shots.find((x) => x.error);
+  const pcts = shots.map((x) => x.coveredPct).sort((a, b) => a - b);
+  const med = pcts.length ? pcts[Math.floor(pcts.length / 2)] : 0;
+  const byName = {};
+  for (const x of shots) if (x.worst) { const n = x.worst.split(' x')[0]; byName[n] = (byName[n] || 0) + 1; }
+  const modal = Object.entries(byName).sort((a, b) => b[1] - a[1])[0];
+  const r = err ? { error: err.error } : {
+    ...shots[shots.length - 1],
+    // THE MEDIAN IS THE VERDICT. min and max are printed so a world that is clear
+    // half the time and buried the other half cannot hide behind either one.
+    coveredPct: med, lo: pcts[0], hi: pcts[pcts.length - 1],
+    spread: +(pcts[pcts.length - 1] - pcts[0]).toFixed(1),
+    worst: modal ? `${modal[0]} in ${modal[1]}/${SAMPLES}` : null,
+  };
   rows.push({ w, dio, ...r });
   if (r.error) { console.log(`  ${w.padEnd(8)} dio=${dio}  ERROR ${r.error}`); await p.close(); continue; }
-  console.log(`  ${w.padEnd(8)} dio=${dio}  camD ${String(r.camD).padStart(5)}  mark ${String(r.mark).padStart(3)}  ${String(r.candidates).padStart(3)} could block  ${String(r.coveredPct).padStart(5)}% covered  ${r.worst ? '<- ' + r.worst : ''}`);
+  console.log(`  ${w.padEnd(8)} dio=${dio}  camD ${String(r.camD).padStart(5)}  mark ${String(r.mark).padStart(3)}  ${String(r.candidates).padStart(3)} could block  median ${String(r.coveredPct).padStart(5)}%  (${r.lo}-${r.hi}, spread ${r.spread})  ${r.worst ? '<- ' + r.worst : ''}`);
   await p.close();
 }
 } finally { await b.close(); }
 
 console.log('\nworld     % of the hero with something in front of him');
-console.log('          diorama -> today          what is in the way');
+console.log('          diorama, median (min-max) -> today, median (min-max)      what is in the way');
 let bad = 0;
 for (const w of WORLDS) {
   const a = rows.find((r) => r.w === w && r.dio === 1), c = rows.find((r) => r.w === w && r.dio === 0);
@@ -193,7 +220,7 @@ for (const w of WORLDS) {
   // DIORAMA-BRIEF.md §17.2 states the honest target: <= 5% on all six worlds.
   const flag = a.coveredPct > 5;
   if (flag) bad++;
-  console.log(`${w.padEnd(9)} ${String(a.coveredPct).padStart(5)}% -> ${String(c.coveredPct).padStart(5)}%   mark ${String(a.mark).padStart(2)}   ${(a.worst || 'nothing').padEnd(24)}${flag ? ' <-- BROKEN' : ''}`);
+  console.log(`${w.padEnd(9)} ${String(a.coveredPct).padStart(5)}% (${String(a.lo).padStart(4)}-${String(a.hi).padStart(5)}) -> ${String(c.coveredPct).padStart(5)}% (${String(c.lo).padStart(4)}-${String(c.hi).padStart(5)})   ${(a.worst || 'nothing').padEnd(22)}${flag ? ' <-- BROKEN' : ''}`);
 }
 // SILENCE IS FAILURE. Errored rows are skipped by the loop above, so without
 // this a run where every world threw would leave `bad` at 0 and print PASS over
