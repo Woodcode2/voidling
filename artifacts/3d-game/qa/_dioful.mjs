@@ -32,6 +32,41 @@
 //   skylark    29.7     620       60
 //   powder     14.5     292       67
 //
+// ── THAT TABLE WAS TAKEN ON A MOVING CAMERA. RETIRED. ──────────────────────
+//
+// Every row above was shot at an unknown azimuth: the menu drifts +/-7 degrees
+// on menuT, which is GAME time, and this probe waited WALL clock. Maple measured
+// 37.3 one morning and 31.9 that afternoon on one build — a 5.4-point swing that
+// crosses the floor in both directions, so the floor was never being tested.
+// __menuFreeze now pins the pendulum and the probe blocks until stageCam.az
+// equals the authored a0, which proves a frame has applied it. Two runs, camera
+// frozen, all six worlds, dio=1:
+//
+//   world      area%        SEEN%       count   spread%
+//   gameday   54.8  54.7   55.0  54.9     267       69
+//   pirate    49.0  49.2   37.2  37.6     427       90
+//   lantern   39.0  39.8   28.8  29.0     393       67
+//   skylark   39.4  38.8   28.5  28.1     259       98
+//   maple     35.7  36.1   28.0  28.0     255       98
+//   powder     9.1   9.4    7.8   8.1     305       71
+//
+// Worst disagreement between the two runs: 0.8 points, against 5.4 before. The
+// residue is the GLB landmarks and the crowd, which also move on game time.
+//
+// WHAT CHANGED IN THE VERDICT. Maple passes now, consistently, at 35.7-36.1 —
+// under the drifting camera it straddled the floor. Skylark passes because
+// DIO_AIM moved it to the launch field. POWDER IS THE ONLY FAILURE, and it is
+// not close: 9.1-9.4 raw, 7.8-8.1 seen, against the next worst at 28.
+//
+// SEEN% IS THE TRUER NUMBER AND THE FLOOR IS STILL ON area%. Deliberate, for one
+// reason: the 35 floor was calibrated against worlds RANKED BY EYE from
+// photographs, and those photographs were of the raw frame. Moving the bar to a
+// column nothing was ever ranked against would be swapping a calibrated number
+// for an uncalibrated one. The two columns rank the six worlds identically, so
+// nothing is being missed today. To move it: re-photograph the six through the
+// scrim, rank by eye again, and put the floor at the break in SEEN% — which on
+// these numbers looks like 20, isolating powder at 8 from maple at 28.
+//
 // Ranked by eye from the photographs: gameday and lantern are the best frames,
 // maple and pirate are good, POWDER lost its subject when the hero stepped in
 // front of the lodge, and SKYLARK is an empty field.
