@@ -20,34 +20,38 @@
 // content nobody can see. The band is the top 55% of the canvas, which is where
 // the panel's top edge sits (~CSS y 536 of 932 on the shot decode).
 //
-// ── AND THE FIRST RUN SHOWED THE PIXEL SHARE IS NOT THE WHOLE QUESTION ─────
-// Measured: powder 13.8%, skylark 30.2%, maple 33.1%, lantern 41.7%, pirate
-// 51.4%, gameday 56.3%. Powder being lowest matches the photograph exactly. But
-// SKYLARK CAME BACK MID-PACK, and higher than its own 24.1% on today's menu —
-// while by eye it is an empty green field. The measure is honest and it is not
-// the question: a single long barrier covering 30% of the frame scores the same
-// as thirty varied props covering 30%. Pixel share is COVERAGE, not INTEREST.
+// ── THREE AXES WERE MEASURED. AREA IS THE ONE THAT MATCHES THE EYE. ────────
 //
-// So a second number, on the axis that actually separates them: how many
-// DISTINCT props have their centre inside the visible band. One big thing and
-// many small things are the same area and very different pictures, and a floor
-// set on area alone would have passed skylark and called it done.
+// All six worlds, diorama camera:
 //
-// ── AND THE COUNT WAS NOT IT EITHER ────────────────────────────────────────
-// Skylark came back with 622 distinct props in the band against today's 49 — so
-// the frame is not empty by count, and it is still an empty green field to look
-// at. Those 622 are a distant crowd clustered on the horizon; the middle of the
-// picture, where the hero is, has nothing in it.
+//   world     area%   count   spread%
+//   gameday    56.1     271       69
+//   pirate     51.0     425       88
+//   lantern    41.3     382       67
+//   maple      39.4     251       98
+//   skylark    29.7     620       60
+//   powder     14.5     292       67
 //
-// The axis that matches the eye is DISTRIBUTION. A 6x8 grid over the band, and
-// the fraction of cells holding at least one prop: props packed into two rows
-// score low however many there are, props spread across the frame score high.
-// Three numbers now — area, count, spread — because the first two each looked
-// sufficient and each passed the one world this bar exists for.
+// Ranked by eye from the photographs: gameday and lantern are the best frames,
+// maple and pirate are good, POWDER lost its subject when the hero stepped in
+// front of the lodge, and SKYLARK is an empty field.
 //
-// NO THRESHOLD IS SET IN THIS FILE YET, deliberately. Picking a floor before
-// seeing the six numbers is how a bar ends up passing exactly what it was written
-// beside. It prints, and the floor goes in once there is a spread to put it in.
+//   AREA separates them exactly. Powder and skylark are the bottom two and there
+//   is a clean break at 29.7 -> 39.4. The floor goes here, at 35%.
+//   COUNT is actively misleading: skylark has the MOST props in frame of any
+//   world, 620, because a distant crowd is packed onto its horizon while the
+//   middle of the picture is bare.
+//   SPREAD is close but cannot tell lantern from powder — both 67, and one is the
+//   best frame in the game while the other is the worst.
+//
+// A CORRECTION TO WHAT THIS FILE SAID BEFORE. Its previous header claimed the
+// area measure "passed skylark" and was therefore insufficient. That was wrong,
+// and it came from reading a partial table: skylark's 29.7 is SECOND LOWEST of
+// the six, and I called it mid-pack while only its own row and today's column
+// were in front of me. Measure 1 was sufficient from the start. The count and
+// spread axes stay because they are cheap and because the count number is worth
+// keeping visible — "620 props and still empty" is the clearest statement of what
+// is wrong with skylark that this probe can make.
 //
 //   node qa/_dioful.mjs [port] [world]
 import { chromium } from 'playwright';
@@ -126,9 +130,16 @@ for (const w of WORLDS) {
   if (!a || !c) continue;
   console.log(`${w.padEnd(9)} ${String(a.propsPct).padStart(5)} ${String(c.propsPct).padStart(6)} ${String(a.inBand).padStart(6)} ${String(c.inBand).padStart(6)} ${String(a.spreadPct).padStart(8)} ${String(c.spreadPct).padStart(7)}`);
 }
+// THE FLOOR, on area, at the break the six numbers showed: 35%.
+const FLOOR = 35;
 const d = rows.filter((r) => r.dio === 1);
+let bad = 0;
 if (d.length) {
-  const f = (k) => `${Math.min(...d.map((r) => r[k]))} to ${Math.max(...d.map((r) => r[k]))}`;
-  console.log(`\nacross the diorama: area ${f('propsPct')}%, count ${f('inBand')}, spread ${f('spreadPct')}%`);
-  console.log('the floor goes on the axis that separates the worlds the eye separates — not before that is clear');
+  for (const r of d) if (r.propsPct < FLOOR) { bad++;
+    console.log(`\n  ${r.w}: ${r.propsPct}% of the visible band is world, against a floor of ${FLOOR}%` +
+      (r.inBand > 400 ? ` — and ${r.inBand} props are in frame, so this is not a shortage of things. They are not where the picture needs them.` : '')); }
+  console.log(bad
+    ? `\nFAIL — ${bad} world(s) frame too little of themselves to be worth looking at`
+    : `\nPASS — every world fills at least ${FLOOR}% of the visible band with itself`);
 }
+process.exit(bad ? 1 : 0);
