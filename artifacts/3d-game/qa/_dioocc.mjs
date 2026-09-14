@@ -99,7 +99,18 @@ for (const w of WORLDS) for (const dio of [1, 0]) {
       bs.copy(o.geometry.boundingSphere).applyMatrix4(o.matrixWorld);
       tmp.subVectors(bs.center, cam.position);
       const t = tmp.dot(axis);
-      if (t <= 0 || t >= camD + HR) return;                 // behind the lens, or past him
+      // THE NEAR FACE IS WHAT OCCLUDES, NOT THE CENTRE. This test used to be
+      // `t <= 0 || t >= camD + HR`, which drops a prop whose bounding-sphere
+      // CENTRE is past the hero even when its near face is still between him and
+      // the lens. That is the exact bug that was found and fixed in the shipped
+      // fadeOccluders (src/prototype3d.ts:1925) after it was measured skipping
+      // Powder's lodge, Lantern's pagoda and Pirate's palm; the probe kept the
+      // broken form and so could not have seen those three either. A prop is out
+      // of the running only if it is WHOLLY behind the lens or WHOLLY past the
+      // hero's far surface. Being generous here costs nothing but time: the
+      // raycast below has rc.far = len - 0.05, so a prop that does not actually
+      // reach him cannot register a hit.
+      if (t + bs.radius <= 0 || t - bs.radius >= camD + HR) return;
       const perp = Math.sqrt(Math.max(0, tmp.lengthSq() - t * t));
       if (perp > HR + bs.radius) return;
       cand.push(o);
@@ -172,7 +183,20 @@ for (const w of WORLDS) {
   if (flag) bad++;
   console.log(`${w.padEnd(9)} ${String(a.coveredPct).padStart(5)}% -> ${String(c.coveredPct).padStart(5)}%   mark ${String(a.mark).padStart(2)}   ${(a.worst || 'nothing').padEnd(24)}${flag ? ' <-- BROKEN' : ''}`);
 }
+// SILENCE IS FAILURE. Errored rows are skipped by the loop above, so without
+// this a run where every world threw would leave `bad` at 0 and print PASS over
+// zero measurements — a probe reporting good news about something it never
+// looked at. Count what was actually graded and say so.
+const graded = WORLDS.filter((w) => {
+  const a = rows.find((r) => r.w === w && r.dio === 1), c = rows.find((r) => r.w === w && r.dio === 0);
+  return a && c && !a.error && !c.error;
+});
+const missing = WORLDS.filter((w) => !graded.includes(w));
+if (missing.length) {
+  console.log(`\nFAIL — ${missing.length} world(s) produced no measurement: ${missing.join(', ')}`);
+  process.exit(1);
+}
 console.log(bad
   ? `\nFAIL — ${bad} world(s) have something across more than 5% of the hero on the diorama`
-  : '\nPASS — under 5% of the hero is behind anything, on all six worlds');
+  : `\nPASS — under 5% of the hero is behind anything, on all ${graded.length} world(s) measured`);
 process.exit(bad ? 1 : 0);

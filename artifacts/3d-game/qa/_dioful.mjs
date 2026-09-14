@@ -179,6 +179,15 @@ for (const w of WORLDS) for (const dio of [1, 0]) {
     let inBand = 0;
     for (const e of eds) {
       if (e.eaten || !e.mesh.visible) continue;
+      // THE CAST LIST USES A LAYERS BIT, NOT .visible. enterMenu removes small
+      // props from the diorama with m.layers.disable(0) (src/prototype3d.ts:1358)
+      // precisely because a bit set on a Group is a no-op — so a cast-off prop is
+      // still `visible === true` and was being counted here. That is what inflated
+      // skylark's headline "620 props in frame and still empty": most of them were
+      // not drawn. The AREA number was never affected, because hiding a mesh that
+      // is already undrawn changes no pixels, which is exactly why area and count
+      // disagreed so violently on that world.
+      if (e.castOff && e.castOff.length && !e.castOff.some((m) => m.layers.test(cam.layers))) continue;
       v.setFromMatrixPosition(e.mesh.matrixWorld).project(cam);
       if (v.z > 1) continue;                       // behind the lens
       const sx = (v.x + 1) * 0.5, sy = (1 - v.y) * 0.5;
