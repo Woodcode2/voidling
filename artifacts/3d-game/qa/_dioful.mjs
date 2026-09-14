@@ -113,6 +113,12 @@ for (const w of WORLDS) for (const dio of [1, 0]) {
   // PIN THE PENDULUM. The drift is on game time and this wait is on wall clock,
   // so without this the azimuth differs every run — worth more than 5 points of
   // fullness on maple, which is more than the scrim correction below.
+  // GATE ON GAME TIME BEFORE FREEZING. Everything alive on this menu runs on GAME
+  // time while the wait above is WALL clock, so a sandbox at 0.4-2.9 fps arrives
+  // with the crowd somewhere different every load. Measured in _dioocc: five
+  // samples inside ONE load agree to 0.2 points, but two loads differ by 12.
+  // menuT is the menu's own game clock — reach a fixed mark, then pin it.
+  await p.waitForFunction(() => window.__menuState().menuT >= 4, null, { timeout: 420000 });
   await p.evaluate(() => window.__menuFreeze(0));
   // WAIT FOR THE CAMERA, NOT FOR menuT. __menuFreeze writes menuT synchronously,
   // so a wait on `menuT === 0` passes before any frame has run and the shot is

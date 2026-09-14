@@ -70,6 +70,15 @@ for (const w of WORLDS) for (const dio of [1, 0]) {
   // at 5% and pirate reads 5.7, so drift alone can move a world across it.
   // Wait on the CAMERA, not on menuT: __menuFreeze writes menuT synchronously and
   // stageCam.az is only recomputed inside the frame loop.
+  // GATE ON GAME TIME BEFORE FREEZING, or the crowd is somewhere different every
+  // load. Five samples inside ONE load agree to within 0.2 points — the crowd does
+  // not move during the 6s window. The variance is entirely BETWEEN loads: maple's
+  // shipped menu read 35.6 then 47.6, gameday's diorama 7 then 0. Same cause as
+  // the camera drift: everything alive here runs on GAME time while the wait above
+  // is WALL clock, so a sandbox at 0.4-2.9 fps arrives with the crowd at a
+  // different place each time. menuT IS the menu's game clock, so wait for it to
+  // reach a fixed mark, and only then pin it.
+  await p.waitForFunction(() => window.__menuState().menuT >= 4, null, { timeout: 420000 });
   await p.evaluate(() => window.__menuFreeze(0));
   await p.waitForFunction(() => {
     const m = window.__menuState();
