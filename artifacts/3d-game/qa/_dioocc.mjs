@@ -63,6 +63,18 @@ for (const w of WORLDS) for (const dio of [1, 0]) {
   await p.goto(`http://127.0.0.1:${PORT}/?w=${w}&manual=1&dio=${dio}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__menuState && window.__menuState().menuMode, null, { timeout: 420000 });
   await p.waitForTimeout(20000);   // the GLB landmarks load async under software GL
+  // PIN THE PENDULUM, same as _dioful. This probe has none of its own protection
+  // against the menu's +/-7 degree drift, which runs on GAME time while the wait
+  // above is WALL clock — so every number it has ever printed was taken at an
+  // unknown azimuth. That is fatal here in a way it is not for area: this bar sits
+  // at 5% and pirate reads 5.7, so drift alone can move a world across it.
+  // Wait on the CAMERA, not on menuT: __menuFreeze writes menuT synchronously and
+  // stageCam.az is only recomputed inside the frame loop.
+  await p.evaluate(() => window.__menuFreeze(0));
+  await p.waitForFunction(() => {
+    const m = window.__menuState();
+    return m.azimuth !== null && Math.abs(m.azimuth - m.a0) < 0.01;
+  }, null, { timeout: 180000 });
 
   const r = await p.evaluate(() => {
     const T = window.__THREE, cam = window.__cam, scene = window.__scene;
