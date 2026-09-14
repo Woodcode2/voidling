@@ -20,6 +20,31 @@
 // content nobody can see. The band is the top 55% of the canvas, which is where
 // the panel's top edge sits (~CSS y 536 of 932 on the shot decode).
 //
+// ── AND THE FIRST RUN SHOWED THE PIXEL SHARE IS NOT THE WHOLE QUESTION ─────
+// Measured: powder 13.8%, skylark 30.2%, maple 33.1%, lantern 41.7%, pirate
+// 51.4%, gameday 56.3%. Powder being lowest matches the photograph exactly. But
+// SKYLARK CAME BACK MID-PACK, and higher than its own 24.1% on today's menu —
+// while by eye it is an empty green field. The measure is honest and it is not
+// the question: a single long barrier covering 30% of the frame scores the same
+// as thirty varied props covering 30%. Pixel share is COVERAGE, not INTEREST.
+//
+// So a second number, on the axis that actually separates them: how many
+// DISTINCT props have their centre inside the visible band. One big thing and
+// many small things are the same area and very different pictures, and a floor
+// set on area alone would have passed skylark and called it done.
+//
+// ── AND THE COUNT WAS NOT IT EITHER ────────────────────────────────────────
+// Skylark came back with 622 distinct props in the band against today's 49 — so
+// the frame is not empty by count, and it is still an empty green field to look
+// at. Those 622 are a distant crowd clustered on the horizon; the middle of the
+// picture, where the hero is, has nothing in it.
+//
+// The axis that matches the eye is DISTRIBUTION. A 6x8 grid over the band, and
+// the fraction of cells holding at least one prop: props packed into two rows
+// score low however many there are, props spread across the frame score high.
+// Three numbers now — area, count, spread — because the first two each looked
+// sufficient and each passed the one world this bar exists for.
+//
 // NO THRESHOLD IS SET IN THIS FILE YET, deliberately. Picking a floor before
 // seeing the six numbers is how a bar ends up passing exactly what it was written
 // beside. It prints, and the floor goes in once there is a spread to put it in.
@@ -70,20 +95,40 @@ for (const w of WORLDS) for (const dio of [1, 0]) {
       const i = (y * W + x) * 4; n++;
       if (Math.abs(A[i] - B[i]) > D || Math.abs(A[i + 1] - B[i + 1]) > D || Math.abs(A[i + 2] - B[i + 2]) > D) diff++;
     }
-    return { propsPct: n ? +(100 * diff / n).toFixed(1) : 0, band: n, edibles: eds.length };
+    // HOW MANY DISTINCT PROPS ARE IN THE BAND. Projected centres, so a prop is
+    // counted once whatever its size — which is the whole point of having this
+    // beside the area figure.
+    const T = window.__THREE, v = new T.Vector3();
+    const GX = 8, GY = 6, cell = new Set();
+    let inBand = 0;
+    for (const e of eds) {
+      if (e.eaten || !e.mesh.visible) continue;
+      v.setFromMatrixPosition(e.mesh.matrixWorld).project(cam);
+      if (v.z > 1) continue;                       // behind the lens
+      const sx = (v.x + 1) * 0.5, sy = (1 - v.y) * 0.5;
+      if (sx < 0 || sx > 1 || sy < 0 || sy > band) continue;
+      inBand++;
+      cell.add(Math.min(GX - 1, Math.floor(sx * GX)) + ',' + Math.min(GY - 1, Math.floor((sy / band) * GY)));
+    }
+    return { propsPct: n ? +(100 * diff / n).toFixed(1) : 0, inBand,
+      spreadPct: +(100 * cell.size / (GX * GY)).toFixed(0), band: n, edibles: eds.length };
   }, BAND);
   rows.push({ w, dio, ...r });
-  console.log(`  ${w.padEnd(8)} dio=${dio}  ${String(r.propsPct).padStart(5)}% of the visible band is props   (${r.edibles} edibles in the world)`);
+  console.log(`  ${w.padEnd(8)} dio=${dio}  area ${String(r.propsPct).padStart(5)}%  count ${String(r.inBand).padStart(4)}  spread ${String(r.spreadPct).padStart(3)}% of 48 cells`);
   await p.close();
 }
 } finally { await b.close(); }
 
-console.log('\nworld     props as a share of the visible band');
-console.log('          diorama   today');
+console.log('\nworld         area%        count       spread% (cells of 48 with a prop)');
+console.log('            dio  today    dio  today      dio   today');
 for (const w of WORLDS) {
   const a = rows.find((r) => r.w === w && r.dio === 1), c = rows.find((r) => r.w === w && r.dio === 0);
   if (!a || !c) continue;
-  console.log(`${w.padEnd(9)} ${String(a.propsPct).padStart(6)}% ${String(c.propsPct).padStart(7)}%`);
+  console.log(`${w.padEnd(9)} ${String(a.propsPct).padStart(5)} ${String(c.propsPct).padStart(6)} ${String(a.inBand).padStart(6)} ${String(c.inBand).padStart(6)} ${String(a.spreadPct).padStart(8)} ${String(c.spreadPct).padStart(7)}`);
 }
-const d = rows.filter((r) => r.dio === 1).map((r) => r.propsPct);
-if (d.length) console.log(`\ndiorama spread: ${Math.min(...d)}% to ${Math.max(...d)}%  — the floor goes in once this spread is understood, not before`);
+const d = rows.filter((r) => r.dio === 1);
+if (d.length) {
+  const f = (k) => `${Math.min(...d.map((r) => r[k]))} to ${Math.max(...d.map((r) => r[k]))}`;
+  console.log(`\nacross the diorama: area ${f('propsPct')}%, count ${f('inBand')}, spread ${f('spreadPct')}%`);
+  console.log('the floor goes on the axis that separates the worlds the eye separates — not before that is clear');
+}
