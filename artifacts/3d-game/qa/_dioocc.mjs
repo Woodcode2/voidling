@@ -40,6 +40,39 @@
 // camera->hero axis, within a perpendicular reach — because raycasting ~3000
 // meshes by 450 rays is not a thing to do once per world, let alone twelve times.
 //
+// ── MEASURED, WITH BOTH CLOCKS PINNED ───────────────────────────────────────
+//
+// Two runs, five samples each, camera frozen and gated on GAME time (menuT >= 4):
+//
+//   world      diorama          shipped menu
+//              r1     r2        r1      r2
+//   maple      4.8    4.8       44.9    44.7
+//   pirate     5.4    6.8        100     100    <- over the 5% bar in BOTH runs
+//   gameday    0.5    0.5          0       0
+//   lantern      0      0        100     100
+//   powder       0      0        100     100
+//   skylark      0      0        1.1       0
+//
+// Worst between-run disagreement: 1.4 points, against 12 before the game-time
+// gate. The verdict is stable — one world fails, the same world, both times.
+//
+// TWO FINDINGS THIS IS NOW GOOD ENOUGH TO STATE.
+//
+// 1. PIRATE IS A REAL FAILURE on the diorama, 5.4 and 6.8 against a 5% bar. It
+//    was previously indistinguishable from noise: unfrozen, it read 5.7 and 7.3
+//    and 4.1, straddling the line.
+//
+// 2. THE SHIPPED MENU COVERS THE HERO COMPLETELY ON THREE WORLDS — pirate,
+//    lantern and powder at 100%, maple at 44.8. This is not the diorama, it is
+//    what ships today. DIO_MARK, which is what fixes it on the diorama, is
+//    `dio ? DIO_MARK : 0` (prototype3d.ts:1352) and so is zero here. He stays
+//    legible because occludedSilhouette draws him over whatever hides him, but
+//    that is the flat-disc-with-two-eyes look, on the first screen a child sees.
+//
+// The residual 1.4 points on pirate is the gate's own granularity: menuT crosses
+// 4 on a frame boundary, so the freeze lands anywhere in [4, 4+dt] with dt
+// clamped at 0.05. Worth tightening only if a verdict ever turns on it.
+//
 //   node qa/_dioocc.mjs [port] [world]
 import { chromium } from 'playwright';
 
