@@ -74,6 +74,11 @@ for (const w of WORLDS) for (const dio of [1, 0]) {
   await p.goto(`http://127.0.0.1:${PORT}/?w=${w}&manual=1&dio=${dio}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__menuState && window.__menuState().menuMode, null, { timeout: 420000 });
   await p.waitForTimeout(20000);   // the GLB landmarks, before anything is counted
+  // PIN THE PENDULUM. The drift is on game time and this wait is on wall clock,
+  // so without this the azimuth differs every run — worth more than 5 points of
+  // fullness on maple, which is more than the scrim correction below.
+  await p.evaluate(() => window.__menuFreeze(0));
+  await p.waitForFunction(() => window.__menuState().menuT === 0, null, { timeout: 120000 });
 
   const r = await p.evaluate((band) => {
     const scene = window.__scene, cam = window.__cam;
@@ -136,12 +141,12 @@ for (const w of WORLDS) for (const dio of [1, 0]) {
       inBand++;
       cell.add(Math.min(GX - 1, Math.floor(sx * GX)) + ',' + Math.min(GY - 1, Math.floor((sy / band) * GY)));
     }
-    return { propsPct: n ? +(100 * diff / n).toFixed(1) : 0,
+    return { az: window.__menuState().azimuth, propsPct: n ? +(100 * diff / n).toFixed(1) : 0,
       seenPct: wAll ? +(100 * wDiff / wAll).toFixed(1) : 0, inBand,
       spreadPct: +(100 * cell.size / (GX * GY)).toFixed(0), band: n, edibles: eds.length };
   }, BAND);
   rows.push({ w, dio, ...r });
-  console.log(`  ${w.padEnd(8)} dio=${dio}  area ${String(r.propsPct).padStart(5)}%  SEEN ${String(r.seenPct).padStart(5)}%  count ${String(r.inBand).padStart(4)}  spread ${String(r.spreadPct).padStart(3)}% of 48 cells`);
+  console.log(`  ${w.padEnd(8)} dio=${dio}  az ${String(r.az).padStart(6)}  area ${String(r.propsPct).padStart(5)}%  SEEN ${String(r.seenPct).padStart(5)}%  count ${String(r.inBand).padStart(4)}  spread ${String(r.spreadPct).padStart(3)}% of 48 cells`);
   await p.close();
 }
 } finally { await b.close(); }

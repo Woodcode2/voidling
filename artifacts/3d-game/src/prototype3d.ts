@@ -1278,6 +1278,8 @@ let menuMode = false;
  *  reads as a camera that was left running, which it is, but it should not
  *  look like it. */
 let menuT = 0;
+/** QA ONLY. When set, the menu pendulum stops dead at this phase — see __menuFreeze. */
+let menuFreeze: number | null = null;
 
 // ── THE LADDER'S OWN LITTLE STATE MACHINE ──────────────────────────────────
 /** What the menu ladder SHOWED last time, so the next paint can animate the
@@ -2933,6 +2935,7 @@ const _dbg = new Proxy(_dbgStore, {
   __menuState: () => Record<string, unknown>;
   __menuOptim: (on: boolean) => boolean;
   __dio: (on: boolean) => boolean;
+  __menuFreeze: (s: number | null) => number | null;
   __kindTally: () => Record<string, number>;
   __dailyDue: () => unknown;
   __claimDaily: () => unknown;
@@ -3338,6 +3341,14 @@ _dbg.__dio = (on: boolean): boolean => {
   menuStage = null;
   if (menuMode) enterMenu();
   return DIORAMA;
+};
+/** QA ONLY. Stop the menu's drift at a chosen phase in seconds, or null to release
+ *  it. Writes menuT directly: a runtime __dio flip calls enterMenu with menuMode
+ *  already true, so the `if (!menuMode) menuT = 0` guard does not reset it. */
+_dbg.__menuFreeze = (s: number | null): number | null => {
+  menuFreeze = (s === null || s === undefined) ? null : +s;
+  if (menuFreeze !== null) menuT = menuFreeze;
+  return menuFreeze;
 };
 _dbg.__menuState = () => {
   const ms = menuStage ?? { az: 0, amp: 0, period: 1, x: 0, z: 0, dist: 0, h: 0, lookY: 0, blocked: -1 };
@@ -12705,7 +12716,15 @@ function animate() {
   // would make the menu look frantic on a fast device and frozen on a slow one,
   // and dt is already clamped at 0.05 so a backgrounded tab cannot jump it.
   if (menuMode && stageCam) {
-    menuT += dt;
+    // __menuFreeze pins the pendulum so a MEASUREMENT is repeatable. This drift
+    // runs on GAME time, on purpose (the comment above says why), and a probe
+    // waits WALL clock. On a software renderer at 0.4-2.9 fps those are not the
+    // same amount of swing twice, and 7 degrees of azimuth changes which
+    // buildings are in shot. It moved maple's fullness 37.3 -> 31.9 between two
+    // runs of ONE build, which is larger than the scrim correction that run was
+    // measuring, and is the same drift-phase trap that once made a screenshot
+    // pair look like a fix that changed zero pixels.
+    menuT = menuFreeze === null ? menuT + dt : menuFreeze;
     const ms = menuStage;
     if (ms) {
       stageCam.az = ms.az + ms.amp * Math.sin((menuT / ms.period) * Math.PI * 2);
