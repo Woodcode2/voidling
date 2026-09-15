@@ -3473,6 +3473,7 @@ _dbg.__dioCut = (half: number | null, depth = 14): boolean => {
   slab.renderOrder = -1;
   scene.add(slab);
   dioCut.slab = slab;
+  (window as unknown as Record<string, unknown>).__dioLid = { floor, lid, cx, cz, half };
   return true;
 };
 _dbg.__menuHero = (on: boolean): boolean => { voidling.group.visible = on; return on; };
