@@ -1252,6 +1252,11 @@ let menuStage: MenuStage | null = null;
  *  in world units. 0 on the shipped menu, always. Read by the sun/shadow branch
  *  and by QA; nothing else may write it but enterMenu. */
 let dioMark = 0;
+/** QA ONLY. Overrides the menu mark so the step can be SWEPT rather than derived.
+ *  The shipped menu's geometry is not agreed with itself — the comment above
+ *  deriveStage's `h` says 32 degrees while `h = dist * 0.62` implies 38.3 — so the
+ *  distance the hero must step to clear the landmark is measured, not computed. */
+let markOverride: number | null = null;
 
 /** ── THE MENU'S COST SAVINGS, AS ONE SWITCH ───────────────────────────────
  *  Three things make the menu cheap: the shadow pass runs at a quarter rate
@@ -1349,7 +1354,7 @@ function enterMenu(): void {
   // ON THE DIORAMA HE STEPS FORWARD OFF IT. The aim stays on the landmark so the
   // block stays centred; he moves toward the camera until the sight line is
   // clear. See DIO_MARK for why that is a derived constant and not a search.
-  dioMark = dio ? DIO_MARK : 0;
+  dioMark = markOverride !== null ? markOverride : (dio ? DIO_MARK : 0);
   // ── THE CAST LIST, APPLIED ────────────────────────────────────────────────
   // Both branches, because __dio(false) re-enters the menu and has to put them
   // back — and because leaveMenu's own mirror only fires from a match, not from
@@ -2936,6 +2941,7 @@ const _dbg = new Proxy(_dbgStore, {
   __menuOptim: (on: boolean) => boolean;
   __dio: (on: boolean) => boolean;
   __menuFreeze: (s: number | null) => number | null;
+  __menuMark: (s: number | null) => number;
   __kindTally: () => Record<string, number>;
   __dailyDue: () => unknown;
   __claimDaily: () => unknown;
@@ -3345,6 +3351,13 @@ _dbg.__dio = (on: boolean): boolean => {
 /** QA ONLY. Stop the menu's drift at a chosen phase in seconds, or null to release
  *  it. Writes menuT directly: a runtime __dio flip calls enterMenu with menuMode
  *  already true, so the `if (!menuMode) menuT = 0` guard does not reset it. */
+/** QA ONLY. Set the menu mark and re-enter, so a sweep can find the step that
+ *  clears the landmark. null restores the shipped behaviour. */
+_dbg.__menuMark = (s: number | null): number => {
+  markOverride = (s === null || s === undefined) ? null : +s;
+  if (menuMode) enterMenu();
+  return dioMark;
+};
 _dbg.__menuFreeze = (s: number | null): number | null => {
   menuFreeze = (s === null || s === undefined) ? null : +s;
   if (menuFreeze !== null) menuT = menuFreeze;
