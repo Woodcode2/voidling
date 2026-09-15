@@ -1399,6 +1399,10 @@ function enterMenu(): void {
   // void that has stopped chasing them.
   life.calm(Infinity);
   document.body.classList.add('diorama');
+  // `island` is the pulled-back picker. Separate from `diorama` on purpose:
+  // `diorama` is added for the SHIPPED menu too, so widening the scrim window on
+  // it would change the live build under the owner mid-playtest.
+  document.body.classList.toggle('island', DIORAMA);
   paintMenuLadder();
 }
 

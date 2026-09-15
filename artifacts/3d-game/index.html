@@ -1224,6 +1224,32 @@
           linear-gradient(180deg, #1c0f3d 0%, rgba(28,15,61,0.92) 15%, rgba(20,11,45,0.38) 30%,
             rgba(13,8,33,0) 44%, rgba(13,8,33,0) 54%, rgba(13,8,33,0.55) 68%,
             rgba(13,8,33,0.93) 82%, #0d0821 100%); }
+      /* ── THE WINDOW, RESHAPED FOR THE ISLAND ────────────────────────────
+         MEASURED, and it is the answer to "why is ours not crisp". The window
+         above was authored when the menu camera stood IN the town and the
+         subject sat at CSS y410-503 — dead centre of the clear band. The pulled
+         back island occupies y180-500, and the gradient paints it:
+
+             y180 (19% of height)   violet alpha 0.76
+             y260 (28%)                          0.46
+             y340 (36%)                          0.20
+             y420 (45%)                          0.00
+
+         So the top three quarters of the island sit under up to 76% violet,
+         fading across the object. Not fog — at 460 units the fog near plane is
+         at 529 and the island spans 400-520, entirely in front of it — and not
+         the light rig either: maple is authored NOON, dusk 0, sunI 1.75. The
+         murk is this gradient.
+
+         hole.io's island sits on flat colour with nothing over it, which is most
+         of why theirs reads crisp. So the window opens: the top band holds the
+         logo and then gets out of the way by 18%, and the bottom band starts
+         where the ladder does. */
+      body.diorama.island #menu { background:
+          linear-gradient(180deg, #1c0f3d 0%, rgba(28,15,61,0.90) 11%,
+            rgba(20,11,45,0.28) 15%, rgba(13,8,33,0) 18%,
+            rgba(13,8,33,0) 58%, rgba(13,8,33,0.55) 68%,
+            rgba(13,8,33,0.93) 82%, #0d0821 100%); }
       body.diorama #menu::before,
       body.diorama #menu::after,
       body.diorama #menuOrb { display: none; }
