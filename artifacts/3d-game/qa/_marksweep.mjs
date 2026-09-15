@@ -62,7 +62,7 @@
 //
 //   node qa/_marksweep.mjs [port] [world]
 import { chromium } from 'playwright';
-import { measureOcclusion } from './_occlib.mjs';
+import { measureOcclusion, waitForScene } from './_occlib.mjs';
 
 const PORT = process.argv[2] || '4177';
 const WORLDS = process.argv[3] ? [process.argv[3]] : ['pirate', 'lantern', 'powder', 'maple', 'gameday', 'skylark'];
@@ -90,6 +90,8 @@ for (const w of WORLDS) {
   await p.waitForTimeout(20000);
   // both clocks pinned, same as _dioocc: a fixed point in GAME time, then freeze
   await p.waitForFunction(() => window.__menuState().menuT >= 4, null, { timeout: 420000 });
+  // …and wait for the WORLD, not just the clocks. The GLBs stream on wall time.
+  await waitForScene(p);
 
   for (const [mk, lat] of MARKS) {
     await p.evaluate(([m, l]) => { window.__menuMark(m, l); window.__menuFreeze(0); }, [mk, lat]);

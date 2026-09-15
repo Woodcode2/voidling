@@ -87,3 +87,42 @@ export function measureOcclusion() {
     worst: worst ? `${worst[0]} x${worst[1]}` : null,
   };
 }
+
+// ── THE THIRD CLOCK: THE SCENE IS STILL ARRIVING ────────────────────────────
+//
+// Pinning menuT pins the camera and the crowd, both of which run on GAME time.
+// It does nothing about the asset stream, which runs on WALL time and on the
+// sandbox's mood: "GLB props stream in for a while after boot"
+// (src/prototype3d.ts:4610), and the landmarks are among them (:1170). A probe
+// that waits a flat 20 seconds is guessing, and three runs of one world, one
+// offset and one frozen azimuth came back 6.8%, 15% and 17% because the scene
+// they each measured was a different scene.
+//
+// So: stop waiting for a clock and wait for the WORLD. Poll what is in the
+// scene until it stops changing. Cheap — a traverse and two counters — and it
+// answers the actual question, which is "has everything arrived yet".
+export function sceneFingerprint() {
+  let meshes = 0, tris = 0;
+  window.__scene.traverse((o) => {
+    if (!o.isMesh) return;
+    meshes++;
+    const g = o.geometry;
+    if (g && g.index) tris += g.index.count;
+    else if (g && g.attributes && g.attributes.position) tris += g.attributes.position.count;
+  });
+  return `${meshes}:${tris}`;
+}
+
+/** Block until sceneFingerprint() is unchanged across `stable` consecutive polls. */
+export async function waitForScene(page, { gap = 2500, stable = 3, timeout = 300000 } = {}) {
+  const t0 = Date.now();
+  let last = null, runs = 0;
+  for (;;) {
+    const fp = await page.evaluate(sceneFingerprint);
+    runs = fp === last ? runs + 1 : 0;
+    last = fp;
+    if (runs >= stable) return fp;
+    if (Date.now() - t0 > timeout) throw new Error(`scene never settled, last ${fp}`);
+    await page.waitForTimeout(gap);
+  }
+}

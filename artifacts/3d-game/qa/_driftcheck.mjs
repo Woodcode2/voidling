@@ -18,7 +18,7 @@
 //
 //   node qa/_driftcheck.mjs [port]
 import { chromium } from 'playwright';
-import { measureOcclusion } from './_occlib.mjs';
+import { measureOcclusion, waitForScene } from './_occlib.mjs';
 
 const PORT = process.argv[2] || '4177';
 // world -> [forward, lateral], from qa/_marksweep.mjs
@@ -41,6 +41,8 @@ for (const [w, off] of Object.entries(PICK)) {
   await p.waitForFunction(() => !!window.__menuState && window.__menuState().menuMode, null, { timeout: 420000 });
   await p.waitForTimeout(20000);
   await p.waitForFunction(() => window.__menuState().menuT >= 4, null, { timeout: 420000 });
+  // …and wait for the WORLD, not just the clocks. The GLBs stream on wall time.
+  await waitForScene(p);
   await p.evaluate((o) => window.__menuMark(o[0], o[1]), off);
 
   const per = [];
