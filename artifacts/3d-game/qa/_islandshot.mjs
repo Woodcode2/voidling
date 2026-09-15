@@ -45,16 +45,16 @@ try {
   await p.addInitScript(() => { try { localStorage.clear();
     localStorage.setItem('voidPlayed','1'); localStorage.setItem('voidTut','1'); localStorage.setItem('voidMute','1');
     localStorage.setItem('voidUnlocked','maple,pirate,gameday,lantern,powder,skylark'); } catch {} });
-  await p.goto(`http://127.0.0.1:${PORT}/?w=${W}&manual=1&dio=1`, { waitUntil: 'domcontentloaded', timeout: 300000 });
+  await p.goto(`http://127.0.0.1:${PORT}/?w=${W}&manual=1&dio=1&slab=${process.env.SLAB ?? 14}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__menuState && window.__menuState().menuMode, null, { timeout: 420000 });
   await waitForScene(p);
   await p.waitForFunction(() => window.__menuState().menuT >= 4, null, { timeout: 420000 });
-  await p.evaluate(() => window.__menuHero(false));    // the void comes off the picker
+  await p.evaluate(() => { window.__menuHero(false); window.__DEPTH = Number(new URLSearchParams(location.search).get('slab') ?? 14); });    // the void comes off the picker
 
   for (const [d, cut, look] of DISTS) {
     await p.evaluate((x) => {
       window.__dioLook(x[2]); window.__dioDist(x[0]); window.__menuHero(false);
-      window.__dioCut(x[1]); window.__menuFreeze(0);
+      window.__dioCut(x[1], window.__DEPTH ?? 14); window.__menuFreeze(0);
     }, [d, cut, look]);
     await p.waitForFunction(() => {
       const s = window.__menuState();
