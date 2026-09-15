@@ -1237,9 +1237,14 @@ const DIO_CAST_R = 1.0;
 /** Shared empty, so the 3,200-odd props too big to cast off allocate nothing. */
 const EMPTY_CAST: THREE.Mesh[] = [];
 
+/** QA ONLY. Override the diorama distance so the framing can be SEEN at several
+ *  pull-backs instead of argued about. The owner's call was to take the void off
+ *  the picker entirely (hole.io does not put a character on theirs), which
+ *  removes the constraint that pinned this at 178. */
+let dioDistOverride: number | null = null;
 function dioCam(lookY: number): { dist: number; h: number; lookAhead: number } {
   const frameH = (DIO_HALF * 2) / DIO_FILL;
-  const dist = frameH / (2 * Math.tan(32 * Math.PI / 360));
+  const dist = dioDistOverride ?? frameH / (2 * Math.tan(32 * Math.PI / 360));
   const rise = dist * Math.sin(DIO_ELEV * Math.PI / 180);
   return { dist, h: lookY + rise, lookAhead: 0.085 };
 }
@@ -2950,6 +2955,8 @@ const _dbg = new Proxy(_dbgStore, {
   __menuFreeze: (s: number | null) => number | null;
   __menuMark: (s: number | null, lat?: number) => number;
   __menuFront: (on: boolean) => boolean;
+  __menuHero: (on: boolean) => boolean;
+  __dioDist: (d: number | null) => number;
   __kindTally: () => Record<string, number>;
   __dailyDue: () => unknown;
   __claimDaily: () => unknown;
@@ -3367,6 +3374,15 @@ _dbg.__dio = (on: boolean): boolean => {
  *  see-through so "the wall stays legible" while he is behind it. On a level
  *  picker that reads as a flat disc with two eyes where her character should be.
  *  He is already drawn on top; he just looks wrong doing it. */
+/** QA ONLY. Take the hero off the menu entirely — the owner's direction, and
+ *  what hole.io's own level picker does (no avatar appears on it at all). */
+_dbg.__menuHero = (on: boolean): boolean => { voidling.group.visible = on; return on; };
+/** QA ONLY. Set the diorama camera distance and re-enter. */
+_dbg.__dioDist = (d: number | null): number => {
+  dioDistOverride = d === null || d === undefined ? null : +d;
+  if (menuMode) enterMenu();
+  return dioDistOverride ?? -1;
+};
 _dbg.__menuFront = (on: boolean): boolean => {
   voidling.group.traverse((o: THREE.Object3D) => {
     const m = o as THREE.Mesh;
