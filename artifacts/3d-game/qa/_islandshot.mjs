@@ -24,7 +24,7 @@ import { mkdirSync } from 'node:fs';
 const PORT = process.argv[2] || '4177';
 const WORLD = process.argv[3] || 'maple';
 // [distance, cut half-size or null]. The cut is what turns a crop into an object.
-const DISTS = [[386, null], [386, 46], [386, 60], [460, 60], [528, 60], [528, 80]];
+const DISTS = [[386, 60], [420, 60], [460, 60], [460, 72], [500, 72], [528, 80]];
 const OUT = 'qa/out/island';
 mkdirSync(OUT, { recursive: true });
 

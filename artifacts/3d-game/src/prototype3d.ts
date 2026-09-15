@@ -3416,7 +3416,11 @@ _dbg.__dioCut = (half: number | null, depth = 14): boolean => {
     new THREE.BoxGeometry(half * 2 - 0.1, depth, half * 2 - 0.1),
     new THREE.MeshLambertMaterial({ color: 0x6b4a2f }),
   );
-  slab.position.set(cx, -depth / 2 + 0.05, cz);
+  // TOP FACE JUST BELOW THE GROUND, not above it. At +0.05 the slab's brown lid
+  // sits over the world's own ground plane and the whole town turns to dirt —
+  // LOOKED AT on Maple, where the grass vanished entirely. The slab is the EDGE
+  // of the earth, seen from the side; it must never be its surface.
+  slab.position.set(cx, -depth / 2 - 0.05, cz);
   slab.renderOrder = -1;
   scene.add(slab);
   dioCut.slab = slab;
