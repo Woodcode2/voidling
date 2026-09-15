@@ -53,7 +53,8 @@ for (const w of WORLDS) {
         const v = new T.Vector3(L.cx + sx * L.half, sy ? 2 : -L.depth, L.cz + sz * L.half).project(cam);
         xs.push((v.x + 1) * 0.5 * 430); ys.push((1 - v.y) * 0.5 * 932);
       }
-      return { az: +s.azimuth.toFixed(1),
+      return { az: +s.azimuth.toFixed(1), camD: Math.round(s.menuDist), half: L.half,
+        frameW: +((2 * s.menuDist * Math.tan(16 * Math.PI / 180)) * 430 / 932).toFixed(0),
         x0: Math.round(Math.min(...xs)), x1: Math.round(Math.max(...xs)),
         y0: Math.round(Math.min(...ys)), y1: Math.round(Math.max(...ys)) };
     });
@@ -64,7 +65,7 @@ for (const w of WORLDS) {
   const top = Math.min(...per.map((r) => r.y0));
   const bot = Math.max(...per.map((r) => r.y1));
   rows.push({ w, offL, offR, top, bot, per });
-  console.log(`  ${w.padEnd(8)} across the swing: x ${String(offL).padStart(5)}..${String(offR).padStart(4)}   y ${String(top).padStart(4)}..${String(bot).padStart(4)}` +
+  console.log(`  ${w.padEnd(8)} camD ${String(per[0].camD).padStart(4)} half ${String(per[0].half).padStart(3)} frame ${String(per[0].frameW).padStart(4)}u  x ${String(offL).padStart(5)}..${String(offR).padStart(4)}   y ${String(top).padStart(4)}..${String(bot).padStart(4)}` +
     `${offL < 4 || offR > W - 4 ? '   <-- RUNS OFF THE SIDE' : ''}${bot > 536 ? '   <-- UNDER THE LADDER PANEL' : ''}`);
   await p.close();
 }
