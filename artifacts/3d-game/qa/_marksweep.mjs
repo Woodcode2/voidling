@@ -89,9 +89,17 @@ for (const w of WORLDS) {
   await p.waitForFunction(() => !!window.__menuState && window.__menuState().menuMode, null, { timeout: 420000 });
   await p.waitForTimeout(20000);
   // both clocks pinned, same as _dioocc: a fixed point in GAME time, then freeze
-  await p.waitForFunction(() => window.__menuState().menuT >= 4, null, { timeout: 420000 });
-  // …and wait for the WORLD, not just the clocks. The GLBs stream on wall time.
+  // ORDER MATTERS, AND I HAD IT BACKWARDS. The scene gate polls for three stable
+  // rounds, which costs a VARIABLE amount of wall time — and the game clock runs
+  // throughout it, so the crowd keeps walking. Gating game time first and then
+  // waiting on the scene let game time advance again by an unknown amount, which
+  // is the thing the gate existed to prevent: pirate then measured 7.3, 14.1 and
+  // 1.1 across three runs while his feet stayed at y348, y348, y349 — he and the
+  // camera were pinned and only what stood in front of him moved.
+  // So: let the WORLD finish arriving first (wall-clock work), and only then pin
+  // the game clock, which nothing after this is allowed to advance.
   await waitForScene(p);
+  await p.waitForFunction(() => window.__menuState().menuT >= 4, null, { timeout: 420000 });
 
   for (const [mk, lat] of MARKS) {
     await p.evaluate(([m, l]) => { window.__menuMark(m, l); window.__menuFreeze(0); }, [mk, lat]);
