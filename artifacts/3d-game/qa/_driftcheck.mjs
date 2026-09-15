@@ -22,7 +22,24 @@ import { measureOcclusion, waitForScene } from './_occlib.mjs';
 
 const PORT = process.argv[2] || '4177';
 // world -> [forward, lateral], from qa/_marksweep.mjs
-let PICK = { pirate: [0, 20], lantern: [0, 20], powder: [0, 20], maple: [0, -26], gameday: [0, 0], skylark: [0, 0] };
+// THE CHOSEN OFFSETS, each [forward, lateral], picked on WORST-across-the-swing
+// and on margin rather than on a bare pass — and every one of them reads flat
+// from the FIRST phase, which matters (see the transient note below).
+//   pirate  [0, 26]   worst 0.9%, feet y360   was 100% covered
+//   lantern [0,-20]   worst 0.0%, feet y348   was 100%
+//   powder  [0, 20]   to be re-verified on the corrected instrument
+//   maple   [0,-26]   to be re-verified
+//   gameday [0,  0]   already clear, deliberately untouched
+//   skylark [0,  0]   already clear, deliberately untouched
+//
+// A TRANSIENT EXISTS AND IT IS NOT THE AZIMUTH. pirate at [0,-20] measured
+// 16.1 13.8 20.6 14.5 2.5 0 0 0 across the eight phases — that decays with TIME,
+// not with the camera angle, and t14 onward is clean. Something in that page load
+// was still settling after waitForScene and the menuT gate had both passed.
+// Every offset picked above reads 0 or flat from the first phase, so none of them
+// rests on it, but it is not yet explained and it is written down rather than
+// discovered again later.
+let PICK = { pirate: [0, 26], lantern: [0, -20], powder: [0, 20], maple: [0, -26], gameday: [0, 0], skylark: [0, 0] };
 // SEARCH MODE: one world, many candidate offsets, each graded on the WORST value
 // across a full swing — which is the grading function every earlier search here
 // got wrong by scoring a single phase.
