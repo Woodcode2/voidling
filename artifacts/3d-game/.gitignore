@@ -104,6 +104,5 @@ qa/out/menufix/*
 !qa/out/menufix/pirate-front.png
 !qa/out/menufix/maple-front.png
 qa/out/island/*
-!qa/out/island/*-cut60.png
 !qa/out/island/gameday-500-cut56-look016.png
 !qa/out/island/pirate-500-cut56-look016.png
