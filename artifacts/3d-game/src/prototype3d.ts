@@ -3409,6 +3409,19 @@ _dbg.__dioLook = (a: number | null): number => {
   if (menuMode) enterMenu();
   return dioLookOverride ?? 0.085;
 };
+/** PER-WORLD CUT. MEASURED as cell occupancy — what share of the box has anything
+ *  in it — not as a prop count, which cannot see an empty region because the props
+ *  that exist are already inside the box.
+ *
+ *  Pirate is the only world that needs one. Its resort does not fill a square, so
+ *  a quarter of its box is bare ground: 69% occupied at the default 56, against
+ *  75% at half 46 shifted (-18,-18). Six points, and that is all that is on offer
+ *  — every other placement tried lands between 69 and 75. The brown IS pirate's
+ *  own terrain, not the earth slab it is nearly the same colour as, so no cut
+ *  removes it entirely; a smaller box just holds proportionally less of it. */
+const DIO_CUT: Partial<Record<WorldId, { half: number; dx: number; dz: number }>> = {
+  pirate: { half: 46, dx: -18, dz: -18 },
+};
 _dbg.__dioCut = (half: number | null, depth = 14): boolean => {
   const R = renderer as THREE.WebGLRenderer;
   const halo = scene.getObjectByName('islandHalo');
@@ -3419,7 +3432,9 @@ _dbg.__dioCut = (half: number | null, depth = 14): boolean => {
     return false;
   }
   const st = menuStage;
-  const cx = st ? st.x : 0, cz = st ? st.z : 0;
+  const per = DIO_CUT[pickedWorld];
+  if (per) half = per.half;
+  const cx = (st ? st.x : 0) + (per ? per.dx : 0), cz = (st ? st.z : 0) + (per ? per.dz : 0);
   R.clippingPlanes = [
     new THREE.Plane(new THREE.Vector3(-1, 0, 0), cx + half),
     new THREE.Plane(new THREE.Vector3(1, 0, 0), -(cx - half)),
