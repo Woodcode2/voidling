@@ -2956,6 +2956,7 @@ const _dbg = new Proxy(_dbgStore, {
   __menuMark: (s: number | null, lat?: number) => number;
   __menuFront: (on: boolean) => boolean;
   __menuHero: (on: boolean) => boolean;
+  __dioCut: (half: number | null, depth?: number) => boolean;
   __dioDist: (d: number | null) => number;
   __kindTally: () => Record<string, number>;
   __dailyDue: () => unknown;
@@ -3376,6 +3377,51 @@ _dbg.__dio = (on: boolean): boolean => {
  *  He is already drawn on top; he just looks wrong doing it. */
 /** QA ONLY. Take the hero off the menu entirely — the owner's direction, and
  *  what hole.io's own level picker does (no avatar appears on it at all). */
+/** QA ONLY. THE CUT — end the world at a hard edge so it reads as an object.
+ *  Pulling the camera back frames the block but shows a CROP OF A MAP: roads run
+ *  off all four sides and nothing bounds it. hole.io's island works because it
+ *  ENDS, in a hard edge against flat colour.
+ *
+ *  Global renderer.clippingPlanes rather than a per-object cull, deliberately.
+ *  The refuters of the earlier "earth cut" proposal found what a cull cannot
+ *  reach: non-edible scenery (a tree is not in `edibles` and would strand in
+ *  mid-air), lane dashes and crowd discs which are InstancedMesh, and the violet
+ *  ground halo. Clipping planes cut geometry wherever it is and whatever list it
+ *  is on, so all three problems go away at once.
+ *
+ *  The halo still has to be hidden by hand: it is additive and depthWrite false,
+ *  so it is invisible today only because the ground occludes it. */
+let dioCut: { slab: THREE.Mesh | null; halo: boolean } = { slab: null, halo: true };
+_dbg.__dioCut = (half: number | null, depth = 14): boolean => {
+  const R = renderer as THREE.WebGLRenderer;
+  const halo = scene.getObjectByName('islandHalo');
+  if (dioCut.slab) { scene.remove(dioCut.slab); dioCut.slab = null; }
+  if (half === null || half === undefined) {
+    R.clippingPlanes = [];
+    if (halo) halo.visible = true;
+    return false;
+  }
+  const st = menuStage;
+  const cx = st ? st.x : 0, cz = st ? st.z : 0;
+  R.clippingPlanes = [
+    new THREE.Plane(new THREE.Vector3(-1, 0, 0), cx + half),
+    new THREE.Plane(new THREE.Vector3(1, 0, 0), -(cx - half)),
+    new THREE.Plane(new THREE.Vector3(0, 0, -1), cz + half),
+    new THREE.Plane(new THREE.Vector3(0, 0, 1), -(cz - half)),
+  ];
+  if (halo) halo.visible = false;
+  // the earth under it — hole.io's island sits on a visible slab, and without one
+  // the clip reads as a sheet of paper rather than a piece of ground
+  const slab = new THREE.Mesh(
+    new THREE.BoxGeometry(half * 2 - 0.1, depth, half * 2 - 0.1),
+    new THREE.MeshLambertMaterial({ color: 0x6b4a2f }),
+  );
+  slab.position.set(cx, -depth / 2 + 0.05, cz);
+  slab.renderOrder = -1;
+  scene.add(slab);
+  dioCut.slab = slab;
+  return true;
+};
 _dbg.__menuHero = (on: boolean): boolean => { voidling.group.visible = on; return on; };
 /** QA ONLY. Set the diorama camera distance and re-enter. */
 _dbg.__dioDist = (d: number | null): number => {

@@ -23,7 +23,8 @@ import { mkdirSync } from 'node:fs';
 
 const PORT = process.argv[2] || '4177';
 const WORLD = process.argv[3] || 'maple';
-const DISTS = [178, 300, 386, 460, 528, 620];
+// [distance, cut half-size or null]. The cut is what turns a crop into an object.
+const DISTS = [[386, null], [386, 46], [386, 60], [460, 60], [528, 60], [528, 80]];
 const OUT = 'qa/out/island';
 mkdirSync(OUT, { recursive: true });
 
@@ -42,8 +43,11 @@ try {
   await p.waitForFunction(() => window.__menuState().menuT >= 4, null, { timeout: 420000 });
   await p.evaluate(() => window.__menuHero(false));    // the void comes off the picker
 
-  for (const d of DISTS) {
-    await p.evaluate((x) => { window.__dioDist(x); window.__menuHero(false); window.__menuFreeze(0); }, d);
+  for (const [d, cut] of DISTS) {
+    await p.evaluate((x) => {
+      window.__dioDist(x[0]); window.__menuHero(false);
+      window.__dioCut(x[1]); window.__menuFreeze(0);
+    }, [d, cut]);
     await p.waitForFunction(() => {
       const s = window.__menuState();
       return s.azimuth !== null && Math.abs(s.azimuth - s.a0) < 0.01;
@@ -53,10 +57,10 @@ try {
       const s = window.__menuState();
       return { dist: Math.round(s.menuDist), az: s.azimuth };
     });
-    const f = `${OUT}/${WORLD}-${d}.png`;
+    const f = `${OUT}/${WORLD}-${d}-cut${cut ?? 'none'}.png`;
     await p.screenshot({ path: f });
     const frameW = (2 * d * Math.tan(16 * Math.PI / 180)) * 430 / 932;
-    console.log(`  ${WORLD.padEnd(8)} dist ${String(d).padStart(4)}  az ${st.az}  frame ${frameW.toFixed(0)}u  block/frame ${(92 / frameW).toFixed(2)}x  -> ${f}`);
+    console.log(`  ${WORLD.padEnd(8)} dist ${String(d).padStart(4)}  cut ${String(cut ?? '-').padStart(4)}  frame ${frameW.toFixed(0)}u  -> ${f}`);
   }
   await p.close();
 } finally { await b.close(); }

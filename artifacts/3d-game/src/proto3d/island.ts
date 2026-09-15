@@ -1139,6 +1139,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       new THREE.PlaneGeometry(Math.max(W3, H3) * 1.15, Math.max(W3, H3) * 1.15),
       new THREE.MeshBasicMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
     );
+    halo.name = 'islandHalo';   // QA: the diorama cut has to hide this, see __dioCut
     halo.rotation.x = -Math.PI / 2; halo.position.y = -3;
     halo.position.x = (minX + maxX) / 2; halo.position.z = (minZ + maxZ) / 2;
     scene.add(halo);
