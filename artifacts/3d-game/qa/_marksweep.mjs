@@ -65,7 +65,10 @@ import { chromium } from 'playwright';
 
 const PORT = process.argv[2] || '4177';
 const WORLDS = process.argv[3] ? [process.argv[3]] : ['pirate', 'lantern', 'powder', 'maple', 'gameday', 'skylark'];
-const MARKS = [0, 4, 8, 12, 16, 20];
+// (mark along the azimuth, lateral step across it). The pure-lateral row exists
+// because stepping toward the lens is what walks him into the ladder panel, and
+// a step ACROSS the view costs nothing against y536.
+const MARKS = [[0, 0], [0, 8], [0, 14], [0, 20], [8, 14], [12, 12]];
 const PANEL_Y = 536;
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -85,8 +88,8 @@ for (const w of WORLDS) {
   // both clocks pinned, same as _dioocc: a fixed point in GAME time, then freeze
   await p.waitForFunction(() => window.__menuState().menuT >= 4, null, { timeout: 420000 });
 
-  for (const mk of MARKS) {
-    await p.evaluate((m) => { window.__menuMark(m); window.__menuFreeze(0); }, mk);
+  for (const [mk, lat] of MARKS) {
+    await p.evaluate(([m, l]) => { window.__menuMark(m, l); window.__menuFreeze(0); }, [mk, lat]);
     await p.waitForFunction(() => {
       const s = window.__menuState();
       return s.azimuth !== null && Math.abs(s.azimuth - s.a0) < 0.01;
@@ -141,35 +144,33 @@ for (const w of WORLDS) {
       // his FEET on screen, in CSS px from the top
       const foot = ctr.clone().addScaledVector(new T.Vector3(0, 1, 0), -HR).project(cam);
       const worst = Object.entries(by).sort((a, b) => b[1] - a[1])[0];
-      return { mark: window.__dioMark(), camD: +camD.toFixed(1),
+      return { camD: +camD.toFixed(1),
         coveredPct: tried ? +(100 * blocked / tried).toFixed(1) : 0,
         footY: Math.round((1 - foot.y) * 0.5 * 932),
         worst: worst ? `${worst[0]} x${worst[1]}` : null };
     });
-    out.push({ w, ...r });
+    out.push({ w, mark: mk, lat, ...r });
     const under = r.footY > PANEL_Y;
-    console.log(`  ${w.padEnd(8)} mark ${String(mk).padStart(2)}  covered ${String(r.coveredPct).padStart(5)}%  feet y${String(r.footY).padStart(4)}${under ? ' <-- BEHIND THE LADDER PANEL' : ''}  ${r.worst || ''}`);
+    console.log(`  ${w.padEnd(8)} fwd ${String(mk).padStart(2)} lat ${String(lat).padStart(2)}  covered ${String(r.coveredPct).padStart(5)}%  feet y${String(r.footY).padStart(4)}${under ? ' <-- BEHIND THE LADDER PANEL' : ''}  ${r.worst || ''}`);
   }
   await p.close();
 }
 } finally { await b.close(); }
 
-console.log('\nworld     ' + MARKS.map((m) => ('m' + m).padStart(7)).join('') + '     (% of him covered)');
+const lbl = MARKS.map(([m, l]) => `${m}/${l}`.padStart(8)).join('');
+console.log('\nworld  fwd/lat' + lbl + '     (% of him covered)');
 for (const w of WORLDS) {
-  const r = MARKS.map((m) => { const x = out.find((o) => o.w === w && o.mark === m); return x ? String(x.coveredPct).padStart(7) : '      ?'; });
-  console.log(w.padEnd(10) + r.join(''));
+  console.log(w.padEnd(14) + MARKS.map(([m, l]) => { const x = out.find((o) => o.w === w && o.mark === m && o.lat === l); return x ? String(x.coveredPct).padStart(8) : '       ?'; }).join(''));
 }
-console.log('\nworld     ' + MARKS.map((m) => ('m' + m).padStart(7)).join('') + '     (feet, CSS y; panel edge 536)');
+console.log('\nworld  fwd/lat' + lbl + '     (feet, CSS y; panel edge 536)');
 for (const w of WORLDS) {
-  const r = MARKS.map((m) => { const x = out.find((o) => o.w === w && o.mark === m); return x ? String(x.footY).padStart(7) : '      ?'; });
-  console.log(w.padEnd(10) + r.join(''));
+  console.log(w.padEnd(14) + MARKS.map(([m, l]) => { const x = out.find((o) => o.w === w && o.mark === m && o.lat === l); return x ? String(x.footY).padStart(8) : '       ?'; }).join(''));
 }
-// THE SMALLEST MARK THAT CLEARS EVERY WORLD WITHOUT BURYING HIM
-const ok = MARKS.filter((m) => WORLDS.every((w) => {
-  const x = out.find((o) => o.w === w && o.mark === m);
+const ok = MARKS.filter(([m, l]) => WORLDS.every((w) => {
+  const x = out.find((o) => o.w === w && o.mark === m && o.lat === l);
   return x && !x.error && x.coveredPct <= 5 && x.footY <= PANEL_Y;
 }));
 console.log(ok.length
-  ? `\nPASS — mark ${ok[0]} clears every world under 5% covered with his feet above y${PANEL_Y}`
-  : `\nFAIL — no swept mark clears every world; the step alone does not fix this`);
+  ? `\nPASS — fwd ${ok[0][0]} / lat ${ok[0][1]} clears every world under 5% covered with feet above y${PANEL_Y}`
+  : `\nFAIL — no swept offset clears every world; stepping him alone does not fix this`);
 process.exit(ok.length ? 0 : 1);

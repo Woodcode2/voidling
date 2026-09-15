@@ -1257,6 +1257,8 @@ let dioMark = 0;
  *  deriveStage's `h` says 32 degrees while `h = dist * 0.62` implies 38.3 — so the
  *  distance the hero must step to clear the landmark is measured, not computed. */
 let markOverride: number | null = null;
+/** QA ONLY. A step ACROSS the view instead of along it. Zero in every shipped path. */
+let latOverride = 0;
 
 /** ── THE MENU'S COST SAVINGS, AS ONE SWITCH ───────────────────────────────
  *  Three things make the menu cheap: the shadow pass runs at a quarter rate
@@ -1364,8 +1366,13 @@ function enterMenu(): void {
     if (!e.castOff) continue;
     for (const m of e.castOff) { if (dio) m.layers.disable(0); else m.layers.enable(0); }
   }
-  const markX = st.x + Math.sin(rad0) * dioMark;
-  const markZ = st.z + Math.cos(rad0) * dioMark;
+  // TOWARD THE LENS, and — QA only, for the sweep — ACROSS it. Stepping toward
+  // the camera is what walks him down the frame into the ladder panel; a lateral
+  // step moves him across the picture at the same screen height, so it costs
+  // nothing against y536. Whether it clears the landmark is a different question
+  // and is measured by qa/_marksweep.mjs rather than assumed.
+  const markX = st.x + Math.sin(rad0) * dioMark + Math.cos(rad0) * latOverride;
+  const markZ = st.z + Math.cos(rad0) * dioMark - Math.sin(rad0) * latOverride;
   voidState.x = markX; voidState.z = markZ;
   voidling.group.position.set(markX, voidling.group.position.y, markZ);
   voidling.setRadius(menuVoidR(st.dist));
@@ -2941,7 +2948,7 @@ const _dbg = new Proxy(_dbgStore, {
   __menuOptim: (on: boolean) => boolean;
   __dio: (on: boolean) => boolean;
   __menuFreeze: (s: number | null) => number | null;
-  __menuMark: (s: number | null) => number;
+  __menuMark: (s: number | null, lat?: number) => number;
   __kindTally: () => Record<string, number>;
   __dailyDue: () => unknown;
   __claimDaily: () => unknown;
@@ -3353,8 +3360,9 @@ _dbg.__dio = (on: boolean): boolean => {
  *  already true, so the `if (!menuMode) menuT = 0` guard does not reset it. */
 /** QA ONLY. Set the menu mark and re-enter, so a sweep can find the step that
  *  clears the landmark. null restores the shipped behaviour. */
-_dbg.__menuMark = (s: number | null): number => {
+_dbg.__menuMark = (s: number | null, lat?: number): number => {
   markOverride = (s === null || s === undefined) ? null : +s;
+  latOverride = lat === undefined || lat === null ? 0 : +lat;
   if (menuMode) enterMenu();
   return dioMark;
 };
