@@ -76,6 +76,28 @@ export function measureOcclusion() {
   }
   const foot = ctr.clone().addScaledVector(new T.Vector3(0, 1, 0), -HR).project(cam);
   const worst = Object.entries(by).sort((a, b) => b[1] - a[1])[0];
+
+  // ── IS HE EVEN IN THE PICTURE? ────────────────────────────────────────────
+  //
+  // THE BLIND SPOT THAT NEARLY SHIPPED. Everything above answers "is anything
+  // between the lens and the hero". That is NOT the question. The question is
+  // "can the child see her character". Push him off the side of the screen and
+  // nothing is in front of him, so this returns 0% covered — THE BEST SCORE IT
+  // CAN GIVE. Deleting the hero scores perfectly.
+  //
+  // It was caught by a screenshot, not by a number: pirate at lateral 26 measured
+  // 1.4% covered across a whole camera swing, and the picture has no hero in it
+  // at all. footY was already checked against the ladder panel, so VERTICAL
+  // displacement was covered; footX was never recorded, and lateral is exactly
+  // the move the fix was built on.
+  const c = ctr.clone().project(cam);
+  const cx = (c.x + 1) * 0.5 * 430, cy = (1 - c.y) * 0.5 * 932;
+  const rpx = (932 / (2 * camD * Math.tan(16 * Math.PI / 180))) * HR;   // his radius on screen
+  const offScreen = c.z > 1 || cx + rpx < 0 || cx - rpx > 430 || cy + rpx < 0 || cy - rpx > 932;
+  // how much of his disc's bounding box is inside the viewport, 0..1
+  const vis = Math.max(0, Math.min(430, cx + rpx) - Math.max(0, cx - rpx)) *
+              Math.max(0, Math.min(932, cy + rpx) - Math.max(0, cy - rpx)) /
+              Math.max(1, (2 * rpx) * (2 * rpx));
   const ms = window.__menuState();
   return {
     az: ms.azimuth === null ? null : +ms.azimuth.toFixed(1),
@@ -84,6 +106,9 @@ export function measureOcclusion() {
     samples: tried, blocked,
     coveredPct: tried ? +(100 * blocked / tried).toFixed(1) : 0,
     footY: Math.round((1 - foot.y) * 0.5 * 932),
+    footX: Math.round((foot.x + 1) * 0.5 * 430),
+    cx: Math.round(cx), cy: Math.round(cy), rpx: Math.round(rpx),
+    offScreen, onScreenFrac: +vis.toFixed(2),
     worst: worst ? `${worst[0]} x${worst[1]}` : null,
   };
 }

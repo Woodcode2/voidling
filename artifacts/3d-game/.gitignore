@@ -95,3 +95,6 @@ qa/out/plinth*.png
 # answered the question are in docs/crews/round-8/diorama-void-r*.png
 qa/out/diovoid/
 
+qa/out/menufix/*
+!qa/out/menufix/pirate-before.png
+!qa/out/menufix/pirate-after.png
