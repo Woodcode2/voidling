@@ -1242,11 +1242,18 @@ const EMPTY_CAST: THREE.Mesh[] = [];
  *  the picker entirely (hole.io does not put a character on theirs), which
  *  removes the constraint that pinned this at 178. */
 let dioDistOverride: number | null = null;
+/** QA ONLY. Lifts the island up the frame so its cut edge clears the level card. */
+let dioLookOverride: number | null = null;
 function dioCam(lookY: number): { dist: number; h: number; lookAhead: number } {
   const frameH = (DIO_HALF * 2) / DIO_FILL;
   const dist = dioDistOverride ?? frameH / (2 * Math.tan(32 * Math.PI / 360));
   const rise = dist * Math.sin(DIO_ELEV * Math.PI / 180);
-  return { dist, h: lookY + rise, lookAhead: 0.085 };
+  // lookAhead pulls the LOOK point back toward the camera, which lifts the
+  // subject up the frame. 0.085 puts the island's front edge behind the level
+  // card, so the earth slab's thickness is never seen — and that thickness is
+  // most of what makes hole.io's island read as a solid object rather than a
+  // tray. QA sweeps it.
+  return { dist, h: lookY + rise, lookAhead: dioLookOverride ?? 0.085 };
 }
 
 /** Computed once per world per session — the island does not move, and a scan
@@ -2957,6 +2964,7 @@ const _dbg = new Proxy(_dbgStore, {
   __menuFront: (on: boolean) => boolean;
   __menuHero: (on: boolean) => boolean;
   __dioCut: (half: number | null, depth?: number) => boolean;
+  __dioLook: (a: number | null) => number;
   __dioDist: (d: number | null) => number;
   __kindTally: () => Record<string, number>;
   __dailyDue: () => unknown;
@@ -3392,6 +3400,11 @@ _dbg.__dio = (on: boolean): boolean => {
  *  The halo still has to be hidden by hand: it is additive and depthWrite false,
  *  so it is invisible today only because the ground occludes it. */
 let dioCut: { slab: THREE.Mesh | null; halo: boolean } = { slab: null, halo: true };
+_dbg.__dioLook = (a: number | null): number => {
+  dioLookOverride = a === null || a === undefined ? null : +a;
+  if (menuMode) enterMenu();
+  return dioLookOverride ?? 0.085;
+};
 _dbg.__dioCut = (half: number | null, depth = 14): boolean => {
   const R = renderer as THREE.WebGLRenderer;
   const halo = scene.getObjectByName('islandHalo');

@@ -24,7 +24,9 @@ import { mkdirSync } from 'node:fs';
 const PORT = process.argv[2] || '4177';
 const WORLD = process.argv[3] || 'maple';
 // [distance, cut half-size or null]. The cut is what turns a crop into an object.
-const DISTS = [[386, 60], [420, 60], [460, 60], [460, 72], [500, 72], [528, 80]];
+// [distance, cut, lookAhead] — lookAhead lifts the island so its cut edge clears
+// the level card and the earth slab's thickness is actually visible.
+const DISTS = [[460, 60, 0.085], [460, 60, 0.16], [460, 60, 0.24], [460, 56, 0.30], [500, 62, 0.24], [420, 54, 0.24]];
 const OUT = 'qa/out/island';
 mkdirSync(OUT, { recursive: true });
 
@@ -43,11 +45,11 @@ try {
   await p.waitForFunction(() => window.__menuState().menuT >= 4, null, { timeout: 420000 });
   await p.evaluate(() => window.__menuHero(false));    // the void comes off the picker
 
-  for (const [d, cut] of DISTS) {
+  for (const [d, cut, look] of DISTS) {
     await p.evaluate((x) => {
-      window.__dioDist(x[0]); window.__menuHero(false);
+      window.__dioLook(x[2]); window.__dioDist(x[0]); window.__menuHero(false);
       window.__dioCut(x[1]); window.__menuFreeze(0);
-    }, [d, cut]);
+    }, [d, cut, look]);
     await p.waitForFunction(() => {
       const s = window.__menuState();
       return s.azimuth !== null && Math.abs(s.azimuth - s.a0) < 0.01;
@@ -57,10 +59,10 @@ try {
       const s = window.__menuState();
       return { dist: Math.round(s.menuDist), az: s.azimuth };
     });
-    const f = `${OUT}/${WORLD}-${d}-cut${cut ?? 'none'}.png`;
+    const f = `${OUT}/${WORLD}-${d}-cut${cut}-look${String(look).replace('.','')}.png`;
     await p.screenshot({ path: f });
     const frameW = (2 * d * Math.tan(16 * Math.PI / 180)) * 430 / 932;
-    console.log(`  ${WORLD.padEnd(8)} dist ${String(d).padStart(4)}  cut ${String(cut ?? '-').padStart(4)}  frame ${frameW.toFixed(0)}u  -> ${f}`);
+    console.log(`  ${WORLD.padEnd(8)} dist ${String(d).padStart(4)} cut ${String(cut).padStart(3)} look ${String(look).padStart(5)}  frame ${frameW.toFixed(0)}u  island/frame ${((cut * 2) / frameW).toFixed(2)}x  -> ${f}`);
   }
   await p.close();
 } finally { await b.close(); }
