@@ -31,7 +31,13 @@ const WORLDS = ALL ? ['maple','pirate','gameday','lantern','powder','skylark'] :
 // THE CHOSEN SETTING, from the sweeps: 500 units back, cut 56, lookAhead 0.16.
 // Island 112u against a 132u frame = 0.85, so it has hole.io's side margin.
 const PICKED = [500, 56, 0.16];
-const DISTS = ALL ? [PICKED] : [[460, 51, 0.16], [500, 56, 0.16], [540, 60, 0.16]];
+// PHASE SWEEP. The drift probe's corner projection is wrong — it reports a 112u
+// island spanning 1290px in a 132u frame, which six photographs contradict — so
+// the swing gets checked the way everything else today got checked: by looking.
+// menuT 0 is the authored azimuth, 7 is +7 degrees, 21 is -7. The extremes are
+// where a square island is widest on screen.
+const PHASE = process.env.PHASE ? Number(process.env.PHASE) : null;
+const DISTS = ALL ? [PICKED] : [PICKED]
 const OUT = 'qa/out/island';
 mkdirSync(OUT, { recursive: true });
 
@@ -54,18 +60,19 @@ try {
   for (const [d, cut, look] of DISTS) {
     await p.evaluate((x) => {
       window.__dioLook(x[2]); window.__dioDist(x[0]); window.__menuHero(false);
-      window.__dioCut(x[1], window.__DEPTH ?? 14); window.__menuFreeze(0);
-    }, [d, cut, look]);
-    await p.waitForFunction(() => {
+      window.__dioCut(x[1], window.__DEPTH ?? 14); window.__menuFreeze(x[3] ?? 0);
+    }, [d, cut, look, PHASE ?? 0]);
+    await p.waitForFunction((t) => {
       const s = window.__menuState();
-      return s.azimuth !== null && Math.abs(s.azimuth - s.a0) < 0.01;
-    }, null, { timeout: 180000 });
+      const want = s.a0 + s.amp * Math.sin((t / s.period) * Math.PI * 2);
+      return s.azimuth !== null && Math.abs(s.azimuth - want) < 0.01;
+    }, PHASE ?? 0, { timeout: 180000 });
     await p.waitForTimeout(1500);
     const st = await p.evaluate(() => {
       const s = window.__menuState();
       return { dist: Math.round(s.menuDist), az: s.azimuth };
     });
-    const f = `${OUT}/${W}-${d}-cut${cut}-look${String(look).replace('.','')}.png`;
+    const f = `${OUT}/${W}-t${PHASE ?? 0}.png`;
     await p.screenshot({ path: f });
     const frameW = (2 * d * Math.tan(16 * Math.PI / 180)) * 430 / 932;
     console.log(`  ${W.padEnd(8)} dist ${String(d).padStart(4)} cut ${String(cut).padStart(3)} look ${String(look).padStart(5)}  frame ${frameW.toFixed(0)}u  island/frame ${((cut * 2) / frameW).toFixed(2)}x  -> ${f}`);
