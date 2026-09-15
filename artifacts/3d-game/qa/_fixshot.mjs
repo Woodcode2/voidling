@@ -16,7 +16,7 @@ import { waitForScene } from './_occlib.mjs';
 import { mkdirSync } from 'node:fs';
 
 const PORT = process.argv[2] || '4177';
-const PICK = { pirate: [0, 26], lantern: [0, -20], powder: [0, 20], maple: [0, -26] };
+const PICK = { pirate: [0, 0], lantern: [0, 0], powder: [0, 0], maple: [0, 0] };
 const OUT = 'qa/out/menufix';
 mkdirSync(OUT, { recursive: true });
 
@@ -39,8 +39,9 @@ for (const [w, off] of Object.entries(PICK)) {
   // BOTH SHOTS AT THE SAME AZIMUTH, or the pair is a comparison of two different
   // moments rather than of two offsets — which is exactly how a "fix" that
   // changed zero pixels once got photographed on this project.
-  for (const [tag, o] of [['before', [0, 0]], ['after', off]]) {
+  for (const [tag, o] of [['before', [0, 0]], ['front', off]]) {
     await p.evaluate((x) => { window.__menuMark(x[0], x[1]); window.__menuFreeze(0); }, o);
+    await p.evaluate((f) => window.__menuFront(f), tag === 'front');
     await p.waitForFunction(() => {
       const s = window.__menuState();
       return s.azimuth !== null && Math.abs(s.azimuth - s.a0) < 0.01;

@@ -2949,6 +2949,7 @@ const _dbg = new Proxy(_dbgStore, {
   __dio: (on: boolean) => boolean;
   __menuFreeze: (s: number | null) => number | null;
   __menuMark: (s: number | null, lat?: number) => number;
+  __menuFront: (on: boolean) => boolean;
   __kindTally: () => Record<string, number>;
   __dailyDue: () => unknown;
   __claimDaily: () => unknown;
@@ -3360,6 +3361,23 @@ _dbg.__dio = (on: boolean): boolean => {
  *  already true, so the `if (!menuMode) menuT = 0` guard does not reset it. */
 /** QA ONLY. Set the menu mark and re-enter, so a sweep can find the step that
  *  clears the landmark. null restores the shipped behaviour. */
+/** QA ONLY, an experiment. On the MENU, draw the hero in front of everything
+ *  instead of as the occluded ghost. The ghost (void3d.ts:666-696) is a gameplay
+ *  affordance — depthFunc GreaterDepth, alpha 0.32 at the core, deliberately
+ *  see-through so "the wall stays legible" while he is behind it. On a level
+ *  picker that reads as a flat disc with two eyes where her character should be.
+ *  He is already drawn on top; he just looks wrong doing it. */
+_dbg.__menuFront = (on: boolean): boolean => {
+  voidling.group.traverse((o: THREE.Object3D) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    if (m.name === 'occludedSilhouette') { m.visible = !on; return; }
+    const mat = m.material as THREE.Material | THREE.Material[];
+    for (const x of Array.isArray(mat) ? mat : [mat]) { if (x) x.depthTest = !on; }
+    m.renderOrder = on ? 20 : 0;
+  });
+  return on;
+};
 _dbg.__menuMark = (s: number | null, lat?: number): number => {
   markOverride = (s === null || s === undefined) ? null : +s;
   latOverride = lat === undefined || lat === null ? 0 : +lat;
