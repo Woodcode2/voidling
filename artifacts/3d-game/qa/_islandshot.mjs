@@ -26,7 +26,7 @@ const WORLD = process.argv[3] || 'maple';
 // [distance, cut half-size or null]. The cut is what turns a crop into an object.
 // [distance, cut, lookAhead] — lookAhead lifts the island so its cut edge clears
 // the level card and the earth slab's thickness is actually visible.
-const DISTS = [[460, 60, 0.12], [460, 60, 0.16], [460, 60, 0.20], [500, 62, 0.16], [420, 54, 0.16], [420, 54, 0.20]];
+const DISTS = [[460, 51, 0.16], [460, 54, 0.16], [500, 56, 0.16], [500, 56, 0.13], [540, 60, 0.16], [420, 47, 0.16]];
 const OUT = 'qa/out/island';
 mkdirSync(OUT, { recursive: true });
 
