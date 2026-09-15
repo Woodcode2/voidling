@@ -16,6 +16,50 @@
 //              ~y536 of 932, and a mark that clears the landmark by burying him
 //              in the panel is not a fix.
 //
+// ── MEASURED. THE STEP CANNOT FIX THE SHIPPED MENU. ─────────────────────────
+//
+// All six worlds, both clocks pinned. % of the hero covered:
+//
+//   world       m0     m4     m8    m12    m16    m20
+//   pirate     100    100   97.1   87.5   43.5   21.3
+//   lantern    100    100    100   56.5   12.9      0
+//   powder     100    100    100   32.9      0      0
+//   maple     55.3   63.3   41.3    5.2    3.2      0
+//   gameday      0      0   14.3   54.9   90.7   35.1
+//   skylark    0.5      0      0      0      0      0
+//
+// His feet, CSS y, against the ladder panel's top edge at 536:
+//
+//   pirate     322    371    423    479    541    607
+//   lantern    321    366    413    464    517    576
+//   powder     322    368    418    471    528    591
+//   maple      300    370    447    533    629    738
+//   gameday    321    366    413    464    518    577
+//   skylark    389    429    472    518    568    621
+//
+// NO GLOBAL MARK WORKS, and the reason is gameday. It is the one world that is
+// already clear at m0, and the mark WALKS HIM INTO SOMETHING: 0 -> 14.3 -> 54.9
+// -> 90.7. A constant that rescues powder breaks the world that was fine. The
+// diorama's "one constant clears every measured case" is true of the diorama's
+// camera and does not port to this one.
+//
+// NO PER-WORLD MARK WORKS EITHER, on three of the six, because the two
+// constraints pull opposite ways — every step that clears the landmark walks him
+// further down the frame and into the ladder panel:
+//
+//   powder    mark 16   0% covered, feet y528     OK
+//   gameday   mark  0   0% covered, feet y321     OK, unchanged
+//   skylark   mark  0   0.5% covered, feet y389   OK, unchanged
+//   pirate    nothing   best 21.3% and feet y607  FAILS BOTH
+//   lantern   nothing   reaches 0% only at m20, feet y576, behind the panel
+//   maple     nothing   reaches 0% only at m20, feet y738, far behind it
+//
+// SO THE AIM HAS TO MOVE, not the hero. deriveStage points the shot at the
+// world's landmark and enterMenu parks him on that same point; while those two
+// are the same point, clearing one costs the other. That is a per-world
+// composition change to the first screen a child sees — the DIO_AIM mechanism,
+// applied to the shipped menu — and it is the owner's call, not a probe's.
+//
 //   node qa/_marksweep.mjs [port] [world]
 import { chromium } from 'playwright';
 
