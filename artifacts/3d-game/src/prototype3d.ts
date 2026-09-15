@@ -3425,9 +3425,16 @@ _dbg.__dioCut = (half: number | null, depth = 14): boolean => {
   if (halo) halo.visible = false;
   // the earth under it — hole.io's island sits on a visible slab, and without one
   // the clip reads as a sheet of paper rather than a piece of ground
+  // UNLIT, not Lambert. The slab's front face points away from the key light, so
+  // a lit material takes it to near-black and it reads as a bar across the
+  // picture rather than as earth — LOOKED AT on Maple at lookAhead 0.24, where
+  // the thickness appeared and was a black band. hole.io's wedge is a warm lit
+  // brown and that visible thickness is most of what sells the object. Basic
+  // material holds its colour whatever the sun is doing, which is what a stylised
+  // cut edge wants; it is also cheaper than lighting it properly.
   const slab = new THREE.Mesh(
     new THREE.BoxGeometry(half * 2 - 0.1, depth, half * 2 - 0.1),
-    new THREE.MeshLambertMaterial({ color: 0x6b4a2f }),
+    new THREE.MeshBasicMaterial({ color: 0x9c6239 }),
   );
   // TOP FACE JUST BELOW THE GROUND, not above it. At +0.05 the slab's brown lid
   // sits over the world's own ground plane and the whole town turns to dirt —
