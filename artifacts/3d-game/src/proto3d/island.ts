@@ -3947,18 +3947,32 @@ const QUIET_LEDGER: number[][] = [];
     geo.rotateX(-Math.PI / 2);
     const mat = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      // CLIPPING HAS TO BE ASKED FOR. three only honours renderer.clippingPlanes
+      // in a ShaderMaterial if `clipping: true` AND the shader compiles in the
+      // clipping chunks — a hand-written shader does not get them for free.
+      // Without this the bay ignores the diorama's cut entirely and floats over
+      // the island as a teal disc, which is exactly how Pirate failed. There are
+      // four custom shaders in this codebase and this was the only one that needs
+      // to be cut: the other three are the void's body, its occluded ghost (both
+      // off the picker) and the starfield, which IS the backdrop.
+      clipping: true,
       uniforms: { uTime: { value: 0 } },
       vertexShader: `
+        #include <clipping_planes_pars_vertex>
         varying vec2 vP;
         void main() {
           vP = position.xz;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+          #include <clipping_planes_vertex>
         }`,
       fragmentShader: `
         precision mediump float;
+        #include <clipping_planes_pars_fragment>
         uniform float uTime;
         varying vec2 vP;
         void main() {
+          #include <clipping_planes_fragment>
           // DOMAIN WARP first. Plain crossed sines produce a regular lattice,
           // which at map zoom reads as a grid of dots stamped on the bay —
           // the first version of this looked like polka dots. Warping the
