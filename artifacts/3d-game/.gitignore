@@ -96,5 +96,10 @@ qa/out/plinth*.png
 qa/out/diovoid/
 
 qa/out/menufix/*
+# kept as the evidence for the shipped-menu occlusion work: the defect, the
+# "fix" that deleted the hero, the render fix, and the one world it does not
+# finish. Everything else under here is regenerable by qa/_fixshot.mjs.
 !qa/out/menufix/pirate-before.png
 !qa/out/menufix/pirate-after.png
+!qa/out/menufix/pirate-front.png
+!qa/out/menufix/maple-front.png
