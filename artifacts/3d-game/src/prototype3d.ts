@@ -3436,6 +3436,31 @@ _dbg.__dioCut = (half: number | null, depth = 14): boolean => {
   // brown and that visible thickness is most of what sells the object. Basic
   // material holds its colour whatever the sun is doing, which is what a stylised
   // cut edge wants; it is also cheaper than lighting it properly.
+  // THE LID HAS TO SIT UNDER THE LOWEST GROUND IN THE BOX, and that is not 0.
+  // MEASURED: maple's visible ground never goes below y=0, so a lid at -0.05
+  // never covers anything; pirate's beach slopes to -3 as it meets the water and
+  // 31% of its box sits BELOW the lid, which is precisely the bare brown quadrant.
+  // A fixed lid cannot serve both, so find the floor with a coarse raycast once,
+  // here, rather than carrying a per-world number.
+  //
+  // (It took four diagnostics to get here. Three failed for a different reason
+  // each: counting props instead of ground; asking whether ground EXISTS rather
+  // than whether it is visible; and taking the farthest ray hit, the island's
+  // underside at -9, instead of the first. The third read maple and pirate as
+  // identical, which is what gave it away — maple works.)
+  const probe = new THREE.Raycaster();
+  probe.layers.set(0);
+  const meshes: THREE.Mesh[] = [];
+  scene.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && m.visible && m !== dioCut.slab) meshes.push(m); });
+  let floor = 0;
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) {
+    probe.set(new THREE.Vector3(cx - half + (2 * half) * (i + 0.5) / 8, 80,
+                                cz - half + (2 * half) * (j + 0.5) / 8), new THREE.Vector3(0, -1, 0));
+    probe.near = 0; probe.far = 200;
+    const hit = probe.intersectObjects(meshes, false);
+    if (hit.length) floor = Math.min(floor, hit[0].point.y);
+  }
+  const lid = floor - 0.05;
   const slab = new THREE.Mesh(
     new THREE.BoxGeometry(half * 2 - 0.1, depth, half * 2 - 0.1),
     new THREE.MeshBasicMaterial({ color: 0x9c6239 }),
@@ -3444,7 +3469,7 @@ _dbg.__dioCut = (half: number | null, depth = 14): boolean => {
   // sits over the world's own ground plane and the whole town turns to dirt —
   // LOOKED AT on Maple, where the grass vanished entirely. The slab is the EDGE
   // of the earth, seen from the side; it must never be its surface.
-  slab.position.set(cx, -depth / 2 - 0.05, cz);
+  slab.position.set(cx, lid - depth / 2, cz);
   slab.renderOrder = -1;
   scene.add(slab);
   dioCut.slab = slab;
