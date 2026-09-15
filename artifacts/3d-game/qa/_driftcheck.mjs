@@ -18,6 +18,7 @@
 //
 //   node qa/_driftcheck.mjs [port]
 import { chromium } from 'playwright';
+import { measureOcclusion } from './_occlib.mjs';
 
 const PORT = process.argv[2] || '4177';
 // world -> [forward, lateral], from qa/_marksweep.mjs
@@ -51,52 +52,7 @@ for (const [w, off] of Object.entries(PICK)) {
       const want = s.a0 + s.amp * Math.sin((t / s.period) * Math.PI * 2);
       return s.azimuth !== null && Math.abs(s.azimuth - want) < 0.01;
     }, ph, { timeout: 180000 });
-    const r = await p.evaluate(() => {
-      const T = window.__THREE, cam = window.__cam, scene = window.__scene, vg = window.__voidGroup();
-      let bob = null;
-      vg.traverse((o) => { const q = o.geometry && o.geometry.parameters;
-        if (q && q.radius === 1 && q.widthSegments === 96 && q.heightSegments === 72) bob = o.parent; });
-      if (!bob) return { error: 'body sphere not found' };
-      bob.updateWorldMatrix(true, false);
-      const ctr = new T.Vector3(), sc = new T.Vector3();
-      bob.matrixWorld.decompose(ctr, new T.Quaternion(), sc);
-      const HR = sc.y, camD = cam.position.distanceTo(ctr);
-      const axis = new T.Vector3().subVectors(ctr, cam.position).normalize();
-      const up = new T.Vector3(0, 1, 0).projectOnPlane(axis).normalize();
-      const right = new T.Vector3().crossVectors(axis, up).normalize();
-      const cand = [], bs = new T.Sphere(), tmp = new T.Vector3();
-      const inVoid = (x) => { for (let a = x; a; a = a.parent) if (a === vg) return true; return false; };
-      scene.traverse((o) => {
-        if (!o.isMesh || inVoid(o)) return;
-        for (let a = o; a; a = a.parent) if (!a.visible) return;
-        if (!o.geometry) return;
-        if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
-        if (!o.geometry.boundingSphere) return;
-        bs.copy(o.geometry.boundingSphere).applyMatrix4(o.matrixWorld);
-        tmp.subVectors(bs.center, cam.position);
-        const t = tmp.dot(axis);
-        if (t + bs.radius <= 0 || t - bs.radius >= camD + HR) return;
-        if (Math.sqrt(Math.max(0, tmp.lengthSq() - t * t)) > HR + bs.radius) return;
-        cand.push(o);
-      });
-      const rc = new T.Raycaster(); rc.layers.set(0);
-      const N = 25; let tried = 0, blocked = 0;
-      for (let iy = 0; iy < N; iy++) for (let ix = 0; ix < N; ix++) {
-        const u = (ix / (N - 1)) * 2 - 1, v = (iy / (N - 1)) * 2 - 1;
-        if (u * u + v * v > 1) continue;
-        tried++;
-        const k = Math.sqrt(Math.max(0, 1 - (u * u + v * v)));
-        const surf = ctr.clone().addScaledVector(right, u * HR).addScaledVector(up, v * HR).addScaledVector(axis, -k * HR);
-        const d = new T.Vector3().subVectors(surf, cam.position); const len = d.length();
-        d.multiplyScalar(1 / len);
-        rc.set(cam.position.clone(), d); rc.near = 0.1; rc.far = len - 0.05;
-        if (rc.intersectObjects(cand, false).length) blocked++;
-      }
-      const foot = ctr.clone().addScaledVector(new T.Vector3(0, 1, 0), -HR).project(cam);
-      return { az: +window.__menuState().azimuth.toFixed(1),
-        coveredPct: tried ? +(100 * blocked / tried).toFixed(1) : 0,
-        footY: Math.round((1 - foot.y) * 0.5 * 932) };
-    });
+    const r = await p.evaluate(measureOcclusion);
     per.push(r);
   }
   const worst = Math.max(...per.map((x) => x.coveredPct));

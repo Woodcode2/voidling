@@ -62,6 +62,7 @@
 //
 //   node qa/_marksweep.mjs [port] [world]
 import { chromium } from 'playwright';
+import { measureOcclusion } from './_occlib.mjs';
 
 const PORT = process.argv[2] || '4177';
 const WORLDS = process.argv[3] ? [process.argv[3]] : ['pirate', 'lantern', 'powder', 'maple', 'gameday', 'skylark'];
@@ -96,61 +97,7 @@ for (const w of WORLDS) {
       const s = window.__menuState();
       return s.azimuth !== null && Math.abs(s.azimuth - s.a0) < 0.01;
     }, null, { timeout: 180000 });
-    const r = await p.evaluate(() => {
-      const T = window.__THREE, cam = window.__cam, scene = window.__scene;
-      const vg = window.__voidGroup();
-      let bob = null;
-      vg.traverse((o) => { const q = o.geometry && o.geometry.parameters;
-        if (q && q.radius === 1 && q.widthSegments === 96 && q.heightSegments === 72) bob = o.parent; });
-      if (!bob) return { error: 'body sphere not found' };
-      bob.updateWorldMatrix(true, false);
-      const ctr = new T.Vector3(), sc = new T.Vector3();
-      bob.matrixWorld.decompose(ctr, new T.Quaternion(), sc);
-      const HR = sc.y, camD = cam.position.distanceTo(ctr);
-      const axis = new T.Vector3().subVectors(ctr, cam.position).normalize();
-      const up = new T.Vector3(0, 1, 0).projectOnPlane(axis).normalize();
-      const right = new T.Vector3().crossVectors(axis, up).normalize();
-      // candidates: anything whose SPHERE reaches between the lens and his far face
-      const cand = [], bs = new T.Sphere(), tmp = new T.Vector3();
-      scene.traverse((o) => {
-        if (!o.isMesh || o === bob) return;
-        for (let a = o; a; a = a.parent) if (!a.visible) return;
-        if (vg === o || (function up2(x){ for (let a=x;a;a=a.parent) if (a===vg) return true; return false; })(o)) return;
-        if (!o.geometry) return;
-        if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
-        if (!o.geometry.boundingSphere) return;
-        bs.copy(o.geometry.boundingSphere).applyMatrix4(o.matrixWorld);
-        tmp.subVectors(bs.center, cam.position);
-        const t = tmp.dot(axis);
-        if (t + bs.radius <= 0 || t - bs.radius >= camD + HR) return;
-        const perp = Math.sqrt(Math.max(0, tmp.lengthSq() - t * t));
-        if (perp > HR + bs.radius) return;
-        cand.push(o);
-      });
-      const rc = new T.Raycaster(); rc.layers.set(0);
-      const N = 25; let tried = 0, blocked = 0; const by = {};
-      for (let iy = 0; iy < N; iy++) for (let ix = 0; ix < N; ix++) {
-        const u = (ix / (N - 1)) * 2 - 1, v = (iy / (N - 1)) * 2 - 1;
-        if (u * u + v * v > 1) continue;
-        tried++;
-        const k = Math.sqrt(Math.max(0, 1 - (u * u + v * v)));
-        const surf = ctr.clone().addScaledVector(right, u * HR).addScaledVector(up, v * HR).addScaledVector(axis, -k * HR);
-        const d = new T.Vector3().subVectors(surf, cam.position); const len = d.length();
-        d.multiplyScalar(1 / len);
-        rc.set(cam.position.clone(), d); rc.near = 0.1; rc.far = len - 0.05;
-        const hits = rc.intersectObjects(cand, false);
-        if (hits.length) { blocked++;
-          const nm = hits[0].object.name || hits[0].object.parent?.name || hits[0].object.type;
-          by[nm] = (by[nm] || 0) + 1; }
-      }
-      // his FEET on screen, in CSS px from the top
-      const foot = ctr.clone().addScaledVector(new T.Vector3(0, 1, 0), -HR).project(cam);
-      const worst = Object.entries(by).sort((a, b) => b[1] - a[1])[0];
-      return { camD: +camD.toFixed(1),
-        coveredPct: tried ? +(100 * blocked / tried).toFixed(1) : 0,
-        footY: Math.round((1 - foot.y) * 0.5 * 932),
-        worst: worst ? `${worst[0]} x${worst[1]}` : null };
-    });
+    const r = await p.evaluate(measureOcclusion);
     out.push({ w, mark: mk, lat, ...r });
     const under = r.footY > PANEL_Y;
     console.log(`  ${w.padEnd(8)} fwd ${String(mk).padStart(2)} lat ${String(lat).padStart(2)}  covered ${String(r.coveredPct).padStart(5)}%  feet y${String(r.footY).padStart(4)}${under ? ' <-- BEHIND THE LADDER PANEL' : ''}  ${r.worst || ''}`);
