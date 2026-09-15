@@ -2,30 +2,71 @@
 
 ## 0 · WHERE THIS ACTUALLY STANDS — read this before anything below
 
-This document grew by accretion and has been corrected five times. **Sections 1–10
+This document grew by accretion and has been corrected six times. **Sections 1–10
 are the original design and several of their numbers are wrong**; §11 onward is
 the record of what survived. If you read only one section, read this one.
 
-### Built and behind `?dio=1`
+### THE OWNER REPLACED THE DESIGN. Everything below about the hero in frame is dead.
+
+Shown a hole.io level-picker screenshot beside a photo of our live menu, the owner
+gave two directions:
+
+1. the picker should read as **a floating island on flat colour**
+2. **the void comes OFF the picker** — hole.io puts no character on theirs at all
+
+**(2) dissolved the fork this brief spent three refuted proposals trying to
+escape.** The camera sat at 178 units only to keep the hero legible at ~240 px,
+and at 178 the 92-unit block is **1.95× the frame width** — it runs off both sides
+and can never read as an object. That conflict was real and irreducible. It was
+not solved by a cleverer camera; it was dissolved by taking the hero out of the
+shot, which no measurement here could have proposed.
+
+### Built, behind `?dio=1`, gate-green at 45/45
 
 | | |
 |---|---|
-| the camera pull-back | 178.2 units back, 99.7 up. Camera elevation 34°, **view axis 36.93°** |
-| what is in frame | **half a block (51%)**, 47.2 world units wide — *not* the 92 this brief claimed |
-| the hero | r = 12, form pinned, **239–244 px** on every world (today's menu: 131–181, varying) |
-| his position | steps `DIO_MARK` = 16 units off the landmark toward the camera |
-| the shadow box | pinned to the block, and the sun centres on the **aim**, not on him |
+| camera | **500 units** back, lookAhead **0.16** (was 178 / 0.085) |
+| the cut | `renderer.clippingPlanes`, half **56** — the world ends at a hard edge |
+| the earth | a slab with **no top face**, DoubleSide, warm brown |
+| the hero | **not on the picker at all** |
+| the scrim | `body.diorama.island` opens the window 18%–58% |
+| per-world | pirate only: half 46, shifted (−18, −18) |
 
-### Shipped unconditionally (not behind the flag)
+**`cut ≤ 0.26 × D`.** The island is `2·cut` wide and the frame is
+`2·D·tan16·430/932`; at 460 units a cut of 72 overflows the sides again. Three
+attempts at this screen have now foundered on some version of *the thing is wider
+than the frame*.
 
-- **The picker is quiet.** Five of six worlds were showing a speech bubble pointing
-  at nobody. Two mechanisms: a spawn gate, and a per-frame retire for bubbles
-  already in the air. `qa/menuquiet.mjs`.
-- **One creature, one size, on every world**, and no phantom evolution per session.
-  `qa/menuform.mjs`.
-- **`fadeOccluders` tests the prop's near face**, not its centre. Corrects the
-  selection; **changes no pixels** — see §16.
-- The ferris wheel is out of the sea; `planGrid()` cannot go stale.
+### The three things that actually made it work
+
+- **Clipping planes, not a cull.** A cull cannot reach scenery (a tree is not in
+  `edibles`), instanced lane dashes and crowd discs, or the additive ground halo.
+  The refutation round that produced **no surviving proposal** is what identified
+  all three — a map of where the ground gives way is worth more than a proposal.
+- **The bay had to opt into clipping.** three honours `renderer.clippingPlanes` in
+  a `ShaderMaterial` only with `clipping: true` *and* the four chunks compiled in.
+  Without it the bay floated over the island as a teal disc. All four custom
+  shaders were audited; the bay was the only one affected.
+- **"Not crisp" was a CSS gradient, not fog and not light.** The scrim laid up to
+  **76% violet** across the object. Fog contributes nothing at 500 units (near
+  plane 529, island 400–520) and maple is authored *noon*. The light rig's own
+  comment records a brightness lift already tried and retracted for this exact
+  complaint — I would have re-run a retracted experiment.
+
+### Verified by looking, not by measuring
+
+Six worlds rendered; the swing photographed at **+7° and −7°**, where a square
+island is widest on screen. It holds at both.
+
+**Five instruments produced confident wrong numbers today** — a prop count, a
+ground-exists check, a farthest-ray-hit, three disagreeing copies of one occlusion
+measure, and a corner projection that claimed a 112-unit island spanned 1290 px in
+a 132-unit frame. Every one was caught by a picture. **None was caught by more
+measurement.** The working rule: *when a measurement and a photograph of the same
+thing disagree, suspect the measurement* — and a measurement with no picture to
+check it against can be wrong exactly this way and never say so.
+
+### Superseded — historical only
 
 ### Measured, per world
 
