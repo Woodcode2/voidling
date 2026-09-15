@@ -22,7 +22,14 @@ import { measureOcclusion, waitForScene } from './_occlib.mjs';
 
 const PORT = process.argv[2] || '4177';
 // world -> [forward, lateral], from qa/_marksweep.mjs
-const PICK = { pirate: [0, 20], lantern: [0, 20], powder: [0, 20], maple: [0, -26], gameday: [0, 0], skylark: [0, 0] };
+let PICK = { pirate: [0, 20], lantern: [0, 20], powder: [0, 20], maple: [0, -26], gameday: [0, 0], skylark: [0, 0] };
+// SEARCH MODE: one world, many candidate offsets, each graded on the WORST value
+// across a full swing — which is the grading function every earlier search here
+// got wrong by scoring a single phase.
+//   node qa/_driftcheck.mjs 4177 pirate '[[0,-20],[0,26],[8,20]]'
+const ONE = process.argv[3], CANDS = process.argv[4] ? JSON.parse(process.argv[4]) : null;
+if (ONE && CANDS) PICK = Object.fromEntries(CANDS.map((c, i) => [`${ONE}#${i}`, c]));
+else if (ONE) PICK = { [ONE]: PICK[ONE] };
 const PHASES = [0, 3.5, 7, 10.5, 14, 17.5, 21, 24.5];   // a full 28s cycle
 const BAR = 5, PANEL_Y = 536;
 
@@ -37,7 +44,7 @@ for (const [w, off] of Object.entries(PICK)) {
   await p.addInitScript(() => { try { localStorage.clear();
     localStorage.setItem('voidPlayed','1'); localStorage.setItem('voidTut','1'); localStorage.setItem('voidMute','1');
     localStorage.setItem('voidUnlocked','maple,pirate,gameday,lantern,powder,skylark'); } catch {} });
-  await p.goto(`http://127.0.0.1:${PORT}/?w=${w}&manual=1&dio=0`, { waitUntil: 'domcontentloaded', timeout: 300000 });
+  await p.goto(`http://127.0.0.1:${PORT}/?w=${w.split('#')[0]}&manual=1&dio=0`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__menuState && window.__menuState().menuMode, null, { timeout: 420000 });
   await p.waitForTimeout(20000);
   // ORDER MATTERS, AND I HAD IT BACKWARDS. The scene gate polls for three stable
