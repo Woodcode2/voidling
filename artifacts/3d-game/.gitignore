@@ -106,3 +106,5 @@ qa/out/menufix/*
 qa/out/island/*
 !qa/out/island/gameday-500-cut56-look016.png
 !qa/out/island/pirate-500-cut56-look016.png
+!qa/out/island/maple-t7.png
+!qa/out/island/maple-t21.png
