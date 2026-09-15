@@ -68,7 +68,9 @@ const WORLDS = process.argv[3] ? [process.argv[3]] : ['pirate', 'lantern', 'powd
 // (mark along the azimuth, lateral step across it). The pure-lateral row exists
 // because stepping toward the lens is what walks him into the ladder panel, and
 // a step ACROSS the view costs nothing against y536.
-const MARKS = [[0, 0], [0, 8], [0, 14], [0, 20], [8, 14], [12, 12]];
+let MARKS = [[0, 0], [0, 8], [0, 14], [0, 20], [8, 14], [12, 12]];
+// node qa/_marksweep.mjs 4177 maple '[[0,-20],[0,-14],[0,26]]'  — sweep your own
+if (process.argv[4]) MARKS = JSON.parse(process.argv[4]);
 const PANEL_Y = 536;
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
