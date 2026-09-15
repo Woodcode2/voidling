@@ -836,7 +836,14 @@
          #c9a6ff with no shadow and no stroke over arbitrary bright ground —
          plaza, sand, farm and airport are all bad backdrops for it.
          The stroke is #timer's idiom, works on any ground, and needs no markup. */
-      #evolve .big { font-size: 46px; letter-spacing: 2px; text-shadow: 0 0 24px rgba(172,108,255,0.9);
+      /* MEASURED, real font, real game: CHOMPOSAURUS is 383px at 46px and the
+         card peaks at scale(1.05), so it needs 402px. Room is width-16:
+         344 at 360, 359 at 375, 374 at 390, 414 at 430. It is CLIPPED on three
+         of the four phone widths a child holds, and has been since before the
+         burst was added — the biggest reward moment in the game showing a cut
+         word. 10.6vw keeps the longest name inside the narrowest phone at peak
+         scale, and the 46px cap means nothing changes on a large screen. */
+      #evolve .big { font-size: min(46px, 10.6vw); letter-spacing: 2px; text-shadow: 0 0 24px rgba(172,108,255,0.9);
         -webkit-text-stroke: 3px rgba(12,6,26,0.92); paint-order: stroke fill; }
       #evolve .sm { font-size: 16px; letter-spacing: 4px; color: #c9a6ff;
         -webkit-text-stroke: 2.5px rgba(12,6,26,0.92); paint-order: stroke fill; }
