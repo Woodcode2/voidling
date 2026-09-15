@@ -13197,6 +13197,9 @@ function animate() {
       if (curStage >= 3) questEvent('devourer');
       if (guideStep === 2) { guideStep = 3; showGuide('you <b>EVOLVED</b>! bigger void, bigger meals 🏠', 5); }
       evolveEl.classList.remove('show'); void (evolveEl as HTMLElement).offsetWidth; evolveEl.classList.add('show');
+      // …and the screen goes warm for a beat. fx.flash is the same call a hit
+      // uses, in the opposite colour: a bite washes red, a form washes gold.
+      fx.flash('rgba(255,214,120,0.34)', 0.5);
       holdBanner(2.4);   // this card owns the screen while it plays
     }
     audio.evolve();

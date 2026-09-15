@@ -842,6 +842,36 @@
         -webkit-text-stroke: 2.5px rgba(12,6,26,0.92); paint-order: stroke fill; }
       #evolve.show { animation: ev 1.8s ease forwards; }
       @keyframes ev { 0%{opacity:0; transform:scale(0.7)} 18%{opacity:1; transform:scale(1.05)} 70%{opacity:1; transform:scale(1)} 100%{opacity:0; transform:scale(1.1)} }
+      /* ── THE POP ────────────────────────────────────────────────────────────
+         The owner, on the level-up: "you see like a big flash… and that makes
+         it fun." The card was TYPOGRAPHY — a white 46px name, a dark stroke and
+         a soft purple glow, all of it correct and none of it a moment. It fires
+         at the single biggest reward in a match and looked like a subtitle.
+         Two pseudo-elements and no new art: a warm burst that blooms and fades,
+         and a ring of rays that spins a few degrees as it goes. Both sit at
+         z-index -1 so the name stays on top, and both are painted only while
+         .show is on, so an idle card costs nothing. Gold and pink against a
+         violet game — the pop comes from the colour being the one thing on
+         screen that is NOT the house purple. */
+      #evolve::before, #evolve::after {
+        content: ''; position: absolute; left: 50%; top: 42%;
+        border-radius: 50%; opacity: 0; z-index: -1; pointer-events: none; }
+      #evolve::before {
+        width: 44vmax; height: 44vmax; margin: -22vmax 0 0 -22vmax;
+        background: radial-gradient(circle, rgba(255,222,130,0.62) 0%,
+          rgba(255,120,214,0.38) 34%, rgba(172,108,255,0) 68%); }
+      #evolve::after {
+        width: 58vmax; height: 58vmax; margin: -29vmax 0 0 -29vmax;
+        background: repeating-conic-gradient(from 0deg,
+          rgba(255,236,176,0.30) 0deg 4deg, rgba(255,236,176,0) 4deg 17deg);
+        -webkit-mask-image: radial-gradient(circle, #000 18%, transparent 62%);
+        mask-image: radial-gradient(circle, #000 18%, transparent 62%); }
+      #evolve.show::before { animation: evBurst 1.5s cubic-bezier(.16,1,.3,1) forwards; }
+      #evolve.show::after { animation: evRays 1.6s cubic-bezier(.16,1,.3,1) forwards; }
+      @keyframes evBurst { 0%{opacity:0; transform:scale(.18)} 14%{opacity:1; transform:scale(.9)}
+        100%{opacity:0; transform:scale(1.55)} }
+      @keyframes evRays { 0%{opacity:0; transform:scale(.3) rotate(0deg)} 16%{opacity:.95}
+        100%{opacity:0; transform:scale(1.45) rotate(26deg)} }
       /* title card — plays only when .show is added (on PLAY) */
       /* THE SCRIM. This card had inset:0, no background of any kind, and sat
          over a live 3D town of pale plaza and light grass. Measured per-glyph
