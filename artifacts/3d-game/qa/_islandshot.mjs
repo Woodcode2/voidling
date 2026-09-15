@@ -23,23 +23,29 @@ import { mkdirSync } from 'node:fs';
 
 const PORT = process.argv[2] || '4177';
 const WORLD = process.argv[3] || 'maple';
+const ALL = WORLD === 'all';
+const WORLDS = ALL ? ['maple','pirate','gameday','lantern','powder','skylark'] : [WORLD];
 // [distance, cut half-size or null]. The cut is what turns a crop into an object.
 // [distance, cut, lookAhead] — lookAhead lifts the island so its cut edge clears
 // the level card and the earth slab's thickness is actually visible.
-const DISTS = [[460, 51, 0.16], [460, 54, 0.16], [500, 56, 0.16], [500, 56, 0.13], [540, 60, 0.16], [420, 47, 0.16]];
+// THE CHOSEN SETTING, from the sweeps: 500 units back, cut 56, lookAhead 0.16.
+// Island 112u against a 132u frame = 0.85, so it has hole.io's side margin.
+const PICKED = [500, 56, 0.16];
+const DISTS = ALL ? [PICKED] : [[460, 51, 0.16], [500, 56, 0.16], [540, 60, 0.16]];
 const OUT = 'qa/out/island';
 mkdirSync(OUT, { recursive: true });
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 try {
+  for (const W of WORLDS) {
   const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });
   p.on('pageerror', (e) => console.log(`  [pageerror] ` + e.message.split('\n')[0]));
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
   await p.addInitScript(() => { try { localStorage.clear();
     localStorage.setItem('voidPlayed','1'); localStorage.setItem('voidTut','1'); localStorage.setItem('voidMute','1');
     localStorage.setItem('voidUnlocked','maple,pirate,gameday,lantern,powder,skylark'); } catch {} });
-  await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}&manual=1&dio=1`, { waitUntil: 'domcontentloaded', timeout: 300000 });
+  await p.goto(`http://127.0.0.1:${PORT}/?w=${W}&manual=1&dio=1`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__menuState && window.__menuState().menuMode, null, { timeout: 420000 });
   await waitForScene(p);
   await p.waitForFunction(() => window.__menuState().menuT >= 4, null, { timeout: 420000 });
@@ -59,10 +65,11 @@ try {
       const s = window.__menuState();
       return { dist: Math.round(s.menuDist), az: s.azimuth };
     });
-    const f = `${OUT}/${WORLD}-${d}-cut${cut}-look${String(look).replace('.','')}.png`;
+    const f = `${OUT}/${W}-${d}-cut${cut}-look${String(look).replace('.','')}.png`;
     await p.screenshot({ path: f });
     const frameW = (2 * d * Math.tan(16 * Math.PI / 180)) * 430 / 932;
-    console.log(`  ${WORLD.padEnd(8)} dist ${String(d).padStart(4)} cut ${String(cut).padStart(3)} look ${String(look).padStart(5)}  frame ${frameW.toFixed(0)}u  island/frame ${((cut * 2) / frameW).toFixed(2)}x  -> ${f}`);
+    console.log(`  ${W.padEnd(8)} dist ${String(d).padStart(4)} cut ${String(cut).padStart(3)} look ${String(look).padStart(5)}  frame ${frameW.toFixed(0)}u  island/frame ${((cut * 2) / frameW).toFixed(2)}x  -> ${f}`);
   }
   await p.close();
+  }
 } finally { await b.close(); }
