@@ -1337,6 +1337,61 @@ function hasPlayed(): boolean {
   try { return !!localStorage.getItem('voidPlayed'); } catch { return false; }
 }
 
+/** ── THE MENU HERO, PER WORLD ──────────────────────────────────────────────
+ *
+ *  The owner's call, after the live 3D island had been measured, re-framed,
+ *  scrimmed and photographed for a fortnight and still would not read crisp on
+ *  a phone: "Maple Island can just be a snapshot of something picturesque that
+ *  represents Maple Island… just like a slightly animated image… we really need
+ *  to keep this simple." So the menu's hero stops being a render and becomes a
+ *  painted poster with a float on it (#menuArt in index.html).
+ *
+ *  MAPLE ONLY, AND THAT IS THE INSTRUCTION, not an oversight: "Can we focus on
+ *  one until it's perfect once we agree we do it for the other levels." A world
+ *  with no entry here keeps the live 3D menu it has today, untouched — the
+ *  fallback is the thing that is already shipping, so the worst case of this
+ *  table is the status quo on five screens and the new one on the sixth.
+ *
+ *  The path stays written as /assets/hf/ because scripts/asset-refs.mjs scans
+ *  the source for exactly that shape: vercel.json rewrites it to the generation
+ *  CDN on the web, and `pnpm build:ios` vendors it to disk for the app. This
+ *  container cannot fetch it — the egress proxy refuses that origin — which is
+ *  why paintMenuArt only reveals the layer on `probe.onload` and leaves the
+ *  live menu up otherwise. A blocked or slow poster is never a blank screen. */
+const MENU_ART: Partial<Record<string, string>> = {
+  // MAPLE FALLS: the town square party on a floating island — mayor on his
+  // podium, brass band, bunting, the church steeple — and the island CARVED OUT
+  // at the bottom, rounded rock and dangling roots, which is the owner's own
+  // amendment: the first take put the void under it and the painter gave him
+  // hands and feet. "What if we just carved out the bottom island part with him
+  // in it?" There is no void on this poster. He is the thing you play.
+  maple: '/assets/hf/hf_20260916_114234_f51f66e2-c219-4eb4-a04e-95f33f03240d.png',
+};
+/** Hang this world's poster in the menu, or leave the live 3D menu up. */
+function paintMenuArt(id: string): void {
+  const host = document.getElementById('menuArt');
+  const img = document.getElementById('menuArtImg') as HTMLImageElement | null;
+  if (!host || !img) return;
+  const src = MENU_ART[id];
+  // SWITCHING WORLDS MUST BE ABLE TO SWITCH BACK. Without this the class from
+  // the world she came from survives into a world with no poster of its own,
+  // and she gets Maple's island hanging over Pirate Bay's menu.
+  if (!src) { document.body.classList.remove('poster'); return; }
+  if (img.getAttribute('src') === src && img.complete && img.naturalWidth > 0) {
+    document.body.classList.add('poster');
+    return;
+  }
+  document.body.classList.remove('poster');
+  const probe = new Image();
+  probe.onload = () => {
+    // the world may have changed again while this was in flight
+    if (MENU_ART[pickedWorld] !== src) return;
+    img.src = src;
+    document.body.classList.add('poster');
+  };
+  probe.src = src;   // no onerror needed: the splash is what is already up
+}
+
 /** Put the camera on this world's stage and the void in front of it. Idempotent:
  *  every path back to the menu calls it, and several of them call it twice. */
 function enterMenu(): void {
@@ -1403,6 +1458,7 @@ function enterMenu(): void {
   // `diorama` is added for the SHIPPED menu too, so widening the scrim window on
   // it would change the live build under the owner mid-playtest.
   document.body.classList.toggle('island', DIORAMA);
+  paintMenuArt(pickedWorld);
   paintMenuLadder();
 }
 
@@ -1444,6 +1500,11 @@ function leaveMenu(): void {
   ladderCancel();
   menuLook = 0;
   document.body.classList.remove('diorama');
+  // `poster` goes with it. Nothing outside #menu reads the class and #menu is
+  // hidden during a match, so leaving it on is invisible rather than wrong —
+  // but a body whose classes describe a screen that is not up is how every
+  // debug session on this file starts one step behind.
+  document.body.classList.remove('poster');
 }
 
 /** THE STEERING CAP, in one place. `Math.min(96, 16 * (camDist / 50))` was
@@ -2935,6 +2996,7 @@ const _dbg = new Proxy(_dbgStore, {
   __hatSheet: (ids: string[]) => Promise<unknown>;
   __voidSheet: (ids: string[]) => Promise<unknown>;
   __texRace: (skinId: string) => Promise<Record<string, unknown>>;
+  __menuArtSrc?: (src: string | null) => string | null;
   __paintVoids?: () => void;
   __previewVoid?: (s: Skin) => void;
   __previewStop?: () => void;
@@ -3501,6 +3563,16 @@ _dbg.__menuMark = (s: number | null, lat?: number): number => {
   latOverride = lat === undefined || lat === null ? 0 : +lat;
   if (menuMode) enterMenu();
   return dioMark;
+};
+/** QA ONLY: substitute the poster for the world on screen. This container's
+ *  egress proxy refuses the generation CDN, so the real Maple poster cannot be
+ *  fetched here — the float has to be photographed against a file that IS on
+ *  disk. Passing null restores the authored entry. */
+_dbg.__menuArtSrc = (src: string | null): string | null => {
+  if (src === null || src === undefined) delete MENU_ART[pickedWorld];
+  else MENU_ART[pickedWorld] = src;
+  paintMenuArt(pickedWorld);
+  return MENU_ART[pickedWorld] ?? null;
 };
 _dbg.__menuFreeze = (s: number | null): number | null => {
   menuFreeze = (s === null || s === undefined) ? null : +s;

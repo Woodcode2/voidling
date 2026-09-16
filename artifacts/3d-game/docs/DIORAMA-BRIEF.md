@@ -6,6 +6,44 @@ This document grew by accretion and has been corrected six times. **Sections 1�
 are the original design and several of their numbers are wrong**; §11 onward is
 the record of what survived. If you read only one section, read this one.
 
+### AND THEN HE REPLACED IT AGAIN: THE MENU HERO IS A PAINTING, NOT A RENDER.
+
+**Everything below this heading — the whole brief, the ?dio=1 build included — is
+now the record of a road not taken.** It is kept because its instrument findings
+are still true and were expensive, not because the screen it describes is the one
+being built.
+
+The owner, on the photographs the section below calls a success:
+
+> "we're missing the mark… it's a giant picture of the island itself… far away…
+> the quality is not good… can we not leverage Higgsfield… Maple Island can just
+> be a snapshot of something picturesque that represents Maple Island… just like
+> a slightly animated image… we really need to keep this simple, Claude…
+> there's kids playing this."
+
+So the menu hero stops being a rendered scene and becomes **one painted poster
+with a float on it** — `#menuArt` in index.html, `MENU_ART` / `paintMenuArt()` in
+prototype3d.ts, `qa/_float.mjs` for the probe. **Maple Falls only**, on his
+instruction: *"Can we focus on one until it's perfect once we agree we do it for
+the other levels."* A world with no poster keeps today's live 3D menu unchanged,
+which is what makes this safe to have on a branch at all.
+
+**Three things this route learned that the route below never could:**
+
+- **`body.diorama` is on for the SHIPPED menu, not just under the flag.** So
+  `body.diorama #menu::after` has been hiding the painted splash on every phone
+  for weeks, and what a child sees today is the live world through a gradient
+  with a clear band at 44%–54%. Closing that band is the poster's actual job; the
+  splash was never the thing being replaced.
+- **Two CSS animations on one element do not compose.** Both writing `transform`
+  means the last one wins outright and the first is silently dropped. The bob and
+  the tilt are on different elements for that reason alone, and `_float.mjs` (d)
+  exists to prove it stayed that way.
+- **A poster is a rectangle until it is masked, and a mask with the wrong sizing
+  keyword is a no-op that photographs as a success.** `ellipse 96% 96%` put the
+  solid stop past the box edges; `ellipse 50% 50%` is the one that makes the
+  percentages mean what they read as.
+
 ### THE OWNER REPLACED THE DESIGN. Everything below about the hero in frame is dead.
 
 Shown a hole.io level-picker screenshot beside a photo of our live menu, the owner

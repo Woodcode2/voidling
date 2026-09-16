@@ -1323,6 +1323,159 @@
       @media (orientation: landscape) {
         #menu::after { background-size: auto 88vh; background-position: center 0; }
       }
+      /* ── THE MENU HERO IS THE WORLD, AND IT FLOATS ──────────────────────
+         The owner, after a fortnight of trying to make the live 3D island read
+         crisp at card size: "Maple Island can just be a snapshot of something
+         picturesque that represents Maple Island… just like a slightly animated
+         image… we really need to keep this simple." So the hero stops being a
+         rendered scene and becomes one painted poster with motion on it.
+
+         WHY IT IS THREE NESTED ELEMENTS AND NOT ONE. Two CSS animations on one
+         element both writing `transform` do not compose — the last one in the
+         list wins outright and the first is simply not applied. The bob and the
+         tilt have to sit on different elements or one of them silently does
+         nothing. #menuArt holds the perspective, #menuArtBob translates, the
+         image rotates.
+
+         AND WHY A TILT AT ALL. A pure up-down bob reads as a sticker sliding on
+         glass: nothing about vertical translation says the thing has a far side.
+         A degree and a half of rotateY on a period that never divides into the
+         bob's is what makes it a solid object turning as it rises — the same
+         reason a hanging mobile looks heavy and a balloon on a string does not.
+         5.2s against 7.3s means the two never line up inside a session.
+
+         The numbers are small on purpose. This is behind the game's name and
+         above her PLAY button; it has to be alive in peripheral vision and
+         invisible the moment she looks at it. */
+      /* WHY THIS ONE SELECTOR NAMES #menu TWICE. `#menu > *` further down this
+         sheet sets `position: relative; z-index: 1` on every direct child of the
+         menu, and it is one ID against one ID — a tie that source order decides,
+         and it is written later. As a bare `#menuArt` this layer lost that tie,
+         stopped being absolute, and joined the column flex as a shrunken item:
+         measured at 382x314 sitting at x=239 on a 430px screen, a third of the
+         poster hanging off the side. Two IDs takes it out of the tie. (The leaf
+         and star rules below are descendants, not children, so `#menu > *` never
+         reaches them and they stay written plainly.) */
+      #menu #menuArt { position: absolute; left: 0; right: 0; top: 10vh; height: 58vh;
+        z-index: 0; pointer-events: none; display: none; overflow: hidden;
+        perspective: 900px; perspective-origin: 50% 42%; }
+      body.poster #menu #menuArt { display: block; }
+      /* ── AND WHAT THE POSTER IS ACTUALLY REPLACING ──────────────────────
+         Not the splash art. enterMenu() adds `diorama` to the body on EVERY
+         path into the menu — the flag only controls `island` — so
+         `body.diorama #menu::after` has been hiding the painted splash this
+         whole time, and what shows on the menu today is the LIVE 3D WORLD,
+         through a gradient with a clear band between 44% and 54% of the screen.
+         That band is the thing the poster has to close. Leaving it open puts a
+         slice of the rendered town behind a painting of the same town.
+
+         So poster mode puts the opaque menu background back — these three stops
+         are the pre-diorama ones, lifted unchanged — closes the window, and
+         brings the star field with it: the stars were collateral damage of the
+         same `body.diorama` rule, and a floating island wants a sky behind it.
+         `.poster.diorama` rather than `.poster` so these win on specificity
+         rather than on which rule happens to be written last. */
+      body.poster.diorama #menu { background:
+          radial-gradient(ellipse at 78% 12%, rgba(240,111,176,0.16), transparent 42%),
+          radial-gradient(ellipse at 18% 30%, rgba(94,200,216,0.10), transparent 40%),
+          radial-gradient(ellipse at 50% 34%, #33175e 0%, #1c0f3d 46%, #0d0821 100%); }
+      body.poster.diorama #menu::before { display: block; }
+      body.poster.diorama #menu::after { display: none; }
+      #menuArtBob { position: absolute; inset: 0;
+        animation: artBob 2.6s ease-in-out infinite alternate; }
+      /* `object-fit: contain` in a box 88vw wide and the full height of the
+         layer: the poster keeps its own 3:4 and centres itself inside that box
+         whichever of the two limits it hits first. No aspect-ratio arithmetic
+         here, and no per-poster sizing when the other five worlds arrive. */
+      #menuArtImg { position: absolute; left: 6vw; right: 6vw; top: 0;
+        width: 88vw; height: 100%; object-fit: contain;
+        transform-origin: 50% 46%;
+        /* ── THE POSTER IS NOT A PHOTOGRAPH IN A FRAME ────────────────────
+           Every one of these paintings comes back as a full 3:4 canvas with its
+           OWN sky in it — a deep purple starfield, because that is what the
+           prompt asks for — so dropped straight onto the menu it lands as a
+           rectangle of one purple sitting on another, with four visible edges
+           and a seam under the tagline. Photographed at 430x932 and it is the
+           first thing the eye finds.
+
+           The fix is the one the splash layer already uses in its own words,
+           "on its own feathered layer… melt into the cosmos with no hard photo
+           edges": a radial mask, solid across the middle where the island is
+           and gone by the corners, so the painted sky hands over to the menu's
+           sky instead of ending, with the fade only ever eating sky.
+
+           THE GEOMETRY IS THE WHOLE TRICK AND THE FIRST ATTEMPT HAD IT BACKWARDS.
+           `ellipse 96% 96%` sets the radii to 96% of the box's WIDTH and HEIGHT
+           — 363px across on a 430px phone, where the box's own half-width is
+           189 — so a solid stop at 62% of that reached 225px and covered every
+           pixel there is. The mask was authored, applied, and did nothing: the
+           photograph came back with four edges as hard as before it.
+           `50% 50%` is the size that makes the ellipse touch the box edges, so
+           the stops below finally mean what they read as: solid out to 78% of
+           the way to the edge, which clears the island's widest point, then
+           eighteen per cent of sky handing over to the menu's own. */
+        -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 46%, #000 0 78%, rgba(0,0,0,0.5) 90%, transparent 100%);
+        mask-image: radial-gradient(ellipse 50% 50% at 50% 46%, #000 0 78%, rgba(0,0,0,0.5) 90%, transparent 100%);
+        animation: artTilt 3.65s ease-in-out infinite alternate;
+        will-change: transform; }
+      @keyframes artBob {
+        from { transform: translate3d(0, -8px, 0); }
+        to   { transform: translate3d(0,  8px, 0); } }
+      @keyframes artTilt {
+        from { transform: rotateY(-1.5deg) rotateZ(-0.7deg); }
+        to   { transform: rotateY( 1.5deg) rotateZ( 0.7deg); } }
+      /* ── FOUR LEAVES, BECAUSE THE ISLAND IS AUTUMN ──────────────────────
+         Not a particle system and not a sprite sheet: four divs on one keyframe
+         each, staggered by delay. They fall past the island rather than off it,
+         which is what sells depth — a leaf that crosses in FRONT of the rock and
+         keeps going is a leaf in the same space as the island. */
+      #menuArt .leaf { position: absolute; top: -8%; width: 11px; height: 11px;
+        border-radius: 68% 4% 68% 4%; opacity: 0;
+        background: linear-gradient(150deg, #ffb74a 0%, #f0682f 58%, #c8382b 100%);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.28);
+        animation: leafFall 13s linear infinite; }
+      #menuArt .leaf:nth-child(2) { left: 22%; animation-duration: 15.5s; animation-delay: -2s;  width: 9px;  height: 9px; }
+      #menuArt .leaf:nth-child(3) { left: 41%; animation-duration: 12.2s; animation-delay: -7s; }
+      #menuArt .leaf:nth-child(4) { left: 63%; animation-duration: 17s;   animation-delay: -4s;  width: 13px; height: 13px; }
+      #menuArt .leaf:nth-child(5) { left: 79%; animation-duration: 14.4s; animation-delay: -10s; width: 8px;  height: 8px; }
+      /* The travel is 52vh and it ends INSIDE the layer on purpose: #menuArt
+         clips (so no leaf ever lands on the PLAY button) and a leaf still at
+         half opacity when it meets that edge vanishes mid-air. It is faded out
+         by 92%, with 8% of the fall left to spare. */
+      @keyframes leafFall {
+        0%   { opacity: 0;    transform: translate3d(0, 0, 0) rotate(0deg); }
+        7%   { opacity: 0.9; }
+        35%  {                transform: translate3d(16px, 20vh, 0) rotate(170deg); }
+        70%  {                transform: translate3d(-8px, 38vh, 0) rotate(300deg); }
+        92%  { opacity: 0; }
+        100% { opacity: 0;    transform: translate3d(6px, 52vh, 0) rotate(400deg); } }
+      /* ── AND THREE STARS THAT ARE NOT PAINTED ON ────────────────────────
+         #menu::before is the star field, and it is one static background image:
+         pulsing IT pulses every star at once, which reads as the screen
+         flickering rather than the sky being alive. These are three discrete
+         stars on three different periods, placed clear of where the poster sits
+         so they twinkle in the sky and not on the rock. */
+      #menuArt .tw { position: absolute; width: 4px; height: 4px; border-radius: 50%;
+        background: #fff; box-shadow: 0 0 7px 2px rgba(198,170,255,0.75);
+        animation: twinkle 4.4s ease-in-out infinite; }
+      #menuArt .tw:nth-child(6) { left: 11%; top: 16%; }
+      #menuArt .tw:nth-child(7) { left: 86%; top: 27%; animation-duration: 6.1s; animation-delay: -2.4s; }
+      #menuArt .tw:nth-child(8) { left: 74%; top: 8%;  animation-duration: 5.3s; animation-delay: -4s; width: 3px; height: 3px; }
+      @keyframes twinkle {
+        0%, 100% { opacity: 0.22; transform: scale(0.7); }
+        50%      { opacity: 1;    transform: scale(1.25); } }
+      /* Motion in the background of a menu is exactly the motion a child who
+         asked the phone to stop moving things did not ask for. The poster stays;
+         it simply stops breathing. */
+      @media (prefers-reduced-motion: reduce) {
+        #menuArtBob, #menuArtImg, #menuArt .leaf, #menuArt .tw { animation: none; }
+        #menuArt .leaf { opacity: 0; }
+        #menuArt .tw { opacity: 0.55; }
+      }
+      @media (orientation: landscape) {
+        #menu #menuArt { top: 2vh; height: 74vh; }
+        #menuArtImg { left: 22vw; right: 22vw; width: 56vw; }
+      }
       #menu > * { position: relative; z-index: 1; }
       @media (orientation: portrait) {
         #menu .foot { margin-top: 8px; }
@@ -2367,6 +2520,25 @@
 
     <!-- ── start menu: full splash key art, opaque (not the live game) ── -->
     <div id="menu">
+      <!-- ── THE POSTER, AND WHAT IT REPLACED ────────────────────────────
+           The hero layer. Empty and hidden until paintMenuArt() finds a poster
+           for the world she is on; when it does, body.poster turns this on and
+           closes the menu's window onto the live 3D scene behind it. A world
+           with no poster never turns it on and keeps that scene, untouched:
+           there is always exactly one hero on this screen, and the one that
+           ships today is the floor this stands on rather than a fallback the
+           change gives up.
+
+           The four leaves and three stars are markup rather than pseudo-elements
+           because an element gets exactly two of those and this needs seven. The
+           nth-child numbers in the CSS count THESE children, so the image stays
+           first and nothing is inserted between them. -->
+      <div id="menuArt" aria-hidden="true">
+        <div id="menuArtBob"><img id="menuArtImg" alt=""></div>
+        <span class="leaf"></span><span class="leaf"></span>
+        <span class="leaf"></span><span class="leaf"></span>
+        <span class="tw"></span><span class="tw"></span><span class="tw"></span>
+      </div>
       <!-- THE NAME (owner's launch call): "Voidling" is a live App Store
            game already (Douglas Johnson, 2026), so the app is THE CUTE WORLD
            ENDER — our own tagline, promoted — and the voidlings stay the
