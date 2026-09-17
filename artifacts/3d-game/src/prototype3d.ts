@@ -1367,6 +1367,27 @@ const MENU_ART: Partial<Record<string, string>> = {
   // in it?" There is no void on this poster. He is the thing you play.
   maple: '/assets/hf/hf_20260916_114234_f51f66e2-c219-4eb4-a04e-95f33f03240d.png',
 };
+/** ── THE POSTER IS OPAQUE, SO THE SCENE BEHIND IT IS NOT DRAWN ─────────────
+ *
+ *  `body.poster.diorama #menu` closes the menu's window with a gradient whose
+ *  last stop is solid #0d0821, over a #menu that is `position: fixed; inset: 0`.
+ *  The canvas behind it is covered to the pixel — and until this flag existed,
+ *  still rendered: 231 draw calls, a quarter-rate shadow map and the bloom
+ *  composer's fifteen passes, thirty times a second, onto pixels nobody can see.
+ *  On the app's FRONT DOOR, which is where a child sits longest and where maple
+ *  — the default world, and the only one with a poster — is what she sees.
+ *
+ *  Day 9 bought that frame down from 519 calls to 410 and then to 231. This
+ *  spends none of it: it stops paying the bill at all while the painting is up.
+ *
+ *  ONE WRITER, because the class and the flag disagreeing is the whole risk: a
+ *  true flag over a menu that is NOT opaque is a black screen, which is worse
+ *  than any frame cost. Every add and remove of `poster` goes through here. */
+let posterUp = false;
+function setPoster(on: boolean): void {
+  posterUp = on;
+  document.body.classList.toggle('poster', on);
+}
 /** Hang this world's poster in the menu, or leave the live 3D menu up. */
 function paintMenuArt(id: string): void {
   const host = document.getElementById('menuArt');
@@ -1376,18 +1397,18 @@ function paintMenuArt(id: string): void {
   // SWITCHING WORLDS MUST BE ABLE TO SWITCH BACK. Without this the class from
   // the world she came from survives into a world with no poster of its own,
   // and she gets Maple's island hanging over Pirate Bay's menu.
-  if (!src) { document.body.classList.remove('poster'); return; }
+  if (!src) { setPoster(false); return; }
   if (img.getAttribute('src') === src && img.complete && img.naturalWidth > 0) {
-    document.body.classList.add('poster');
+    setPoster(true);
     return;
   }
-  document.body.classList.remove('poster');
+  setPoster(false);
   const probe = new Image();
   probe.onload = () => {
     // the world may have changed again while this was in flight
     if (MENU_ART[pickedWorld] !== src) return;
     img.src = src;
-    document.body.classList.add('poster');
+    setPoster(true);
   };
   probe.src = src;   // no onerror needed: the splash is what is already up
 }
@@ -1500,11 +1521,10 @@ function leaveMenu(): void {
   ladderCancel();
   menuLook = 0;
   document.body.classList.remove('diorama');
-  // `poster` goes with it. Nothing outside #menu reads the class and #menu is
-  // hidden during a match, so leaving it on is invisible rather than wrong —
-  // but a body whose classes describe a screen that is not up is how every
-  // debug session on this file starts one step behind.
-  document.body.classList.remove('poster');
+  // `poster` goes with it — and this one is not cosmetic any more. The flag it
+  // carries suppresses the draw, so a match that began with it still set would
+  // render nothing at all. setPoster owns both.
+  setPoster(false);
 }
 
 /** THE STEERING CAP, in one place. `Math.min(96, 16 * (camDist / 50))` was
@@ -13585,7 +13605,11 @@ function animate() {
   // menuMode is false through all of those by construction.
   const drawThisFrame = !menuMode || !menuOptim || (shadowFrame % 2) === 0;
   if (shadowFrame++ % shadowEvery === 0) renderer.shadowMap.needsUpdate = true;
-  if (!drawThisFrame) { requestAnimationFrame(animate); return; }
+  // …and NOTHING at all while the menu is a painting. `posterUp` is only ever
+  // true with menuMode true and the opaque background up (see setPoster), and
+  // the rAF still runs: the sim steps, the town walks, the drift advances, so
+  // the frame the poster comes down on is a live one, not a stale buffer.
+  if (posterUp || !drawThisFrame) { requestAnimationFrame(animate); return; }
   // …through the composer only on the rungs that can afford it. applyQuality
   // owns bloomOn, so the adapter switching rungs switches the glow with it.
   if (bloomOn) {

@@ -1416,8 +1416,21 @@
            eighteen per cent of sky handing over to the menu's own. */
         -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 46%, #000 0 78%, rgba(0,0,0,0.5) 90%, transparent 100%);
         mask-image: radial-gradient(ellipse 50% 50% at 50% 46%, #000 0 78%, rgba(0,0,0,0.5) 90%, transparent 100%);
-        animation: artTilt 3.65s ease-in-out infinite alternate;
+        /* TWO ANIMATIONS, AND THESE ONES DO COMPOSE. The note further up about
+           the bob and the tilt needing separate elements is about two
+           animations writing the SAME property — there the last wins and the
+           first is dropped. artTilt writes `transform` and artFade writes
+           `opacity`, so both apply. The distinction is the property, not the
+           count.
+           The fade exists because the poster arrives over the network: until it
+           decoded, the menu hard-cut from the live 3D world to a painting in one
+           frame, which reads as a glitch rather than a load. `both` so it ends
+           held at 1, and display:none -> block restarts it, so it plays exactly
+           once, on reveal. */
+        animation: artTilt 3.65s ease-in-out infinite alternate,
+                   artFade 0.5s ease-out both;
         will-change: transform; }
+      @keyframes artFade { from { opacity: 0 } to { opacity: 1 } }
       @keyframes artBob {
         from { transform: translate3d(0, -8px, 0); }
         to   { transform: translate3d(0,  8px, 0); } }

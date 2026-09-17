@@ -102,7 +102,13 @@ const read = () => {
       const el = document.getElementById(id);
       return el ? el.getAnimations().map((a) => ({
         name: a.animationName, dur: a.effect.getTiming().duration,
-        dir: a.effect.getTiming().direction })) : [];
+        dir: a.effect.getTiming().direction,
+        // WHICH PROPERTY does this animation write? That, not the count, is
+        // what decides whether two of them can coexist on one element.
+        props: [...new Set(a.effect.getKeyframes()
+          .flatMap((k) => Object.keys(k))
+          .filter((k) => !['offset', 'composite', 'computedOffset', 'easing'].includes(k)))],
+      })) : [];
     }),
     artBox: (() => { const r = document.getElementById('menuArtImg')?.getBoundingClientRect();
       return r ? { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) } : null; })(),
@@ -180,16 +186,24 @@ try {
   //     clothes. The authored durations are a property of the stylesheet and
   //     are exact at any frame rate.
   //
-  //     Two things have to hold. ONE animation per element: a second one on the
-  //     same element is the composition bug arriving, and it is silent. And a
-  //     ratio that is not a small whole number: 2.6s against 3.65s realign every
-  //     37.96s, which is longer than a child looks at a menu — equal periods, or
-  //     3.9 against 2.6, would beat in plain sight.
+  //     Two things have to hold. AT MOST ONE ANIMATION PER ELEMENT WRITING
+  //     `transform`: a second one is the composition bug arriving, silently.
+  //     And a ratio that is not a small whole number: 2.6s against 3.65s realign
+  //     every 379.6s, which is longer than a child looks at a menu — equal
+  //     periods, or 3.9 against 2.6, would beat in plain sight.
+  //
+  //     COUNTING ANIMATIONS WAS THE WRONG QUESTION, and this check failed the
+  //     first honest build that proved it: artFade was added to #menuArtImg to
+  //     cross-fade the poster in, giving that element two animations and zero
+  //     conflict — artFade writes `opacity`, artTilt writes `transform`. The
+  //     rule was never "one animation"; it is "one writer per property".
   const a = s0.anims;
   const names = a.map((x) => x.map((y) => y.name).join('+'));
-  if (a[0].length === 1 && a[1].length === 1) pass(`one animation per element: ${names[0]} on the bob, ${names[1]} on the image`);
-  else fail(`animations per element are ${a[0].length} and ${a[1].length} — two on one element do not compose, the first is dropped`);
-  const [d0, d1] = [a[0][0] && a[0][0].dur, a[1][0] && a[1][0].dur];
+  const tf = a.map((x) => x.filter((y) => y.props.includes('transform')));
+  if (tf[0].length === 1 && tf[1].length === 1)
+    pass(`exactly one transform-writer per element: ${tf[0][0].name} on the bob, ${tf[1][0].name} on the image (of ${names[0]} / ${names[1]})`);
+  else fail(`transform-writers per element are ${tf[0].length} and ${tf[1].length} — two on one element do not compose, the first is dropped`);
+  const [d0, d1] = [tf[0][0] && tf[0][0].dur, tf[1][0] && tf[1][0].dur];
   const ratio = d0 && d1 ? Math.max(d0, d1) / Math.min(d0, d1) : 1;
   const nearInt = Math.abs(ratio - Math.round(ratio)) < 0.04;
   if (d0 && d1 && d0 !== d1 && !nearInt) {
@@ -197,8 +211,8 @@ try {
     const lcm = (d0 * d1) / g(d0, d1);
     pass(`bob ${d0}ms x2 vs tilt ${d1}ms x2 (ratio ${ratio.toFixed(3)}) — they realign every ${(lcm * 2 / 1000).toFixed(1)}s`);
   } else fail(`bob ${d0}ms vs tilt ${d1}ms (ratio ${ratio.toFixed(3)}) — the two periods beat together and the float looks mechanical`);
-  if (a[0][0] && a[0][0].dir === 'alternate' && a[1][0] && a[1][0].dir === 'alternate') pass('both run `alternate` — the poster eases back, it never snaps to its start');
-  else fail(`directions are ${a[0][0] && a[0][0].dir} / ${a[1][0] && a[1][0].dir} — a non-alternating loop jumps on every repeat`);
+  if (tf[0][0] && tf[0][0].dir === 'alternate' && tf[1][0] && tf[1][0].dir === 'alternate') pass('both run `alternate` — the poster eases back, it never snaps to its start');
+  else fail(`directions are ${tf[0][0] && tf[0][0].dir} / ${tf[1][0] && tf[1][0].dir} — a non-alternating loop jumps on every repeat`);
 
   // (e) THE PICTURES. Eight frames across one bob, as the child sees them.
   for (let k = 0; k < 8; k++) {
@@ -274,7 +288,28 @@ try {
   if (!stillOn.length) pass('body.calm silences every one of them — the in-app toggle reaches the float AND the evolve burst');
   else fail(`body.calm leaves ${stillOn.length} still animating: ${stillOn.join(', ')} — the parent's own switch does not reach ${stillOn.join('/')}`);
 
-  // (j) A WORLD WITH NO POSTER FALLS BACK, and falls back from a world that HAD
+  // (j) THE SCENE IS NOT BEING DRAWN BEHIND THE POSTER — AND THE SCREEN IS NOT
+  //     BLACK EITHER. These are one check on purpose: the render-skip's only
+  //     real hazard is a `posterUp` that is true over a menu that is NOT opaque,
+  //     and that failure looks like a black rectangle, not like a slow frame.
+  //     (f) above already proved the canvas contributes zero pixels; this proves
+  //     the pixels it stopped contributing were replaced by a poster and not by
+  //     nothing.
+  const lit = await p.evaluate(() => {
+    const r = document.getElementById('menuArtImg').getBoundingClientRect();
+    // sample the middle of the poster: it must not be the background colour
+    return { cx: Math.round(r.x + r.width / 2), cy: Math.round(r.y + r.height / 2) };
+  });
+  const px = await p.screenshot({ clip: { x: lit.cx - 20, y: lit.cy - 20, width: 40, height: 40 } });
+  const { PNG: P2 } = await import('pngjs');
+  const patch = P2.sync.read(px);
+  let sum = 0, n = 0;
+  for (let i = 0; i < patch.data.length; i += 4) { sum += patch.data[i] + patch.data[i + 1] + patch.data[i + 2]; n++; }
+  const mean = sum / (n * 3);
+  if (mean > 40) pass(`the middle of the poster reads ${mean.toFixed(0)}/255 mean brightness — a painting is there, not a black hole`);
+  else fail(`the middle of the poster reads ${mean.toFixed(0)}/255 — the draw was skipped and nothing replaced it`);
+
+  // (k) A WORLD WITH NO POSTER FALLS BACK, and falls back from a world that HAD
   //     one — the state that leaves an old island hanging behind a hidden splash.
   await p.evaluate(() => window.__menuArtSrc(null));
   await p.waitForTimeout(200);
