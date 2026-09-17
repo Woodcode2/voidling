@@ -2411,10 +2411,13 @@
          exactly the sort of thing a child with vestibular sensitivity is stuck
          looking at while deciding what to tap.
 
-         Honours the OS setting only. The in-app BIG MOTION switch cannot reach
-         these rules, which is the trade for keeping it a two-line change; the
-         switch governs the flash and the shake, which are the ones that matter
-         in play. */
+         (This paragraph used to end "Honours the OS setting only. The in-app
+         BIG MOTION switch cannot reach these rules... the switch governs the
+         flash and the shake, which are the ones that matter in play." That trade
+         was abandoned when the body.calm block below was written; the note is
+         kept in its own words because it is the argument that has to stay lost
+         every time someone adds an animation and only tests it with the OS
+         preference on.) */
       /* body.calm mirrors the OS query: the in-game BIG MOTION toggle sets it
          (fx.ts setReduceMotion), so the switch a parent can actually find
          governs the SAME set of animations the OS preference does. Before
@@ -2426,11 +2429,32 @@
       body.calm #skinPrev .spCard, body.calm #daily .dCard, body.calm .skCard .rib,
       body.calm .skCard.bought, body.calm .burst > i, body.calm #shopWallet.bump,
       body.calm .skCard.isnew::before, body.calm #skinPrev.win .spWin,
-      body.calm .gPill {
+      body.calm .gPill,
+      /* ── THE TWO NEWEST EFFECTS, ADDED THE DAY THEY WERE WRITTEN ────────
+         The list above exists because the toggle once reached two things and a
+         parent reasonably concluded it was broken. Both of these arrived after
+         it and both repeated the original mistake, because the OS block below
+         carries a `*, *::before, *::after` catch-all and this one does not: an
+         effect added to the sheet is silenced by the OS preference for free and
+         has to be named HERE by hand.
+
+         The evolve burst is the one that matters. It is a full-screen gold wash
+         plus a 58vmax ray fan, on a six-year-old, at the loudest moment of the
+         match — exactly the motion a parent reaches for this switch to stop. */
+      body.calm #evolve::before, body.calm #evolve::after,
+      /* and the menu's floating island, for the same reason */
+      body.calm #menuArtBob, body.calm #menuArtImg,
+      body.calm #menuArt .leaf, body.calm #menuArt .tw {
         animation: none !important;
       }
       body.calm .burst { display: none !important; }
       body.calm #growth .gFill { background-size: 100% 100%; }
+      /* the leaves are pure animation — parked, they would sit in a row along
+         the top of the sky. The stars hold at a readable brightness instead of
+         the 0.22 trough they would freeze at. (Mirrors the OS-query rules on
+         #menuArt further up this sheet.) */
+      body.calm #menuArt .leaf { opacity: 0 !important; }
+      body.calm #menuArt .tw { opacity: 0.55 !important; }
       @media (prefers-reduced-motion: reduce) {
         #growth .gFill, #end.show #btnAgain, #gift .gRay, #gift .gBox,
         #dailyGrid .dCell.now, #dailyGrid .dCell.now::after, #btnAgain,

@@ -228,7 +228,53 @@ try {
   else fail(`prefers-reduced-motion: the bob still took ${rm.size} values`);
   await p.screenshot({ path: `${OUT}/maple-reduced.png` });
 
-  // (h) A WORLD WITH NO POSTER FALLS BACK, and falls back from a world that HAD
+  // (i) THE PARENT'S OWN SWITCH REACHES BOTH NEW EFFECTS.
+  //
+  //     Two reduced-motion paths exist and they are NOT equivalent. The OS
+  //     query's block carries a `*, *::before, *::after` catch-all, so anything
+  //     added to the stylesheet is silenced by the OS preference for free. The
+  //     in-app BIG MOTION toggle — body.calm, which is the switch a parent can
+  //     actually find — is an explicit selector list, so a new animation obeys
+  //     it only if someone names it by hand.
+  //
+  //     That asymmetry has already bitten this file once: the toggle shipped
+  //     governing the shake and the flash cap and nothing else, and the sheet's
+  //     own comment records why that was wrong — "a control that calms a third
+  //     of the motion teaches a parent it is broken". Check (f) above tests the
+  //     OS path and would pass happily while the toggle did nothing.
+  //
+  //     Tested with the OS preference OFF, so only body.calm can be doing the
+  //     silencing. Covers the evolve burst as well as the float: it is the
+  //     louder of the two and it arrived by the same route.
+  await p.emulateMedia({ reducedMotion: null });
+  await p.waitForTimeout(300);
+  const calm = await p.evaluate(() => {
+    const ev = document.getElementById('evolve');
+    const hadShow = ev && ev.classList.contains('show');
+    if (ev) ev.classList.add('show');            // the rays only exist on .show
+    const read = () => ({
+      bob: getComputedStyle(document.getElementById('menuArtBob')).animationName,
+      img: getComputedStyle(document.getElementById('menuArtImg')).animationName,
+      leaf: getComputedStyle(document.querySelector('#menuArt .leaf')).animationName,
+      tw: getComputedStyle(document.querySelector('#menuArt .tw')).animationName,
+      evB: ev ? getComputedStyle(ev, '::before').animationName : 'none',
+      evA: ev ? getComputedStyle(ev, '::after').animationName : 'none',
+    });
+    const loud = read();
+    document.body.classList.add('calm');
+    const quiet = read();
+    document.body.classList.remove('calm');
+    if (ev && !hadShow) ev.classList.remove('show');
+    return { loud, quiet };
+  });
+  const moving = (o) => Object.entries(o).filter(([, v]) => v && v !== 'none').map(([k]) => k);
+  const loudOn = moving(calm.loud), stillOn = moving(calm.quiet);
+  if (loudOn.length >= 5) pass(`with BIG MOTION on, ${loudOn.length} effects animate: ${loudOn.join(', ')}`);
+  else fail(`only ${loudOn.length} effects animate with motion ON (${loudOn.join(', ')}) — this check is not measuring what it thinks`);
+  if (!stillOn.length) pass('body.calm silences every one of them — the in-app toggle reaches the float AND the evolve burst');
+  else fail(`body.calm leaves ${stillOn.length} still animating: ${stillOn.join(', ')} — the parent's own switch does not reach ${stillOn.join('/')}`);
+
+  // (j) A WORLD WITH NO POSTER FALLS BACK, and falls back from a world that HAD
   //     one — the state that leaves an old island hanging behind a hidden splash.
   await p.evaluate(() => window.__menuArtSrc(null));
   await p.waitForTimeout(200);
