@@ -7807,6 +7807,14 @@ function endMatch(result: GoalResult = null) {
   });
 }
 
+/** ── THE COALESCING FLOATER ────────────────────────────────────────────────
+ *  Points banked inside one window, the world position of the last thing eaten,
+ *  and the countdown. Flushed in the frame loop. 0.14s is short enough that a
+ *  single bite still reads as instant and long enough that a hedgerow leaves
+ *  one number instead of nine. */
+let eatFloatPts = 0, eatFloatT = 0;
+const eatFloatAt = new THREE.Vector3();
+const EAT_FLOAT_WINDOW = 0.14;
 /** How far a prop swings around the void on its way in, in radians. ~200
  *  degrees — measured off hole.io's own ten-frame eat, where a police car turns
  *  a little over half a circle between touching the rim and disappearing. The
@@ -7926,6 +7934,20 @@ function capture(e: Edible, giveHunger = true) {
   const preyMult = (e.mesh.userData.ptsMult as number | undefined) ?? 1;
   const pts = Math.max(1, Math.round(e.radius * 12 * comboMult * preyMult * feverMult));
   playerScore += pts;
+  // ── THE NUMBER THE OWNER ASKED FOR: "when you eat points go into a bar" ──
+  // hole.io floats a "+1" on EVERY bite; ours floated one only on the set
+  // pieces — a rival devoured, a steal, a bonk, a near miss — so the ordinary
+  // act the whole game is made of paid out silently. bubbles.float() already
+  // existed and was only ever called for the spectacle.
+  //
+  // COALESCED, because a bite is not one a second. Ours come in bursts — a
+  // hedgerow, a row of bins, a beat window — and one node per prop would be
+  // both unreadable and a DOM churn nobody asked for. Points inside one short
+  // window add up and leave as a single bigger number, which is also the more
+  // satisfying read: the burst becomes one punch instead of a stutter of ones.
+  eatFloatPts += pts;
+  eatFloatAt.set(e.mesh.position.x, voidling.radius + 2.2, e.mesh.position.z);
+  eatFloatT = EAT_FLOAT_WINDOW;
   // during a beat window every bite answers in the beat's colour — the doubled
   // value is FELT at the exact moment and place it is earned. Small and short:
   // this fires on every eat, and a beat window is when eats come fastest.
@@ -13472,6 +13494,16 @@ function animate() {
 
   // combo decays when you stop eating
   comboT -= dt; if (comboT <= 0) combo = 0;
+  // …and the banked bite points leave as one number when the burst stops. Runs
+  // on REAL dt rather than game time so a hit-stop cannot hold the payout back:
+  // the number is feedback about what just happened, not part of the ceremony.
+  if (eatFloatT > 0) {
+    eatFloatT -= dt;
+    if (eatFloatT <= 0 && eatFloatPts > 0) {
+      bubbles.float(eatFloatAt, `+${eatFloatPts.toLocaleString()}`);
+      eatFloatPts = 0;
+    }
+  }
 
   // NO DEFENCE LAYER. Police cars, army jeeps, tanks and gunships used to
   // escalate with the player's form. A void cannot be hurt, so they were free

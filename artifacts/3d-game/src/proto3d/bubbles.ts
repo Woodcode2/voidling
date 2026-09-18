@@ -159,12 +159,34 @@ const style = document.createElement('style');
     .vb .vbN i { font-style: normal; display: inline-block; width: 8px; height: 8px;
       border-radius: 50%; margin-right: 4px; vertical-align: baseline; }
     .vb.show { opacity: 1; }
+    /* ── A NUMBER THAT HAS TO HOLD OVER A MOVING WORLD ───────────────────
+       hole.io's "+1" is white with a hard dark outline and it stacks three deep
+       over a pile of crates without ever becoming unreadable. Ours was 17px
+       with a 1px stroke at 0.35 alpha — a hint of an outline, over grass, road,
+       red brick and white pavement in the same second.
+       The 3px hard stroke with 'paint-order: stroke fill' is the idiom this
+       game already uses on #timer, for exactly the reason recorded there: a
+       glow spreads a colour INTO its background, it does not separate one from
+       the other. THE PINK STAYS — it is the void's own colour and the one that
+       says the points are HERS, against the green the rivals' numbers use. */
     .vf {
       position: fixed; transform: translate(-50%, -50%); z-index: 4; pointer-events: none;
-      font-family: 'Fredoka', system-ui, sans-serif; font-weight: 900; font-size: 17px; color: #ff7da8;
-      -webkit-text-stroke: 1px rgba(70,20,50,0.35);
-      text-shadow: 0 2px 6px rgba(0,0,0,0.35); opacity: 0; white-space: nowrap;
+      font-family: 'Fredoka', system-ui, sans-serif; font-weight: 900; font-size: 20px; color: #ff7da8;
+      -webkit-text-stroke: 3px rgba(26,10,22,0.92); paint-order: stroke fill;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.45); opacity: 0; white-space: nowrap;
     }
+    /* ── AND IT MUST STILL EXIST WHEN THE MOTION IS TURNED OFF ────────────
+       '.vf' is opacity 0 at rest and vfRise is what reveals it. Both
+       reduced-motion paths cap animation-duration at 0.01ms, so the animation
+       completed instantly ON ITS 100% FRAME — which is opacity 0. A child whose
+       parent turned BIG MOTION off was not getting a calmer number, she was
+       getting NO number at all, on every eat. The slot pool retires on a
+       timestamp rather than on animationend, so simply holding it visible is
+       safe: it still leaves when its 'until' comes round. */
+    @media (prefers-reduced-motion: reduce) {
+      .vf.go { opacity: 1 !important; transform: translate(-50%, -70%) !important; }
+    }
+    body.calm .vf.go { opacity: 1 !important; transform: translate(-50%, -70%) !important; }
     .vf.big { font-size: 26px; color: #7ef2a0; letter-spacing: 1px; }
     .vf.go { animation: vfRise 0.9s ease-out forwards; }
     @keyframes vfRise {
