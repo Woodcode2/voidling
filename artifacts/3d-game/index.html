@@ -518,7 +518,18 @@
         top: calc(var(--timer-bottom) + 6px); z-index: 12;
         display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px;
         border-radius: 22px; background: rgba(28, 15, 61, 0.82);
-        box-shadow: 0 2px 10px rgba(0,0,0,0.35); pointer-events: none; }
+        box-shadow: 0 2px 10px rgba(0,0,0,0.35); pointer-events: none;
+        /* ── A PILL WITH A FIXED HEIGHT MUST NOT BE ALLOWED TO WRAP ───────
+           `height: 44px` with no width limit and no nowrap is a trap: a value
+           too long to fit does not shrink and does not ellipse, it wraps — and
+           the fixed height then renders the extra lines OUTSIDE the pill's
+           background, floating over the world and up through the clock. That is
+           the owner's dot-2 photograph, and qa/_hudgoal.mjs reproduces it.
+           The icons in refreshGoalChip are what make the string short; this is
+           what makes the pill safe whatever a future world puts in it. If a set
+           ever does outgrow the screen, max-width holds it on screen and the
+           probe fails loudly, which is the failure mode worth having. */
+        white-space: nowrap; max-width: calc(100vw - 24px); }
       #goal .gLabel { font-size: 12px; letter-spacing: 1.2px; color: #cfc4ee; }
       #goal .gVal { font-size: 17px; color: #fff6df; font-weight: 700; }
       body.menu #goal, body.ovl #goal { display: none; }
@@ -669,7 +680,20 @@
       .pipRow { display: flex; gap: 12px; justify-content: center; align-items: center;
         margin: 2px auto 0; }
       /* THE HEADLINE PIP: picture first, word under it, caption under that. */
+      /* ── THE WORD SITS UNDER THE PIP'S RING, NOT UNDER ITS BOX ──────────
+         `.pip.here::after` insets by `--pipSize * -0.16`, so the you-are-here
+         ring is painted OUTSIDE the pip's layout box — 15.4px below it at the
+         headline's 96px. The column's `gap: 6px` measured from the box, not the
+         ink, so the ring's bottom arc was drawn straight through the top half
+         of NOT YET. Photographed by the owner, reproduced in qa/out/endshot,
+         and visible only at 3x: at page scale it reads as a clipped word, which
+         is what sent the first fix after line-height instead of the ring.
+         In the 34px row the same overhang is 5.4px and clears the layout
+         easily, which is why only the headline broke.
+         The margin is derived from --pipSize where that variable is actually
+         defined, so it stays correct if the headline is ever resized. */
       .pipHead { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+      .pipHead > .pip { margin-bottom: calc(var(--pipSize) * 0.16); }
       .pipHW { font-size: 13px; letter-spacing: 3px; color: #efe6ff; }
       .pipHC { font-size: 12px; font-style: normal; letter-spacing: 1.4px; color: #b9a6e4; }
       /* the five dots on the end card, and the ordinal under them for dad */
@@ -768,8 +792,22 @@
          gets the gift glyph she knows from the grid and a number. */
       .endDaily { display: block; margin-top: 6px; font-size: 13px; font-style: normal;
         letter-spacing: 1.2px; color: #ffd9a8; }
-      #end .hd.pipHd .pipHW { font-size: 13px; }
-      #end .hd.pipHd .pipHC { font-size: 12px; }
+      /* ── line-height 1 ON A 13px BOLD CUTS ITS OWN GLYPHS ───────────────
+         `.hd.pipHd` sets `line-height: 1` (correct for the 96px pip it wraps),
+         and the word under the pip inherited it: a 13px box for a face whose em
+         box needs about 15, so NOT YET rendered with its bottom third shaved
+         off — WHICH WAS NOT THE BUG. Measured: overflow is visible on every
+         ancestor, there is no mask and no clip-path, and the word's box is 18px
+         for a 13px face. It was never clipped; the here-ring is painted over it
+         (see .pipHead). The leading stays because `line-height: 1` on a 13px
+         bold is genuinely tight, but it fixed nothing and is not why the word
+         reads correctly now. */
+      #end .hd.pipHd .pipHW { font-size: 13px; line-height: 1.4; }
+      /* the caption now carries the goal itself (see paintLevelEnd), so it is
+         a sentence rather than an afterthought: cream like every other value in
+         the game, and given room to sit under the word without crowding it. */
+      #end .hd.pipHd .pipHC { font-size: 12px; line-height: 1.4; font-style: normal;
+        font-weight: 700; letter-spacing: 0.8px; color: #ffe9a8; }
       /* the next-reward card carries a pip now, so it needs room above the word */
       #endNext .unlockCard .pip { margin-bottom: 4px; }
       #endQuests { width: min(92%, 380px); margin: 2px auto 0; display: none; flex-direction: column; gap: 6px; }

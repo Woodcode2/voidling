@@ -54,7 +54,9 @@ import { isUnlocked, gateFor, completeWorld, WORLD_LABEL, unlockedCount, type Wo
 import { allLevels, current as levelCurrent, recordLevelResult, trackLevelStart,
   ordinal as levelOrdinal, ladderSeen, markLadderSeen,
   type Goal, type LevelState } from './game/levels';
-import { ensurePipDefs, pipRow, pipHead, pip, PIP_WORD,
+// (PIP_WORD left this import with the duplicate miss card that used to spell the
+// state out a second time — pipHead writes the word itself.)
+import { ensurePipDefs, pipRow, pipHead, pip,
   PIP_FLIP_MS, PIP_HOP_MS, PIP_REVEAL_STEP_MS } from './proto3d/pips';
 import { recentEvents } from './proto3d/telemetry';
 import { bumpMatch, deal, type Deal } from './game/matchdeck';
@@ -2366,8 +2368,14 @@ export interface LevelSpec {
   eat: number;
   /** Dot 2: three kinds and counts, SMALLEST COUNT FIRST so the first tick
    *  lands inside the first minute. Kinds are the eat handler's own
-   *  (`questEvent`), never a list re-derived here. */
-  set: { kind: string; n: number; label: string }[];
+   *  (`questEvent`), never a list re-derived here.
+   *
+   *  THE ICON IS PER ENTRY, NOT PER KIND, and that is the whole point of it
+   *  sitting here: `house` is HOUSES on Maple, STALLS at the fair and CHALETS
+   *  in the snow, and a child looking for a chalet is not looking for a
+   *  suburban house. The icon is what she actually reads — see refreshGoalChip
+   *  for why the HUD stopped spelling these out in words. */
+  set: { kind: string; n: number; label: string; icon: string }[];
   /** Dot 3: the tagged prop's name, and the radius the void needs to eat it
    *  (the prop's own radius over EAT_RATIO — the cue's test, not a guess). */
   landmark: string;
@@ -2383,7 +2391,7 @@ const LEVEL_SPEC: Record<WorldId, LevelSpec> = {
   // p10 run reaches 18,790 at half the clock · barn r 5.0 needs R 4.50 (~62%)
   // · SET done at 76 s (42%) · devours 29% by 70%
   maple: { eat: 18000, landmark: 'barn', landmarkR: 4.50, rank: 3, clear: 28,
-    set: [{ kind: 'house', n: 5, label: 'HOUSES' }, { kind: 'car', n: 8, label: 'CARS' }, { kind: 'snack', n: 40, label: 'SNACKS' }] },
+    set: [{ kind: 'house', n: 5, label: 'HOUSES', icon: '🏠' }, { kind: 'car', n: 8, label: 'CARS', icon: '🚗' }, { kind: 'snack', n: 40, label: 'SNACKS', icon: '🍿' }] },
   // 19,353 at half · lookout r 4.0 needs R 3.60 (~45%) · SET at 56 s (31%)
   // GOLD IS CAPPED AT 6 EVERYWHERE, and the cap is arithmetic rather than
   // taste: gildTreasure() gilds GILD_N = 20 props a match, the family eats
@@ -2392,24 +2400,24 @@ const LEVEL_SPEC: Record<WorldId, LevelSpec> = {
   // 81 s with a p90 of 147, and 20 never. A gold goal above this is a race
   // against the rubber band for the last few coins.
   pirate: { eat: 18000, landmark: 'lookout', landmarkR: 3.60, rank: 3, clear: 28,
-    set: [{ kind: 'gild', n: 6, label: 'GOLD' }, { kind: 'cabana', n: 20, label: 'CABANAS' }, { kind: 'snack', n: 60, label: 'SNACKS' }] },
+    set: [{ kind: 'gild', n: 6, label: 'GOLD', icon: '💰' }, { kind: 'cabana', n: 20, label: 'CABANAS', icon: '⛱️' }, { kind: 'snack', n: 60, label: 'SNACKS', icon: '🍿' }] },
   // 34,800 at half · clock tower r 4.5 needs R 4.05 (~51%) · SET at 99 s (55%)
   gameday: { eat: 32000, landmark: 'clock tower', landmarkR: 4.05, rank: 2, clear: 32,
-    set: [{ kind: 'car', n: 4, label: 'TRUCKS' }, { kind: 'house', n: 8, label: 'HOUSES' }, { kind: 'snack', n: 40, label: 'SNACKS' }] },
+    set: [{ kind: 'car', n: 4, label: 'TRUCKS', icon: '🛻' }, { kind: 'house', n: 8, label: 'HOUSES', icon: '🏠' }, { kind: 'snack', n: 40, label: 'SNACKS', icon: '🍿' }] },
   // 41,206 at half · gate r 5.0 needs R 4.50 (~62%) · SET at 48 s (27%) ·
   // devours 48% by 70%, the densest world in the game
   lantern: { eat: 40000, landmark: 'gate', landmarkR: 4.50, rank: 2, clear: 45,
-    set: [{ kind: 'gild', n: 6, label: 'GOLD' }, { kind: 'house', n: 40, label: 'STALLS' }, { kind: 'snack', n: 100, label: 'SNACKS' }] },
+    set: [{ kind: 'gild', n: 6, label: 'GOLD', icon: '💰' }, { kind: 'house', n: 40, label: 'STALLS', icon: '🎪' }, { kind: 'snack', n: 100, label: 'SNACKS', icon: '🍿' }] },
   // 11,104 at half · bell tower r 4.4 needs R 3.96 (~55%) · SET at 91 s (50%)
   powder: { eat: 10000, landmark: 'bell tower', landmarkR: 3.96, rank: 1, clear: 30,
-    set: [{ kind: 'gild', n: 4, label: 'GOLD' }, { kind: 'house', n: 4, label: 'CHALETS' }, { kind: 'snack', n: 40, label: 'SNACKS' }] },
+    set: [{ kind: 'gild', n: 4, label: 'GOLD', icon: '💰' }, { kind: 'house', n: 4, label: 'CHALETS', icon: '🏡' }, { kind: 'snack', n: 40, label: 'SNACKS', icon: '🍿' }] },
   // 32,020 at half · hangar r 5.5 needs R 4.95 (~73%) · SET at 39 s (22%)
   // vans were 40 on the hunt's timing (39 s) but the island carries 98 and the
   // family eats 40-50% of the board, so 40 would have been a race against the
   // rubber band for the last few. 15 clears the 6N rule and the hunt reached it
   // at 22 s.
   skylark: { eat: 30000, landmark: 'hangar', landmarkR: 4.95, rank: 1, clear: 38,
-    set: [{ kind: 'gild', n: 6, label: 'GOLD' }, { kind: 'car', n: 15, label: 'VANS' }, { kind: 'snack', n: 100, label: 'SNACKS' }] },
+    set: [{ kind: 'gild', n: 6, label: 'GOLD', icon: '💰' }, { kind: 'car', n: 15, label: 'VANS', icon: '🚐' }, { kind: 'snack', n: 100, label: 'SNACKS', icon: '🍿' }] },
 };
 
 /** The dot being played, or null. Non-null ONLY when a human chose a level —
@@ -2474,7 +2482,9 @@ function goalLine(w: WorldId, n: Goal): string {
   const sp = LEVEL_SPEC[w], place = (WORLD_COPY[w].place || 'the world').toUpperCase();
   switch (n) {
     case 1: return `EAT ${sp.eat.toLocaleString()} OF ${place}`;
-    case 2: return setOrder(w).map((x) => `${x.n} ${x.label}`).join(' · ');
+    // the same pictures the HUD uses — the card and the chip should not
+    // describe one goal in two languages
+    case 2: return setOrder(w).map((x) => `${x.icon} ${x.n} ${x.label}`).join(' · ');
     case 3: return `EAT THE ${sp.landmark.toUpperCase()}`;
     case 4: return sp.rank === 1 ? 'BE THE BIGGEST VOID' : `FINISH TOP ${sp.rank}`;
     default: return `EAT ${sp.clear}% OF ${place}`;
@@ -2509,10 +2519,30 @@ function refreshGoalChip(): void {
       break;
     }
     case 2: {
+      // ── PICTURES, NOT WORDS, AND IT IS A LAYOUT FIX AS WELL AS A READING ONE ──
+      //
+      // This spelled the set out: "COLLECT 5 HOUSES  8 CARS  40 SNACKS". In a
+      // pill declared `height: 44px` with no width limit, that does not shrink
+      // and does not ellipse — it WRAPS, and because the height is fixed the
+      // extra lines render outside the pill's background, over the world, up
+      // through the clock. Photographed by the owner on his phone at dot 2 and
+      // reproduced by qa/_hudgoal.mjs on both worlds it ships on: box 44px,
+      // content 54px. His words: "the goal clock and other items to get needs
+      // polishing. It's all together."
+      //
+      // Pirate's is longer still ("6 GOLD  20 CABANAS  60 SNACKS"), so this was
+      // never one phone or one level.
+      //
+      // AND THE READER IS SIX. Three nouns in caps is the single hardest thing
+      // in this HUD for a child who cannot yet read — she is being asked, mid
+      // match, to parse "CABANAS". The icons are per ENTRY (see LevelSpec.set),
+      // so a chalet and a market stall are different pictures rather than one
+      // generic house. Counting DOWN is unchanged; a finished kind shows its
+      // tick where its number was.
       label = 'COLLECT';
       val = setOrder(pickedWorld).map((x) => {
         const left = Math.max(0, x.n - (kindTally[x.kind] ?? 0));
-        return left === 0 ? `${x.label} ✓` : `${left} ${x.label}`;
+        return left === 0 ? `${x.icon}✓` : `${x.icon}${left}`;
       }).join('  ');
       break;
     }
@@ -7327,7 +7357,11 @@ function paintLevelEnd(result: GoalResult): boolean {
   // Draft 1 led with the word and the child skeptic killed it: the first thing
   // on the one screen that tells her how she did was a word she cannot read,
   // and on a miss it was a word with no picture at all.
-  endHd.innerHTML = pipHead(mine, goal.n);
+  // …AND THE GOAL RIDES WITH IT. pipHead has always taken a caption; nothing
+  // passed one, so the one fact the headline was missing — what this dot
+  // actually wanted — lived in a second card lower down that otherwise repeated
+  // the headline exactly. See the note on #endNext below.
+  endHd.innerHTML = pipHead(mine, goal.n, result === 'win' ? undefined : goal.line);
   endHd.classList.add('pipHd');
 
   // 2. THE FIVE DOTS, with this match's dot popping once. The caption is the
@@ -7339,14 +7373,28 @@ function paintLevelEnd(result: GoalResult): boolean {
   // its padlock already off — the thing she just earned, shown as a thing
   // rather than described. On a miss it is this dot again, which is honest: the
   // ring has not moved.
+  // ── ON A MISS THIS SLOT SAID NOTHING THE HEADLINE HAD NOT ALREADY SAID ───
+  //
+  // The owner, on a photograph of this card: "The end menu is convoluted and
+  // busy. We need it simple."
+  //
+  // It drew the SAME pip and the SAME word a second time, 56px instead of 96,
+  // inside the loudest box on the screen — a glowing gold border — whose only
+  // new information was the goal line. LOOKED AT (qa/_endshot.mjs) a missed
+  // dot 1 read: a 96px retry pip captioned NOT YET, five dots, a level caption,
+  // two reward lines, a drop orb, and then a gold box containing a 56px retry
+  // pip captioned NOT YET. Eleven blocks, two of them the same block.
+  //
+  // The goal line moved up into the headline's caption, where it belongs — the
+  // picture, the word, and what the word was about, in one place — and the
+  // second copy is gone. A WIN still fills this slot, because there the pip is
+  // the NEXT dot and the line is the NEXT goal: genuinely new, and the reason
+  // the slot exists.
   const nx = el('endNext');
   if (result === 'win' && goal.n < 5) {
     const nextState = states[goal.n] ?? 'open';
     nx.innerHTML = `<div class="unlockCard">${pip(nextState, { n: goal.n + 1, size: 56, cls: 'pop' })}`
       + `<b>NEXT UP</b><span>${goalLine(pickedWorld, (goal.n + 1) as Goal)}</span></div>`;
-  } else if (result !== 'win') {
-    nx.innerHTML = `<div class="unlockCard">${pip(mine, { n: goal.n, size: 56 })}`
-      + `<b>${PIP_WORD[mine]}</b><span>${goal.line}</span></div>`;
   }
 
   // 4. THE FOOTER SAYS WHAT IT DOES. CONTINUE goes to whatever is current —

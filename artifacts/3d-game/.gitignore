@@ -114,3 +114,6 @@ qa/out/evolve-*.png
 # demand and only ever looked at once. The evidence that matters is the PASS
 # lines and the commit message that quotes them.
 qa/out/float/
+
+# The goal-chip probe's frames — one per world per dot, regenerated on demand.
+qa/out/hudgoal/
