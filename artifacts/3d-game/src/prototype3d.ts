@@ -5619,6 +5619,16 @@ function addCoins(n: number) {
   coins += n;
   localStorage.setItem('voidCoins', String(coins));
   coinEl.textContent = `✦ ${coins}`;
+  // ── A COUNTER THAT SAYS NOTHING SHOULD NOT BE ON THE FRONT DOOR ─────────
+  // hole.io's menu shows a wallet because it HAS a wallet — 3.75k and a gem
+  // count, earned. A brand-new profile opens ours to "✦ 0" in the corner of
+  // the first screen it ever sees: a number whose only content is that she has
+  // none, on the screen whose whole job is to invite. It comes back the instant
+  // the first coin lands, which is the end of her first match.
+  // Every mutation of `coins` goes through this function, so this is the one
+  // place it can be decided. #shopWallet is a SEPARATE element (index.html),
+  // so the shop's own balance is unaffected and cannot go blank.
+  coinEl.style.display = coins > 0 ? '' : 'none';
   for (const f of coinWatchers) f(coins);
 }
 addCoins(0);

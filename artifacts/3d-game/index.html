@@ -1531,7 +1531,11 @@
       @media (orientation: portrait) {
         #menu .foot { margin-top: 8px; }
         .navRow { margin-top: 10px; }
-          #btnPlay { padding: 14px 64px; }
+        /* (`#btnPlay { padding: 14px 64px }` lived here and had never once
+           applied. A media query adds no specificity, so it tied with the
+           #btnPlay rule further down this sheet and lost on source order —
+           dead the day it was written. Removed rather than left to be
+           "fixed" by someone who would see nothing change.) */
       }
       #menuOrb { display: none; }
       /* ── THE GAME'S OWN NAME HAD THE LEAST PROTECTION OF ANY TYPE IN IT ────
@@ -1989,7 +1993,14 @@
       #timer, #coins, #growth, #btnQuit { transition: opacity 0.35s ease; }
       body.intro #timer, body.intro #coins, body.intro #growth, body.intro #btnQuit { opacity: 0; }
       #menu button { font-family: inherit; cursor: pointer; border: none; color: #fff; }
-      #btnPlay { font-size: 24px; font-weight: 700; letter-spacing: 3px; padding: 16px 76px; border-radius: var(--r-md);
+      /* BIGGER, AND WITH A CONTOUR. hole.io's PLAY is the widest, brightest,
+         highest-contrast object on its menu and nothing on that screen argues
+         with it. Ours was 24px in a field of 12-13px chrome — largest, but not
+         by enough to be the obvious answer to "what do I do". The white contour
+         is what makes it hold over a poster whose colours we do not control:
+         a stroke separates, where the existing drop shadow only spreads. */
+      #btnPlay { font-size: 28px; font-weight: 700; letter-spacing: 3px; padding: 20px 88px; border-radius: var(--r-md);
+        border: 3px solid rgba(255,255,255,0.92);
         background: linear-gradient(180deg, #ff5d7e, #ff2450);
         /* the plinth, named once so the reveal's one-shot glow can add a halo to
            it instead of replacing it — box-shadow animates the whole stack, so a
@@ -2002,15 +2013,20 @@
          accent (set inline as --evc by prototype3d), with a slow light sweep
          so it reads as an occasion rather than another button. Hidden 351
          days a year; the menu column loses nothing when no season runs. */
-      #eventRibbon { display: none; position: relative; overflow: hidden; margin-top: 10px;
-        padding: 9px 22px; border-radius: 999px; font-size: 12.5px; font-weight: 700; letter-spacing: 1.2px;
+      /* A CHIP, NOT A SECOND BUTTON. It kept a 4px plinth and a 22px glow —
+         the same furniture PLAY uses to say "press me" — so it read as an equal
+         offer. Flattened to a label: smaller, no plinth, a whisper of glow. */
+      #eventRibbon { display: none; position: relative; overflow: hidden; margin-bottom: 10px;
+        padding: 6px 15px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 1.1px;
         color: #1c0930; background: var(--evc, #ffd23f);
-        background: linear-gradient(180deg, var(--evc, #ffd23f), color-mix(in srgb, var(--evc, #ffd23f) 72%, #000));
-        box-shadow: 0 4px 0 rgba(0,0,0,0.35);
-        box-shadow: 0 4px 0 rgba(0,0,0,0.35), 0 0 22px color-mix(in srgb, var(--evc, #ffd23f) 55%, transparent); }
+        background: linear-gradient(180deg, var(--evc, #ffd23f), color-mix(in srgb, var(--evc, #ffd23f) 82%, #000));
+        box-shadow: 0 0 10px color-mix(in srgb, var(--evc, #ffd23f) 32%, transparent); }
       #eventRibbon.show { display: inline-block; }
-      #eventRibbon em { display: block; font-style: normal; font-size: 11px; font-weight: 700;
-        letter-spacing: 1.6px; opacity: 0.75; margin-top: 2px; }
+      /* …and the sub-line with it. A chip that wraps to two lines is a card. The
+         <em> is still WRITTEN by paintEventRibbon — it stays in the DOM for the
+         end card and the picker, which have room for it — it just does not open
+         a second row on the front door. */
+      #eventRibbon em { display: none; }
       #eventRibbon::after { content: ''; position: absolute; inset: 0;
         background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.55) 50%, transparent 70%);
         transform: translateX(-110%); animation: evSweep 3.4s ease-in-out infinite; }
@@ -2620,7 +2636,12 @@
            STARS: the species, the family and the first form keep the word.
            Two lines so the four-word name lands at logo scale on a phone. -->
       <div class="logo"><i>THE CUTE</i>WORLD ENDER</div>
-      <div class="tag">STARRING THE VOIDLINGS</div>
+      <!-- THE TAGLINE IS GONE FROM THE MENU. "STARRING THE VOIDLINGS" is 22
+           characters at 11px with 7px of letter-spacing, on the one screen a
+           child who cannot read has to navigate. hole.io's front door carries
+           no sentence at all. The CSS RULE STAYS — index.html groups .tag with
+           #loadScr .lName, so deleting it would strip the load screen's line
+           too; only the markup goes. -->
       <div class="spacer"></div>
       <div id="menuOrb"><svg viewBox="0 0 200 200" width="100%" height="100%">
         <defs>
@@ -2654,15 +2675,21 @@
            ring is on: the button and the ring can never point at different
            things (see levelCurrent). No 1-30 ordinal here — that number is the
            grown-up's and belongs on the end card (§4.7 bar 6). -->
+      <!-- the season ribbon: only exists while a world is in season (events.ts).
+           A date, never a countdown — the pull is the repaint, not a timer.
+           ABOVE THE LADDER NOW, not under PLAY. It is a glowing gold pill with a
+           two-line body and it sat directly beneath the one control this screen
+           exists to offer — two bright things stacked, the lower one newer and
+           moving, so the eye went to the announcement instead of the button.
+           hole.io's BATTLE card sits off to the SIDE of its diorama for the same
+           reason: the season is an aside, PLAY is the sentence. -->
+      <button id="eventRibbon"></button>
       <div id="menuLadder">
         <div id="mlWorld"></div>
         <div id="mlPips" class="pips"></div>
         <div id="mlGoal"></div>
       </div>
       <button id="btnPlay">PLAY</button>
-      <!-- the season ribbon: only exists while a world is in season (events.ts).
-           A date, never a countdown — the pull is the repaint, not a timer. -->
-      <button id="eventRibbon"></button>
       <div class="navRow">
         <button class="navCard" id="btnBook"><i>📗</i>SCRAPBOOK<em id="bookCount"></em></button>
         <button class="navCard" id="btnShop"><i>🛍️</i>SHOP</button>
