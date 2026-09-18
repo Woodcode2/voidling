@@ -83,12 +83,39 @@ export const WORLD = {
   // boundary holds — meadow/forest 1.81 -> 1.81, park/forest 2.65 -> 2.68,
   // sand/meadow 1.70 -> 1.72. They are still plainly green; they have stopped
   // shouting over the props.
-  meadow: 0x99b78c,      // base grass — was 0x74c352, chroma 0.443 -> 0.169
-  park: 0xbedcb1,        // park grass — was 0x9ae878, chroma 0.439 -> 0.169
+  // ── DESATURATED TWICE, AND ONCE IS THE DESIGN ─────────────────────────
+  // This pass pre-desaturated the source (0x74c352 -> 0x99b78c, chroma 0.443
+  // -> 0.169) so the ground would stop shouting over the props. But island.ts
+  // ALREADY does that job: quiet() pulls every ground colour toward its own
+  // luminance at maple's GROUND_DIALLED 0.40 dial, and the dial is what keeps
+  // props louder than the floor. Running both meant the lawn was dialled down
+  // twice and rendered #a5b1a0 — a grey with a rumour of green in it, span 17.
+  //
+  // Restoring the source and keeping the dial is not a reversal of that pass's
+  // ARGUMENT, it is a removal of its DUPLICATE: prop-over-ground separation is
+  // governed entirely by the dial, which is untouched, so the ground gets its
+  // colour back without getting its voice back. Modelled through the real
+  // transform: #a5b1a0 span 17 -> #94b487 span 45. The ceiling never bites
+  // here — at 0.40 even hole.io's own #a1c92a comes through at span 64, so it
+  // is the DIAL, not GROUND_CEILING, that sets the ceiling on this world's
+  // grass. Anyone wanting more must argue with the dial, in front of a picture.
+  // AND YELLOWER THAN THE ALBEDO YOU EXPECT, because the fill is a cool blue
+  // (WORLD_LIGHT.maple.fill 0xb0d8ff at 0.84) and it lands on the ground. At
+  // 0x74c352 the lawn PHOTOGRAPHED as rgb(86,139,97) — blue OVERTAKING red on
+  // a grass, where hole.io's reads rgb(161,201,42) with red far above blue.
+  // The fix belongs in the albedo rather than the rig: the cool counter-light
+  // is what separates form from form on every prop in the world, and warming it
+  // to fix the lawn would flatten all of them.
+  meadow: 0x8ac83c,      // base grass — dialled once, and biased yellow
+  park: 0x9ae878,        // park grass — same double-dial, same restoration
   forest: 0x6b866a,      // forest ground — was 0x479046, chroma 0.290 -> 0.110
   sand: 0xebe3cb,        // beach sand — was 0xf6e3a4, chroma 0.322 -> 0.125
-  pavement: 0xbcc4d4,    // plaza / sidewalk — was 0xe4e4ec, 1.01 against sand
-  road: 0x6b7292,        // asphalt (cool lavender-gray)
+  // A WARM, BRIGHT PAVEMENT, and the value is chosen against SAND rather than
+  // against the road: 0xe6d6d1 was proposed and paints #ded8d6, which sits 13.9
+  // from painted sand and re-breaks the very bug this line's old comment
+  // records fixing. 0xfacac8 paints #e3d0cf and sits 21.7 away, clear of it.
+  pavement: 0xfacac8,    // plaza / sidewalk — warm, and clear of sand
+  road: 0x7f737f,        // asphalt — warm neutral; the lavender read as haze
   // WIRED, not retired: the lane dashes were a literal 0xf2f5fa in island.ts
   // while this said 0xdce3ee. Same disagreement, same fix — this is the shipped
   // value and the dash material reads it.

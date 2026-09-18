@@ -1246,8 +1246,25 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
 // everywhere: at 0.40 it measured a stage p75 of 0.173 against the 0.16 the
 // finished bake is held to, where maple came in at 0.118 on the same number.
 // A world made of one material needs more of the dial than a world made of six.
+// ── MAPLE'S DIAL, RAISED AGAINST THE REFERENCE ────────────────────────────
+// 0.40 -> 0.62, maple only. The owner sent hole.io as the bar and the lawn was
+// the loudest miss: ours photographed rgb(88,139,95) — BLUE ABOVE RED on a
+// grass — against their rgb(161,201,42).
+//
+// Chasing it through the albedo does not work, and that was worth proving
+// before touching this line. Restoring meadow from its pre-desaturated 0x99b78c
+// and then biasing it yellow moved the rendered lawn by rgb(2,0,-2). Warming
+// the fill light moved it the WRONG way (darker, and no hue recovery). The dial
+// is what flattens it: modelled on the real ground literal #63b84e, quiet()
+// paints span 43 / red-blue +9 at 0.40, and span 68 / +13 at 0.62.
+//
+// WHAT THE DIAL IS FOR IS UNCHANGED. It exists so the ground does not shout
+// over the props, and at 0.62 the ground still carries well under half the
+// chroma of anything standing on it — props are not dialled at all. This is a
+// quieter ground than pirate's 0.35 world reads as, not a louder one than
+// powder's 0.55. GROUND_CEILING is untouched and still never bites here.
 const GROUND_DIALLED = new Map<string, number>([
-  ['maple', 0.40], ['pirate', 0.35], ['powder', 0.55], ['skylark', 0.55],
+  ['maple', 0.62], ['pirate', 0.35], ['powder', 0.55], ['skylark', 0.55],
 ]);
 // ── AND A CEILING, WHICH IS A DIFFERENT QUESTION FROM THE STAGE ───────────
 // The loudest slice of a ground is legitimately not stage. MAPLE's autumn leaf
