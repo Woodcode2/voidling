@@ -718,8 +718,33 @@
       #mlWorld { font-size: 12px; font-weight: 700; letter-spacing: 3px; color: #cbb6f5;
         cursor: pointer; padding: 2px 10px; border-radius: 999px; }
       #mlWorld::after { content: ' ▾'; opacity: 0.65; }
-      #mlPips .pipRow { gap: 14px; }
+      /* ── THE LADDER'S PIPS ARE OBJECTS, NOT HAIRLINES ──────────────────
+         Scoped to #mlPips ON PURPOSE. .pipDot is shared with the end card (34px)
+         and the world card (18px), and a 4px plinth that reads as a button at
+         52px reads as a smudge at 18. Only the menu ladder — the one place a
+         child is choosing something — gets the weight.
+
+         A thicker rim, a plinth and an inner highlight: the same three-part
+         treatment PLAY uses, because they are the same kind of thing. The
+         current dot then scales ABOVE its neighbours, which is what hole.io
+         does with its green 7 — the eye finds where you are before it reads a
+         single number. */
+      #mlPips .pipRow { gap: 16px; }
       #mlPips .pip { cursor: pointer; }
+      #mlPips .pipDot {
+        border-width: max(3px, calc(var(--pipSize) * 0.085));
+        box-shadow: 0 4px 0 rgba(0,0,0,0.34), inset 0 2px 0 rgba(255,255,255,0.16); }
+      /* the dot you are on, lifted off the row. 1.14 rather than the 1.2 that
+         reads better in isolation: the here-ring is painted at --pipSize * -0.16
+         OUTSIDE the box, so at 52px it already reaches 8.3px past the edge, and
+         a bigger scale walks it into the neighbour across a 16px gap. */
+      #mlPips .pip.here { transform: scale(1.14); z-index: 2; }
+      /* …and it fills rather than merely outlining. An open dot was a 7%-white
+         wash with a cream rim — the least emphatic state in the set, on the dot
+         that matters most. */
+      #mlPips .pip.s-open.here .pipDot {
+        background: rgba(255,246,223,0.26); box-shadow: 0 4px 0 rgba(0,0,0,0.34),
+          inset 0 2px 0 rgba(255,255,255,0.22), 0 0 16px rgba(255,246,223,0.30); }
       #mlGoal { font-size: 14px; font-weight: 700; letter-spacing: 0.8px; color: #fff6df;
         text-align: center; text-wrap: balance; min-height: 18px;
         text-shadow: 0 2px 8px rgba(0,0,0,0.6); }

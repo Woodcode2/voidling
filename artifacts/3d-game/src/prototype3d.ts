@@ -7239,7 +7239,13 @@ function paintMenuLadder(): void {
   // ladder, and a tap landing in that window must do what the dot she can see
   // says, not what the dot she cannot see yet says.
   const draw = (sts: LevelState[], mark?: { pop?: number; ring?: number; arrive?: boolean }) => {
-    pips.innerHTML = pipRow(sts, { size: 40, popAt: mark?.pop !== undefined ? mark.pop + 1 : undefined });
+    // 40 -> 52. hole.io's level pips are the second-biggest object on its menu
+    // after PLAY — chunky ovals you could press with a thumb, with the current
+    // one enlarged. Ours were 40px hairline rings reading as decoration beside
+    // the button. The size lives here rather than in CSS because pipRow bakes
+    // it into --pipSize per call, and the end card (34) and world card (18)
+    // must not move with it.
+    pips.innerHTML = pipRow(sts, { size: 52, popAt: mark?.pop !== undefined ? mark.pop + 1 : undefined });
     const nodes = [...pips.querySelectorAll('.pip')] as HTMLElement[];
     // THE RING, FORCED. pip() derives `here` from the state, which is right for
     // every still frame and wrong for exactly one: the flip, where the dot has
