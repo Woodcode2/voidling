@@ -7807,6 +7807,12 @@ function endMatch(result: GoalResult = null) {
   });
 }
 
+/** How far a prop swings around the void on its way in, in radians. ~200
+ *  degrees — measured off hole.io's own ten-frame eat, where a police car turns
+ *  a little over half a circle between touching the rim and disappearing. The
+ *  arc this replaced integrated to ~609 degrees under the software renderer and
+ *  something else entirely at 60fps; see the drain loop for why. */
+const EAT_ARC = 3.49;
 // devour one edible: spiral it in, grow, score (2D combo model), charge hunger
 let combo = 0, comboT = 0, chompCd = 0;
 // ── POWDER PASS: THE SNOW SHELL ────────────────────────────────────────────
@@ -12944,12 +12950,29 @@ function animate() {
       // …never more than 42 degrees of arc in one frame, however long the
       // frame was. Past about a third of a turn the eye stops joining the
       // positions into a curve and starts seeing a jump.
-      e.orbit += Math.min(0.73, dtw * 10 * (1 + 2.2 * e.t));
+      // ── THE ARC IS DRIVEN BY t, NOT ACCUMULATED PER FRAME ────────────────
+      // `e.orbit += Math.min(0.73, dtw * 10 * (1 + 2.2 * e.t))` made the shipped
+      // game and every QA render two different animations. At 60fps the term
+      // peaks at 0.0167*10*3.2 = 0.535 and the 0.73 clamp NEVER fires; under the
+      // software renderer the trace's orbit column steps by exactly 0.730 every
+      // single frame, i.e. hard-clamped throughout, integrating to ~609 degrees
+      // of spin. Nobody was looking at the same eat twice.
+      //
+      // Driving the angle off e.t makes it identical at any frame rate and puts
+      // the total arc in one named number. EAT_ARC is ~200 degrees, which is
+      // what hole.io's ten-frame sequence actually turns; squared keeps the
+      // acceleration the old comment wanted, so the last third still whips.
+      // `e.orbit` stays the prop's ENTRY angle (capture seeds it from
+      // atan2(dz, dx)) rather than becoming an accumulator, so nothing new has
+      // to be baked and the paths that set `eaten` without calling capture()
+      // cannot arrive here with an undefined field.
+      const calmEat = reduceMotion();
+      const ang = e.orbit + (calmEat ? 0 : EAT_ARC) * e.t * e.t;
       // …and 1 - t is a straight line into the middle. Squared, the prop hangs
       // at the rim for a beat and then drops, which is what a drain does.
       const r = e.orbitR * (1 - e.t * e.t);
-      p.x = voidState.x + Math.cos(e.orbit) * r;
-      p.z = voidState.z + Math.sin(e.orbit) * r;
+      p.x = voidState.x + Math.cos(ang) * r;
+      p.z = voidState.z + Math.sin(ang) * r;
       // THINGS WERE FALLING UPWARDS. `cy` is the void's group height, which is
       // dispR * RADIUS_SINK = +0.31 x R ABOVE the ground — so this line, whose
       // own comment says "sink INTO the pit", lerped every prop UP. Measured
@@ -12958,12 +12981,31 @@ function animate() {
       // the DESCENT stays on real time: hit-stop is meant to punch the void's
       // own body, not to hang the thing that is currently falling into it
       p.y = THREE.MathUtils.lerp(p.y, -R * 0.55, Math.min(1, dt * 7));
-      e.mesh.rotation.x += e.spin.x * dtw; e.mesh.rotation.y += e.spin.y * dtw; e.mesh.rotation.z += e.spin.z * dtw;
+      // ── AND THE SWITCH REACHES THE EAT AT LAST ───────────────────────────
+      // reduceMotion() is honoured in seven places in this file and NOT ONE of
+      // them is between capture() and the end of this loop — so a child whose
+      // parent turned BIG MOTION off still got the full tumble and the full
+      // orbit, about fifty times a match, on the one action the whole product
+      // is made of. Rotation and orbit are the vestibular channels and they go;
+      // the radial travel and the scale stay, because those are what say "that
+      // thing is mine now" and a calm player should still be told.
+      if (!calmEat) {
+        e.mesh.rotation.x += e.spin.x * dtw; e.mesh.rotation.y += e.spin.y * dtw; e.mesh.rotation.z += e.spin.z * dtw;
+      }
       // …and it was DELETED AT 0.10 SCALE. On a shell nobody notices; on a
       // seven-unit hotel that is a 1.4-unit chunk of building blinking out in
       // mid-air, which is exactly the "they just disappear" report. Drive the
       // scale off e.t directly so it always finishes at zero.
-      const k = Math.max(0, 1 - e.t);
+      // ── FULL SIZE UNTIL IT IS IN THE MOUTH, THEN GONE ────────────────────
+      // `k = 1 - e.t` started shrinking on the FIRST frame, so a prop was
+      // already at 0.49 scale while still 0.66 capture-radii off the axis —
+      // dissolving in mid-air on its way in, which is the "they just disappear"
+      // read. hole.io's police car holds its full size all the way to the rim
+      // and only vanishes once the rim is over it. Hold, then collapse over
+      // what is left. T_DROP is a literal rather than a baked per-prop field so
+      // this ships on its own.
+      const T_DROP = calmEat ? 0.40 : 0.62;
+      const k = e.t < T_DROP ? 1 : Math.max(0, 1 - (e.t - T_DROP) / (1 - T_DROP));
       e.mesh.scale.set(e.homeScale.x * k, e.homeScale.y * k, e.homeScale.z * k);
       if (e.t >= 1) {
         // the puff marks where the THING went, not where the void is standing
