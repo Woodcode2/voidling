@@ -252,8 +252,22 @@ for (const { WORLD, v } of RUNS) {
   // the old shape the splash step would have gone green on a menu with no
   // readable type on it at all, having measured nothing. A probe that cannot
   // find what it measures must FAIL, never skip (GOVERNOR.md rule 4).
+  // ── AND .tag IS NO LONGER ONE OF THEM ───────────────────────────────────
+  // "STARRING THE VOIDLINGS" was cut from the menu markup: 22 characters at
+  // 11px with 7px of letter-spacing, on the one screen a child who cannot read
+  // has to navigate, against a reference (hole.io) whose front door carries no
+  // sentence at all. The CSS rule survives because it is shared with the load
+  // screen's .lName, so only #menu's instance is gone.
+  //
+  // THE GUARD ABOVE IS NOT WEAKENED, and that is the thing to check rather than
+  // assume. Its stated failure mode is "the splash step would have gone green
+  // on a menu with no readable type on it at all, having measured nothing" —
+  // and .logo and .logo i are still REQUIRED, still the menu's own type, and
+  // still the largest thing on the screen. A menu that loses its name fails
+  // exactly as loudly as it did before. What is no longer required is a line
+  // the design no longer has.
   for (const [sel, label] of [['#menu .logo i', 'menu THE CUTE'],
-    ['#menu .logo', 'menu logo'], ['#menu .tag', 'menu tag']]) {
+    ['#menu .logo', 'menu logo']]) {
     const c = await contrast(p, sel, label);
     c.required = sel;
     rec.contrast.push(c);
