@@ -7336,6 +7336,13 @@ function paintLevelEnd(result: GoalResult): boolean {
   // left over from a level run would sit on the next goal-free one — the pips
   // of a world she is no longer playing, under a headline about a percentage.
   el('endPips').innerHTML = ''; el('endPipsCap').textContent = '';
+  // …AND #endNext WITH THEM, which it was not, and did not need to be until
+  // now. The miss branch used to write this slot unconditionally, so it was
+  // always overwritten; with the duplicate card gone a MISS writes nothing —
+  // and the card is reused across matches, so a win followed by a miss left the
+  // won dot's "NEXT UP" box sitting under a NOT YET headline. Caught by the
+  // push gate (qa/levels.mjs part d), not by looking at one card in isolation.
+  el('endNext').innerHTML = '';
   endHd.classList.remove('pipHd');
   endEl.classList.remove('lvl', 'rivals');
   el('endStats').classList.remove('open');

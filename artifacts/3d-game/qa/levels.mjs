@@ -862,6 +862,9 @@ if (ONLY.includes('d')) {
     hdState: (document.querySelector('#endHd .pip')?.className.match(/s-(\w+)/) || [])[1] ?? '',
     hdGlyph: (document.querySelector('#endHd .pip use')?.getAttribute('href') || '').replace('#', ''),
     hdWord: document.querySelector('#endHd .pipHW')?.textContent ?? '',
+    // the goal line, which lives in the headline's caption since the duplicate
+    // card below it was removed
+    hdCaption: document.querySelector('#endHd .pipHC')?.textContent ?? '',
     pips: [...document.querySelectorAll('#endPips .pip')].map((e) => (e.className.match(/s-(\w+)/) || [])[1] ?? ''),
     here: [...document.querySelectorAll('#endPips .pip')].map((e) => e.classList.contains('here')),
     cap: document.getElementById('endPipsCap')?.textContent ?? '',
@@ -994,8 +997,25 @@ if (ONLY.includes('d')) {
     else ok(`(d) ${tag}: the attempt was counted (${a1.tries})`);
     if (!/TRY AGAIN/.test(r.again)) bad(`(d) ${tag}: the footer reads "${r.again}" after a miss — it must say what it does, and what it does is replay this dot`);
     else ok(`(d) ${tag}: the footer says "${r.again}"`);
-    if (r.nextState !== 'fin') bad(`(d) ${tag}: #endNext shows "${r.nextText || r.nextHtml.slice(0, 60)}" — after a miss the slot is this dot again, which is where the ring still is`);
-    else ok(`(d) ${tag}: #endNext is this dot again, "${r.nextText}"`);
+    // ── THE MISS SLOT IS EMPTY NOW, AND THAT IS THE POINT ─────────────────
+    // This asserted `#endNext` held THIS dot again — a second 56px pip and a
+    // second NOT YET, in a gold box, under a headline that had just said both.
+    // The owner on a photograph of it: "The end menu is convoluted and busy. We
+    // need it simple." The duplicate is gone and the goal line it carried moved
+    // into the headline's own caption.
+    //
+    // So the bar moves rather than disappearing, and it moves to the two things
+    // the consolidation could actually break:
+    //   1. the goal line must SURVIVE the move — losing it is the real risk of
+    //      folding two blocks into one, and it would be invisible on a card
+    //      nobody photographed;
+    //   2. the slot must be EMPTY, not merely unwritten. #end is reused across
+    //      matches, so a win followed by a miss showed the won dot's NEXT UP box
+    //      under a NOT YET headline until paintLevelEnd learned to clear it.
+    if (!r.hdCaption) bad(`(d) ${tag}: the headline has no caption — the goal line was dropped when the duplicate card went, so the card no longer says what the dot wanted`);
+    else ok(`(d) ${tag}: the goal rides with the headline, "${r.hdCaption}"`);
+    if (r.nextHtml.trim()) bad(`(d) ${tag}: #endNext still holds "${r.nextHtml.slice(0, 60)}" after a miss — the slot is the NEXT dot's and a miss has no next dot; stale content here is a won dot's box under a NOT YET headline`);
+    else ok(`(d) ${tag}: #endNext is empty after a miss`);
   }
 
   // ── (d4) RIVALS NEVER ENDS EARLY ────────────────────────────────────────
