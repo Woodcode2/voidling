@@ -1607,9 +1607,26 @@ interface WorldLight {
   fill: number; fillI: number; fillOff: [number, number, number];
 }
 const WORLD_LIGHT: Record<WorldId, WorldLight> = {
-  maple:   { sun: 0xfff2d8, sunI: 1.75, hemiSky: 0xdfeaff, hemiGround: 0x4a4468, hemiI: 0.5,
-             off: [-55, 95, 42], dusk: 0, normalBias: 0.15, exposure: 1.0,
-             fill: 0x9fc8ff, fillI: 0.62, fillOff: [62, 46, -58] },
+  // ── MAPLE, RE-LIT AGAINST THE REFERENCE ─────────────────────────────────
+  // The owner sent 27 seconds of hole.io as the bar. Measured against it at
+  // matched framing, we are NOT less saturated overall — we are 21% DARKER
+  // (mean value 0.558 against 0.706) and the darkness is the GROUND. Their
+  // lawn samples #A1C92A; ours renders #93AA7F.
+  //
+  // Two causes, both here. hemiI has never reached a light (see HEMI_APPLIED
+  // below), so maple's authored 0.5 was running at the flat 0.22 — and the
+  // bounce colour was a PLUM, 0x4a4468, which is why the lower half of every
+  // sphere in this world reads unlit and every green goes grey where the sky
+  // does not hit it. A slate bounce lights the shadow side without tinting it.
+  //
+  // Backed off ON PURPOSE: hemi 0.72 / exposure 1.14 was measured first and
+  // overshot the biggest-area contrast to 1.55:1 against hole.io's 1.83:1.
+  // 0.62 / 1.12 lands on 1.8:1. sunI 1.75 -> 2.00 is a GATE EVENT: qa/formsep
+  // regex-scrapes sunI out of this table and re-grades every maple palette
+  // colour at the new key, so that probe must be re-run, not assumed.
+  maple:   { sun: 0xfff8ee, sunI: 2.00, hemiSky: 0xeef5ff, hemiGround: 0xb4bcc6, hemiI: 0.62,
+             off: [-55, 95, 42], dusk: 0, normalBias: 0.15, exposure: 1.12,
+             fill: 0xb0d8ff, fillI: 0.84, fillOff: [62, 46, -58] },
   pirate:  { sun: 0xfff2d8, sunI: 1.75, hemiSky: 0xdfeaff, hemiGround: 0x4a4468, hemiI: 0.5,
              off: [-55, 95, 42], dusk: 0, normalBias: 0.15, exposure: 1.0,
              fill: 0x8fd6ff, fillI: 0.58, fillOff: [62, 46, -58] },
@@ -1844,9 +1861,25 @@ const HOURS: Record<WorldId, WorldHour[]> = {
     { name: 'low cloud', dusk: 0.92, sunK: 0.78, warm: -0.16 },
   ],
 };
+/** ── WHICH WORLDS' AUTHORED hemiI ACTUALLY REACHES A LIGHT ─────────────────
+ *
+ *  WORLD_LIGHT has carried a per-world `hemiI` column since it was written and
+ *  NOTHING HAS EVER READ IT — `hemi.intensity = RIG.hemiI` pinned all six to
+ *  the flat 0.22. Exactly the situation the `exposure` column was in before
+ *  owner decision 1 unlocked it.
+ *
+ *  OPT-IN, NOT A FLAG DAY. The obvious move is to point the light at the
+ *  column and set the other five rows to 0.22 so nothing changes — but
+ *  gameday 0.86, lantern 1.75, powder 0.9 and skylark 1.05 are AUTHORED
+ *  numbers somebody reasoned about, and overwriting them with 0.22 to fake
+ *  a no-op would make the column lie a second time, in the same way, while
+ *  looking like it had been fixed. This set is byte-identical for five worlds
+ *  and preserves what they asked for, for whoever dials them in next. */
+const HEMI_APPLIED = new Set<WorldId>(['maple']);
+const hemiNow = (): number => (HEMI_APPLIED.has(pickedWorld) ? LIGHT.hemiI : RIG.hemiI);
 function applyLightRig(): void {
   sun.intensity = RIG.sunI * hourSunK;
-  hemi.intensity = RIG.hemiI;
+  hemi.intensity = hemiNow();
   // the fill rides the same dimmer as the key, so a world that dims at dusk
   // does not end up lit only from behind — and it rides the HOUR with it
   fill.intensity = LIGHT.fillI * hourSunK * (RIG.sunI / WORLD_LIGHT[pickedWorld].sunI);
@@ -1863,7 +1896,7 @@ function applyHour(h: WorldHour): void {
   island.setDusk(h.dusk);
   applyLightRig();
 }
-const hemi = new THREE.HemisphereLight(LIGHT.hemiSky, LIGHT.hemiGround, RIG.hemiI);
+const hemi = new THREE.HemisphereLight(LIGHT.hemiSky, LIGHT.hemiGround, hemiNow());
 scene.add(hemi);
 // THE COOL COUNTER-LIGHT. See WorldLight.fill: the world had a single sun, so
 // every shadow side fell to flat hemisphere ambient and forms read as gradients
