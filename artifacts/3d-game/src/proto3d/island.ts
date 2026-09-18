@@ -8836,7 +8836,24 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     };
     // 1. THE VERGES. Small and many — this is the layer that stops a drive
     //    across town being a drive across nothing.
-    for (let t = 0; t < 26000 && filled < 2300; t++) {
+    //    THE CAP WAS THE LIMIT, NOT THE LAND. Measured against the owner's
+    //    hole.io reference, maple carries 2.20 objects per 100u² against GAME
+    //    DAY's 3.77 and LANTERN NIGHT's 4.75 — the emptiest world we ship, and
+    //    the one a cold boot drops a child into. It is not full: 14,032 more
+    //    r=1.2 props still fit at the existing spotFree separation. This loop
+    //    stopped because `filled < 2300` fired, not because it ran out of room.
+    //
+    //    AND IT WAS A DUSTING WHERE hole.io HAS HEAPS. Ours measured
+    //    variance/mean 1.06 — a pure Poisson scatter, which is the most EVEN
+    //    way to place things and therefore the one that reads least like a
+    //    world somebody lives in. GAME DAY runs 1.22 and LANTERN 1.93. So every
+    //    accepted spot now seeds a small clump around itself: same rejection
+    //    rules, same separation, but the result clusters.
+    //
+    //    Affordable because the camera moved. At PLAY_DIST 29 this fill cost
+    //    +21% draw calls; at 22 the frame measured 320 against the old 445, so
+    //    the density is paid for out of what pulling in already gave back.
+    for (let t = 0; t < 62000 && filled < 5200; t++) {
       const wx = mr(LO, HI), wy = mr(LO, HI);
       const { m, r3 } = pickTiny();
       if (!maplePlaceable(wx, wy, r3)) continue;
@@ -8844,6 +8861,22 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       MS.claimSpot(wx, wy, r3 * 20);
       place(m, w(wx), w(wy), r3);
       filled++;
+      // …and the clump. Just over half the seeds grow one, because a world of
+      // nothing but clumps is as uniform as a world of none — the variance
+      // comes from SOME places being busier than others, not from every place
+      // being busy. The offset is 0.5-1.2 separations: close enough to read as
+      // one thicket rather than as neighbours.
+      const extra = mrnd() < 0.55 ? 1 + Math.floor(mrnd() * 3) : 0;
+      for (let k = 0; k < extra && filled < 5200; k++) {
+        const a = mrnd() * Math.PI * 2, d = 26 + mrnd() * 34;
+        const cx = wx + Math.cos(a) * d, cy = wy + Math.sin(a) * d;
+        const nb = pickTiny();
+        if (!maplePlaceable(cx, cy, nb.r3)) continue;
+        if (!MS.spotFree(cx, cy, nb.r3 * 20)) continue;
+        MS.claimSpot(cx, cy, nb.r3 * 20);
+        place(nb.m, w(cx), w(cy), nb.r3);
+        filled++;
+      }
     }
     // 2. THE BIG TREES. The town is called MAPLE FALLS and its largest edible
     //    was a 6.5-unit town hall — 46 objects in the whole world at radius 4
