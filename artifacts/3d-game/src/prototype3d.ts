@@ -808,7 +808,29 @@ function coastSolid(R0: number): (x: number, z: number) => boolean {
 // was touched. Used by the descent's end, the settled follow distance and the
 // steering cap's stand-in during the descent; declared HERE, above every one of
 // them, so none of the three can read it in its temporal dead zone.
-const PLAY_DIST = 29;
+// ── AND 29 -> 22, AGAINST THE REFERENCE ───────────────────────────────────
+// The owner sent hole.io as the bar. Measured on a full 760x1651 frame of it,
+// the hole's bright rim spans 38.0% of frame width at "Size 2". Ours at R~3
+// reads 29% at PLAY_DIST 29 and 38% at 22 — the reference's number, exactly.
+//
+// THIS DOES NOT MAKE THE WORLD DENSER AND IT WAS TEMPTING TO THINK IT WOULD.
+// Prop screen-coverage is camera-INVARIANT, as the trig says and as the A/B
+// confirms: 31.4% of the frame at PLAY_DIST 29 against 31.8% at 20. What
+// pulling in buys is READABILITY — at camDist 68 a bench is a bench and the
+// void's face is a face; at 98 both are mush — and DRAW CALLS: R=9 measured
+// 445 calls at 29 and 320 at 22, i.e. 28% back. That headroom is what pays for
+// the fill passes that DO make it denser.
+//
+// WHAT THIS COSTS, STATED PLAINLY: the note above tuned 33 -> 29 so that all
+// six worlds' void-on-screen sizes landed inside 22-26. PLAY_DIST is global, so
+// 22 scales every world by 29/22 = 1.318 and moves that spread to roughly
+// 27-33. Maple is the world being dialled in against the reference and it is
+// the world this was checked on; the other five now sit bigger than their
+// tuning intended and want looking at when their turn comes.
+//
+// The pace still does not move with it: steerCap normalises by PLAY_DIST, which
+// is the trap this constant sprang the last time it was touched.
+const PLAY_DIST = 22;
 
 /** ── QA ONLY: PARK THE CAMERA WHERE THE MENU'S DIORAMA WOULD PUT IT ────────
  *  Scaffolding for one measurement, and it is here because that measurement
@@ -4887,7 +4909,18 @@ puffPoints.frustumCulled = false; scene.add(puffPoints);
 // then only touched when something is eaten (scale to zero) or the match
 // resets. Movers keep their own disc: they need a matrix every frame and
 // there are only a few dozen of them.
-const SH_CAP = 4096;
+// ── ONE DRAW CALL, WHATEVER THE COUNT ─────────────────────────────────────
+// 4096 with maple already holding 3,674 of them: 422 slots of headroom before
+// the world's fill passes were raised at all. Overflow is not "no shadow", it
+// is WORSE than the instanced path — a prop that misses the harvest keeps its
+// own transparent depthWrite:false disc, and those are SORTED TRANSPARENT
+// draws, more expensive per call than the opaque geometry they sit under.
+//
+// The mesh is one geometry and one shared material, so raising the cap costs
+// exactly one thing: the matrix array. 12,288 x 16 floats x 4 bytes = 786 KB.
+// It must NOT be quality-rung gated — rung 3 drops the real shadow map, which
+// is precisely when these contact discs are the only grounding left.
+const SH_CAP = 12288;
 let shMesh: THREE.InstancedMesh | null = null;
 let shCount = 0;
 const _shM = new THREE.Matrix4();
@@ -4914,7 +4947,15 @@ function bakeContactShadows(): void {
     }
     const disc = e.mesh.children.find((c) => c.userData.cshadow) as THREE.Mesh | undefined;
     if (!disc) continue;
-    if (shCount >= SH_CAP) return;
+    // CONTINUE, NOT RETURN — AND NOT BREAK EITHER. A bare `return` here
+    // abandoned the WHOLE loop the moment the cap was reached, so every
+    // already-harvested prop after the first unharvested one stopped having its
+    // matrix refreshed. validateWorld nudges props off roads between sweeps, so
+    // that leaves discs standing on the grass where their prop used to be.
+    // `break` has the identical fault. The refresh branch above this runs first
+    // and continues on its own, so skipping just the HARVEST for this prop is
+    // what keeps the rest of the array live.
+    if (shCount >= SH_CAP) continue;
     if (!shMesh) {
       shMesh = new THREE.InstancedMesh(disc.geometry, disc.material as THREE.Material, SH_CAP);
       shMesh.frustumCulled = false;
