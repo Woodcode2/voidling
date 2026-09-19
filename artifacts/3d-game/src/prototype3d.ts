@@ -3161,6 +3161,7 @@ const _dbg = new Proxy(_dbgStore, {
   __solidAt: (x: number, z: number, r: number) => boolean;
   __voidGroup: () => THREE.Group;
   __camAim: () => { aim: number; now: number };
+  __forceEvolve: () => void;
   __news: () => void;
   __setSkin: (s: Record<string, unknown>) => void;
   __voidState: () => { x: number; z: number; r: number };
@@ -3361,6 +3362,14 @@ let camAim = 0;
 // sleeps and then measures is reading the second number while meaning the
 // first. qa/_voidframe.mjs reads both and says which it is quoting.
 _dbg.__camAim = () => ({ aim: camAim, now: camDist });
+let _forceEvolve = false;
+// QA: fire the NEXT form change on the following frame, without touching the
+// radius. The ceremony is the single biggest moment in a match and it is also
+// the hardest to photograph, because reaching it honestly means playing a real
+// match to a real size under a software renderer. This drives the real block at
+// the stage check — same card, same audio, same banner hold — so a probe grades
+// the shipped ceremony rather than a reconstruction of it. qa/_evolvecover.mjs.
+_dbg.__forceEvolve = () => { _forceEvolve = true; };
 // QA: every card that reached the screen this match, plus where the arc stands.
 // qa/newsarc.mjs asserts on this AND on #news's own bounding box — the log
 // proves the code ran, the box proves a child could read it.
@@ -13650,7 +13659,8 @@ function animate() {
     audio.setMusicStage(MENU_VSTAGE);
   } else {
   // evolution: form change on growth (with a flash), plus ring/glow via setStage
-  const ns = stageFor(voidling.radius);
+  const ns = _forceEvolve ? Math.min(FORMS.length - 1, curStage + 1) : stageFor(voidling.radius);
+  if (_forceEvolve) _forceEvolve = false;
   if (ns > curStage) {
     curStage = ns;
     // Recovering to a form you have already reached is not an evolution. See
