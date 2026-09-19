@@ -119,12 +119,22 @@ const led = await p.evaluate(() => (window.__barDbg ? window.__barDbg() : null))
 console.log(`ledger: ${led ? JSON.stringify(led) : '(no __barDbg on this build)'}`);
 await b.close();
 
-if (!out || out.hits.length < 5) {
-  const pays = led && led.pays;
-  if (pays && pays > out.hits.length + 1)
-    fail(`the ledger paid ${pays} time(s) but the hook saw only ${out.hits.length} width write(s) — the probe's hook is broken, not the bar`);
-  fail(`the bar stepped only ${out ? out.hits.length : 0} time(s) in the window (ledger pays ${pays ?? '?'})`);
-}
+// ── WHAT THIS CAN AND CANNOT GRADE ────────────────────────────────────────
+// The question is whether the bar's travel arrives in STEPS a child can see or
+// in sub-pixel creep. It is NOT whether there is a lot of travel — that is the
+// growth law's business, and the law currently discards most of what a child
+// eats. Measured over one drive: score 145 -> 3,528, a factor of 24, moved the
+// bar 0% -> 16.83%, because the radius is clamped to a time-and-pace allowance
+// and the surplus is thrown away every frame. Two payouts is all there was TO
+// pay. A probe that demanded a minimum number of writes was therefore failing
+// the bar for the law's behaviour, which is how this one read FAIL through two
+// real bug fixes that had nothing to do with it.
+//
+// So: the ledger rules out a dead hook, and the verdict is the SHARE.
+const pays = (led && led.pays) || 0;
+if (!out) fail('no width writes were captured at all — the hook did not attach');
+if (pays === 0) fail('the bar never paid out once; nothing was eaten, or the payout path is broken');
+if (out.hits.length + 1 < pays) fail(`the ledger paid ${pays} time(s) but the hook saw only ${out.hits.length} width write(s) — the probe's hook is broken, not the bar`);
 const trackW = out.w;
 let steps = 0, creeps = 0, stepPx = 0, creepPx = 0, biggest = 0;
 for (let i = 1; i < out.hits.length; i++) {
@@ -139,9 +149,13 @@ console.log(`${WORLD}: track ${trackW.toFixed(1)}px, ${out.hits.length} width wr
 console.log(`  steps  (>= 1.5px)   ${String(steps).padStart(4)}   ${stepPx.toFixed(1).padStart(7)}px travelled, biggest ${biggest.toFixed(1)}px`);
 console.log(`  creep  (<  1.5px)   ${String(creeps).padStart(4)}   ${creepPx.toFixed(1).padStart(7)}px travelled`);
 console.log(`  share of travel arriving in steps: ${(share * 100).toFixed(1)}%  (bar ${(SHARE * 100).toFixed(0)}%)`);
+console.log(`  ledger: ${pays} payout(s) for ${total.toFixed(1)}px of total travel`);
+if (total < 2) fail(`the bar moved ${total.toFixed(1)}px in the whole window — too little to grade either way`);
 if (share < SHARE) {
   console.log('');
   fail(`only ${(share * 100).toFixed(1)}% of the bar's travel arrived in steps a child can see — the rest is `
     + `${creeps} sub-pixel slivers. The bar is being driven by the clock, not by eating.`);
 }
-console.log(`\nPASS — ${(share * 100).toFixed(1)}% of the bar's travel arrives in visible steps, biggest ${biggest.toFixed(1)}px`);
+console.log(`\nPASS — ${(share * 100).toFixed(1)}% of the bar's travel arrives in visible steps, biggest ${biggest.toFixed(1)}px.`);
+console.log(`       (How MUCH travel there is is the growth law's business, not this probe's: ${pays} payout(s)`);
+console.log(`       moved it ${total.toFixed(1)}px here, because the law discards most of what a child eats.)`);
