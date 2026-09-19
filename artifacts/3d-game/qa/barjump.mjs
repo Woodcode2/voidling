@@ -108,9 +108,19 @@ while (guard++ < 5000) {
 await p.waitForTimeout(3000);
 
 const out = await p.evaluate(() => window.__bw);
+// …and the game's own ledger, so a low write count can be told apart from a
+// hook that stopped seeing writes. pays >> hits means the hook is broken;
+// pays == hits means the bar genuinely stepped that few times.
+const led = await p.evaluate(() => (window.__barDbg ? window.__barDbg() : null));
+console.log(`ledger: ${led ? JSON.stringify(led) : '(no __barDbg on this build)'}`);
 await b.close();
 
-if (!out || out.hits.length < 5) fail(`only ${out ? out.hits.length : 0} width write(s) captured — the hook did not see the bar`);
+if (!out || out.hits.length < 5) {
+  const pays = led && led.pays;
+  if (pays && pays > out.hits.length + 1)
+    fail(`the ledger paid ${pays} time(s) but the hook saw only ${out.hits.length} width write(s) — the probe's hook is broken, not the bar`);
+  fail(`the bar stepped only ${out ? out.hits.length : 0} time(s) in the window (ledger pays ${pays ?? '?'})`);
+}
 const trackW = out.w;
 let steps = 0, creeps = 0, stepPx = 0, creepPx = 0, biggest = 0;
 for (let i = 1; i < out.hits.length; i++) {
