@@ -5035,7 +5035,21 @@ function makePine(): THREE.Group {
   // the chord and the cone's own side normals do the rest once the material
   // stops flattening them.
   const parts = [part(new THREE.CylinderGeometry(0.5, 0.7, 2.4, 9), PROPS.trunk, 0, 1.2, 0)];
-  for (let i = 0; i < 3; i++) parts.push(part(new THREE.ConeGeometry(3.2 - i * 0.7, 3, 14), PROPS.pine, 0, 3 + i * 2.1, 0));
+  // ── THREE TIERS, THREE VALUES ───────────────────────────────────────────
+  // All three cones took the same albedo, so a pine was one green silhouette
+  // with a couple of seams in it — and the skylight in part() cannot separate
+  // them either, because their normals are near-identical tier to tier.
+  // A real conifer is darkest at the bottom: each tier shades the one below it.
+  // ConeGeometry is closed by default and the tiers overhang each other (r 3.2
+  // / 2.5 / 1.8 against a cone that has narrowed to ~0.96 by the next tier's
+  // base), so those undersides are genuinely visible from a 46-degree camera —
+  // and DOWN_K already darkens them, which is what makes the step read as a
+  // shadow rather than as a stripe.
+  const TIER = [0.80, 0.90, 1.00];
+  for (let i = 0; i < 3; i++) {
+    parts.push(part(new THREE.ConeGeometry(3.2 - i * 0.7, 3, 14),
+      TIER[i] === 1 ? PROPS.pine : shade(PROPS.pine, TIER[i]), 0, 3 + i * 2.1, 0));
+  }
   const grp = new THREE.Group(); grp.add(mergedProp(parts, PROP_SMOOTH_MAT));
   return noFront(grp);
 }
