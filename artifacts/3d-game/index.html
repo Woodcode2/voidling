@@ -2545,7 +2545,20 @@
          governs the SAME set of animations the OS preference does. Before
          this, the toggle reached exactly two things — camera shake and the
          flash cap — and every CSS pulse ignored it. */
-      body.calm #growth .gFill, body.calm #end.show #btnAgain, body.calm #gift .gRay,
+      /* ── gShine LIVES ON THE PSEUDO-ELEMENT, AND THAT IS WHY IT LEAKED ──
+         `#growth .gFill` was in this list from the start, and it never did
+         anything: the sheen is authored on `#growth .gFill::after` (see the
+         gShine rule above), and a pseudo-element is its OWN animation box —
+         `animation: none` on the parent does not reach into it. Measured, with
+         body.calm set and every descendant of #growth swept across
+         {element, ::before, ::after}: the only thing still running was
+         `gFill::after = gShine @ 2.1s`. So a child whose parent turned BIG
+         MOTION off kept a travelling sheen on the one HUD element that is on
+         screen for every second of every match. The OS query caught it all
+         along — its `*, *::before, *::after` catch-all flattens it to 1e-05s —
+         which is exactly why the in-app toggle's failure went unnoticed. */
+      body.calm #growth .gFill, body.calm #growth .gFill::after,
+      body.calm #end.show #btnAgain, body.calm #gift .gRay,
       body.calm #gift .gBox, body.calm #dailyGrid .dCell.now,
       body.calm #dailyGrid .dCell.now::after, body.calm #btnAgain, body.calm #shopFloat,
       body.calm #skinPrev .spCard, body.calm #daily .dCard, body.calm .skCard .rib,
@@ -2563,6 +2576,13 @@
          The evolve burst is the one that matters. It is a full-screen gold wash
          plus a 58vmax ray fan, on a six-year-old, at the loudest moment of the
          match — exactly the motion a parent reaches for this switch to stop. */
+      /* #news::after carries `newsShine`, and it is the SECOND animation this
+         list missed for the same reason as the growth bar's sheen: the rule is
+         on the pseudo-element and the list named the element. Found by sweeping
+         every HUD root across {element, ::before, ::after} rather than checking
+         the one that was already suspected. qa/_calmleak.mjs now does that sweep
+         on every run, so a third one cannot hide the same way. */
+      body.calm #news::after,
       body.calm #evolve::before, body.calm #evolve::after,
       /* and the menu's floating island, for the same reason */
       body.calm #menuArtBob, body.calm #menuArtImg,
@@ -2570,7 +2590,33 @@
         animation: none !important;
       }
       body.calm .burst { display: none !important; }
+      /* ── TWO CARDS THAT MUST NOT SIMPLY BE SILENCED ──────────────────────
+         #evolve.show and #news.show are not decorations on a visible element:
+         their animations ARE their visibility. Both elements sit at opacity 0
+         in their base rule, both animations run `forwards`, and nothing in the
+         JS ever removes `.show` on a timer — src/prototype3d.ts:13675 and
+         :6558 remove-and-re-add it purely to restart the animation. So the
+         final keyframe at opacity 0 is what takes each card off screen.
+         Putting either in the `animation: none` list above would leave it
+         pinned at opacity 0 and a child with BIG MOTION off would never see an
+         evolution at all — strictly worse than the motion it removes.
+         These twins keep the same duration, the same easing and the same
+         opacity envelope, and drop only the transform, which is the part BIG
+         MOTION is actually about. */
+      body.calm #evolve.show { animation: evCalm 1.8s ease forwards; }
+      @keyframes evCalm { 0% { opacity: 0 } 18% { opacity: 1 } 70% { opacity: 1 } 100% { opacity: 0 } }
+      body.calm #news.show { animation: newsCalm 5.6s ease forwards; }
+      @keyframes newsCalm {
+        0% { opacity: 0; transform: translateX(-50%); }
+        9% { opacity: 1; transform: translateX(-50%); }
+        84% { opacity: 1; transform: translateX(-50%); }
+        100% { opacity: 0; transform: translateX(-50%); }
+      }
       body.calm #growth .gFill { background-size: 100% 100%; }
+      /* stopped mid-travel the sheen freezes as a bright diagonal stripe across
+         the fill, which reads as a rendering fault rather than as a still bar.
+         Park it off the end instead, so a calm bar is simply a clean bar. */
+      body.calm #growth .gFill::after { background-position: -120% 0; opacity: 0; }
       /* the leaves are pure animation — parked, they would sit in a row along
          the top of the sky. The stars hold at a readable brightness instead of
          the 0.22 trough they would freeze at. (Mirrors the OS-query rules on
@@ -2578,7 +2624,7 @@
       body.calm #menuArt .leaf { opacity: 0 !important; }
       body.calm #menuArt .tw { opacity: 0.55 !important; }
       @media (prefers-reduced-motion: reduce) {
-        #growth .gFill, #end.show #btnAgain, #gift .gRay, #gift .gBox,
+        #growth .gFill, #growth .gFill::after, #end.show #btnAgain, #gift .gRay, #gift .gBox,
         #dailyGrid .dCell.now, #dailyGrid .dCell.now::after, #btnAgain,
         #shopFloat, #skinPrev .spCard, #daily .dCard, .skCard .rib,
         .skCard.bought, .burst > i, #shopWallet.bump, .skCard.isnew::before,
@@ -2590,6 +2636,7 @@
         .burst { display: none !important; }
         /* the one that is on screen for every second of every match */
         #growth .gFill { background-size: 100% 100%; }
+        #growth .gFill::after { background-position: -120% 0; opacity: 0; }
         *, *::before, *::after {
           animation-duration: 0.01ms !important;
           animation-iteration-count: 1 !important;
