@@ -88,7 +88,11 @@ await p.evaluate(() => {
 // drive did exactly that, and a bar with nothing to pay out looks identical to
 // a bar that cannot pay out. Warp to fresh ground whenever the score stops
 // moving, so the thing under test is the BAR and not the food supply.
-const OBSERVE = 18;      // sim-seconds
+// SIX sim-seconds, not eighteen. The frame loop here manages roughly one frame
+// per two wall-seconds, so eighteen would be an hour of wall clock for a
+// measurement that is complete in minutes — and a probe nobody can afford to
+// run is a probe that does not get run.
+const OBSERVE = 6;      // sim-seconds
 const t0 = await p.evaluate(() => window.__matchState().t);
 let guard = 0, lastScore = -1, stale = 0;
 while (guard++ < 5000) {

@@ -3164,6 +3164,8 @@ const _dbg = new Proxy(_dbgStore, {
   __forceEvolve: () => void;
   __law: () => Record<string, number | boolean>;
   __barDbg: () => { gShown: number; gDebt: number; gBiteK: number; pays: number; rect: number | null };
+  __bubStats: () => { launched: number; landed: number; displaced: number; noTarget: number };
+  __eatFloat: () => { t: number; pts: number };
   __news: () => void;
   __setSkin: (s: Record<string, unknown>) => void;
   __voidState: () => { x: number; z: number; r: number };
@@ -3389,6 +3391,12 @@ let _payN = 0;
 // everything within reach of a void that never moves, and a bar with nothing to
 // pay out looks exactly like a bar that cannot pay out.
 _dbg.__barDbg = () => ({ gShown, gDebt, gBiteK, pays: _payN, rect: gRect ? gRect.width : null });
+// QA: the flying numbers' own tally — launched vs landed separates a flush
+// that never fired from a flight that never arrived. See bubbles.flightStats.
+_dbg.__bubStats = () => bubbles.flightStats();
+// QA: the coalescing window's live state, which is what decides whether a
+// flight is launched at all.
+_dbg.__eatFloat = () => ({ t: eatFloatT, pts: eatFloatPts });
 // QA: every card that reached the screen this match, plus where the arc stands.
 // qa/newsarc.mjs asserts on this AND on #news's own bounding box — the log
 // proves the code ran, the box proves a child could read it.
