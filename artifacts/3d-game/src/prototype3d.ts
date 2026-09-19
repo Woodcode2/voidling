@@ -7879,6 +7879,34 @@ function endMatch(result: GoalResult = null) {
 let eatFloatPts = 0, eatFloatT = 0;
 const eatFloatAt = new THREE.Vector3();
 const EAT_FLOAT_WINDOW = 0.14;
+/** ── AND THE BAR HAS TO SAY IT GOT IT ──────────────────────────────────────
+ *  The owner, on hole.io: "when you eat points go into a bar". Ours has a bar,
+ *  and until now the bar could not tell a house from a traffic cone: #growth
+ *  popped on an EVOLUTION and on a demoting bite, and in between it only crept,
+ *  because its width is formProgress(radius) and the growth law rate-limits the
+ *  radius. So the one thing a child does fifty times a match landed on the bar
+ *  as nothing at all.
+ *
+ *  This is the acknowledgement, not a change to the law: the bar flashes on a
+ *  bite, graded by how big that bite was. `eatTickK` keeps the BIGGEST bite in
+ *  the flash rather than the last, because in a burst the thing worth reacting
+ *  to is the biggest thing that went in.
+ *
+ *  AND IT HAS A DARK GAP, WHICH IS THE WHOLE DESIGN. The first version simply
+ *  re-armed a 0.34s hold on every bite, and qa/_bartick.mjs caught what that
+ *  actually does: the void eats near-continuously in ordinary play, so the bar
+ *  measured LIT at rest and never went out. A bar that is always on says
+ *  exactly as much as a bar that never moves. So a flash lasts EAT_TICK_LIT
+ *  and then owes EAT_TICK_DARK before it may fire again — a spree reads as a
+ *  rhythm of pulses rather than a solid glow, and one landmark bite still
+ *  reads as one clear flash.
+ *
+ *  A big meal is exempt from the wait: a landmark going down must register on
+ *  the frame it happens, whatever the bar was doing a moment earlier. */
+let eatTickT = 0, eatTickK = 0, eatTickCd = 0;
+const EAT_TICK_LIT = 0.16;
+const EAT_TICK_DARK = 0.13;
+const EAT_TICK_BIG = 0.55;
 /** How long the drain loop takes to carry a prop of relative size `mass` all
  *  the way in, in seconds. The exact inverse of the rate in the drain branch
  *  (`e.t += dtw * (2.9 - 1.3 * mass)`), and it exists so the jaw can be held
@@ -8046,6 +8074,14 @@ function capture(e: Edible, giveHunger = true) {
   eatFloatPts += pts;
   eatFloatAt.set(e.mesh.position.x, voidling.radius + 2.2, e.mesh.position.z);
   eatFloatT = EAT_FLOAT_WINDOW;
+  // …and the growth bar takes the same bite. `bite` is already the meal's size
+  // relative to the void, which is the grade every other cue in this function
+  // rides on, so the bar answers a landmark and a bin differently for free.
+  if (eatTickCd <= 0 || bite >= EAT_TICK_BIG) {
+    eatTickK = Math.max(eatTickK, bite);
+    eatTickT = EAT_TICK_LIT;
+    eatTickCd = EAT_TICK_LIT + EAT_TICK_DARK;
+  }
   // during a beat window every bite answers in the beat's colour — the doubled
   // value is FELT at the exact moment and place it is earned. Small and short:
   // this fires on every eat, and a beat window is when eats come fastest.
@@ -13634,6 +13670,19 @@ function animate() {
       bubbles.float(eatFloatAt, `+${eatFloatPts.toLocaleString()}`);
       eatFloatPts = 0;
     }
+  }
+  // …and the bar's own acknowledgement, on the same real-time clock — it is
+  // feedback about what just happened, not part of any ceremony, so a hit-stop
+  // must not hold it. The class is written only on the frames it changes.
+  if (eatTickCd > 0) eatTickCd -= dt;
+  if (eatTickT > 0) {
+    eatTickT -= dt;
+    const want = eatTickK >= EAT_TICK_BIG ? 'big' : 'tick';
+    if (!growthEl.classList.contains(want)) {
+      growthEl.classList.remove('tick', 'big');
+      growthEl.classList.add(want);
+    }
+    if (eatTickT <= 0) { growthEl.classList.remove('tick', 'big'); eatTickK = 0; }
   }
 
   // NO DEFENCE LAYER. Police cars, army jeeps, tanks and gunships used to

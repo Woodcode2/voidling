@@ -228,6 +228,36 @@
       /* the forms still ahead, as pips on the track */
       #growth .gPip { position: absolute; top: 50%; width: 2px; height: 9px; margin-top: -4.5px;
         background: rgba(255,255,255,0.30); border-radius: 1px; }
+      /* ── A BITE JUST LANDED ────────────────────────────────────────────
+         The owner, on hole.io: "when you eat points go into a bar". The bar
+         popped on an evolution and on a demotion and did NOTHING in between,
+         so the action a child takes fifty times a match never reached it.
+         Two grades, because a traffic cone and a landmark should not answer
+         the same: .tick is the everyday bite, .big is a meal over half the
+         void's own size. Both are lights and glows only — no transform on
+         #growth itself, so this can never fight the .pop scale an evolution
+         may be running at the same moment.
+
+         AND IT IS DELIBERATELY NOT IN THE body.calm LIST. Every new animation
+         in this file has to be named there by hand, because that block is an
+         explicit selector list and not a catch-all. This one carries no
+         animation: it is a filter and a box-shadow, so BIG MOTION leaves it
+         alone, and under the OS reduced-motion query the 0.01ms
+         transition-duration turns the fade into a snap. Both are correct. A
+         child who has turned motion off still has to be told the bite landed;
+         what they asked not to have is things MOVING. */
+      #growth .gFill { transition: width 0.12s linear, filter 0.09s ease-out, box-shadow 0.09s ease-out; }
+      #growth.tick .gFill { filter: brightness(1.30) saturate(1.12);
+        box-shadow: 0 0 14px rgba(184,117,255,0.85); }
+      #growth.tick .gTrack { box-shadow: inset 0 1px 2px rgba(0,0,0,0.4), 0 0 9px rgba(184,117,255,0.45); }
+      #growth.big .gFill { filter: brightness(1.55) saturate(1.2);
+        box-shadow: 0 0 20px rgba(255,210,90,0.9); }
+      #growth.big .gTrack { box-shadow: inset 0 1px 2px rgba(0,0,0,0.4), 0 0 16px rgba(255,210,90,0.7); }
+      /* the leading edge of the fill catches it hardest — that is where the
+         thing just went in */
+      #growth.big .gFill::before { content: ''; position: absolute; top: 0; bottom: 0; right: -2px;
+        width: 10px; border-radius: 5px; background: rgba(255,246,214,0.95);
+        box-shadow: 0 0 14px rgba(255,226,140,0.95); }
       /* an evolution just landed: the whole bar takes a beat */
       #growth.pop { transform: translateX(-50%) scale(1.045); }
       #growth.pop .gTrack { box-shadow: inset 0 1px 2px rgba(0,0,0,0.4), 0 0 16px rgba(255,210,90,0.75); }
