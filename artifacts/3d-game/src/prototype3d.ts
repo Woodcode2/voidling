@@ -3162,6 +3162,7 @@ const _dbg = new Proxy(_dbgStore, {
   __voidGroup: () => THREE.Group;
   __camAim: () => { aim: number; now: number };
   __forceEvolve: () => void;
+  __law: () => Record<string, number | boolean>;
   __news: () => void;
   __setSkin: (s: Record<string, unknown>) => void;
   __voidState: () => { x: number; z: number; r: number };
@@ -3370,6 +3371,14 @@ let _forceEvolve = false;
 // the stage check — same card, same audio, same banner hold — so a probe grades
 // the shipped ceremony rather than a reconstruction of it. qa/_evolvecover.mjs.
 _dbg.__forceEvolve = () => { _forceEvolve = true; };
+/** QA: the growth law's own working, read off the frame that computed it.
+ *  Every number here is ASSIGNED into one long-lived object rather than a
+ *  fresh literal, because this runs every frame. A probe that recomputes the
+ *  law in-page instead of reading it drifts from the code — qa/_rf_pacefloor
+ *  already carries a lawCap missing both its LAW_TOP clamp and its feastR
+ *  term, and a six-rung form ladder against the shipped seven. */
+const _law: Record<string, number | boolean> = {};
+_dbg.__law = () => ({ ..._law });
 // QA: every card that reached the screen this match, plus where the arc stands.
 // qa/newsarc.mjs asserts on this AND on #news's own bounding box — the log
 // proves the code ran, the box proves a child could read it.
@@ -4144,7 +4153,7 @@ _dbg.__matchState = () => ({
   graze: rivals.grazeCount(),
   band: rivals.bandStat(),   // QA: is the lane multiplier pinned at its clamp?
   fever: feverMult,          // QA: is a beat window live right now?
-  t: started ? matchElapsed() : 0, clock: matchClock, score: playerScore, r: voidling.radius, ev: rivalEv,
+  t: started ? matchElapsed() : 0, clock: matchClock, score: playerScore, r: voidling.radius, eaten: matchEaten, ev: rivalEv,
   // QA, round 7 stream A: the arm/start split is invisible from outside without
   // these, and a goal card that never appeared cost a full diagnostic run to
   // localise. armed vs started is the whole shape of the opening.
@@ -5617,6 +5626,14 @@ let feastR = 0;
 const FEAST_PER_RIVAL = 1.25;           // five rivals eaten = the full +6
 // Pacing: evolutions should be EARNED milestones. law cap ≈ MUNCHKIN ~23s,
 // GOBBLIN ~53s, CHOMPOSAURUS ~100s, WORLD ENDER ~153s on a strong run.
+/** Seconds since the last bite in which the score floor may still pay out.
+ *  A FEEL number, not a measured one, and the only knob on the idle-growth
+ *  fix: if a gate row moves, raise this rather than widening the fix.
+ *  It lives in tClock, and tClock advances with the CLAMPED frame dt — so
+ *  under a software renderer at 1-2fps four of these seconds are roughly
+ *  ninety of wall clock. Any probe that waits for it must POLL __law().fed,
+ *  never sleep. */
+const FLOOR_FED = 4.0;
 const LAW_RATE = 0.025;   // evolutions are EARNED — slower clock, same 2D shape
 let lastR = 0.9;          // previous frame's radius — the growth RATE limiter
 const growRadius = (R: number, eR: number) => {
@@ -8019,6 +8036,11 @@ const KEEL_UP = new THREE.Vector3(0, 1, 0);
 const _kq = new THREE.Quaternion(), _kq2 = new THREE.Quaternion();
 // devour one edible: spiral it in, grow, score (2D combo model), charge hunger
 let combo = 0, comboT = 0, chompCd = 0;
+/** tClock at the last bite of ANY kind. The score floor is about to be gated
+ *  on it; until then it is written and never read, so this commit changes no
+ *  frame of the game. tClock is wall time since page load, which is why
+ *  beginMatch resets it to -99 rather than to tClock. */
+let lastEatAt = -99;
 // ── POWDER PASS: THE SNOW SHELL ────────────────────────────────────────────
 // Carving through a snowdrift packs a white shell on the void, and while it
 // holds the void eats ONE SIZE CLASS UP (EAT_RATIO 1.11 -> 1.61). This is the
@@ -12570,6 +12592,15 @@ function animate() {
       // ceiling was already pace-scaled; the floor underneath it was not, so
       // the floor decided the outcome and skill did nothing.
       const scoreFloor = Math.min(lawCap, START_R * (1 + Math.pow(playerScore / 974, 0.57)) + surgeT * surgeT * 2.6 * pace);
+      // …and the same numbers, mirrored for QA. `raw` is the floor BEFORE the
+      // min with lawCap, which is the term that carries the finale surge and
+      // therefore the one that grows an idle player.
+      _law.el2 = el2; _law.surgeT = surgeT; _law.par = par; _law.pace = pace;
+      _law.paceK = paceK; _law.lawCap = lawCap; _law.scoreFloor = scoreFloor;
+      _law.raw = START_R * (1 + Math.pow(playerScore / 974, 0.57)) + surgeT * surgeT * 2.6 * pace;
+      _law.feastR = feastR; _law.maxStep = maxStep; _law.tClock = tClock;
+      _law.demoteHold = demoteHold; _law.lastEatAt = lastEatAt;
+      _law.fed = tClock - lastEatAt < FLOOR_FED;
       // …AND IT MAY NOT UNDO A FORM LOSS. See demoteHold beside biteMercy.
       // Measured from source, a par run at 60s: lawCap 3.06, raw floor 4.18,
       // so scoreFloor IS lawCap and the player's radius sits pinned exactly on
