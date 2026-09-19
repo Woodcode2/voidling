@@ -104,15 +104,22 @@ await b.close();
 // Consecutive PAIRS only, counted only when the score is identical at both ends
 // and the floor is unfed at both ends. Positive moves only, so a band edge or a
 // downward nudge cannot cancel the growth being measured.
-let grow = 0, pairs = 0, dropped = 0;
+let grow = 0, pairs = 0, dropped = 0, cerRise = 0;
 for (let i = 1; i < rows.length; i++) {
   const a = rows[i - 1], c = rows[i];
   if (a.score !== c.score) { dropped++; continue; }
   if (a.fed !== null && (a.fed || c.fed)) { dropped++; continue; }
   pairs++;
   grow += Math.max(0, c.r - a.r);
+  // CEREMONIES ARE COUNTED PER COUNTED PAIR, for the same reason GROW is.
+  // Taking max(cer) - cer[0] across ALL rows sweeps in the rows that were just
+  // dropped for having eaten something — and an evolution on a row where the
+  // score moved may well have been earned by that bite. Measured on the build
+  // this was written against, exactly that happened: the final row scored
+  // 560 -> 596 and fired a ceremony, and the across-all-rows count reported it
+  // as "fired while the phone was down". It was not.
+  cerRise += Math.max(0, c.cer - a.cer);
 }
-const cerRise = Math.max(...rows.map(r => r.cer)) - rows[0].cer;
 console.log('');
 if (!hasLaw) console.log('NOTE — this build has no __law hook, so "fed" could not be read and the');
 if (!hasLaw) console.log('       unfed wait was a fixed sleep. Pairs were gated on score alone.');
