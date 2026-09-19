@@ -4118,6 +4118,7 @@ _dbg.__devourAll = (pct = 100): number => {
     e.mesh.visible = false; e.mesh.userData.eaten = true; e.mesh.userData.byPlayer = true;
     setShadowInstance((e.mesh.userData.shIdx as number) ?? -1, false);
     have++; n++;
+    lastEatAt = tClock;   // this path open-codes capture()'s bookkeeping; keep it fed
   }
   return n;
 };
@@ -4717,6 +4718,7 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   // no breakingNews here: announceFam already puts a full-screen card up for
   // this, and a ticker headline three seconds later is the same news twice
   playerScore += pts;
+  lastEatAt = tClock;   // a rival is a meal, and feastR is delivered BY the floor
   addCoins(15);
   questEvent('rival');
   stats.rivals = (stats.rivals ?? 0) + 1; saveStats();
@@ -8136,6 +8138,7 @@ function capture(e: Edible, giveHunger = true) {
     }
   }
   combo++; comboT = 1.6;
+  lastEatAt = tClock;   // the floor is gated on this — see FLOOR_FED
   if (combo > (stats.combo ?? 0)) { stats.combo = combo; saveStats(); }
   // ── THE COMBO IS WHY NOBODY CAN CATCH THE PLAYER ──────────────────────────
   // Five attempts to close the race by feeding the family have now failed, four
@@ -8635,7 +8638,7 @@ function beginMatch(solo = false) {
   life.cue('match');
   lookUpAt = -1; lookUpT = -1;
   drumCueT = 0; clearBeatLoot();
-  feverMult = 1; feverT = 0; lastR = voidling.radius; matchEaten = 0; signedOn = false;
+  feverMult = 1; feverT = 0; lastR = voidling.radius; matchEaten = 0; lastEatAt = -99; signedOn = false;
   // ── THE HERO WAS ASLEEP BEFORE THE MATCH BEGAN ────────────────────────────
   // `sleepy` fires at `tClock - lastInput > 8`, and tClock is WALL time since
   // the page loaded while lastInput only moves on canvas input. Tapping PLAY
@@ -12609,7 +12612,39 @@ function animate() {
       // in the frame loop. Suppressing the floor for six seconds is what turns
       // "like a level loss" from a thing that is announced into a thing that
       // happens.
-      if (!frozenR && voidling.radius < scoreFloor && tClock >= demoteHold) voidling.setRadius(scoreFloor);
+      // ── THE FLOOR IS A CATCH-UP, NOT A DRIP-FEED ────────────────────────
+      // The owner, watching his own recording: "One instance when you stand
+      // still for some reason you grow." He was right. This line PUSHES the
+      // radius up to scoreFloor, and scoreFloor carries surgeT^2 * 2.6 * pace
+      // where surgeT is max(0, elapsed - matchLen*0.66)/(matchLen*0.34) —
+      // elapsed time and nothing else. So for the last third of every match
+      // the clock alone lifted a parked player, and the growth bar with it.
+      //
+      // MEASURED with the score frozen at 614 and no input sent: the bar sat
+      // at 98.34% from 130s remaining, began climbing between the 70s and 50s
+      // samples — surgeT switches on at matchLen*0.34 = 61.2s remaining,
+      // exactly there — reached 99.77% by 35s, and the next sample was
+      // MUNCHKIN. A child who puts the phone down gets promoted for it.
+      //
+      // This is not new ground. The note above records the same class of bug
+      // found once already: the surge half of the floor "had no pace term, so
+      // it pulled an idle player's radius up unconditionally". A pace factor
+      // was multiplied in. It reduced the push and did not remove it, because
+      // pace is earned EARLIER and then multiplies a term that still grows
+      // with the clock.
+      //
+      // `fed` is the whole fix: the floor may only pay out within FLOOR_FED
+      // seconds of an actual bite. A player whose inter-bite gap is under four
+      // seconds — which is every player who is playing — sees no change at
+      // all. The ceiling is untouched, so nothing a child can reach BY EATING
+      // moves; only the push for doing nothing goes.
+      //
+      // It also gates post-demotion recovery, which is the owner's call and he
+      // made it: a demoted child now takes one mouthful to get their form
+      // back instead of it returning on a timer. The comment at the demotion
+      // branch already tells them to go and consume.
+      const fed = tClock - lastEatAt < FLOOR_FED;
+      if (!frozenR && fed && tClock >= demoteHold && voidling.radius < scoreFloor) voidling.setRadius(scoreFloor);
     }
   }
 
