@@ -3163,6 +3163,7 @@ const _dbg = new Proxy(_dbgStore, {
   __camAim: () => { aim: number; now: number };
   __forceEvolve: () => void;
   __law: () => Record<string, number | boolean>;
+  __barDbg: () => { gShown: number; gDebt: number; gBiteK: number; pays: number; rect: number | null };
   __news: () => void;
   __setSkin: (s: Record<string, unknown>) => void;
   __voidState: () => { x: number; z: number; r: number };
@@ -3379,6 +3380,15 @@ _dbg.__forceEvolve = () => { _forceEvolve = true; };
  *  term, and a six-rung form ladder against the shipped seven. */
 const _law: Record<string, number | boolean> = {};
 _dbg.__law = () => ({ ..._law });
+let _payN = 0;
+// QA: the growth bar's ledger. gShown is what the bar DISPLAYS, gDebt is what
+// it owes, and `pays` counts the payouts that have actually landed. This is
+// what settled whether the bar was broken or merely slow: a probe reported the
+// bar never moving, and reading these showed pays going 0 -> 1 with gShown
+// stepping 0 -> 0.1576 in a single write. The bar was fine; the probe had eaten
+// everything within reach of a void that never moves, and a bar with nothing to
+// pay out looks exactly like a bar that cannot pay out.
+_dbg.__barDbg = () => ({ gShown, gDebt, gBiteK, pays: _payN, rect: gRect ? gRect.width : null });
 // QA: every card that reached the screen this match, plus where the arc stands.
 // qa/newsarc.mjs asserts on this AND on #news's own bounding box — the log
 // proves the code ran, the box proves a child could read it.
@@ -5351,6 +5361,7 @@ window.addEventListener('blur', () => keys.clear());   // Cmd-Tab mid-hold must 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  refreshGRect();   // the growth bar moved; the flying numbers aim at it
 });
 
 // ── match state + HUD ─────────────────────────────────────────────────────────
@@ -6912,6 +6923,24 @@ function paintGrowth(r: number) {
     growthEl.classList.toggle('max', !nxt);
     // one pip per remaining form, spaced across what is LEFT of the journey —
     // "three more to go" is the thing a child wants off this bar
+    // ── A BAND CHANGE IS NOT A 377px SLIDE BACKWARDS ─────────────────────
+    // formProgress restarts at zero at every rung, so the crossing authors
+    // ~99.7% -> ~0% in ONE write — and `transition: width 0.12s linear` then
+    // slides the fill backwards across nearly the whole track, underneath the
+    // evolve ceremony, at all five crossings. Fill it to the brim, hold a beat
+    // so the child sees it complete, then SNAP to the new band with the
+    // transition suppressed for that one write.
+    gFillEl.style.width = '100%'; lastGw = '100%';
+    const bandTo = st;
+    setTimeout(() => {
+      if (gPipStage !== bandTo) return;          // another crossing overtook us
+      gShown = formProgress(voidling.radius); gDebt = 0;
+      gFillEl.style.transition = 'none';
+      const w = `${(gShown * 100).toFixed(2)}%`;
+      gFillEl.style.width = w; lastGw = w;
+      void gFillEl.offsetWidth;
+      requestAnimationFrame(() => { gFillEl.style.transition = ''; });
+    }, 120);
     for (const p of Array.from(gTrackEl.querySelectorAll('.gPip'))) p.remove();
     const left = FORMS.length - 1 - st;
     for (let i = 1; i < left; i++) {
@@ -6931,10 +6960,57 @@ function paintGrowth(r: number) {
   // change-gated anyway.)
   const gm = `${Math.round(r * 1.6)}m`;
   if (gm !== lastGm) { lastGm = gm; gMEl.textContent = gm; }
-  const gw = `${(formProgress(r) * 100).toFixed(2)}%`;
+  // …and the fill is no longer written from the truth. It is written from
+  // gShown, which only a bite moves. Keep the SIGN on the debt: a within-band
+  // downward move has to be payable too, or a demotion would leave the bar
+  // stranded above where the void actually is.
+  gDebt = formProgress(r) - gShown;
+  const gw = `${(gShown * 100).toFixed(2)}%`;
   if (gw !== lastGw) { lastGw = gw; gFillEl.style.width = gw; }
 }
+/** Pay the whole outstanding debt in one step, and punch the head of the bar
+ *  while it lands. Graded: a meal over half the void's own size gets the
+ *  brighter punch, the same threshold every other eat cue in this file uses. */
+function gbarPay(): void {
+  _payN++;
+  gShown += gDebt;
+  gDebt = 0;
+  const cls = gBiteK >= EAT_TICK_BIG ? 'paybig' : 'pay';
+  growthEl.classList.remove('pay', 'paybig');
+  void growthEl.offsetWidth;
+  growthEl.classList.add(cls);
+  setTimeout(() => growthEl.classList.remove(cls), 140);
+  gBiteK = 0;
+}
 let lastGm = '', lastGw = '';
+/** ── THE BAR PAYS ON A BITE, NOT ON THE CLOCK ──────────────────────────────
+ *  The owner, on hole.io: "when you eat like points are going into the bar".
+ *  Ours crawled. formProgress(radius) is written every frame and the growth law
+ *  rate-limits the radius, so the fill advanced in slivers no child could
+ *  connect to anything they did — measured, roughly 20 width writes per second
+ *  of sim, each one a fraction of a pixel.
+ *
+ *  gShown is what the bar DISPLAYS; the truth is what formProgress says. The
+ *  gap between them is gDebt, and it is paid in one step when a bite lands.
+ *  paintGrowth may never advance gShown — only gbarPay() does. */
+let gShown = 0, gDebt = 0, gBiteK = 0;
+/** The bar's track rect, cached. THE STALE-RECT TRAP: #growth is display:none
+ *  on the menu and whenever it carries .off, so a rect read outside a match is
+ *  0x0 at the origin — and every flying number would then sail to the top-left
+ *  corner of the screen. Refreshed on resize AND on the first frame of each
+ *  match, and never read per frame. */
+let gRect: DOMRect | null = null;
+function refreshGRect(): void {
+  const r = gTrackEl.getBoundingClientRect();
+  gRect = r.width > 4 ? r : null;
+}
+/** Where a flying number should land: the HEAD of the fill, which moves as the
+ *  bar fills, which is why this is a function the flight calls each frame
+ *  rather than a point captured at launch. */
+function gBarTarget(): { x: number; y: number } | null {
+  if (!gRect) return null;
+  return { x: gRect.left + gRect.width * Math.min(1, Math.max(0, gShown)), y: gRect.top + gRect.height / 2 };
+}
 
 // rank ladder (hole.io placement points: 20/10/5/2/1) + daily streak
 let xp = Number(localStorage.getItem('voidXP') || 0);
@@ -7978,12 +8054,23 @@ function endMatch(result: GoalResult = null) {
 
 /** ── THE COALESCING FLOATER ────────────────────────────────────────────────
  *  Points banked inside one window, the world position of the last thing eaten,
- *  and the countdown. Flushed in the frame loop. 0.14s is short enough that a
- *  single bite still reads as instant and long enough that a hedgerow leaves
- *  one number instead of nine. */
+ *  and the countdown. Flushed in the frame loop.
+ *
+ *  ── LEADING ARM, FIXED WINDOW ────────────────────────────────────────────
+ *  This was 0.14s and RE-ARMED on every bite, which makes it a trailing
+ *  debounce: the payout waits for eating to stop. Measured on a real match it
+ *  did not go silent — 320 floats in 42 seconds — but it left 85 near-duplicate
+ *  numbers inside 0.2s of each other (+15 +16 +14 +19 +19 +19), because 0.14s
+ *  is too SHORT to merge the burst it exists to merge.
+ *
+ *  Armed only when idle and held for a fixed 0.45s, it becomes a rate cap
+ *  instead: a burst pays out on a fixed schedule from its FIRST bite, at most
+ *  ~2.2 times a second, and the numbers merge into one that is worth reading.
+ *  The growth bar's step rides the same schedule, so the number and the bar
+ *  move together rather than at two different rhythms. */
 let eatFloatPts = 0, eatFloatT = 0;
 const eatFloatAt = new THREE.Vector3();
-const EAT_FLOAT_WINDOW = 0.14;
+const EAT_FLOAT_WINDOW = 0.45;
 /** ── AND THE BAR HAS TO SAY IT GOT IT ──────────────────────────────────────
  *  The owner, on hole.io: "when you eat points go into a bar". Ours has a bar,
  *  and until now the bar could not tell a house from a traffic cone: #growth
@@ -8184,10 +8271,11 @@ function capture(e: Edible, giveHunger = true) {
   // satisfying read: the burst becomes one punch instead of a stutter of ones.
   eatFloatPts += pts;
   eatFloatAt.set(e.mesh.position.x, voidling.radius + 2.2, e.mesh.position.z);
-  eatFloatT = EAT_FLOAT_WINDOW;
+  if (eatFloatT <= 0) eatFloatT = EAT_FLOAT_WINDOW;   // LEADING: arm on the first bite, never re-arm
   // …and the growth bar takes the same bite. `bite` is already the meal's size
   // relative to the void, which is the grade every other cue in this function
   // rides on, so the bar answers a landmark and a bin differently for free.
+  gBiteK = Math.max(gBiteK, bite);   // the bar's payout is graded too — see gbarPay
   if (eatTickCd <= 0 || bite >= EAT_TICK_BIG) {
     eatTickK = Math.max(eatTickK, bite);
     eatTickT = EAT_TICK_LIT;
@@ -8638,7 +8726,8 @@ function beginMatch(solo = false) {
   life.cue('match');
   lookUpAt = -1; lookUpT = -1;
   drumCueT = 0; clearBeatLoot();
-  feverMult = 1; feverT = 0; lastR = voidling.radius; matchEaten = 0; lastEatAt = -99; signedOn = false;
+  feverMult = 1; feverT = 0; lastR = voidling.radius; matchEaten = 0; lastEatAt = -99; gShown = 0; gDebt = 0; gBiteK = 0; signedOn = false;
+  gRect = null; setTimeout(refreshGRect, 0);   // the bar is display:none until the match paints it
   // ── THE HERO WAS ASLEEP BEFORE THE MATCH BEGAN ────────────────────────────
   // `sleepy` fires at `tClock - lastInput > 8`, and tClock is WALL time since
   // the page loaded while lastInput only moves on canvas input. Tapping PLAY
@@ -13840,7 +13929,18 @@ function animate() {
   if (eatFloatT > 0) {
     eatFloatT -= dt;
     if (eatFloatT <= 0 && eatFloatPts > 0) {
-      bubbles.float(eatFloatAt, `+${eatFloatPts.toLocaleString()}`);
+      // ── THE NUMBER GOES INTO THE BAR ───────────────────────────────────
+      // The owner, on hole.io: "when you eat like points are going into the
+      // bar." It used to rise off the prop and fade in mid-air, with the bar
+      // creeping independently somewhere else on screen. Now it flies to the
+      // head of the fill and the bar takes its step AS THE NUMBER LANDS, so
+      // the two are one gesture rather than two unrelated ones.
+      //
+      // gbarPay is handed over as the arrival callback rather than called
+      // here, so the payout cannot happen before the number that explains it.
+      // bubbles.flyTo guarantees it fires in every motion state — under
+      // reduced motion the duration is zero and it lands on the next frame.
+      bubbles.flyTo(eatFloatAt, `+${eatFloatPts.toLocaleString()}`, gBarTarget, gbarPay);
       eatFloatPts = 0;
     }
   }

@@ -2,6 +2,7 @@
 // anchor to screen each frame. Ambient chatter + panic barks, biome-flavoured,
 // exactly like the 2D game. A small pool keeps it readable (global cap).
 import * as THREE from 'three';
+import { reduceMotion } from './fx';
 
 // 'rival' is the FAMILY's kind, and it is not the same thing as 'event':
 // the diagnosis that forced the split found both slots held by town-hall
@@ -18,6 +19,13 @@ export interface Bubbles {
    *  two are visually different classes at a glance. */
   say(pos: THREE.Vector3, text: string, kind: BubbleKind, opts?: { name?: string; color?: string }): void;
   float(pos: THREE.Vector3, text: string, big?: boolean): void;   // rising score/juice text
+  /** THE NUMBER GOES INTO THE BAR. The owner, on hole.io: "when you eat like
+   *  points are going into the bar". Same pooled node as float(), but instead
+   *  of rising and fading in world space it flies to a SCREEN point and fires
+   *  onArrive when it lands. `target` is read every frame rather than captured,
+   *  because the bar's head moves as the bar fills. */
+  flyTo(pos: THREE.Vector3, text: string, target: () => { x: number; y: number } | null,
+    onArrive: () => void, big?: boolean): void;
   /** `hero` is the void's world position and radius. Pass it and no bubble
    *  will be drawn across his face. See the note at HERO_PAD. */
   update(dt: number, hero?: { pos: THREE.Vector3; r: number }): void;
@@ -42,6 +50,13 @@ interface Slot {
   lx: number;
   ly: number;
   vis: number;   // -1 unknown, 0 hidden, 1 visible
+  /** set only on a flying floater — see flyTo(). sx/sy are the screen point it
+   *  launched from, filled on its first update once the world point is known. */
+  fly?: {
+    t: number; dur: number; sx: number; sy: number;
+    target: (() => { x: number; y: number } | null) | null;
+    onArrive: (() => void) | null;
+  } | null;
 }
 
 // Was a flat 150. The camera pulls back to 300 at WORLD ENDER, so every
@@ -188,6 +203,11 @@ const style = document.createElement('style');
     }
     body.calm .vf.go { opacity: 1 !important; transform: translate(-50%, -70%) !important; }
     .vf.big { font-size: 26px; color: #7ef2a0; letter-spacing: 1px; }
+    /* A FLYING NUMBER CARRIES ITS OWN OPACITY, and that is not optional:
+       '.vf' is authored opacity 0 and only '.vf.go's vfRise reveals it, so a
+       flying slot — which deliberately runs no animation, because its motion is
+       a per-frame lerp — would otherwise be invisible in every motion state. */
+    .vf.fly { opacity: 1 !important; z-index: 6; }
     .vf.go { animation: vfRise 0.9s ease-out forwards; }
     @keyframes vfRise {
       0% { opacity: 0; transform: translate(-50%, -30%) scale(0.6); }
@@ -359,6 +379,20 @@ const style = document.createElement('style');
       void (f.el as HTMLElement).offsetWidth;
       f.el.classList.add('go');
     },
+    flyTo(pos, text, target, onArrive, big = false) {
+      text = sentence(text);
+      const f = floats[fHead]; fHead = (fHead + 1) % floats.length;
+      f.active = true; f.pos.copy(pos);
+      f.el.textContent = text;
+      f.el.className = `vf fly${big ? ' big' : ''}`;
+      // `until` is a SAFETY NET, not the schedule: if the target goes away or a
+      // frame is dropped the slot still retires rather than sticking on screen.
+      f.until = clock + 0.6;
+      f.lx = -1; f.ly = -1;
+      // dur 0 under reduced motion, so it lands on the very next update frame —
+      // the payout must still happen, it just does not travel.
+      f.fly = { t: 0, dur: reduceMotion() ? 0 : 0.28, sx: -1, sy: -1, target, onArrive };
+    },
     reset() {
       // Every live bubble and floater dies at the match boundary. They used to
       // carry over verbatim — measured in 5 of 5 match transitions — and hang
@@ -375,8 +409,10 @@ const style = document.createElement('style');
       for (const f of floats) {
         f.active = false; f.until = 0;
         f.el.classList.remove('show');
+        f.el.className = 'vf';
         f.el.textContent = '';
         f.lx = -1; f.ly = -1;
+        f.fly = null;   // a pending payout dies with the match, not into the next one
       }
     },
     update(dt: number, hero?: { pos: THREE.Vector3; r: number }) {
@@ -559,6 +595,43 @@ const style = document.createElement('style');
       }
       for (const f of floats) {
         if (!f.active) continue;
+        if (f.fly) {
+          const fl = f.fly;
+          // the launch point is the world position, projected ONCE
+          if (fl.sx < 0) {
+            v.copy(f.pos).project(camera);
+            if (v.z > 1) { fl.sx = w * 0.5; fl.sy = h * 0.5; }
+            else { fl.sx = (v.x * 0.5 + 0.5) * w; fl.sy = (-v.y * 0.5 + 0.5) * h; }
+          }
+          const tgt = fl.target && fl.target();
+          fl.t += dt;
+          const k = Math.min(1, fl.dur > 0 ? fl.t / fl.dur : 1);
+          const e = k * k;                     // ease IN — it accelerates into the bar
+          if (!tgt) {
+            // nowhere to fly to (the bar is hidden, or its rect is not measured
+            // yet). Retire the slot, but STILL pay: the number is cosmetic, the
+            // payout is not, and swallowing it would strand the bar's debt.
+            f.active = false; f.el.className = 'vf';
+            const cb = fl.onArrive; fl.onArrive = null; f.fly = null;
+            if (cb) cb();
+            continue;
+          }
+          const px = fl.sx + (tgt.x - fl.sx) * e, py = fl.sy + (tgt.y - fl.sy) * e;
+          if (Math.abs(px - f.lx) > 0.5 || Math.abs(py - f.ly) > 0.5) {
+            f.lx = px; f.ly = py;
+            f.el.style.left = `${px}px`;
+            f.el.style.top = `${py}px`;
+            f.el.style.transform = `translate(-50%, -50%) scale(${(1 - 0.45 * e).toFixed(3)})`;
+          }
+          if (k >= 1 || clock > f.until) {
+            f.active = false; f.el.className = 'vf'; f.el.style.transform = '';
+            // null the callback BEFORE calling it, so a re-entrant path cannot
+            // pay the same debt twice
+            const cb = fl.onArrive; fl.onArrive = null; f.fly = null;
+            if (cb) cb();
+          }
+          continue;
+        }
         if (clock > f.until) { f.active = false; f.el.classList.remove('go'); continue; }
         v.copy(f.pos).project(camera);
         if (v.z > 1) continue;

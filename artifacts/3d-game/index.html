@@ -192,7 +192,10 @@
          part a child actually wants to know. */
       #growth { position: fixed; z-index: 5; pointer-events: none;
         left: 50%; transform: translateX(-50%);
-        bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+        /* an unconditional floor. env() resolves to 0 in a non-standalone mobile
+           browser, which put the card 14px off the bottom edge — measured at
+           440x956, 430x932 and 375x667 — directly above the toolbar. */
+        bottom: max(26px, calc(18px + env(safe-area-inset-bottom, 0px)));
         width: min(92vw, 460px); box-sizing: border-box;
         padding: 8px 12px 9px; border-radius: 15px;
         background: linear-gradient(180deg, rgba(30,16,58,0.91), rgba(16,8,30,0.93));
@@ -201,32 +204,54 @@
         backdrop-filter: blur(8px);
         transition: transform 0.18s cubic-bezier(0.2,1.6,0.4,1); }
       #growth .gRow { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
-      #growth .gNow { color: #fff; font-size: 13px; font-weight: 700; letter-spacing: 1.6px;
+      #growth .gNow { color: #fff; font-size: 15px; font-weight: 700; letter-spacing: 1.6px;
         text-shadow: 0 1px 3px rgba(0,0,0,0.7); white-space: nowrap; }
       /* the metres are the local "how big am I" read the chip under the void
          used to carry — it keeps its job, it just stopped moving around */
       #growth .gM { color: #ffd25a; font-size: 12.5px; font-weight: 700;
         font-variant-numeric: tabular-nums; white-space: nowrap; }
-      #growth .gNext { margin-left: auto; color: #a892d8; font-size: 12px; font-weight: 700;
+      #growth .gNext { margin-left: auto; color: #a892d8; font-size: 11px; font-weight: 700;
         letter-spacing: 1.4px; white-space: nowrap; }
       #growth .gNext b { color: #d9c2ff; font-weight: 700; }
-      #growth .gTrack { position: relative; height: 9px; border-radius: 5px; overflow: hidden;
-        background: rgba(255,255,255,0.12); box-shadow: inset 0 1px 2px rgba(0,0,0,0.4); }
-      /* SMOOTH BY CONSTRUCTION. The fill is written every frame and the growth
-         law rate-limits the radius, so the width lands within a hair of where
-         it was — the short transition only exists to absorb the 5Hz HUD tick
-         and the odd dropped frame. */
-      #growth .gFill { position: absolute; inset: 0 auto 0 0; width: 0%; border-radius: 5px;
-        background: linear-gradient(90deg, #7b4fe0 0%, #b875ff 55%, #e3c8ff 100%);
-        box-shadow: 0 0 10px rgba(184,117,255,0.55);
-        transition: width 0.12s linear; }
-      /* a travelling sheen, so a bar that is creeping still reads as ALIVE */
-      #growth .gFill::after { content: ''; position: absolute; inset: 0;
-        background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.42) 50%, transparent 70%);
-        background-size: 220% 100%; animation: gShine 2.1s linear infinite; }
-      @keyframes gShine { 0% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
+      /* 20px, not 9. The meter was 0.81% of a 440x956 screen and the label row
+         above it outweighed it 1.78:1 — the text was bigger than the thing the
+         text describes. And the track is a SOLID now: rgba(255,255,255,0.12)
+         over a translucent card made its colour depend on whatever the world
+         was doing behind it, so the fill's contrast against it measured
+         anywhere from 2.00:1 to 2.75:1 depending on the ground. */
+      #growth .gTrack { position: relative; height: 20px; border-radius: 10px; overflow: hidden;
+        background: #150a26; box-shadow: inset 0 1px 3px rgba(0,0,0,0.55); }
+      /* IT STEPS NOW, IT DOES NOT CREEP. The fill is written from gShown, which
+         only a bite moves, so this transition is the STEP's own easing rather
+         than a smoother over per-frame slivers. Low stop #7b4fe0 -> #a05cff:
+         4.958:1 against the solid track, where the old pair measured 2.4:1.
+         background-size is pinned to the TRACK's width as a static calc, so the
+         gradient stays put as the fill grows and a 90% bar is a different
+         picture from a 10% one — the one free signal a progress bar gets, and
+         it was being thrown away by letting the gradient scale with the fill.
+         A static calc, never written from JS, or it reintroduces the per-frame
+         style invalidation the change-gate in paintGrowth exists to kill. */
+      #growth .gFill { position: absolute; inset: 0 auto 0 0; width: 0%; border-radius: 10px;
+        background: linear-gradient(90deg, #a05cff 0%, #b875ff 55%, #e3c8ff 100%);
+        background-size: calc(min(92vw, 460px) - 26px) 100%;
+        box-shadow: 0 0 12px rgba(184,117,255,0.55);
+        transition: width 0.16s cubic-bezier(0.2, 1.1, 0.35, 1); }
+      /* THE HEAD. This existed only under .big; it is permanent now, because it
+         is where the bar is ADDING and it is what the flying number aims at. */
+      #growth .gFill::before { content: ''; position: absolute; top: 0; bottom: 0; right: -2px;
+        width: 14px; border-radius: 10px; background: rgba(255,246,214,0.95);
+        box-shadow: 0 0 14px rgba(255,226,140,0.9);
+        transform-origin: 100% 50%; }
+      /* …and it punches on the step. A transform, not a keyframe: the body.calm
+         list governs `animation` and is explicit, and this file has already
+         shipped four animations that were never named in it. */
+      #growth.pay .gFill::before { transform: scaleX(1.9) scaleY(1.2);
+        transition: transform 90ms ease-out; }
+      #growth.paybig .gFill::before { transform: scaleX(2.6) scaleY(1.35);
+        background: #fff6d6; box-shadow: 0 0 22px rgba(255,226,140,1);
+        transition: transform 90ms ease-out; }
       /* the forms still ahead, as pips on the track */
-      #growth .gPip { position: absolute; top: 50%; width: 2px; height: 9px; margin-top: -4.5px;
+      #growth .gPip { position: absolute; top: 50%; width: 2px; height: 20px; margin-top: -10px;
         background: rgba(255,255,255,0.30); border-radius: 1px; }
       /* ── A BITE JUST LANDED ────────────────────────────────────────────
          The owner, on hole.io: "when you eat points go into a bar". The bar
@@ -503,11 +528,16 @@
          outside it. The border is
          quieter than it was (0.22 from 0.30) because we have the ghost hand to do
          the teaching; their stick has to carry that job as well as feedback. */
-      #joy { position: fixed; width: 110px; height: 110px; border-radius: 50%; z-index: 6;
+      /* z-index 7, not 6. The flying score numbers (.vf.fly, z-index 6) travel
+         through the bottom of the screen on their way to the growth bar, and
+         .vf nodes are created at runtime so they come later in DOM order and
+         win a tie at the same index — a number would land on top of the child's
+         thumb. #evolve (9) and #banner (8) already sit above both. */
+      #joy { position: fixed; width: 110px; height: 110px; border-radius: 50%; z-index: 7;
         box-sizing: border-box;
         background: transparent; border: 2px solid rgba(255,255,255,0.22);
         transform: translate(-50%, -50%); pointer-events: none; display: none; }
-      #joyNub { position: fixed; width: 52px; height: 52px; border-radius: 50%; z-index: 6;
+      #joyNub { position: fixed; width: 52px; height: 52px; border-radius: 50%; z-index: 7;
         background: rgba(201,166,255,0.55); box-shadow: 0 0 14px rgba(172,108,255,0.5);
         transform: translate(-50%, -50%); pointer-events: none; display: none; }
       /* coins + quests */
@@ -2564,19 +2594,23 @@
          governs the SAME set of animations the OS preference does. Before
          this, the toggle reached exactly two things — camera shake and the
          flash cap — and every CSS pulse ignored it. */
-      /* ── gShine LIVES ON THE PSEUDO-ELEMENT, AND THAT IS WHY IT LEAKED ──
-         `#growth .gFill` was in this list from the start, and it never did
-         anything: the sheen is authored on `#growth .gFill::after` (see the
-         gShine rule above), and a pseudo-element is its OWN animation box —
-         `animation: none` on the parent does not reach into it. Measured, with
-         body.calm set and every descendant of #growth swept across
-         {element, ::before, ::after}: the only thing still running was
-         `gFill::after = gShine @ 2.1s`. So a child whose parent turned BIG
-         MOTION off kept a travelling sheen on the one HUD element that is on
-         screen for every second of every match. The OS query caught it all
-         along — its `*, *::before, *::after` catch-all flattens it to 1e-05s —
-         which is exactly why the in-app toggle's failure went unnoticed. */
-      body.calm #growth .gFill, body.calm #growth .gFill::after,
+      /* ── A PSEUDO-ELEMENT IS ITS OWN ANIMATION BOX ──────────────────────
+         This list is EXPLICIT, so every animation has to be named in it by
+         hand — and naming the parent does not reach a `::before` or `::after`.
+         `#growth .gFill` sat in this list for a long time doing nothing at all,
+         because the animation it was meant to stop was authored on
+         `#growth .gFill::after`. Measured, with body.calm set and every
+         descendant of #growth swept across {element, ::before, ::after}, that
+         sheen was still running at its full 2.1s while the toggle claimed to
+         have stopped it.
+         It hid because the OS query DOES catch it — that block carries a
+         `*, *::before, *::after` catch-all which flattens every duration to
+         0.01ms — so anyone testing with the OS preference saw a still HUD and
+         concluded the feature worked. Check the in-app toggle separately.
+         (The sheen itself is gone now: the bar steps on a bite, so it no longer
+         needs a travelling highlight to prove it is alive. The lesson is what
+         is left, and qa/_calmleak.mjs enforces it on every run.) */
+      body.calm #growth .gFill,
       body.calm #end.show #btnAgain, body.calm #gift .gRay,
       body.calm #gift .gBox, body.calm #dailyGrid .dCell.now,
       body.calm #dailyGrid .dCell.now::after, body.calm #btnAgain, body.calm #shopFloat,
@@ -2631,11 +2665,9 @@
         84% { opacity: 1; transform: translateX(-50%); }
         100% { opacity: 0; transform: translateX(-50%); }
       }
-      body.calm #growth .gFill { background-size: 100% 100%; }
       /* stopped mid-travel the sheen freezes as a bright diagonal stripe across
          the fill, which reads as a rendering fault rather than as a still bar.
          Park it off the end instead, so a calm bar is simply a clean bar. */
-      body.calm #growth .gFill::after { background-position: -120% 0; opacity: 0; }
       /* the leaves are pure animation — parked, they would sit in a row along
          the top of the sky. The stars hold at a readable brightness instead of
          the 0.22 trough they would freeze at. (Mirrors the OS-query rules on
@@ -2643,7 +2675,7 @@
       body.calm #menuArt .leaf { opacity: 0 !important; }
       body.calm #menuArt .tw { opacity: 0.55 !important; }
       @media (prefers-reduced-motion: reduce) {
-        #growth .gFill, #growth .gFill::after, #end.show #btnAgain, #gift .gRay, #gift .gBox,
+        #growth .gFill, #end.show #btnAgain, #gift .gRay, #gift .gBox,
         #dailyGrid .dCell.now, #dailyGrid .dCell.now::after, #btnAgain,
         #shopFloat, #skinPrev .spCard, #daily .dCard, .skCard .rib,
         .skCard.bought, .burst > i, #shopWallet.bump, .skCard.isnew::before,
@@ -2654,8 +2686,6 @@
            in the middle of the card until the timeout removes them */
         .burst { display: none !important; }
         /* the one that is on screen for every second of every match */
-        #growth .gFill { background-size: 100% 100%; }
-        #growth .gFill::after { background-position: -120% 0; opacity: 0; }
         *, *::before, *::after {
           animation-duration: 0.01ms !important;
           animation-iteration-count: 1 !important;
