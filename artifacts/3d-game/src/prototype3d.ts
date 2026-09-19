@@ -813,6 +813,46 @@ function coastSolid(R0: number): (x: number, z: number) => boolean {
 // the hole's bright rim spans 38.0% of frame width at "Size 2". Ours at R~3
 // reads 29% at PLAY_DIST 29 and 38% at 22 — the reference's number, exactly.
 //
+// ── AND THAT NUMBER IS RIGHT, BUT YOU CANNOT CHECK IT BY WATCHING ─────────
+// It was re-measured by projecting the void's radius through the live camera
+// at nine radii, four and a half seconds apart, and came back 26.8% at R 0.9
+// rising to 77.9% at R 12.2 — which reads as the void swallowing the screen
+// and the 38% above being off by 1.65x. It is the MEASUREMENT that is wrong,
+// and the trap is worth the space because the next person will fall in it.
+//
+// camDist eases: `camDist += (targetDist - camDist) * (1 - exp(-1.6 * dt))`,
+// a 0.625s time constant. dt is clamped to 0.05, so each FRAME closes 7.7% of
+// the remaining gap and settling takes about 57 frames — a third of a second
+// at 60fps, and thirty to sixty SECONDS at the 1-2fps the software renderer
+// gives QA. Every wait short of that samples a camera still flying outward,
+// sitting far too close, with the void correspondingly huge. A screenshot
+// taken mid-bite is worse again: impulse() lunges the body past its size, so
+// R 5 photographed 600ms after a forced eat reads 86%.
+//
+// The framing a child actually sees is the SETTLED one, and that is arithmetic
+// rather than observation. With fov 32 and aspect 430/932, tan(fovx/2) is
+// 0.1323, and a sphere of radius R at distance d spans (R/d)/0.1323 of the
+// frame width. At d = PLAY_DIST * (R/0.9)^0.82:
+//
+//                 PLAY_DIST 22     PLAY_DIST 29
+//     R  0.9          26.2%            23.5%     <- targetDist has a floor of 26,
+//     R  3.0          38.4%            29.1%        so 22 does not apply at spawn
+//                                                <- the 38 and the 29 above
+//     R  5.0          42.1%            31.9%
+//     R  9.0          46.8%            35.5%
+//     R 12.0          49.3%            37.4%
+//
+// So 22 puts R~3 on the reference's 38.0% to within half a point, 29 put it on
+// 29.1%, and both figures in the paragraph above are sound. The arithmetic is
+// checked against the probe's own unsettled rows — feeding each MEASURED
+// distance back through (R/d)/0.1323 reproduces every reading to within 0.4
+// points — so the formula and the lag explain the whole discrepancy between
+// them. Across a match the void runs 31% to 49% of frame width. It is not too
+// close. qa/_voidframe.mjs holds the measurement and waits for the settle.
+//
+// ?pd=N overrides this at runtime so the framing can be photographed at
+// several values without three builds.
+//
 // THIS DOES NOT MAKE THE WORLD DENSER AND IT WAS TEMPTING TO THINK IT WOULD.
 // Prop screen-coverage is camera-INVARIANT, as the trig says and as the A/B
 // confirms: 31.4% of the frame at PLAY_DIST 29 against 31.8% at 20. What
@@ -830,7 +870,7 @@ function coastSolid(R0: number): (x: number, z: number) => boolean {
 //
 // The pace still does not move with it: steerCap normalises by PLAY_DIST, which
 // is the trap this constant sprang the last time it was touched.
-const PLAY_DIST = 22;
+const PLAY_DIST = Number(new URLSearchParams(location.search).get('pd')) || 22;
 
 /** ── QA ONLY: PARK THE CAMERA WHERE THE MENU'S DIORAMA WOULD PUT IT ────────
  *  Scaffolding for one measurement, and it is here because that measurement
@@ -3120,6 +3160,7 @@ const _dbg = new Proxy(_dbgStore, {
   __setHat: (id: string | null) => void;
   __solidAt: (x: number, z: number, r: number) => boolean;
   __voidGroup: () => THREE.Group;
+  __camAim: () => { aim: number; now: number };
   __news: () => void;
   __setSkin: (s: Record<string, unknown>) => void;
   __voidState: () => { x: number; z: number; r: number };
@@ -3313,6 +3354,13 @@ _dbg.__solidAt = (x: number, z: number, r: number) => coastSolid(r)(x, z);
 // was applied and too small or never applied at all, and that distinction cost
 // a whole round of wrong tuning.
 _dbg.__voidGroup = () => voidling.group;
+let camAim = 0;
+// QA: the camera's settled distance and where it currently is. The gap
+// between them is the ease, which is a third of a second at 60fps and up to
+// a minute at the 1-2fps a software renderer manages — so a probe that
+// sleeps and then measures is reading the second number while meaning the
+// first. qa/_voidframe.mjs reads both and says which it is quoting.
+_dbg.__camAim = () => ({ aim: camAim, now: camDist });
 // QA: every card that reached the screen this match, plus where the arc stands.
 // qa/newsarc.mjs asserts on this AND on #news's own bounding box — the log
 // proves the code ran, the box proves a child could read it.
@@ -13451,6 +13499,12 @@ function animate() {
     // armed: the world waits at the establishing height. Nothing eases toward the
     // playing distance until the player has asked for a match.
     if (armed && !started && !ended) targetDist = DESCENT_START;
+    // WHERE THE CAMERA IS TRYING TO BE, captured after every modifier and
+    // before the ease. QA cannot wait out the ease under the software
+    // renderer (57 frames; see PLAY_DIST) and must not transcribe the law
+    // to work around that — this is the settled distance, read off the
+    // build. qa/_voidframe.mjs.
+    camAim = targetDist;
     camDist += (targetDist - camDist) * (1 - Math.exp(-1.6 * dt));
     // steepen the camera as the void grows (hole.io): big hole ⇒ near-top-down,
     // so towers and trees stop hiding the hero
