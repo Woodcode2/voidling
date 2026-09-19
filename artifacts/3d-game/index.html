@@ -446,6 +446,17 @@
         font-size: 15px; font-weight: 700; letter-spacing: 0.3px;
         box-shadow: 0 2px 0 rgba(0,0,0,0.28); }
       #banner.show { animation: bnr 2.4s cubic-bezier(0.2, 1.5, 0.4, 1) forwards; }
+      /* ── RETIRING A BANNER THAT IS ALREADY UP ───────────────────────────
+         holdBanner() only ever stopped the NEXT banner from printing. A banner
+         fired up to two seconds before an evolution is still on screen for the
+         whole life of the evolve card, because nothing removes `.show`.
+         This is a TRANSITION and not a new @keyframes, deliberately: the
+         body.calm list governs `animation` and is explicit, so every keyframe
+         added to this file has to be named there by hand — and this repo has
+         now shipped four animations that were not. A transition is covered by
+         the OS catch-all and carries no motion of its own. */
+      #banner.bye { animation: none !important; opacity: 0;
+        transition: opacity 0.14s linear; }
       @keyframes bnr {
         0%   { opacity: 0; transform: translateY(-14px) scale(0.86); }
         14%  { opacity: 1; transform: translateY(0) scale(1); }
@@ -917,7 +928,15 @@
       #powers button.off b { opacity: 0.45; }
       #powers button b { display: block; font-size: 14px; color: #c9a6ff; }
       /* EVOLVED flash */
-      #evolve { position: fixed; top: 24%; left: 0; right: 0; text-align: center; z-index: 7; pointer-events: none;
+      /* z-index 9, not 7. #banner (414) and #count (419) are both 8 and both are
+         plain body siblings of this element with no stacking context between
+         them, so for as long as this said 7 the rival chatter and the countdown
+         painted OVER the single biggest moment in a match. Measured in headless
+         Chromium with the real Fredoka-700: a banner card covered 44.8% of the
+         .big name at 360px, 49.2% at 390, 53.8% at 430, and 100% of the .sm line
+         at every width. #end is also 9 but its markup comes later and it is
+         display:none outside the whistle, so it still wins that tie. */
+      #evolve { position: fixed; top: 24%; left: 0; right: 0; text-align: center; z-index: 9; pointer-events: none;
         color: #fff; font-weight: 700; opacity: 0; }
       /* THE LAST HERO MESSAGE THAT NEVER GOT THE STROKE. #timer, #titlecard and
          #banner were each measured against the live world and given a hard

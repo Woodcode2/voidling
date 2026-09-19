@@ -5447,10 +5447,39 @@ function cardHtml(text: string): string {
  *  announceHtml already existed and already keeps only the newest message; it
  *  was simply never armed for ordinary banners, only for the evolve card. */
 const BANNER_READ = 1.9;
+/** how long #banner.show's `bnr` animation runs before its last keyframe hides
+ *  the card (index.html) — the window in which retireBanner() still has work */
+const BANNER_LIFE = 2.4;
+let bannerShownAt = -99;
 function paintBanner(html: string) {
+  bannerEl.classList.remove('bye');   // a card being printed is not a card being retired
   bannerEl.innerHTML = html;
   bannerEl.classList.remove('show'); void bannerEl.offsetWidth; bannerEl.classList.add('show');
   bannerFree = Math.max(bannerFree, tClock + BANNER_READ);
+  bannerShownAt = tClock;
+}
+/** ── PULL A SHOWING BANNER DOWN ────────────────────────────────────────────
+ *  holdBanner() is forward-only: it stops the NEXT banner from printing and
+ *  does nothing about one already on screen. Nothing anywhere removes `.show`
+ *  from #banner — the `bnr` animation's last keyframe is what hides it, 2.4s
+ *  after it printed. So a rival banner fired up to two seconds before an
+ *  evolution sat on top of the evolve card for the card's entire life, which
+ *  is exactly what the owner's recording shows: GOBBLIN painted under
+ *  "NIBBLES TOOK THE LEAD!".
+ *
+ *  The card is RE-QUEUED rather than discarded. bannerQ is a single-slot
+ *  latest-wins queue and pumpBanner() reprints from it once the hold expires,
+ *  so the message the child was owed still arrives — after the ceremony
+ *  instead of over it. */
+function retireBanner() {
+  // BANNER_READ (1.9) is the QUEUE hold, not the card's life: `bnr` runs 2.4s
+  // and holds opacity 1 until 80% of it, so a card between 1.9s and 2.4s old is
+  // still on screen and still worth pulling down. Keyed to the animation.
+  if (tClock - bannerShownAt >= BANNER_LIFE) return;   // already finished on its own
+  bannerQ.length = 0;
+  bannerQ.push(bannerEl.innerHTML);
+  bannerEl.classList.remove('show');
+  bannerEl.classList.add('bye');
 }
 function announce(text: string) { announceHtml(cardHtml(text)); }
 function announceHtml(html: string) {
@@ -13686,7 +13715,10 @@ function animate() {
       // …and the screen goes warm for a beat. fx.flash is the same call a hit
       // uses, in the opposite colour: a bite washes red, a form washes gold.
       fx.flash('rgba(255,214,120,0.34)', 0.5);
-      holdBanner(2.4);   // this card owns the screen while it plays
+      // this card owns the screen while it plays — and that now means BOTH
+      // directions: pull down anything already up, and hold the next one off
+      // until the 1.8s `ev` animation has finished with a beat to spare.
+      retireBanner(); holdBanner(2.6);
     }
     audio.evolve();
     // the LENS marks the evolution too: a punch plus a 7% distance pop that
