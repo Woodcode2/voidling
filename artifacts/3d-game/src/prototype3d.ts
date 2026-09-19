@@ -7016,6 +7016,17 @@ function refreshGRect(): void {
  *  bar fills, which is why this is a function the flight calls each frame
  *  rather than a point captured at launch. */
 function gBarTarget(): { x: number; y: number } | null {
+  // ── AND IF IT WAS NEVER MEASURED, MEASURE IT NOW ────────────────────────
+  // beginMatch schedules refreshGRect on the next tick, and if #growth is still
+  // display:none at that tick — it is hidden on the menu and whenever it
+  // carries .off — the rect comes back 0x0 and gRect stays null for the WHOLE
+  // match. Measured: a probe run reported rect null throughout, so every flight
+  // took the no-target path and the bar never saw a target at all. Guarding
+  // against a stale 0x0 rect was only half the trap; never getting one is the
+  // other half.
+  // This is a lazy retry, not a per-frame read: it runs at most once per flight
+  // launch (~2/s at the payout rate) and stops entirely the moment it succeeds.
+  if (!gRect) refreshGRect();
   if (!gRect) return null;
   return { x: gRect.left + gRect.width * Math.min(1, Math.max(0, gShown)), y: gRect.top + gRect.height / 2 };
 }
