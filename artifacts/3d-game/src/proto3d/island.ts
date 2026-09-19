@@ -4761,6 +4761,20 @@ export const tint = (hex: number, t: number): number => {
  *  step — a chamfer or a shallow roof pitch should read as a soft turn, not as
  *  a banded one. ny=1 -> 1.18, ny=0.707 -> 0.96, ny=0 -> 0.74, ny=-1 -> 0.56. */
 const TOP_K = 1.18, SIDE_K = 0.74, DOWN_K = 0.56;
+/** THE SKYLIGHT, as one definition. part() baked this into every prop's albedo
+ *  in commit 1c80de6 — "a box reads as a form and not a slab", the owner on
+ *  hole.io — and the walking crowd was the one population that never got it,
+ *  because life.ts builds its people through its own pc() and not through
+ *  part(). Exported rather than copied so there is exactly one skylight in the
+ *  codebase and it cannot drift in two places.
+ *
+ *  `lum` is the incoming colour's LINEAR luminance and the max() is the toe
+ *  guard: as a colour approaches the tone curve's toe the darkening softens to
+ *  nothing, so a near-black trim comes out darker rather than a different hue. */
+export function skyK(ny: number, lum: number): number {
+  const k = ny >= 0 ? SIDE_K + (TOP_K - SIDE_K) * ny * ny : SIDE_K - (SIDE_K - DOWN_K) * ny * ny;
+  return Math.max(k, 1 - (1 - k) * Math.min(1, lum / 0.08));
+}
 export function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy?: number, sz?: number): THREE.BufferGeometry {
   const wasRound = ROUND_GEO.test(geo.type);
   const g = geo.index ? geo.toNonIndexed() : geo;
@@ -4822,8 +4836,7 @@ export function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0
   for (let i = 0; i < n; i++) {
     let k = 1;
     if (nrm) {
-      const ny = nrm.getY(i);
-      k = ny >= 0 ? SIDE_K + (TOP_K - SIDE_K) * ny * ny : SIDE_K - (SIDE_K - DOWN_K) * ny * ny;
+      k = skyK(nrm.getY(i), lum);
       // ── AND A FLOOR, BECAUSE THE TOE EATS HUE ───────────────────────────
       // The tempting guard is to name the things that must not darken — trunks,
       // lamp poles — but that list cannot hold across 141 raw BoxGeometry here,

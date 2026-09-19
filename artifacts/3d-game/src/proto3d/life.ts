@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { PROPS } from './palette';
 import {
   ROAD_CENTERS_3D, blockCenter3D, planGrid, HALF_BLOCK_3D,
-  railPointAt, insideIsland3, inLagoon3, inWater3, worldId, part, mergedProp, nearSpawn,
+  railPointAt, insideIsland3, inLagoon3, inWater3, worldId, part, mergedProp, nearSpawn, skyK,
   type Biome, type AddEdible,
 } from './island';
 import * as LUXE from './luxe';
@@ -613,10 +613,47 @@ function pc(base: Geo, col: number, x = 0, y = 0, z = 0, sx = 1, sy = sx, sz = s
   _pv.set(x, y, z); _ps.set(sx, sy, sz);
   g.applyMatrix4(_m4.compose(_pv, _pq, _ps));
   _pcol.setHex(col);
+  // ── THE CROWD GETS THE SKYLIGHT TOO ──────────────────────────────────────
+  // This flooded ONE hex across every vertex of every part of every walking
+  // person, so a head, a sleeve and the top of a shoe all came out of the same
+  // albedo at the same value and only the key light separated them. On a
+  // shadowed side, or under an overcast rung, that is nothing at all — which is
+  // the owner's "the people in game are like Lego".
+  //
+  // part() has baked a normal-keyed skylight into every PROP since 1c80de6,
+  // whose message opens with his own words on hole.io: "The detail in the 3d
+  // models. Nothing looks blocky." The movers were the one population left out,
+  // because they are built here and not through part(). Same function now —
+  // skyK is exported from island.ts precisely so there is one of it.
+  //
+  // THE MULTIPLY IS IN LINEAR AND THAT IS NOT WHAT IT LOOKS LIKE. _pcol.setHex()
+  // returns LINEAR values (three's ColorManagement converts sRGB on the way in),
+  // so x0.74 does NOT display as a 26% drop — measured, it is 12.7%. island.ts
+  // carries the same warning. Anyone re-baselining against 26% will read a
+  // correct result as a failure.
+  //
+  // AND IT COSTS NEGATIVE MEMORY. Float32 colour is 12 B/vertex; a normalized
+  // Uint16 is 6. A reference adult is 4,416 vertices, so this saves 25.9 KB per
+  // person in every world, for exactly zero triangles. 65,536 levels per channel
+  // is far past anything a screen resolves, and Uint8 is NOT safe here for the
+  // same reason island.ts gives: linear 8-bit bands visibly in the darks.
   const n = g.getAttribute('position').count;
-  const c = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) { c[i * 3] = _pcol.r; c[i * 3 + 1] = _pcol.g; c[i * 3 + 2] = _pcol.b; }
-  g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+  const nrm = g.getAttribute('normal');
+  const lum = 0.2126 * _pcol.r + 0.7152 * _pcol.g + 0.0722 * _pcol.b;
+  const cols = new Uint16Array(n * 3);
+  const cr = _pcol.r * 65535, cg = _pcol.g * 65535, cb = _pcol.b * 65535;
+  for (let i = 0; i < n; i++) {
+    // NO NORMAL MEANS NO TINT, not a side face. The tempting fallback is ny = 0,
+    // and ny = 0 is SIDE_K — which would silently darken such a geometry for no
+    // reason. island.ts records the same trap.
+    const k = nrm ? skyK(nrm.getY(i), lum) : 1;
+    cols[i * 3] = Math.min(65535, Math.round(cr * k));
+    cols[i * 3 + 1] = Math.min(65535, Math.round(cg * k));
+    cols[i * 3 + 2] = Math.min(65535, Math.round(cb * k));
+  }
+  // the trailing `true` is the NORMALIZED flag and is load-bearing: without it
+  // three reads these as raw integers and every person renders white
+  g.setAttribute('color', new THREE.BufferAttribute(cols, 3, true));
   return g;
 }
 const weld = (parts: Geo[]): THREE.Mesh => {
