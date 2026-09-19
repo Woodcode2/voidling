@@ -4754,6 +4754,13 @@ export const tint = (hex: number, t: number): number => {
   return (ch(16) << 16) | (ch(8) << 8) | ch(0);
 };
 
+/** ── THE SKYLIGHT, AS THREE NUMBERS ───────────────────────────────────────
+ *  What a face's albedo is multiplied by, in LINEAR, according to where it
+ *  points. Squared against the normal's Y so the falloff is gentle near the
+ *  horizon and only the genuinely up- and down-facing faces take the full
+ *  step — a chamfer or a shallow roof pitch should read as a soft turn, not as
+ *  a banded one. ny=1 -> 1.18, ny=0.707 -> 0.96, ny=0 -> 0.74, ny=-1 -> 0.56. */
+const TOP_K = 1.18, SIDE_K = 0.74, DOWN_K = 0.56;
 export function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy?: number, sz?: number): THREE.BufferGeometry {
   const wasRound = ROUND_GEO.test(geo.type);
   const g = geo.index ? geo.toNonIndexed() : geo;
@@ -4781,9 +4788,57 @@ export function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0
   // returns LINEAR values (three's ColorManagement converts from sRGB on the
   // way in), and 8-bit linear bands visibly in the darks — which is most of a
   // night market and all of the contact shading baked in below.
+  // ── AND THE COLOUR IS NO LONGER FLAT ACROSS THE PART ──────────────────────
+  //
+  // The owner, on hole.io: "The detail in the 3d models. Nothing looks blocky."
+  // The models in that reference are NOT high-poly — the trees are blobs and the
+  // cars are rounded boxes. What stops them reading as blocks is that every face
+  // of a form carries a different value, so a cube reads as a lit OBJECT rather
+  // than as a flat slab with an outline.
+  //
+  // Ours flooded ONE hex across every vertex of a part. A wall and the roof
+  // above it came out of the same albedo at the same value, and only the real
+  // key light separated them — which on a shadowed side, or under an overcast
+  // rung, is nothing at all.
+  //
+  // So bake a skylight into the albedo, keyed to the vertex normal: faces that
+  // look up get the sky, faces that look sideways get less, undersides get
+  // least. It is a free ambient-occlusion-shaped gradient that costs no lights,
+  // no passes and no triangles — just the colour that was already being written.
+  //
+  // THE MULTIPLY IS IN LINEAR AND THAT IS NOT WHAT IT LOOKS LIKE. _pc.setHex()
+  // returns LINEAR (three's ColorManagement converts sRGB on the way in), so
+  // x0.74 does NOT display as a 26% drop — measured, it is 12.7%, and x1.18 is
+  // a 7.7% lift. This file's own note further up records the same trap. Anyone
+  // re-baselining against a predicted 26% will read the correct result as a
+  // failure.
+  const nrm = g.getAttribute('normal');
+  // …and NO NORMAL MEANS NO TINT, not a side face. The obvious fallback is
+  // `nrm ? nrm.getY(i) : 0`, and ny=0 is SIDE_K — so a geometry with no normal
+  // attribute would be silently darkened 26% linear for no reason at all.
+  const lum = 0.2126 * _pc.r + 0.7152 * _pc.g + 0.0722 * _pc.b;
   const cols = new Uint16Array(n * 3);
-  const cr = Math.round(_pc.r * 65535), cg = Math.round(_pc.g * 65535), cb = Math.round(_pc.b * 65535);
-  for (let i = 0; i < n; i++) { cols[i * 3] = cr; cols[i * 3 + 1] = cg; cols[i * 3 + 2] = cb; }
+  const cr = _pc.r * 65535, cg = _pc.g * 65535, cb = _pc.b * 65535;
+  for (let i = 0; i < n; i++) {
+    let k = 1;
+    if (nrm) {
+      const ny = nrm.getY(i);
+      k = ny >= 0 ? SIDE_K + (TOP_K - SIDE_K) * ny * ny : SIDE_K - (SIDE_K - DOWN_K) * ny * ny;
+      // ── AND A FLOOR, BECAUSE THE TOE EATS HUE ───────────────────────────
+      // The tempting guard is to name the things that must not darken — trunks,
+      // lamp poles — but that list cannot hold across 141 raw BoxGeometry here,
+      // 380 box() sites in mainstreet, plus life/luxe/tailgate. A VALUE floor
+      // scopes itself: as the incoming colour approaches the tone curve's toe
+      // (TOE 0.014), the darkening softens to nothing. Below ~0.06 linear the
+      // toe starts eating hue, and a near-black trim multiplied again comes out
+      // of the curve as a different colour rather than a darker one.
+      // Brightening is untouched: for k > 1 this max() is a no-op.
+      k = Math.max(k, 1 - (1 - k) * Math.min(1, lum / 0.08));
+    }
+    cols[i * 3] = Math.min(65535, Math.round(cr * k));
+    cols[i * 3 + 1] = Math.min(65535, Math.round(cg * k));
+    cols[i * 3 + 2] = Math.min(65535, Math.round(cb * k));
+  }
   g.setAttribute('color', new THREE.BufferAttribute(cols, 3, true));
   // no prop material samples a map — see installPropShader. Dropping uv pays
   // for aGloss twice over, and both have to happen HERE so every geometry
