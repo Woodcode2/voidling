@@ -2253,6 +2253,13 @@ function applyQuality() {
 
 // ── edibles + island ─────────────────────────────────────────────────────────
 interface Edible { mesh: THREE.Object3D; radius: number; eaten: boolean; t: number; orbit: number; orbitR: number; spin: THREE.Vector3; home: THREE.Vector3; homeScale: THREE.Vector3; homeRotY: number;
+  /** THE KEEL — the axis a prop tips over on its way in, the angle it stops
+   *  at, its orientation at the moment it was taken, and the height it fell
+   *  from. Filled in by capture(), NOT by addEdible: a match eats about sixty
+   *  props, and giving all 5,614 on Maple a Vector3 and a Quaternion up front
+   *  would be ~11,000 objects allocated at load for state that 99% of them
+   *  never read. Every reader guards on `keel` being there. */
+  keel?: THREE.Vector3; rest?: THREE.Quaternion; keelA?: number; dropY?: number;
   /** the objects that actually carry a fade uniform — see addEdible */
   fadeTo?: THREE.Object3D[];
   /** the MESHES of a prop too small to read at the diorama camera — see
@@ -7872,12 +7879,30 @@ function endMatch(result: GoalResult = null) {
 let eatFloatPts = 0, eatFloatT = 0;
 const eatFloatAt = new THREE.Vector3();
 const EAT_FLOAT_WINDOW = 0.14;
+/** How long the drain loop takes to carry a prop of relative size `mass` all
+ *  the way in, in seconds. The exact inverse of the rate in the drain branch
+ *  (`e.t += dtw * (2.9 - 1.3 * mass)`), and it exists so the jaw can be held
+ *  open for precisely that long. If that rate ever changes, this changes with
+ *  it or the mouth starts shutting early again. */
+const eatSeconds = (mass: number): number => 1 / (2.9 - 1.3 * Math.min(1, Math.max(0, mass)));
 /** How far a prop swings around the void on its way in, in radians. ~200
  *  degrees — measured off hole.io's own ten-frame eat, where a police car turns
  *  a little over half a circle between touching the rim and disappearing. The
  *  arc this replaced integrated to ~609 degrees under the software renderer and
  *  something else entirely at 60fps; see the drain loop for why. */
 const EAT_ARC = 3.49;
+/** Where the keel STOPS. A prop used to integrate `rotation += spin * dt` with
+ *  spin at 4.5-7.5 rad/s, so over a 0.4-0.6s eat a house turned 130 to 250
+ *  degrees and kept going — a brick tumbling in free space, not a building
+ *  falling into a hole. hole.io's tower goes over ONCE and lands face-down in
+ *  the mouth. Anything car-sized or bigger tips to KEEL_BIG_A and stays there;
+ *  small round debris (a shell, a bin) has no readable "over", so it keeps a
+ *  full tumble and a yaw wobble on top. */
+const KEEL_BIG = 0.9;
+/** seconds the jaw stays open AFTER the meal has landed — see the chomp call */
+const EAT_JAW_LAG = 0.08;
+const KEEL_UP = new THREE.Vector3(0, 1, 0);
+const _kq = new THREE.Quaternion(), _kq2 = new THREE.Quaternion();
 // devour one edible: spiral it in, grow, score (2D combo model), charge hunger
 let combo = 0, comboT = 0, chompCd = 0;
 // ── POWDER PASS: THE SNOW SHELL ────────────────────────────────────────────
@@ -7911,6 +7936,22 @@ function capture(e: Edible, giveHunger = true) {
   // topple toward the hole (the hole.io fantasy): the tip axis is perpendicular
   // to the pull direction, so things visibly keel over INTO the void
   e.spin.set((dz / d) * rand(4.5, 7.5), rand(-1.5, 1.5), (-dx / d) * rand(4.5, 7.5));
+  // …and the SAME axis, as a unit vector, for the keel that actually renders.
+  // (dz, 0, -dx)/d is perpendicular to the pull, so a positive turn about it
+  // drops the prop's top toward the void. The rest pose is snapshotted rather
+  // than rebuilt from homeRotY because a few props carry homeRotX/homeRotZ too
+  // (see the restore at the rematch) and rebuilding would silently stand them
+  // back up on the one frame a child is looking straight at them.
+  if (!e.keel) { e.keel = new THREE.Vector3(); e.rest = new THREE.Quaternion(); }
+  e.keel.set(dz / d, 0, -dx / d);
+  e.rest!.copy(e.mesh.quaternion);
+  // a building goes over once and stops; a seashell is round, so "over" means
+  // nothing and it may tumble as far as it likes
+  e.keelA = e.radius >= KEEL_BIG ? rand(1.52, 2.09) : rand(3.0, 4.4);
+  // fall from where it IS. The old descent lerped toward the void GROUP's y,
+  // which sits +0.31 x R above the ground, and that is how props ended up
+  // rising out of the island on their way into it.
+  e.dropY = e.mesh.position.y;
   // HOW BIG WAS THAT, RELATIVE TO ME? Everything below is graded by it, which
   // is the whole point: one number separates a landmark from a traffic cone.
   const bite = THREE.MathUtils.clamp(e.radius / Math.max(0.4, voidling.radius), 0.12, 1);
@@ -8077,7 +8118,18 @@ function capture(e: Edible, giveHunger = true) {
     // floor behind a moving player.
     spawnPuff(e.mesh.position.x, 0.5, e.mesh.position.z, e.radius > 4 ? 10 : 6, tint);
   }
-  voidling.chomp(bite);   // graded by how big that was relative to us
+  // graded by how big that was relative to us — and held open for longer than
+  // the drain loop needs to carry it in. eatSeconds() is the inverse of the
+  // rate at prototype3d's drain branch; the two must not drift apart.
+  //
+  // EAT_JAW_LAG is why this is not just eatSeconds(bite). Matching the drain
+  // exactly puts the jaw's last open frame and the meal's last falling frame
+  // on the same tick, and dt is clamped to 0.05 — so a frame landing a
+  // millisecond late shuts the mouth on the swallow instead of after it, which
+  // is the bug this whole change exists to remove, surviving as a flicker.
+  // One and a half clamped frames of margin also buys the beat that reads as
+  // eating: mouth open, thing gone, mouth closes.
+  voidling.chomp(bite, eatSeconds(bite) + EAT_JAW_LAG);
   stats.eaten++; matchEaten++;
   // the very first thing a brand-new player ever eats gets a PARTY — the
   // guaranteed wow inside the first 30 seconds
@@ -13059,7 +13111,20 @@ function animate() {
       // units of RISE, 245 of them climbing. Straight down into the hole now.
       // the DESCENT stays on real time: hit-stop is meant to punch the void's
       // own body, not to hang the thing that is currently falling into it
-      p.y = THREE.MathUtils.lerp(p.y, -R * 0.55, Math.min(1, dt * 7));
+      // ── AND IT NO LONGER SINKS INTO THE LAWN ─────────────────────────────
+      // `lerp(p.y, -R * 0.55, dt * 7)` is an exponential with a 143ms time
+      // constant, and it started on the CAPTURE frame — so on a 364ms snack
+      // the prop was 63% underground by t=0.39, while the orbit still had it
+      // 84% of the way OUT from the axis. Things visibly sank through the
+      // grass a void-width away from the void. Phase it: hold the prop at the
+      // height it was taken from while the spiral carries it in, then let it
+      // fall, squared, so it accelerates like a fall instead of easing like a
+      // slider. Driven off e.t, so it is the same animation at 60fps and at
+      // the 1-2fps the software renderer gives QA.
+      const T_FALL = calmEat ? 0.30 : 0.46;
+      const y0 = e.dropY ?? p.y;
+      const f = e.t <= T_FALL ? 0 : (e.t - T_FALL) / (1 - T_FALL);
+      p.y = y0 + (-R * 0.55 - y0) * f * f;
       // ── AND THE SWITCH REACHES THE EAT AT LAST ───────────────────────────
       // reduceMotion() is honoured in seven places in this file and NOT ONE of
       // them is between capture() and the end of this loop — so a child whose
@@ -13068,8 +13133,17 @@ function animate() {
       // is made of. Rotation and orbit are the vestibular channels and they go;
       // the radial travel and the scale stay, because those are what say "that
       // thing is mine now" and a calm player should still be told.
-      if (!calmEat) {
-        e.mesh.rotation.x += e.spin.x * dtw; e.mesh.rotation.y += e.spin.y * dtw; e.mesh.rotation.z += e.spin.z * dtw;
+      // ── THE KEEL, WITH AN END STOP ───────────────────────────────────────
+      // Driving the tip off e.t instead of integrating a rate does two things.
+      // It makes the eat identical at any frame rate, like the arc above it.
+      // And it gives the turn somewhere to STOP: a house lands face-down in
+      // the mouth at ~100 degrees and holds there, which is the hole.io image,
+      // instead of carrying on past it into a pirouette. Squared, so the prop
+      // leans first and goes over hardest as the mouth takes it.
+      if (!calmEat && e.keel && e.rest) {
+        _kq.setFromAxisAngle(e.keel, (e.keelA ?? 1.8) * e.t * e.t);
+        if (e.radius < KEEL_BIG) _kq.multiply(_kq2.setFromAxisAngle(KEEL_UP, e.spin.y * e.t * 2.4));
+        e.mesh.quaternion.copy(_kq).multiply(e.rest);
       }
       // …and it was DELETED AT 0.10 SCALE. On a shell nobody notices; on a
       // seven-unit hotel that is a 1.4-unit chunk of building blinking out in

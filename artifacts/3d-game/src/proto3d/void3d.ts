@@ -60,7 +60,7 @@ export interface Void3D {
    *  expression rather than describe it. `smile` is the open kawaii grin's
    *  own visibility — the one feature a child reads first — and `maw` is the
    *  gape's current scale. See qa/faceparity.mjs. */
-  faceState(): { mood: Mood; maw: number; smile: boolean; biting: boolean };
+  faceState(): { mood: Mood; maw: number; smile: boolean; biting: boolean; hold: number };
   /** QA/capture: hold the jaw shut so the face shows its MOOD and nothing else.
    *  The gape is driven by eating, not by mood, so a hero parked anywhere with
    *  food in reach is mid-bite in almost every frame and cannot be
@@ -72,7 +72,11 @@ export interface Void3D {
    *  photographed at every size instead of caught mid-animation. 0 releases.
    *  See qa/gapesheet.mjs. Never call from gameplay. */
   pinGape(v: number): void;
-  chomp(k?: number): void;             // quick mouth-open bite (on eat)
+  /** Quick mouth-open bite (on eat). `k` is the meal's size relative to the
+   *  void; `hold` is the seconds the maw must stay open for — pass the meal's
+   *  own descent time so the jaw cannot shut with the thing still going down
+   *  it. Without it the mouth closes ~145ms early on EVERY eat, at any size. */
+  chomp(k?: number, hold?: number): void;
   animGulp(): void;          // big gape + hold (GULP)
   animDash(): void;          // stretch pulse (ROCKET BITE)
   animCollapse(): void;      // inhale-shrink then burst (COLLAPSE)
@@ -1721,7 +1725,11 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     arriveY(y: number) { arriveLift = Math.max(0, y); },
     bump() { wobble = Math.min(1, wobble + 0.42); },
     calm() { evolveT = 0; wobble = 0; ringBurst = 0; },
-    faceState() { return { mood, maw: mp.maw, smile: mouth.visible, biting: mouthT > 0 }; },
+    // `hold` is the SECONDS the jaw still owes, which is the number QA has to
+    // see: `biting` only says the mouth is open, and the bug worth catching is
+    // the mouth shutting EARLY — while the meal is still on its way down. A
+    // boolean sampled at 1-2fps cannot tell those apart. qa/_eatmotion.mjs.
+    faceState() { return { mood, maw: mp.maw, smile: mouth.visible, biting: mouthT > 0, hold: mouthT }; },
     pinMouth(shut) { mouthPinShut = shut; if (shut) { mouthT = 0; mouthMax = 0; mouthAge = 0; } },
     pinGape(v) {
       if (v <= 0) { mouthT = 0; mouthMax = 0; return; }
@@ -1956,7 +1964,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     // GRADED. This took no argument, so the mouth opened exactly as wide for a
     // hotel as for a hydrant — about fifty times a match, on the one action the
     // whole game is made of. `k` is the meal's size relative to the void.
-    chomp(k = 0.3) {
+    chomp(k = 0.3, hold = 0) {
       if (mouthPinShut) return;
       const g = Math.min(1, Math.max(0.12, k));
       const want = 0.18 + 0.30 * g;                 // 0.22 -> 0.48 of a second
@@ -1974,7 +1982,15 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // the wind-up only plays from a CLOSED mouth — a hoover spree must not
       // re-anticipate mid-chew, that would read as stutter
       if (cur < 0.05) mouthAge = 0;
-      if (mouthT < want) mouthT = want;
+      // ── AND THE JAW MUST NOT SHUT WITH A HOUSE HALFWAY DOWN IT ──────────
+      // `want` is 220-480ms. The drain loop takes 1 / (2.9 - 1.3 * mass)
+      // seconds to carry a prop in — 364ms for a snack, 625ms for a meal the
+      // void's own size — so the mouth was closing roughly 145ms early on EVERY
+      // eat, at every size, on the one action the whole game is made of. The
+      // void stops being a creature at the exact moment it matters most.
+      // `hold` is that descent time, passed by the caller that knows it.
+      const w = Math.max(want, hold);
+      if (mouthT < w) mouthT = w;
       mouthMax = Math.max(wide, cur);
       wobble = Math.min(1, wobble + 0.30 + 0.55 * g);
     },
