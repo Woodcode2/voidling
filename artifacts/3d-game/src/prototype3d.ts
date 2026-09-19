@@ -13405,9 +13405,20 @@ function animate() {
   } else {
     // the menu shortens the world to cull it; a match gets its distance back
     if (!TOPDOWN && camera.far !== PLAY_FAR) { camera.far = PLAY_FAR; camera.updateProjectionMatrix(); }
-    // CONTINUOUS zoom (hole.io): distance ∝ R^0.78 — the void visibly gains
-    // ~20% screen size across a form before the camera catches up, so growth
-    // reads every few seconds instead of only at evolutions
+    // CONTINUOUS zoom (hole.io): distance ∝ R^0.82 — the void visibly gains
+    // screen size across a form before the camera catches up, so growth reads
+    // every few seconds instead of only at evolutions. (This said 0.78 while
+    // the line below has said 0.82 for as long as it has existed; 0.82 is the
+    // one that ships and the one qa/_voidframe.mjs grades.)
+    //
+    // AND THERE IS NO PER-WORLD TERM HERE, which settles something the
+    // PLAY_DIST note above left open: it worried that moving 29 -> 22 scaled
+    // all six worlds by 1.318 when only Maple had been checked. Framing at a
+    // given R is byte-identical in every world — what differs between them is
+    // only the radius their pacing reaches. The floor of 26 and the ceiling of
+    // 340 bound both ends, and at R_CAP (18, and only reachable by eating five
+    // rivals) the void is 53.6% of frame width. Ordinary play tops out near
+    // R 12 and 49.3%. So there is no per-world framing problem to look at.
     let targetDist = Math.min(340, Math.max(26, PLAY_DIST * Math.pow(R / 0.9, 0.82)));
     if (introT > 0) {
       introT -= dt;
