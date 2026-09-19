@@ -4,6 +4,9 @@
 import * as THREE from 'three';
 import { reduceMotion } from './fx';
 
+/** see flightStats() — module-level so it survives a reset */
+const fStats = { launched: 0, landed: 0, displaced: 0, noTarget: 0 };
+
 // 'rival' is the FAMILY's kind, and it is not the same thing as 'event':
 // the diagnosis that forced the split found both slots held by town-hall
 // set-piece barks ("Point of order! POINT of order!") wearing the event
@@ -31,6 +34,13 @@ export interface Bubbles {
   update(dt: number, hero?: { pos: THREE.Vector3; r: number }): void;
   /** Clear every live bubble and floater. Called at match reset. */
   reset(): void;
+  /** QA: how the flying score numbers are faring. `launched` vs `landed`
+   *  separates a flush that never fires from a flight that never lands —
+   *  qa/barjump.mjs could not tell those apart and sent the investigation to
+   *  the wrong half of the system twice. `displaced` counts flights the pool
+   *  recycled out from under (their payout is still made), `noTarget` counts
+   *  the ones that found no bar to fly to. */
+  flightStats(): { launched: number; landed: number; displaced: number; noTarget: number };
 }
 
 interface Slot {
@@ -373,6 +383,16 @@ const style = document.createElement('style');
     float(pos, text, big = false) {
       text = sentence(text);
       const f = floats[fHead]; fHead = (fHead + 1) % floats.length;
+      // A RECYCLED SLOT MUST NOT STAY IN FLIGHT. float() and flyTo() share one
+      // pool, and a slot taken back while a flight was still pending kept its
+      // `fly` object — so the ordinary rising floater re-entered the flight
+      // branch in update() with stale state, and worse, the payout that flight
+      // was carrying was silently dropped. Pay it out on the way past rather
+      // than losing it: the number is cosmetic, the bar's debt is not.
+      if (f.fly) {
+        const cb = f.fly.onArrive; f.fly.onArrive = null; f.fly = null;
+        if (cb) cb();
+      }
       f.active = true; f.pos.copy(pos); f.until = clock + 0.9;
       f.el.textContent = text;
       f.el.className = `vf${big ? ' big' : ''}`;
@@ -380,8 +400,15 @@ const style = document.createElement('style');
       f.el.classList.add('go');
     },
     flyTo(pos, text, target, onArrive, big = false) {
+      fStats.launched++;
       text = sentence(text);
       const f = floats[fHead]; fHead = (fHead + 1) % floats.length;
+      // …and the same for a flight displacing a flight (see float() above)
+      if (f.fly) {
+        const cb = f.fly.onArrive; f.fly.onArrive = null; f.fly = null;
+        fStats.displaced++;
+        if (cb) cb();
+      }
       f.active = true; f.pos.copy(pos);
       f.el.textContent = text;
       f.el.className = `vf fly${big ? ' big' : ''}`;
@@ -393,6 +420,7 @@ const style = document.createElement('style');
       // the payout must still happen, it just does not travel.
       f.fly = { t: 0, dur: reduceMotion() ? 0 : 0.28, sx: -1, sy: -1, target, onArrive };
     },
+    flightStats() { return { ...fStats }; },
     reset() {
       // Every live bubble and floater dies at the match boundary. They used to
       // carry over verbatim — measured in 5 of 5 match transitions — and hang
@@ -613,6 +641,7 @@ const style = document.createElement('style');
             // payout is not, and swallowing it would strand the bar's debt.
             f.active = false; f.el.className = 'vf';
             const cb = fl.onArrive; fl.onArrive = null; f.fly = null;
+            fStats.noTarget++;
             if (cb) cb();
             continue;
           }
@@ -625,6 +654,7 @@ const style = document.createElement('style');
           }
           if (k >= 1 || clock > f.until) {
             f.active = false; f.el.className = 'vf'; f.el.style.transform = '';
+            fStats.landed++;
             // null the callback BEFORE calling it, so a re-entrant path cannot
             // pay the same debt twice
             const cb = fl.onArrive; fl.onArrive = null; f.fly = null;
