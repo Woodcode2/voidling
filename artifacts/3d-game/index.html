@@ -190,6 +190,40 @@
          reads as a journey rather than a meter — where you are, what you are
          becoming, and a pip for every form still ahead of you, which is the
          part a child actually wants to know. */
+      /* ── THE WAYFINDER ──────────────────────────────────────────────────────
+         The owner: "when you hit the amount needed for the goal you get this
+         arrow that points where that last objective is — give some form of
+         guidance to finish the level."
+
+         It serves the LANDMARK dot and only that one, because it is the only
+         goal kind with a findable object. goalMet() at prototype3d.ts:2553
+         switches on five cases: EAT is a score, CLEAR is a percentage and
+         RIVALS is a placing that cannot even answer before the buzzer. There
+         is no "last objective" on three of the five dots to point at, and an
+         arrow that invented one would be lying to a six-year-old.
+
+         The trigger is the owner's sentence literally. On the landmark dot,
+         "the amount needed" IS a radius — LEVEL_SPEC carries landmarkR per
+         world — and refreshGoalChip already flips the chip to EAT IT NOW at
+         exactly voidling.radius >= landmarkR. The arrow rides that same
+         crossing and not a frame earlier: before it, she cannot eat the barn,
+         and pointing at something she would bounce off is worse than silence.
+
+         NO @keyframes, deliberately. It is shown and hidden by a class that JS
+         adds and removes, and it already moves every frame because it tracks a
+         thing in the world — so it needs no idle animation, nothing has to be
+         hand-entered in the body.calm list, and it cannot fall into the trap
+         that leaves #evolve, #banner and #titlecard on screen for ten
+         microseconds under the OS reduced-motion catch-all. */
+      #wayfind { position: fixed; left: 0; top: 0; z-index: 5; pointer-events: none;
+        width: 0; height: 0; opacity: 0; visibility: hidden;
+        border-left: 15px solid transparent; border-right: 15px solid transparent;
+        border-bottom: 24px solid #ffd25a;
+        filter: drop-shadow(0 0 0 #2a1608) drop-shadow(0 2px 3px rgba(0,0,0,0.45));
+        transition: opacity 0.22s linear, visibility 0s linear 0.22s; }
+      #wayfind.on { opacity: 1; visibility: visible;
+        transition: opacity 0.22s linear, visibility 0s linear 0s; }
+      body.ovl #wayfind, body.menu #wayfind { display: none; }
       #growth { position: fixed; z-index: 5; pointer-events: none;
         left: 50%; transform: translateX(-50%);
         /* an unconditional floor. env() resolves to 0 in a non-standalone mobile
@@ -2723,6 +2757,7 @@
       <button id="pw3"><b>2</b>COLLAPSE</button>
     </div>
     <div id="evolve"><div class="big"></div><div class="sm">EVOLVED</div></div>
+    <div id="wayfind"></div>
     <div id="guide"></div>
     <!-- the ghost hand: a looping press-and-drag demo over the live game.
          Shown by the drag lesson, hidden by the first real drag — see the

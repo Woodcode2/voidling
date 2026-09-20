@@ -629,8 +629,15 @@ if (ONLY.includes('c')) {
     2: { label: 'COLLECT', re: /^(.+)$/, dir: 'down',
       // the remaining counts, summed; a ticked line contributes 0
       num: (m) => m[1].split(/\s{2,}/).reduce((s, t) => s + (/✓/.test(t) ? 0 : Number((t.match(/^(\d+)/) || [0, 0])[1])), 0) },
-    3: { label: 'the landmark name', re: /^(\d+)%$|^(EAT IT NOW)$/, dir: 'up',
-      num: (m) => (m[2] ? 100 : Number(m[1])) },
+    // THE PERCENTAGE IS GONE AND THAT IS THE POINT. It was the void's SIZE
+    // against the landmark, not any part of the landmark eaten, and under a
+    // label reading BARN, beside four other kinds whose chips all count down
+    // what is LEFT, "BARN 62%" read as "you have eaten 62% of a barn". The
+    // chip now carries the instruction and the growth bar keeps the size.
+    // Two states, so 'dir' is a step and not a slope: GROW BIGGER may become
+    // EAT IT NOW and must never go back.
+    3: { label: 'the landmark name', re: /^(GROW BIGGER)$|^(EAT IT NOW)$/, dir: 'up',
+      num: (m) => (m[2] ? 100 : 0) },
     4: { label: 'PLACE', re: /^#(\d|-) OF (\d+)$/, dir: 'rank',
       num: (m) => (m[1] === '-' ? 0 : Number(m[1])) },
     5: { label: 'WORLD', re: /^(\d+)% \/ (\d+)%$/, dir: 'up',

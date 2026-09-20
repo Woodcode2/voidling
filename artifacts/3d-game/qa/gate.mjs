@@ -541,6 +541,10 @@ const SUITE = [
     cmd: ['node', 'qa/roundlod.mjs'], verdict: pf,
     why: 'no NEW round thing ships under the 14x10 bar island.ts states — the debt is frozen at 153 and visible every run' },
 
+  { id: 'wayfind', tier: 'feel', profiles: ['push', 'live'], timeout: 900,
+    cmd: ['node', 'qa/wayfind.mjs', '4177', 'maple'], verdict: pf,
+    why: 'the arrow points AT the landmark from every bearing, including the half of the world behind the camera where project() mirrors x and y — and it stays down until she is big enough to eat the thing (the owner: "give some form of guidance to finish the level")' },
+
   { id: 'peoplefacet', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/peoplefacet.mjs'], verdict: pf,
     why: 'the walking people are curves and not prisms — every part wide enough for a facet to read carries at least the 14 sides island.ts states, measured as the straight edge in screen pixels at the closest the camera ever settles (the owner, twice: "the people in game as like Lego")' },

@@ -2649,9 +2649,18 @@ function refreshGoalChip(): void {
       break;
     }
     case 3: {
+      // ── "BARN 62%" WAS A LIE A SIX-YEAR-OLD COULD READ ────────────────────
+      // That percentage is the VOID'S SIZE against the barn — how big she is,
+      // not how much of it is gone. Under a label reading BARN, beside a chip
+      // that on every other dot counts down what is LEFT ("🚗2", "21% / 28%",
+      // "#3 OF 5"), it reads as "you have eaten 62% of a barn". She has eaten
+      // none of it; she cannot bite it at all until the number reaches 100.
+      // The growth bar already tells the size story, in its own language and
+      // at the bottom of the screen where she is looking for it. The chip's
+      // job here is the instruction, so it gives the instruction.
       const need = sp.landmarkR || 1;
       label = sp.landmark.toUpperCase();
-      val = voidling.radius >= need ? 'EAT IT NOW' : `${Math.round(Math.min(100, voidling.radius / need * 100))}%`;
+      val = voidling.radius >= need ? 'EAT IT NOW' : 'GROW BIGGER';
       break;
     }
     case 4: label = 'PLACE'; val = `#${lastRank || '-'} OF ${1 + rivals.list.filter((r) => r.joined).length}`; break;
@@ -2661,6 +2670,100 @@ function refreshGoalChip(): void {
   if (l) l.textContent = label;
   if (v) v.textContent = val;
   el0.hidden = false;
+}
+
+/** ── THE WAYFINDER ────────────────────────────────────────────────────────
+ *  One chevron that points at the landmark, from the moment she is big enough
+ *  to eat it. The owner: "give some form of guidance to finish the level."
+ *
+ *  ONLY THE LANDMARK DOT. goalMet() switches on five kinds and three of them
+ *  have no object: EAT is a score, CLEAR is a percentage, RIVALS is a placing
+ *  that returns false until the buzzer. goalProp is already resolved once at
+ *  beginMatch and held, so this costs one projection per frame and no scan.
+ *
+ *  THE BEARING IS TAKEN IN CAMERA SPACE, NOT FROM THE PROJECTED POINT.
+ *  Vector3.project() mirrors x and y for anything BEHIND the camera, so an
+ *  edge arrow built from clamped NDC points the wrong way exactly when the
+ *  child most needs it — when she has walked past the barn. Camera space is
+ *  signed correctly on both sides of the lens: x is right, y is up, and z is
+ *  negative in front. */
+const WAY_PAD = 30, WAY_TOP = 100, WAY_BOT = 160, WAY_LIFT = 34;
+const _wayV = new THREE.Vector3(), _wayC = new THREE.Vector3();
+let wayOn = false, wayLX = -1, wayLY = -1, wayLA = 999;
+
+/** Where the chevron goes for one world point, and which way it faces.
+ *  Split out from the paint so a probe can sweep it over a whole sphere of
+ *  targets in a single frame — this box renders about one frame per two
+ *  seconds, so any probe that has to GROW to the landmark radius to see the
+ *  arrow at all would take longer than the gate it belongs to. */
+function wayAim(target: THREE.Vector3): { x: number; y: number; ang: number; onScreen: boolean; inFront: boolean } | null {
+  const w = window.innerWidth, h = window.innerHeight;
+  const L = WAY_PAD, R = w - WAY_PAD, T = WAY_TOP, B = h - WAY_BOT;
+  if (R <= L || B <= T) return null;                  // a viewport too small to aim in
+  // ── THE RAY STARTS AT THE VOID, NOT AT THE MIDDLE OF THE SCREEN ──────────
+  // The child steers the void, so the direction she needs is the one from HIM
+  // to the barn. He is not at the centre: the look target leads him, and his
+  // screen position wanders by up to a sixth of the frame width. Aiming from
+  // the centre would hand her a bearing that is a little wrong all the time
+  // and most wrong when he is furthest off it, which is when she is moving
+  // fastest. This repo has already made the world-axis version of exactly this
+  // mistake once — see the note on the gaze at the steering basis, where "look
+  // where you are going" pointed 45 degrees away from where the void was
+  // actually going, because a flat world basis was fed to a billboarded face.
+  let ox = w * 0.5, oy = h * 0.5;
+  _wayC.copy(voidling.group.position).applyMatrix4(camera.matrixWorldInverse);
+  if (_wayC.z < -0.1) {
+    _wayV.copy(voidling.group.position).project(camera);
+    ox = (_wayV.x * 0.5 + 0.5) * w; oy = (-_wayV.y * 0.5 + 0.5) * h;
+  }
+  _wayC.copy(target).applyMatrix4(camera.matrixWorldInverse);
+  const inFront = _wayC.z < -0.1;
+  let px = 0, py = 0, onScreen = false;
+  if (inFront) {
+    _wayV.copy(target).project(camera);
+    px = (_wayV.x * 0.5 + 0.5) * w; py = (-_wayV.y * 0.5 + 0.5) * h;
+    onScreen = px >= L && px <= R && py >= T && py <= B;
+  }
+  let x: number, y: number, dx: number, dy: number;
+  if (onScreen) {
+    // it is in shot: sit above it and point DOWN at it, so the arrow marks the
+    // building rather than sending her away from something she can already see
+    x = px; y = Math.max(T, py - WAY_LIFT); dx = 0; dy = 1;
+  } else {
+    dx = inFront ? px - ox : _wayC.x;
+    dy = inFront ? py - oy : -_wayC.y;
+    const m = Math.hypot(dx, dy) || 1; dx /= m; dy /= m;
+    // the ray leaves the void and stops at the safe rect; clamp the origin
+    // into the rect first so a void pushed off the edge still yields a hit
+    const cx = Math.min(R, Math.max(L, ox)), cy = Math.min(B, Math.max(T, oy));
+    const tx = dx > 0 ? (R - cx) / dx : dx < 0 ? (L - cx) / dx : Infinity;
+    const ty = dy > 0 ? (B - cy) / dy : dy < 0 ? (T - cy) / dy : Infinity;
+    const t = Math.max(0, Math.min(tx, ty));
+    x = cx + dx * t; y = cy + dy * t;
+  }
+  // the chevron's own art points UP, so a direction of (0,-1) is zero rotation
+  return { x, y, ang: Math.atan2(dy, dx) * 180 / Math.PI + 90, onScreen, inFront };
+}
+function paintWayfinder(): void {
+  const sp = LEVEL_SPEC[pickedWorld];
+  const want = !!goal && goal.n === 3 && !!goalProp && !goalProp.eaten
+    && !goalProp.mesh.userData.byPlayer && started && !ended && !paused
+    && voidling.radius >= (sp.landmarkR || 1);
+  if (!want) {
+    if (wayOn) { wayOn = false; wayEl.classList.remove('on'); }
+    return;
+  }
+  const gp = goalProp!;
+  _wayV.copy(gp.mesh.position); _wayV.y += gp.radius * 0.9;   // aim at its roof, not its floor
+  const a = wayAim(_wayV);
+  if (!a) return;
+  if (Math.abs(a.x - wayLX) > 0.5 || Math.abs(a.y - wayLY) > 0.5 || Math.abs(a.ang - wayLA) > 0.5) {
+    wayLX = a.x; wayLY = a.y; wayLA = a.ang;
+    wayEl.style.transform = `translate(-50%,-50%) rotate(${a.ang.toFixed(1)}deg)`;
+    wayEl.style.left = `${a.x.toFixed(1)}px`;
+    wayEl.style.top = `${a.y.toFixed(1)}px`;
+  }
+  if (!wayOn) { wayOn = true; wayEl.classList.add('on'); }
 }
 
 const WORLD_COPY: Record<WorldId, WorldCopy> = {
@@ -3143,6 +3246,9 @@ const _dbg = new Proxy(_dbgStore, {
   __firstBite: unknown;
   __openAudio: { k: string; t: number }[];
   __fadeStats: () => Record<string, number>;
+  __voidPos: () => { x: number; y: number; z: number };
+  __wayAim: (x: number, y: number, z: number) => { x: number; y: number; ang: number; onScreen: boolean; inFront: boolean } | null;
+  __wayState: () => { on: boolean; x: number; y: number; ang: number; cued: boolean; chip: string; goalN: number; haveProp: boolean; r: number; need: number; pad: number; top: number; bot: number };
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void; __settle: () => { inside: number; through: number; doorstep: number; feet: number; ms: number }; __settleAgain: () => string[]; __introLen: () => number; __authored: () => { hours: number; mid: (string | undefined)[] };
   __life: Life; __moverStats: (gate: number) => { near: number; total: number }; __crowdGate: number;
   __hatSheet: (ids: string[]) => Promise<unknown>;
@@ -3926,6 +4032,19 @@ _dbg.__levelPlaying = () => playingGoal;
 // rebuilt the line from LEVEL_SPEC would be asserting against its own copy of
 // goalLine(), which is the one thing GOVERNOR rule 4 forbids.
 _dbg.__goalState = () => (goal ? { ...goal } : null);
+// THE WAYFINDER, for qa/wayfind.mjs. __wayAim runs the placement for ANY world
+// point so the probe can sweep a whole sphere of targets in one frame instead
+// of growing to the landmark radius, which on this box costs more wall time
+// than the gate it belongs to. __wayState is what the arrow is actually doing.
+_dbg.__wayAim = (x: number, y: number, z: number) => wayAim(new THREE.Vector3(x, y, z));
+_dbg.__voidPos = () => ({ x: voidling.group.position.x, y: voidling.group.position.y, z: voidling.group.position.z });
+_dbg.__wayState = () => ({
+  on: wayOn, x: wayLX, y: wayLY, ang: wayLA,
+  cued: goalCued, chip: (document.querySelector('#goal .gVal') as HTMLElement | null)?.textContent ?? '',
+  goalN: goal ? goal.n : 0, haveProp: !!goalProp,
+  r: voidling.radius, need: LEVEL_SPEC[pickedWorld].landmarkR || 0,
+  pad: WAY_PAD, top: WAY_TOP, bot: WAY_BOT,
+});
 // Drive a result straight into the ladder without playing three minutes for
 // it. The state machine and the telemetry are pure given a result, and the
 // match wiring that produces one lands on day 5.
@@ -5387,6 +5506,7 @@ const gTrackEl = growthEl.querySelector('.gTrack') as HTMLElement;
 const gFillEl = growthEl.querySelector('.gFill') as HTMLElement;
 const hungerLbl = el('hungerlbl');
 const evolveEl = el('evolve'), endEl = el('end'), endHd = el('endHd'), endSub = el('endSub'), endList = el('endList');
+const wayEl = el('wayfind');
 const bannerEl = el('banner'), hungerEl = el('hunger'), hungerFill = hungerEl.querySelector('.fill') as HTMLElement;
 let prevHunger = 0;
 
@@ -6359,6 +6479,8 @@ let heroProp: Edible | null = null;
  *  every match before the last rival walks in. */
 let lastRank = 0;
 let heroCued = false, heroAte = false;
+/** dot 3's own cue, which the hero landmark had been collecting instead. */
+let goalCued = false;
 // reactive one-shots: big beats the player just caused jump the queue
 const newsQueue: string[] = [];
 function breakingNews(h: string) {
@@ -8759,7 +8881,7 @@ function beginMatch(solo = false) {
   lastInput = tClock;
   // the hero is whatever the biggest thing on this world is — resolved per
   // match, so a re-rolled or re-scaled landmark needs no second list
-  heroCued = false; heroAte = false; heroProp = null;
+  heroCued = false; heroAte = false; heroProp = null; goalCued = false;
   for (const k of Object.keys(kindTally)) delete kindTally[k];   // QA day 2: per-MATCH counts
   // GATED ON THE CUE, NOT ON `hero`. `hero` is a camera waypoint — the fly-by
   // coordinates for the intro — and Maple deliberately has none, which also
@@ -13357,6 +13479,7 @@ function animate() {
   // dodges HUD panels by DOM id and he is a 3D object, so he was the one thing
   // on screen with no rule protecting him. qa/bubbleclear.mjs measures it.
   bubbles.update(dt, { pos: voidling.group.position, r: voidling.radius });
+  paintWayfinder();
   const cy = voidling.group.position.y;
 
   for (const e of edibles) {
@@ -14006,6 +14129,28 @@ function animate() {
       if (COPY.heroCueNews) breakingNews(COPY.heroCueNews);
       audio.ready(); buzz(30);
       fx.ring(heroProp.mesh.position.x, heroProp.mesh.position.z, 0xf0b429, heroProp.radius * 5, 0.9);
+    }
+    // ── AND THE THING THE LEVEL ACTUALLY ASKED FOR ─────────────────────────
+    // heroProp is the LARGEST edible on the island (resolved per match); on
+    // Maple that is the Town Hall. goalProp is the one carrying
+    // userData.landmark, which on Maple is the barn. They are DIFFERENT
+    // OBJECTS on every world, and only the first of them had a moment.
+    //
+    // So when the biggest building came into range the game spent a banner, a
+    // headline, a sound, a buzz and a gold ring at its position — and when the
+    // building the child had been set as her goal came into range, it flipped
+    // a 17px chip value from "98%" to "EAT IT NOW" and did nothing else. No
+    // ring, no sound, no direction. The ceremony was bolted to the wrong prop.
+    //
+    // Same five channels, same latch shape, same calm gating — the only new
+    // thing here is that it fires for the right object.
+    if (goal && goal.n === 3 && goalProp && !goalCued && !goalProp.mesh.userData.eaten
+        && goalProp.radius <= voidling.radius * EAT_RATIO) {
+      goalCued = true;
+      announce(`${LEVEL_SPEC[pickedWorld].landmark.toUpperCase()} — GO EAT IT!`);
+      holdBanner(2.4);
+      audio.ready(); buzz(30);
+      fx.ring(goalProp.mesh.position.x, goalProp.mesh.position.z, 0xffd23f, goalProp.radius * 5, 0.9);
     }
     if (heroProp && COPY.heroGone && !heroAte && heroProp.mesh.userData.eaten) {
       heroAte = true;
