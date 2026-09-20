@@ -2561,6 +2561,13 @@
          uses env(safe-area-inset-top) — so on an iPhone 15 Pro the BACK button
          on WORLDS, TROPHIES and TOP VOIDS sat 33pt above the safe area, behind
          the Dynamic Island. An omission, not a decision. */
+      /* the drawn medal, and the not-yet-ranked row */
+      .tvMed { display: block; width: 22px; height: 22px; margin: 0 auto; }
+      .tvMed.m1 { color: #ffd25a; } .tvMed.m2 { color: #d8dbe4; } .tvMed.m3 { color: #d09155; }
+      .tvNew { display: block; width: 22px; height: 22px; margin: 0 auto; opacity: 0.9; }
+      .tv.fresh .sc2 { color: #b9a8e0; }
+      .nm2 em { display: block; font-style: normal; font-size: 10px; font-weight: 700;
+        letter-spacing: 0.5px; color: #b9a8e0; margin-top: 1px; }
       /* ── MY VOID · the profile ────────────────────────────────────────
          One screen where there were three. Every pane inside it keeps the id
          and the `.show` semantics it had as a full-screen overlay, so the
@@ -2603,9 +2610,15 @@
       .backBtn { font-family: inherit; font-size: 14px; font-weight: 700; letter-spacing: 1px; color: #c9a6ff;
         background: rgba(122,79,224,0.3); border: 2px solid rgba(201,166,255,0.35); border-radius: 12px;
         padding: 9px 18px; cursor: pointer; }
-      #statsRow { display: flex; gap: 14px; margin-bottom: 22px; flex-wrap: wrap; justify-content: center; }
-      .stat { background: rgba(255,255,255,0.06); border-radius: 14px; padding: 12px 20px; text-align: center; min-width: 96px; }
-      .stat .v { font-size: 24px; font-weight: 700; color: #ffe08a; }
+      #statsRow { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center;
+        width: min(660px, 94vw); }
+      /* TIGHTER, SO THE TABS ARE ABOVE THE FOLD. On its own screen this row was
+         the content; inside MY VOID it sits between the portrait and the three
+         tabs, and at 12px/20px with a 96px floor it wrapped to two rows of
+         slabs at 430pt — 300px of mostly zeroes for a new player, with the
+         tabs pushed off the bottom of the phone. One row now. */
+      .stat { background: rgba(255,255,255,0.06); border-radius: 12px; padding: 8px 12px; text-align: center; min-width: 68px; }
+      .stat .v { font-size: 19px; font-weight: 700; color: #ffe08a; }
       .stat .l { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: #b9a8e0; margin-top: 2px; }
       #trophyGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; padding-bottom: 30px; width: min(660px, 94vw); margin: 0 auto; }
       .tr { background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.1); border-radius: 16px;
@@ -3130,6 +3143,17 @@
         <rect fill="#ff7a9c" x="2.2" y="6.6" width="19.6" height="4.4" rx="1.5"/>
         <rect fill="#ffd25a" x="10.5" y="6.6" width="3" height="14.2"/>
         <path fill="#ffd25a" d="M12 7.1C10.2 3.4 5.6 2.8 5.6 5.4c0 1.7 3.2 2.1 6.4 1.7zM12 7.1c1.8-3.7 6.4-4.3 6.4-1.7 0 1.7-3.2 2.1-6.4 1.7z"/>
+      </symbol>
+      <!-- A MEDAL, colourable. .m1/.m2/.m3 set currentColor, so gold, silver and
+           bronze are one drawing instead of three system emoji that render as
+           somebody else's artwork on every platform. -->
+      <symbol id="ic-medal" viewBox="0 0 24 24">
+        <!-- ONE V OF RIBBON, NOT TWO STRAPS. Drawn as two separate lines the
+             ribbon read as a pair of ears at 22px, which is the only size this
+             is ever shown at. A single V meeting the disc is a medal. -->
+        <path d="M8.4 2.6 12 9.6 15.6 2.6" stroke="#7a4fe0" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="12" cy="15.2" r="6.8" fill="currentColor"/>
+        <circle cx="12" cy="15.2" r="4.4" fill="rgba(255,255,255,0.26)"/>
       </symbol>
       <!-- MY VOID — the profile's own face, at icon size. Same two-eyed read as
            the portrait inside it, so the cell and the screen are the same thing. -->

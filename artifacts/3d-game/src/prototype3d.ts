@@ -11003,13 +11003,39 @@ function weeklyBoard(): { name: string; score: number; color: number; me?: boole
     { name: 'JELLY', color: FAMILY_INK.JELLY }, { name: 'B1G-B1TE', color: 0xd85a5a },
     { name: 'snackrat', color: 0xb98cff },
   ].map((s, i) => ({ ...s, score: Math.round((anchor * mul[i]) / 5) * 5 }));
-  const rows = [...seeds, { name: 'You', score: mine, color: 0x9a5cff, me: true }];
+  const rows = [...seeds, { name: 'You', score: mine, color: 0x9a5cff, me: true, unplayed: mine <= 0 }];
   return rows.sort((a, b) => b.score - a.score);
 }
 function renderTop() {
-  const medals = ['🥇', '🥈', '🥉'];
-  el('topList').innerHTML = weeklyBoard().map((r, i) =>
-    `<div class="tv ${r.me ? 'me' : ''}"><span class="rk">${medals[i] || i + 1}</span><span class="dot2" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm2">${r.name}</span><span class="sc2">${r.score}</span></div>`).join('');
+  const rows = weeklyBoard();
+  // ── A CHILD WHO HAS NOT PLAYED IS NOT EIGHTH ────────────────────────────
+  // weeklyBoard() floors the RIVALS' anchor at 220 so nobody faces an
+  // unclimbable wall, and its own comment promises "a new child still opens
+  // mid-table rather than at the bottom" — but the player's own score has no
+  // floor, so before her first match `mine` is 0 and she sorts last. The first
+  // thing her profile said was "8 · You · 0". Moving this board inside MY VOID
+  // made that the loudest line on her own page.
+  //
+  // Inventing a score to lift her would be a lie, and lying to a six-year-old
+  // about her own number is worse than the ranking. So she is simply NOT RANKED
+  // until she has one: no ordinal, no zero, and a line that says what to do
+  // about it. Everyone else keeps their place, which is the honest part.
+  const anyPlayed = rows.some((r) => r.me && !(r as { unplayed?: boolean }).unplayed);
+  let place = 0;
+  el('topList').innerHTML = rows.map((r) => {
+    const fresh = !!(r as { unplayed?: boolean }).unplayed;
+    if (!fresh) place++;
+    const rank = fresh ? '<svg class="tvNew" viewBox="0 0 24 24"><use href="#ic-void"/></svg>'
+      : place <= 3 ? `<svg class="tvMed m${place}" viewBox="0 0 24 24"><use href="#ic-medal"/></svg>`
+        : String(place);
+    const score = fresh ? '—' : String(r.score);
+    return `<div class="tv ${r.me ? 'me' : ''}${fresh ? ' fresh' : ''}">`
+      + `<span class="rk">${rank}</span>`
+      + `<span class="dot2" style="background:#${r.color.toString(16).padStart(6, '0')}"></span>`
+      + `<span class="nm2">${r.name}${fresh ? '<em>play a match to join this week</em>' : ''}</span>`
+      + `<span class="sc2">${score}</span></div>`;
+  }).join('');
+  void anyPlayed;
 }
 el('btnTop')?.addEventListener('click', () => openProfile('topvoids'));
 
