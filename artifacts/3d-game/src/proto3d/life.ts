@@ -571,12 +571,58 @@ const nb = (g: THREE.BufferGeometry): THREE.BufferGeometry => {
 // torso are the large smooth curves the eye reads, so they get the most; hands
 // and hat bands are a few pixels and stay cheap. Measured triangle cost is
 // recorded in the commit.
+// ── ROUND TWO: THE LIMBS WERE NEVER THE TELL ────────────────────────────────
+// The raise above fixed the head and took the arms and legs off five sides.
+// The owner still said Lego, so the facets were measured in SCREEN PIXELS
+// rather than argued about (qa/peoplefacet.mjs, which prints the table every
+// run). pc() scales a base primitive of radius 0.5, so a part's world radius
+// is HALF its scale argument — and that one factor of two had the ranking
+// upside down. At d=26, the floor of targetDist and the closest the camera
+// ever settles, 62.5 css px cover a world unit and a facet is
+// 2*r*sin(PI/N)*62.5 px of dead-straight edge:
+//
+//     part     on screen   was        now
+//     cyl        83.8px    21.7px ->  18.6px   hat bands, trays
+//     taper      58.8px    20.1px ->  13.1px   THE CHEST, and the thighs
+//     sphS       70.0px    18.1px ->  15.6px   the shoulder yoke
+//     drum       52.5px    13.6px ->  11.7px   the hips
+//     dot        35.0px    12.0px ->   9.1px   feet, hands, beach balls
+//     tube       20.0px     6.8px               left at 9 — see below
+//
+// A thigh is 22 px wide and its facet was under 8 px: the arms and legs were
+// the SMALLEST straight edges on a person and raising them would have bought
+// almost nothing. The chest is 59 px wide and showed a 20 px flat — a third of
+// the torso was one panel, on the object a child looks at most. It shares
+// B.taper with the thighs, which is why one number fixes both.
+//
+// 14 is not a new bar. It is the one island.ts already states beside makeTree:
+// "14x10 is the point where the profile stops reading as a polygon at the
+// closest the camera ever gets." People stand closer than trees, so they get
+// the same bar rather than a softer one. B.tube stays at 9 because its widest
+// use is a 20 px neck, and B.tri stays a triangle because a tricorn brim is
+// one on purpose; the probe exempts both and says so.
+//
+// B.dot stops at 12x8 instead, and that one is a cost decision made on a
+// measurement rather than a preference. Taking it to 14x10 with the others
+// came to 3,045 triangles per person against 1,803 before — SIXTY-NINE PER
+// CENT of a whole townsperson — to fix the smallest of the five edges,
+// because dot is instanced five or six times on everybody (two feet, the
+// hands, the floral pattern, a beach ball). 12x8 buys 12.0px -> 9.1px for
+// 2,506 per person, +39%, and normalised to an equal crowd the whole scene
+// goes 5,015,692 -> 5,256,140 triangles, +4.8%. qa/peoplefacet.mjs carries
+// the rule that lets it through: fourteen sides OR under ten pixels of flat.
+// That rule is the economics — the eye reads the LENGTH of a flat, not the
+// side count, so a small part should be allowed to buy its way out cheaply.
+//
+// This box has no GPU, so none of the above is a frame-rate measurement and
+// no claim is made that it is one. It is a triangle count, read off the live
+// scene graph at load, before and after.
 const B = {
   sph: nb(new THREE.SphereGeometry(0.5, 16, 11)),         // head — the silhouette that matters most
-  sphS: nb(new THREE.SphereGeometry(0.5, 12, 8)),         // shoulders, buns, balls
+  sphS: nb(new THREE.SphereGeometry(0.5, 14, 10)),        // shoulders, buns, balls
   // hands were 6x4 — a six-sided lump is a NUT, not a fist, and hands sit at
   // the end of every swinging arm where the eye tracks motion
-  dot: nb(new THREE.SphereGeometry(0.5, 9, 6)),
+  dot: nb(new THREE.SphereGeometry(0.5, 12, 8)),
   // THE CROWN IS THE CLOSE-UP. This was 12x4 with a note that "the profile
   // matters less" — and the profile is exactly what the player reads at spawn,
   // where a person stands 100+ px tall beside a small void. Four height rings,
@@ -587,9 +633,9 @@ const B = {
   // 3,392 verts a person already carries.
   hemi: nb(new THREE.SphereGeometry(0.5, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.56)),
   tube: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 9, 1, true)),    // open limb segment
-  taper: nb(new THREE.CylinderGeometry(0.4, 0.5, 1, 9, 1, true)),   // open, wider at the BOTTOM
-  drum: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 12, 1, true)),   // open torso barrel
-  cyl: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 12)),             // capped: hat bands, trays
+  taper: nb(new THREE.CylinderGeometry(0.4, 0.5, 1, 14, 1, true)),  // open, wider at the BOTTOM
+  drum: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 14, 1, true)),   // open torso barrel
+  cyl: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 14)),             // capped: hat bands, trays
   flare: nb(new THREE.CylinderGeometry(0.34, 0.5, 1, 14, 1, true)), // skirts, bobs, robes
   box: nb(new THREE.BoxGeometry(1, 1, 1)),
   tri: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 3)),              // tricorn brim: a TRIANGLE from above, deliberately

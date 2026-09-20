@@ -539,7 +539,11 @@ const SUITE = [
 
   { id: 'roundlod', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/roundlod.mjs'], verdict: pf,
-    why: 'no NEW round thing ships under the 14x10 bar island.ts states — the debt is frozen at 154 and visible every run' },
+    why: 'no NEW round thing ships under the 14x10 bar island.ts states — the debt is frozen at 153 and visible every run' },
+
+  { id: 'peoplefacet', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
+    cmd: ['node', 'qa/peoplefacet.mjs'], verdict: pf,
+    why: 'the walking people are curves and not prisms — every part wide enough for a facet to read carries at least the 14 sides island.ts states, measured as the straight edge in screen pixels at the closest the camera ever settles (the owner, twice: "the people in game as like Lego")' },
 
   { id: 'safety', tier: 'words', profiles: ['push', 'live'], timeout: 60,
     cmd: ['node', 'scripts/safety-scan.mjs'], verdict: exitCode,

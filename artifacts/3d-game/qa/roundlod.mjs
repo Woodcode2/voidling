@@ -46,7 +46,7 @@ import { join } from 'path';
 // single-line call. The twelve are a counting-method difference and NOT twelve
 // spheres anybody fixed — recording them as progress would have been a lie in
 // the ratchet's own baseline, on its first day.
-const BASELINE = 154;
+const BASELINE = 153;
 
 // THE SPEND — the same counted calls, priced instead of judged:
 // 2*W*(H-1) summed per call SITE (not per instance; the probe cannot see
@@ -84,7 +84,36 @@ const BASELINE = 154;
 //     purpose-made so the gores reach the crown. sph() in that file is a
 //     sheep's body, a hare, a flower, and the whale's eye. A 10x8 eye is not
 //     the "visibly octagonal planter dome" this probe was written about.
-const TRI_BASELINE = 39158;
+//
+// ── A THIRD LEGITIMATE CASE: A MEASURED RAISE ON THE HERO CROWD ───────────
+// The owner, twice, on his own recording: the people look like Lego. The
+// facets were measured in screen pixels rather than argued about, and the
+// answer is in qa/peoplefacet.mjs and in the table in life.ts. Two of the
+// five primitives raised to the 14 bar are spheres this probe can see:
+//
+//   sphS  12x8 -> 14x10   2*14*9 - 2*12*7 = 252 - 168 = +84   the shoulder yoke
+//   dot    9x6 -> 12x8    2*12*7 - 2* 9*5 = 168 -  90 = +78   feet, hands, balls
+//
+//   39320 = 39158 + 84 + 78.
+//
+// dot stops at 12x8 rather than the 14x10 the others got, and the reason is a
+// measurement rather than a preference: taking it to 14x10 cost +1,242
+// triangles per person, 69% of a whole townsperson, to fix the SMALLEST
+// straight edge of the five parts raised. 12x8 takes that edge from 12.0px to
+// 9.1px for half the spend. qa/peoplefacet.mjs carries the rule that lets it:
+// fourteen sides OR under ten pixels of flat.
+//
+// dot was UNDER-BAR DEBT — single-digit on both axes — so this is the first
+// case the file already allowed, and BASELINE drops 154 -> 153 in the same
+// commit, as the rule asks. sphS at 12x8 was never debt and its raise is the
+// new case: a shipped resolution raised deliberately because a 70px-wide
+// shoulder was showing an 18px straight edge at the closest the camera
+// settles. The arithmetic is here so the next reader can disagree with it.
+//
+// This probe still cannot see a cylinder, and a person's chest, hips and
+// thighs are all cylinders. qa/peoplefacet.mjs covers that gap for people;
+// the world kits remain uncovered and that is known, not forgotten.
+const TRI_BASELINE = 39320;
 
 const DIR = 'src/proto3d';
 const files = readdirSync(DIR).filter((f) => f.endsWith('.ts'));
