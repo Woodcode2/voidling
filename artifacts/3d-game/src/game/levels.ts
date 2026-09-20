@@ -213,6 +213,28 @@ export function current(world: string): Goal {
   return 5;
 }
 
+/** ── IS THIS WORLD FINISHED? ───────────────────────────────────────────────
+ *  All five dots PASSED, which under the win gate means she met the goal on
+ *  every one of them. 'fin' does not count: being there when the clock ran out
+ *  is not finishing.
+ *
+ *  The owner's ask, in his words: "after they beat the last level for that
+ *  world that world become permanently unlocked in like a level picker". The
+ *  mechanism for that already exists — every non-locked dot on the menu ladder
+ *  plays when tapped, and states only ever rise, so a passed dot is passed
+ *  forever. What was missing is the FACT, and therefore the telling: a child
+ *  who has finished a world has no way to know the ladder has stopped being a
+ *  queue and become a shelf. This is that fact, in one place, so the menu and
+ *  anything after it cannot disagree about it.
+ *
+ *  Deliberately NOT a stored bit. It is derivable from rows that can only rise,
+ *  so storing it would add a second truth that could fall out of step with the
+ *  first — the same reasoning that keeps 'open' derived in allLevels(). */
+export function worldDone(world: string): boolean {
+  const rows = allLevels().filter((r) => r.world === world);
+  return rows.length === GOALS.length && rows.every((r) => passed(r.st));
+}
+
 /** ── HAS SHE EVER SEEN THE LADDER? ────────────────────────────────────────
  *  One bit, stored beside the rows rather than in its own key, because it is a
  *  fact ABOUT the ladder and a second key is a second thing that can be wiped

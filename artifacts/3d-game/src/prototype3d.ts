@@ -52,7 +52,7 @@ import { STICKERS_BY_WORLD, STICKERS, collectInRun, hasSticker, TIER_POINTS,
 import { liveEvents, eventForWorld, eventEndLabel, type SeasonEvent } from './game/seasons';
 import { isUnlocked, gateFor, completeWorld, WORLD_LABEL, unlockedCount, type WorldKey } from './game/unlocks';
 import { allLevels, current as levelCurrent, recordLevelResult, trackLevelStart,
-  ordinal as levelOrdinal, ladderSeen, markLadderSeen,
+  ordinal as levelOrdinal, ladderSeen, markLadderSeen, worldDone,
   type Goal, type LevelState } from './game/levels';
 // (PIP_WORD left this import with the duplicate miss card that used to spell the
 // state out a second time — pipHead writes the word itself.)
@@ -7585,7 +7585,19 @@ function paintMenuLadder(): void {
   if (w) w.textContent = (WORLD_LABEL[pickedWorld as WorldKey] ?? pickedWorld).toUpperCase();
   const pips = document.getElementById('mlPips');
   const line = document.getElementById('mlGoal');
-  if (line) line.textContent = goalLine(pickedWorld, cur);
+  // ── A FINISHED WORLD STOPS BEING A QUEUE AND BECOMES A SHELF ────────────
+  // The owner: "after they beat the last level for that world that world
+  // become permanently unlocked in like a level picker". Every non-locked dot
+  // on this row already plays when tapped and states only ever rise, so a
+  // passed dot is passed forever — the ladder has BEEN a picker since day 7
+  // for anything she has beaten. What was missing is that nobody told her.
+  //
+  // So when all five are passed the card changes its mind out loud: a gold rim
+  // instead of the lavender one, and the one line under the dots stops naming
+  // the next goal (there isn't one) and says what she can do instead.
+  const roam = worldDone(pickedWorld);
+  host.classList.toggle('roam', roam);
+  if (line) line.textContent = roam ? 'PICK ANY LEVEL' : goalLine(pickedWorld, cur);
   if (!pips) return;
   // THE REVEAL CLASS COMES OFF ON THE NEXT PAINT. It lives on #mlPips, which
   // survives every repaint, while the pips themselves are replaced wholesale —
@@ -7619,6 +7631,41 @@ function paintMenuLadder(): void {
     if (mark?.ring !== undefined) {
       nodes.forEach((n, i) => n.classList.toggle('here', i === mark.ring));
       if (mark.arrive) nodes[mark.ring]?.classList.add('ringIn');
+    }
+    // ── AND A FLAG OVER IT, BOBBING ───────────────────────────────────────
+    // The owner: "maybe an arrow or something floating above the current level
+    // saying okay or something". The ring and the 1.14 scale already mark this
+    // dot, and both are quiet at arm's length on a phone — a child's eye lands
+    // on the biggest bright thing, which is PLAY, and then has to go looking.
+    // Candy Crush and hole.io both solve it with a pointer that will not sit
+    // still, for the same reason.
+    //
+    // ONE WORD, not a sentence, and the shape carries it anyway: a pill with a
+    // point aimed at the dot. Injected here rather than in pips.ts because that
+    // component also draws the end card's row at 34px and the world card's at
+    // 18, where a flag this size would be a smudge over a neighbour.
+    //
+    // Never on a finished world: when every dot is open there is no "here" to
+    // point at, and a flag over the fifth one would be pointing at nothing.
+    if (!roam) {
+      const at = nodes.find((n) => n.classList.contains('here'));
+      if (at) at.insertAdjacentHTML('beforeend', '<span class="pipFlag" aria-hidden="true">HERE</span>');
+    } else {
+      // ── THE RING STILL HAS A JOB ON A FINISHED WORLD ────────────────────
+      // The comment over this card in index.html states the invariant it was
+      // built on: "PLAY launches exactly the dot the ring is on: the button and
+      // the ring can never point at different things". pip() derives `here`
+      // from the STATE, and neither 'done' nor 'clear' is a here-state — so on
+      // a world where all five are passed nothing carried the ring, while PLAY
+      // went on launching dot 5 (levels.ts current() returns 5 when the world
+      // is finished, "so the ring has somewhere to sit"). The button's target
+      // became invisible on the one screen that exists to show it.
+      //
+      // So the ring is forced onto the dot PLAY will actually launch. It is not
+      // saying "you are here" any more — the flag said that, and the flag has
+      // gone — it is saying "this is the one loaded", which is the truth.
+      const at = nodes[levelCurrent(pickedWorld) - 1];
+      if (at) { nodes.forEach((n) => n.classList.remove('here')); at.classList.add('here'); }
     }
     // TAPPING A DOT PLAYS IT. A row of dots a child cannot touch is a picture
     // of a ladder rather than a ladder — and she will touch them, because they

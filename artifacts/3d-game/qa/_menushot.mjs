@@ -17,6 +17,13 @@ const PROFILES = [
     1: { st: 'clear', best: 24100, pct: 31, n: 3 },
     2: { st: 'done', best: 3, pct: 22, n: 2 },
     3: { st: 'fin', best: 0, pct: 18, n: 4 } } } }],
+  // a world she has BEATEN: the ladder stops being a queue and becomes a shelf
+  ['finished', 'maple', { v: 1, w: { maple: {
+    1: { st: 'clear', best: 31200, pct: 44, n: 3 },
+    2: { st: 'done', best: 2, pct: 38, n: 2 },
+    3: { st: 'done', best: 0, pct: 31, n: 4 },
+    4: { st: 'done', best: 1, pct: 29, n: 1 },
+    5: { st: 'done', best: 26, pct: 52, n: 2 } } } }],
   ['travelled', 'pirate', { v: 1, w: {
     maple: { 1: { st: 'clear', n: 2 }, 2: { st: 'clear', n: 1 }, 3: { st: 'done', n: 1 },
       4: { st: 'done', n: 2 }, 5: { st: 'done', n: 1 } },

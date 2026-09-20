@@ -896,6 +896,47 @@
          single number. */
       #mlPips .pipRow { gap: 16px; }
       #mlPips .pip { cursor: pointer; }
+      /* ── THE FLAG OVER THE DOT SHE IS ON ───────────────────────────────
+         A pill with a point, bobbing, injected into the .here pip by
+         paintMenuLadder. The ring and the 1.14 scale already mark that dot and
+         both are quiet at arm's length: a child's eye lands on the biggest
+         bright thing, which is PLAY, and then has to go looking for where she
+         is. This is the thing that will not sit still.
+
+         `overflow: visible` on .pip is not needed — the dot is not clipped —
+         but the ROW is 52px tall with a 16px gap and the flag lives above it,
+         so #mlPips carries the space rather than the flag overlapping the
+         world switcher. The ladder card's own `gap: 8px` then sits between the
+         switcher and that margin, not between the switcher and the flag. */
+      #mlPips { margin-top: 15px; }
+      .pipFlag { position: absolute; left: 50%; bottom: calc(100% + 9px); transform: translate(-50%, 0);
+        z-index: 3; pointer-events: none; white-space: nowrap;
+        padding: 3px 9px 4px; border-radius: 8px;
+        font-size: 10px; font-weight: 700; letter-spacing: 1.6px; color: #2a1206;
+        background: linear-gradient(180deg, #ffe08a, #ffb82a);
+        box-shadow: 0 3px 0 rgba(140, 78, 8, 0.55), 0 4px 12px rgba(0, 0, 0, 0.45);
+        animation: pipFlagBob 1.5s ease-in-out infinite; }
+      /* the point, aimed at the dot */
+      .pipFlag::after { content: ''; position: absolute; left: 50%; top: 100%;
+        transform: translateX(-50%); width: 0; height: 0;
+        border-left: 5px solid transparent; border-right: 5px solid transparent;
+        border-top: 6px solid #ffb82a; }
+      /* TRANSFORM, NOT `bottom`. The flag already carries translateX(-50%) to
+         centre itself, so the bob has to travel in the same property or the two
+         fight; animating `bottom` also relayouts the pip on every frame of an
+         infinite loop, on the one screen that is already rendering a live 3D
+         island behind it. */
+      @keyframes pipFlagBob {
+        0%, 100% { transform: translate(-50%, 0); }
+        50% { transform: translate(-50%, -6px); }
+      }
+      /* ── A WORLD SHE HAS FINISHED ──────────────────────────────────────
+         Gold instead of lavender, because the card is no longer a queue. The
+         line under the dots says PICK ANY LEVEL and the flag does not appear —
+         there is no "here" left to point at. (levels.ts worldDone) */
+      #menuLadder.roam { border-color: rgba(255, 210, 90, 0.55);
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 0 22px rgba(255, 210, 90, 0.18); }
+      #menuLadder.roam #mlGoal { color: #ffe08a; }
       #mlPips .pipDot {
         border-width: max(3px, calc(var(--pipSize) * 0.085));
         box-shadow: 0 4px 0 rgba(0,0,0,0.34), inset 0 2px 0 rgba(255,255,255,0.16); }
@@ -2785,6 +2826,9 @@
         animation: none !important;
       }
       body.calm .burst { display: none !important; }
+      /* the flag stays, it just stops bobbing — its visibility is CSS, not a
+         keyframe, so silencing it does not take it away (see calmcards) */
+      body.calm .pipFlag { animation: none !important; }
       /* ── TWO CARDS THAT MUST NOT SIMPLY BE SILENCED ──────────────────────
          #evolve.show and #news.show are not decorations on a visible element:
          their animations ARE their visibility. Both elements sit at opacity 0
