@@ -6004,13 +6004,45 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // sand with nothing above it — the "sticks everywhere" on Pirate Bay were
     // palm trunks and dune grass casting shadows the map could not draw. They
     // keep their contact blob, which is what actually grounds a small prop.
-    if (shouldCast(r, mesh)) setShadow(mesh);   // one predicate, shared with glb()
-    else {
-      mesh.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.receiveShadow = true; });
-      // tiny props still get the cheap blob — grounded on EVERY quality tier,
-      // even when the real shadow map is off on weak phones
-      mesh.add(contactShadow(Math.max(0.55, r * 1.1)));
-    }
+    // ── THE TWO BRANCHES WERE EXCLUSIVE, AND THAT IS WHY NOTHING BIG TOUCHES
+    //    THE FLOOR ───────────────────────────────────────────────────────────
+    // A SMALL prop got the contact blob. A CASTING prop got the shadow map and
+    // no blob at all. So every tree, bench, planter, news box and lamppost sat
+    // on the lawn like a sticker: measured, the lawn under a bench leg is 2.3%
+    // darker than a bench-width away while the road under a walking person is
+    // 46% darker — three different physics in one picture. The shadow map
+    // cannot close it on its own, because it is one hard key at a fixed angle,
+    // so a prop standing where the sun grazes gets a shadow thrown sideways and
+    // nothing underneath it. At a 46-65 degree camera the contact is what the
+    // eye reads as weight.
+    //
+    // ONE RULE FOR EVERYTHING, and the radius is 1.1 because that is the only
+    // value that can be SEEN. contactShadow(k*r) scales CircleGeometry(1, 24)
+    // by k*r*1.35, so the disc radius is 1.35*k*r — and a prop hides its own
+    // disc whenever its top-down half-extent exceeds that. Swept over the 2,024
+    // casting props on Maple, with the median prop 1.27x wider than its own
+    // nominal radius (qa/_disccap.mjs and the sweep beside it):
+    //
+    //     k      disc      props whose disc is visible
+    //     0.46   0.62r       14 of 2024   0.7%
+    //     0.62   0.84r       94           4.6%
+    //     0.80   1.08r      377          18.6%
+    //     1.00   1.35r     1500          74.1%
+    //     1.10   1.485r    1760          87.0%
+    //
+    // The studio's own order of work specified 0.46, corrected from a review's
+    // 0.62 on the grounds that 0.62 would put "a 4.2-unit dark pool under a
+    // 5-unit tree". Both are no-ops: they ground under one per cent and under
+    // five per cent of props respectively. The pool objection misreads the
+    // texture — it is a radial gradient with a tight core and a fast falloff,
+    // which is exactly what the small-prop branch has drawn all along at 1.1
+    // and why those props are the ones that already read as standing on
+    // something. So the distinction is deleted rather than re-tuned.
+    if (shouldCast(r, mesh)) setShadow(mesh);
+    else mesh.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.receiveShadow = true; });
+    // …and EVERYTHING gets the blob, on every quality tier, even when the real
+    // shadow map is off on a weak phone.
+    mesh.add(contactShadow(Math.max(0.55, r * 1.1)));
     scene.add(mesh); addEdible(mesh, r);
   };
 
