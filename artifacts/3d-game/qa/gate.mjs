@@ -372,7 +372,7 @@ const SUITE = [
   // (d) 150s, (j) 101s, (h) 80s, (b) ~60s — about 1,050s in total. 2400 leaves
   // room for a box under load without hiding a probe that has actually hung.
   { id: 'levels', tier: 'feel', profiles: ['push', 'live'], timeout: 2400,
-    cmd: ['node', 'qa/levels.mjs', String(PORT), '--only=a,b,c,d,e,f,g,h,i,j'], verdict: pf,
+    cmd: ['node', 'qa/levels.mjs', String(PORT), '--only=a,b,c,d,e,f,g,h,i,j,k,l'], verdict: pf,
     why: 'the ladder agrees with itself about where a child is — thirty dots, one green ring per world, a dot opened only by a goal MET rather than a match merely finished, and a goal the child can actually see on screen while she plays for it' },
 
   // ── HOW MANY TAPS FROM OPENING THE APP TO PLAYING, ON BOTH SIDES OF MIDNIGHT

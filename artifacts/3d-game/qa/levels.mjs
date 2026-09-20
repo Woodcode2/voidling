@@ -1341,6 +1341,93 @@ if (ONLY.includes('i')) {
   else ok(`(i) __levels() is untouched by a harness match`);
 }
 
+// ── (l) EVERY DOOR INTO A MATCH CARRIES A DOT ────────────────────────────────
+// The studio found the season ribbon starting a match the ladder does not
+// count: it set voidWorld and voidAutoPlay and NOT voidPlayGoal, and its
+// same-world branch called launchWorld() without setting playingGoal. And
+// playingGoal is never reset to null anywhere in the file, so on a fresh load
+// that match had no dot at all and after a win it silently replayed the dot she
+// had just passed. seasons.ts runs 102 days a year and the ribbon is the
+// second-brightest control on the menu.
+//
+// Part (j) already guards PLAY. This guards the other three, and asserts the
+// thing a per-door check cannot: that the button and the ring never point at
+// different dots.
+if (ONLY.includes('l')) {
+  const p = await open({ voidUnlocked: UNLOCK_ALL }, '?w=maple&manual=1');
+  await p.waitForFunction(() => typeof window.__levelCurrent === 'function', null, { timeout: 420000 })
+    .catch(() => { });
+
+  // (l1) THE RIBBON. It is date-driven — liveEvents() reads the real clock — so
+  // on a day with no season this cannot be exercised. Say so loudly rather than
+  // reporting green: a probe that silently skips its target for 263 days a year
+  // is worse than no probe, and this suite has shipped that shape before.
+  const rib = await p.evaluate(() => {
+    const r = document.getElementById('eventRibbon');
+    if (!r || !r.classList.contains('show')) return null;
+    return { text: (r.textContent || '').trim().slice(0, 40) };
+  });
+  if (!rib) {
+    console.log('  ··   (l) no season is live today, so the ribbon could not be driven — NOT COVERED');
+  } else {
+    // THE RIBBON RELOADS THE PAGE for a different world, which destroys the
+    // execution context — and this suite's own addInitScript CLEARS
+    // localStorage on every load, so the dot it wrote is gone before anything
+    // can read it. Mirror the write into sessionStorage, which the seed does
+    // not touch and the reload does not clear, and read it on the other side.
+    await p.evaluate(() => {
+      const real = localStorage.setItem.bind(localStorage);
+      localStorage.setItem = (k, v) => {
+        try { if (k === 'voidPlayGoal' || k === 'voidWorld') sessionStorage.setItem('probe:' + k, String(v)); } catch { }
+        return real(k, v);
+      };
+      try { localStorage.removeItem('voidPlayGoal'); sessionStorage.removeItem('probe:voidPlayGoal'); } catch { }
+    });
+    const navved = await Promise.all([
+      p.waitForNavigation({ timeout: 20000 }).then(() => true).catch(() => false),
+      p.evaluate(() => document.getElementById('eventRibbon').click()),
+    ]).then((r) => r[0]);
+    await p.waitForTimeout(1200);
+    const after = await p.evaluate(() => ({
+      playing: window.__levelPlaying ? window.__levelPlaying() : 'hook missing',
+      mirrored: (() => { try { return sessionStorage.getItem('probe:voidPlayGoal'); } catch { return null; } })(),
+    })).catch(() => ({ playing: 'unreadable', mirrored: null }));
+    // ASSERT POSITIVE EVIDENCE, NEVER THE ABSENCE OF A FAILURE. The first
+    // version of this bar read `playing === null && mirrored === null`, and
+    // `playing` comes back as the STRING 'hook missing' when the reload has not
+    // brought the debug API up yet — so the AND could never be true and the
+    // probe passed on the broken build, printing stored=null while it did. A
+    // dot must be shown to EXIST: a real number in playingGoal, or a real
+    // value mirrored out of the setItem call.
+    const dotNum = Number(after.mirrored);
+    const gotDot = (typeof after.playing === 'number' && after.playing >= 1)
+      || (after.mirrored !== null && after.mirrored !== '' && Number.isFinite(dotNum) && dotNum >= 1);
+    if (!gotDot)
+      bad(`(l) the season ribbon ("${rib.text}") started a match carrying no dot `
+        + `(navigated=${navved}, playing=${JSON.stringify(after.playing)}, stored=${JSON.stringify(after.mirrored)}) `
+        + `— the ladder will not count it`);
+    else ok(`(l) the season ribbon carries a dot (navigated=${navved}, playing=${JSON.stringify(after.playing)}, stored=${after.mirrored})`);
+  }
+
+  // (l2) THE PIP AND THE WORLD CARD, and the stale case part (j) has for PLAY:
+  // the button and the ring must never point at different dots.
+  const agree = await p.evaluate(() => {
+    const ring = [...document.querySelectorAll('#mlPips .pip')].findIndex((e) => e.classList.contains('here')) + 1;
+    const cur = window.__levelCurrent(document.body.dataset.world || 'maple');
+    return { ring, cur };
+  }).catch(() => null);
+  // NOT a silent skip. The ribbon above may have navigated, which tears the
+  // menu down — so say which it was rather than printing nothing, because a
+  // check that quietly does not run is the failure mode this whole suite keeps
+  // finding in other probes.
+  if (!agree) console.log('  ··   (l) the ring check could not read the menu (the ribbon navigated away) — NOT COVERED');
+  else if (agree.ring > 0 && agree.ring !== agree.cur)
+    bad(`(l) the ring sits on dot ${agree.ring} while the ladder's current dot is ${agree.cur} — two doors, two answers`);
+  else if (agree.ring === 0) console.log('  ··   (l) no ring on screen to compare — NOT COVERED');
+  else ok(`(l) the ring and the ladder agree on dot ${agree.cur}`);
+  await p.close();
+}
+
 await b.close();
 const secs = ((Date.now() - t0) / 1000).toFixed(0);
 if (fails.length) {

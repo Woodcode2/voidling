@@ -9685,9 +9685,20 @@ const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) 
     rib.classList.add('show');
     rib.addEventListener('click', () => {
       track('event_ribbon', { id: ev.id, world: ev.world, from: pickedWorld });
-      if (ev.world === pickedWorld) { launchWorld(); return; }
+      // ── THE RIBBON HAS TO CARRY A DOT, LIKE EVERY OTHER DOOR ──────────────
+      // It did not. It set voidWorld and voidAutoPlay and NOT voidPlayGoal, and
+      // the same-world branch launched without setting playingGoal — so the
+      // brightest control on the menu started a match the ladder does not
+      // count. playingGoal is never reset to null anywhere, so on a fresh load
+      // that match had no dot at all, and after a win it silently replayed the
+      // dot she had just passed. seasons.ts runs 102 days a year.
+      //
+      // This is the world card's own shape, twenty lines up, which is correct.
+      const dot = levelCurrent(ev.world);
+      if (ev.world === pickedWorld) { playingGoal = dot; launchWorld(); return; }
       localStorage.setItem('voidWorld', ev.world);
       localStorage.setItem('voidAutoPlay', '1');
+      localStorage.setItem('voidPlayGoal', String(dot));
       location.href = location.pathname;
     });
   }
