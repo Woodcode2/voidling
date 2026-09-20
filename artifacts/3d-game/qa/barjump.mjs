@@ -122,13 +122,29 @@ await b.close();
 // ── WHAT THIS CAN AND CANNOT GRADE ────────────────────────────────────────
 // The question is whether the bar's travel arrives in STEPS a child can see or
 // in sub-pixel creep. It is NOT whether there is a lot of travel — that is the
-// growth law's business, and the law currently discards most of what a child
-// eats. Measured over one drive: score 145 -> 3,528, a factor of 24, moved the
-// bar 0% -> 16.83%, because the radius is clamped to a time-and-pace allowance
-// and the surplus is thrown away every frame. Two payouts is all there was TO
-// pay. A probe that demanded a minimum number of writes was therefore failing
-// the bar for the law's behaviour, which is how this one read FAIL through two
-// real bug fixes that had nothing to do with it.
+// growth law's business. Measured over one drive: score 145 -> 3,528 moved the
+// bar 0% -> 16.83%, and two payouts was all there was TO pay. A probe demanding
+// a minimum number of WRITES therefore fails the bar for the LAW's behaviour,
+// which is how this one read FAIL through two real bug fixes that had nothing
+// to do with it.
+//
+// AND DO NOT READ THAT DRIVE AS "EATING BARELY MOVES THE BAR", which is what it
+// was first taken to mean and which manufactured a phase of work that the
+// evidence does not support. It was sampled in the first FIVE SECONDS of a
+// match, where the law's allowance is 1.14 units BY DESIGN — a bar reading ~16%
+// there is correct, because the void genuinely is that small. Simulated across
+// a full 180s match against the law as shipped, and validated against the one
+// figure prototype3d.ts records for itself (par run at 60s, lawCap 3.06 and raw
+// floor 4.18; the simulation gives 3.06 and 4.17):
+//
+//     0.5 bites/s, small meals  ->  radius 1.84, score    981
+//     2   bites/s, small meals  ->  radius 2.88, score  3,402
+//     6   bites/s, small meals  ->  radius 4.93, score 10,359
+//     6   bites/s, big meals    ->  radius 6.76, score 19,926
+//
+// A 3.7x spread in final size. Eating differentiates strongly over a match. The
+// reason THIS probe's sample is tiny is the HARDWARE — 180 match-seconds is
+// over an hour of wall clock at one frame per two seconds — not the design.
 //
 // So: the ledger rules out a dead hook, and the verdict is the SHARE.
 const pays = (led && led.pays) || 0;
