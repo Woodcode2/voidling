@@ -31,6 +31,10 @@ export interface Bubbles {
     onArrive: () => void, big?: boolean): void;
   /** `hero` is the void's world position and radius. Pass it and no bubble
    *  will be drawn across his face. See the note at HERO_PAD. */
+  /** THE FORM-NAME CALLOUT. Pops the new form name above his head for 0.8s.
+   *  Placed from the same projection that maintains heroBox, so it costs no
+   *  extra project() and cannot disagree with the face box it has to dodge. */
+  formCall(text: string): void;
   update(dt: number, hero?: { pos: THREE.Vector3; r: number }): void;
   /** Clear every live bubble and floater. Called at match reset. */
   reset(): void;
@@ -41,6 +45,20 @@ export interface Bubbles {
    *  recycled out from under (their payout is still made), `noTarget` counts
    *  the ones that found no bar to fly to. */
   flightStats(): { launched: number; landed: number; displaced: number; noTarget: number };
+  /** THE CALLOUT'S WHOLE PATH, for qa/formcall.mjs. Returns the placement at
+   *  any point of its life against the CURRENT heroBox, so the probe can sweep
+   *  the path in one frame. A rising thing cannot be cleared by a check that
+   *  samples one instant — that is the hole the first probe for this feature
+   *  had, and it is the hole this closes. */
+  /** …and against an ARBITRARY box, so a probe can walk the whole ladder
+   *  without mutating the live sim. Sweeping radii through __setVoidR means
+   *  every reading is taken from a camera still easing toward a target that
+   *  just moved, heroBox is one frame behind that motion, and the two
+   *  disagree for reasons that have nothing to do with the callout —
+   *  measured, by up to three times. This separates the GEOMETRY, which is
+   *  pure and sweepable, from the PROJECTION, which is live and checked once. */
+  formSweep(a: number, box?: { top: number; bottom: number; left: number; right: number; cx: number; cy: number; rx: number; ry: number; on: boolean }): { x: number; y: number; o: number; s: number } | null;
+  formBox(): { top: number; bottom: number; left: number; right: number; cx: number; cy: number; rx: number; ry: number; on: boolean };
 }
 
 interface Slot {
@@ -249,12 +267,95 @@ const style = document.createElement('style');
   const v = new THREE.Vector3();
   // HUD rect scratch, filled once per update() and reused — see the read/write
   // split in update(). Fixed-size arrays with a live count, so no allocation.
-  const heroBox = { top: 0, bottom: 0, left: 0, right: 0, on: false };
-  const heroV = new THREE.Vector3(), heroR = new THREE.Vector3();
+  // cx/cy/rx/ry join the four edges because the form-name callout rides the
+  // SAME single projection: one more consumer, no second project() per frame.
+  // ry is measured and not derived from rx — the camera is pitched about 46
+  // degrees, so vertical pixels per world unit are NOT horizontal ones, and
+  // the ratio moves across the ladder. A crown written as cy - k*rx is wrong
+  // at one end of it.
+  const heroBox = { top: 0, bottom: 0, left: 0, right: 0, cx: 0, cy: 0, rx: 0, ry: 0, on: false };
+  const heroV = new THREE.Vector3(), heroR = new THREE.Vector3(), heroU = new THREE.Vector3();
+  let formEl: HTMLElement | null = null;
+  let formUntil = -1, formT0 = 0, formLX = -1, formLY = -1, formLO = -1;
+  const FORM_LIFE = 0.80;
   const hudR: DOMRect[] = []; let hudN = 0;
   const bandR: DOMRect[] = []; let bandN = 0;
 
+  /** Where the callout's BOTTOM edge sits this frame, and how opaque it is.
+   *  Split out so a probe can sweep it without driving a ceremony: a rising
+   *  thing occupies a PATH, and a check that samples one instant cannot clear
+   *  it. The probe sweeps `a` from 0 to 1 against live heroBox values. */
+  function formPlace(a: number, box: typeof heroBox = heroBox): { x: number; y: number; o: number; s: number } | null {
+    if (!box.on) return null;
+    // Bind here as well as in formCall(): the horizontal clamp is computed
+    // from the element's OWN width, and falling back to a guess means the
+    // clamp is wrong by whatever the guess is wrong by. Measured with a 120px
+    // guess against the real 246px of CHOMPOSAURUS, the name ran off the side
+    // of a 360px screen on every frame where he was off centre.
+    if (!formEl) formEl = document.getElementById('form');
+    const W = window.innerWidth;
+    // TWO FLOORS, AND WHICH ONE BINDS CHANGES ACROSS THE LADDER. box.top is
+    // the face box every other thing on screen already dodges. `crown` is the
+    // top of the SWOLLEN silhouette: celebrate() overshoots the drawn radius by
+    // about 16% at 0.20s and the callout's whole life sits inside that window,
+    // so a box built from the LOGICAL radius is not a safe edge on its own.
+    // Screen y grows DOWNWARD, so clearing his head is a SUBTRACTION. Writing
+    // this as a min against top PLUS a fraction of the radius puts the sticker
+    // in his brow, which is exactly how the first draft of this got it wrong.
+    const crown = box.cy - 1.30 * box.ry;
+    const yMax = Math.min(box.top, crown) - 6;
+    // The rise is a FRACTION OF HIM, not a fixed pixel count. A flat 8px is
+    // smaller than the camera's own settle drift, so it would read as sinking.
+    const rise = Math.max(10, box.rx * 0.30);
+    const ease = 1 - (1 - a) * (1 - a);
+    const halfW = Math.min((formEl ? formEl.offsetWidth : 120) / 2 + 8, W / 2);
+    // …AND A CEILING, so it cannot leave the top of the screen. The camera law
+    // holds him at a roughly constant fraction of the frame — camDist grows
+    // with his radius — so on a settled lens there is always room above his
+    // head and this never binds. It binds while the lens is still travelling,
+    // which is most of the first second of a match and any frame a probe
+    // catches mid-ease: measured, an unsettled lens put him at ry 342 on a
+    // 780px screen and sent the callout 313px above the viewport. Clamping to
+    // the edge is the right failure: a sticker pinned under the clock is
+    // legible, and one off the top is not there at all.
+    const h = formEl ? formEl.offsetHeight : 32;
+    const ceil = 60 + h;
+    return {
+      x: Math.min(W - halfW, Math.max(halfW, box.cx)),
+      y: Math.max(ceil, yMax - rise * ease),
+      o: a < 0.14 ? a / 0.14 : a > 0.66 ? (1 - a) / 0.34 : 1,
+      s: a < 0.16 ? 0.74 + 1.625 * a : 1,
+    };
+  }
+  function formPaint(a: number): void {
+    const f = formPlace(a);
+    if (!f || !formEl) return;
+    if (Math.abs(f.x - formLX) > 0.5 || Math.abs(f.y - formLY) > 0.5) {
+      formLX = f.x; formLY = f.y;
+      formEl.style.left = `${f.x.toFixed(1)}px`;
+      formEl.style.top = `${f.y.toFixed(1)}px`;
+    }
+    if (Math.abs(f.o - formLO) > 0.01) { formLO = f.o; formEl.style.opacity = f.o.toFixed(3); }
+    formEl.style.transform = `translate(-50%,-100%) scale(${f.s.toFixed(3)})`;
+  }
+
   return {
+    /** THE FORM NAME POPS ABOVE HIS HEAD. Placed SYNCHRONOUSLY here, before the
+     *  class goes on, because bubbles.update() runs earlier in the frame than
+     *  the ceremony that calls this — so waiting for the next update() would
+     *  show one full frame of an unpositioned, fully opaque name at the top
+     *  left of the screen. That is ~16ms on a phone and ~2 SECONDS on the QA
+     *  box. The base rule carries visibility:hidden and only .on lifts it, so
+     *  an element with no coordinates can never also be visible. */
+    formCall(text) {
+      if (!formEl) formEl = document.getElementById('form');
+      if (!formEl) return;
+      formEl.textContent = text;
+      formT0 = clock; formUntil = clock + FORM_LIFE;
+      formLX = -1; formLY = -1; formLO = -1;
+      formPaint(0);
+      formEl.classList.add('on');
+    },
     say(pos, text, kind, opts) {
       text = sentence(text);
       // ── THE TEMPORAL RULES (comms redesign) ─────────────────────────────
@@ -421,6 +522,8 @@ const style = document.createElement('style');
       f.fly = { t: 0, dur: reduceMotion() ? 0 : 0.28, sx: -1, sy: -1, target, onArrive };
     },
     flightStats() { return { ...fStats }; },
+    formSweep(a, box) { return formPlace(Math.min(1, Math.max(0, a)), box ?? heroBox); },
+    formBox() { return { ...heroBox }; },
     reset() {
       // Every live bubble and floater dies at the match boundary. They used to
       // carry over verbatim — measured in 5 of 5 match transitions — and hang
@@ -459,6 +562,10 @@ const style = document.createElement('style');
           heroR.add(hero.pos).project(camera);
           const rx = Math.abs((heroR.x * 0.5 + 0.5) * w - cx);
           if (rx > 4) {
+            // …and one point one world radius ABOVE him, for the vertical scale
+            heroU.copy(hero.pos); heroU.y += hero.r; heroU.project(camera);
+            heroBox.cx = cx; heroBox.cy = cy; heroBox.rx = rx;
+            heroBox.ry = Math.abs((-heroU.y * 0.5 + 0.5) * h - cy) || rx;
             heroBox.left = cx - rx * 0.62 - HERO_PAD;
             heroBox.right = cx + rx * 0.62 + HERO_PAD;
             heroBox.top = cy - rx * 0.76 - HERO_PAD;
@@ -529,6 +636,21 @@ const style = document.createElement('style');
         const r = el2.getBoundingClientRect();
         if (!r.height) continue;
         bandR[bandN++] = r;
+      }
+      // ── THE FORM-NAME CALLOUT RIDES HIM ───────────────────────────────────
+      // Here and not beside the heroBox block twenty lines up: this is AFTER
+      // the last getBoundingClientRect in update(), so a style write cannot
+      // reintroduce the per-bubble synchronous relayout the read/write split
+      // above exists to kill. It reads no band rect, only heroBox.
+      if (formUntil >= 0) {
+        if (clock >= formUntil) {
+          formUntil = -1;
+          if (formEl) formEl.classList.remove('on');
+        } else {
+          // retired on a TIMESTAMP, never on animationend — there is no
+          // animation to end, and that is the point of the whole element
+          formPaint(Math.min(1, (clock - formT0) / FORM_LIFE));
+        }
       }
       for (const s of slots) {
         if (!s.active) continue;

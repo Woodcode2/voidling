@@ -3247,6 +3247,9 @@ const _dbg = new Proxy(_dbgStore, {
   __openAudio: { k: string; t: number }[];
   __fadeStats: () => Record<string, number>;
   __voidPos: () => { x: number; y: number; z: number };
+  __formSweep: (a: number, box?: { top: number; bottom: number; left: number; right: number; cx: number; cy: number; rx: number; ry: number; on: boolean }) => { x: number; y: number; o: number; s: number } | null;
+  __formBox: () => { top: number; bottom: number; left: number; right: number; cx: number; cy: number; rx: number; ry: number; on: boolean };
+  __formCall: (t: string) => void;
   __wayAim: (x: number, y: number, z: number) => { x: number; y: number; ang: number; onScreen: boolean; inFront: boolean } | null;
   __wayState: () => { on: boolean; x: number; y: number; ang: number; cued: boolean; chip: string; goalN: number; haveProp: boolean; r: number; need: number; pad: number; top: number; bot: number };
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void; __settle: () => { inside: number; through: number; doorstep: number; feet: number; ms: number }; __settleAgain: () => string[]; __introLen: () => number; __authored: () => { hours: number; mid: (string | undefined)[] };
@@ -4038,6 +4041,13 @@ _dbg.__goalState = () => (goal ? { ...goal } : null);
 // than the gate it belongs to. __wayState is what the arrow is actually doing.
 _dbg.__wayAim = (x: number, y: number, z: number) => wayAim(new THREE.Vector3(x, y, z));
 _dbg.__voidPos = () => ({ x: voidling.group.position.x, y: voidling.group.position.y, z: voidling.group.position.z });
+// THE FORM-NAME CALLOUT, for qa/formcall.mjs. __formSweep(a) returns where the
+// sticker's bottom edge sits at any point of its 0.80s life against the CURRENT
+// projection, so the probe can walk the whole PATH inside one frame instead of
+// waiting out a ceremony on a box that renders one frame per two seconds.
+_dbg.__formSweep = (a: number, box?: Parameters<typeof bubbles.formSweep>[1]) => bubbles.formSweep(a, box);
+_dbg.__formBox = () => bubbles.formBox();
+_dbg.__formCall = (t: string) => bubbles.formCall(t);
 _dbg.__wayState = () => ({
   on: wayOn, x: wayLX, y: wayLY, ang: wayLA,
   cued: goalCued, chip: (document.querySelector('#goal .gVal') as HTMLElement | null)?.textContent ?? '',
@@ -14005,7 +14015,23 @@ function animate() {
     setTimeout(() => growthEl.classList.remove('pop'), 260);
     // never draw over the MAPLE ISLE title card — one hero message at a time
     if (tClock > titleUntil) {
-      evolveEl.querySelector('.big')!.textContent = FORMS[curStage];
+      // ── THE NAME GOES ON HIM, NOT ON A CARD IN THE MIDDLE OF THE SCREEN ──
+      // The owner, on hole.io: "What if we had a graphics that looked beat like
+      // hole and it says level up next to the void?" — and, having seen that
+      // his own reference announces the new SIZE rather than the words level
+      // up: "keeping the names work maybe as how we set ourselves different
+      // right? So instead of level up we use the names?"
+      //
+      // So CHOMPOSAURUS pops above his head and rides him, and the card keeps
+      // what the card is actually good at: the flash. Its .big line goes empty
+      // — an empty block is zero-height, so the card SHRINKS to its EVOLVED
+      // line plus the burst, which is also what buys the callout its corridor
+      // between #news and his face. The card is not retired: evolveEl is read
+      // at three other sites including resetMatch(), el() ends in a non-null
+      // assertion, and typecheck is therefore blind to the TypeError that
+      // deleting the markup would throw on every single match start.
+      evolveEl.querySelector('.big')!.textContent = '';
+      bubbles.formCall(FORMS[curStage]);
       if (curStage >= 3) questEvent('devourer');
       if (guideStep === 2) { guideStep = 3; showGuide('you <b>EVOLVED</b>! bigger void, bigger meals 🏠', 5); }
       evolveEl.classList.remove('show'); void (evolveEl as HTMLElement).offsetWidth; evolveEl.classList.add('show');

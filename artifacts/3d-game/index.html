@@ -224,6 +224,44 @@
       #wayfind.on { opacity: 1; visibility: visible;
         transition: opacity 0.22s linear, visibility 0s linear 0s; }
       body.ovl #wayfind, body.menu #wayfind { display: none; }
+      /* ── THE FORM-NAME CALLOUT ───────────────────────────────────────────────
+         The owner, on hole.io: "What if we had a graphics that looked beat like
+         hole and it says level up next to the void?" — and then, shown that his
+         own reference announces the new SIZE rather than the words level up:
+         "keeping the names work maybe as how we set ourselves different right?
+         So instead of level up we use the names?"
+
+         So this says CHOMPOSAURUS, not LEVEL UP. That is the reference's own
+         grammar (it says "Size 3" — WHAT YOU BECAME) in our vocabulary, and it
+         keeps one word from carrying three jobs: the end card already prints
+         LEVEL UP for the persistent rank and LEVEL 3 means a goal dot.
+
+         MEASURED OFF THE REFERENCE STILLS: their callout's glyph body is 30px
+         against the ordinary score floater's 20px — one and a half times. Ours
+         lands on the same ratio: .vf is 20px (bubbles.ts), .vf.big is 26px, and
+         this is 30px. CHOMPOSAURUS, the longest name, renders 246px here, which
+         fits the narrowest phone; at the 46px the evolve card uses it is 383px
+         and clipped on three of four widths, which is why the card has its own
+         10.6vw rule and why this does not simply reuse that size.
+
+         IT RIDES THE VOID. Placed every frame by bubbles.ts from the same
+         single projection that maintains heroBox, anchored by its BOTTOM edge
+         so the clamp acts on the edge nearest his head.
+
+         NO @keyframes, deliberately — opacity and transform are written per
+         frame from JS. So there is nothing to hand-enter in the body.calm list,
+         and nothing for the OS reduced-motion catch-all to flatten. The four
+         hero cards in this sheet are each on screen for TEN MICROSECONDS under
+         that catch-all because their visibility IS their animation; this one
+         cannot join them in either direction. */
+      #form { position: fixed; left: 0; top: 0; z-index: 7; pointer-events: none;
+        opacity: 0; visibility: hidden; white-space: nowrap;
+        transform: translate(-50%, -100%) scale(0.74); transform-origin: 50% 100%;
+        font-family: 'Fredoka', system-ui, sans-serif; font-weight: 900;
+        font-size: 30px; letter-spacing: 1px; line-height: 1.05; color: #ffd25a;
+        -webkit-text-stroke: 3px rgba(26, 10, 22, 0.92); paint-order: stroke fill; }
+      #form.on { visibility: visible; }
+      body.ovl #form, body.menu #form { display: none; }
       #growth { position: fixed; z-index: 5; pointer-events: none;
         left: 50%; transform: translateX(-50%);
         /* an unconditional floor. env() resolves to 0 in a non-standalone mobile
@@ -2758,6 +2796,7 @@
     </div>
     <div id="evolve"><div class="big"></div><div class="sm">EVOLVED</div></div>
     <div id="wayfind"></div>
+    <div id="form"></div>
     <div id="guide"></div>
     <!-- the ghost hand: a looping press-and-drag demo over the live game.
          Shown by the drag lesson, hidden by the first real drag — see the
