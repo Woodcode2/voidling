@@ -553,6 +553,10 @@ const SUITE = [
     cmd: ['node', 'qa/headclear.mjs', '4177', 'maple'], verdict: pf,
     why: 'no hand prop is drawn through its carrier\'s own face — the arm\'s vertices are transformed into the head group\'s space and tested against the skull ellipsoid, twice seconds apart, so a sign welded into a skull (the placard: 7 of 9 carriers, every frame) is told apart from an arm that swings through one for a frame' },
 
+  { id: 'calmcards', tier: 'ui', profiles: ['push', 'live'], timeout: 600,
+    cmd: ['node', 'qa/calmcards.mjs', '4177'], verdict: pf,
+    why: 'nothing a child has to read disappears when the phone asks for less motion — every card whose animation IS its visibility keeps its full run under prefers-reduced-motion (before: all four at 0ms), measured by walking the card\'s own timeline rather than watching wall-clock frames' },
+
   { id: 'navtap', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 600,
     cmd: ['node', 'qa/navtap.mjs', '4177'], verdict: pf,
     why: 'every control on the front door clears 44x44, no label is cut off inside its own button at 375pt, and the door to the worlds is not smaller than the trophy shelf (the owner: "it\'s basic and over complicated for navigation")' },

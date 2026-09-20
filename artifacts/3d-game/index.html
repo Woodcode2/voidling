@@ -2834,6 +2834,53 @@
           transition-duration: 0.01ms !important;
           scroll-behavior: auto !important;
         }
+
+        /* ── AND THE FOUR THE CATCH-ALL ABOVE WAS DELETING ─────────────────
+           MEASURED (qa/calmcards.mjs), in visible milliseconds over the same
+           1.6s window, with the OS setting off and on:
+
+             #banner     1,083ms  ->  0ms
+             #evolve     1,300ms  ->  0ms
+             #titlecard    483ms  ->  0ms
+             #news          (same shape; the probe could not stage it)
+
+           These four are not decorations on a visible element: THEIR ANIMATION
+           IS THEIR VISIBILITY. Each sits at opacity 0 in its base rule, each
+           runs `forwards`, and nothing in the JS removes `.show` on a timer —
+           the final keyframe at opacity 0 is what takes the card off screen. So
+           `animation-duration: 0.01ms` does not calm them down, it shows and
+           hides them between two paints. A child whose parent turned on Reduce
+           Motion — for motion sickness, for migraine, or just because the phone
+           feels calmer — never saw an evolution, a beat, or a level's name.
+
+           Reduce Motion means DO NOT MOVE IT. It has never meant do not show
+           it, and iOS's own Human Interface Guidelines say so in as many words.
+
+           The treatment is the one this sheet already invented for the in-game
+           BIG MOTION toggle twenty lines below: same duration, same easing,
+           same opacity envelope, and drop only the transform — which is the
+           part the setting is actually about. Those twins are reused where they
+           exist rather than a second pair being written to drift from them.
+
+           SPECIFICITY IS WHY THIS WORKS. Both these rules and the catch-all are
+           `!important`, so the more specific selector wins: (1,1,0) for
+           `#evolve.show` against (0,0,0) for `*`. The `body.calm` variants are
+           listed too — a player can have BIG MOTION off AND the OS setting on,
+           and `body.calm #evolve.show` at (1,2,0) would otherwise outrank the
+           repair. */
+        @keyframes bnrStill {
+          0% { opacity: 0; } 14% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; }
+        }
+        @keyframes goalStill {
+          0% { opacity: 0; } 19.5% { opacity: 1; } 83.3% { opacity: 1; } 100% { opacity: 0; }
+        }
+        #banner.show { animation: bnrStill 2.4s ease forwards !important; }
+        #evolve.show, body.calm #evolve.show { animation: evCalm 1.8s ease forwards !important; }
+        #news.show, #news.panic.show, body.calm #news.show {
+          animation: newsCalm 5.6s ease forwards !important; }
+        #titlecard.show { animation: goalStill 0.60s ease forwards !important; }
+        #titlecard.show .lvl, #titlecard.show .name, #titlecard.show .sub {
+          animation: goalInk 0.60s ease forwards !important; }
       }
     </style>
   </head>
