@@ -889,8 +889,14 @@
          never see it. 200px floors the door at 8,800px^2 on every world.
          The probe now sweeps the shortest and longest names too; do not remove
          this line to tidy up. */
+      /* FULL WIDTH, WHICH IS WHAT FINALLY MAKES BAR (c) IMMUNE. The min-width
+         floor was sized against a FOUR-cell dock; with two cells each one is
+         half the row and no fixed pill can stay ahead of it. A plaque that
+         spans its own card is 295x48 at 375pt against 172x75 for a nav cell —
+         ahead at every width, and no longer sized by how many letters the
+         world's name happens to have. */
       #menu #worldSwitch { display: flex; align-items: center; justify-content: center; gap: 7px;
-        min-height: 44px; min-width: 200px; padding: 0 18px; border-radius: 999px; cursor: pointer; color: #e7dcff;
+        width: 100%; min-height: 48px; padding: 0 18px; border-radius: 16px; cursor: pointer; color: #e7dcff;
         background: rgba(184, 117, 255, 0.15);
         border: 1.5px solid rgba(184, 117, 255, 0.40);
         box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.10); }
@@ -2423,7 +2429,11 @@
 
          The cells keep their own hit areas — 85.7 x 61 at 375pt, 105 x 61 at
          430 — so nothing here costs a tap target (qa/navtap.mjs bar a). */
-      .navRow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-top: 14px;
+      /* TWO DOORS. The four cells were SCRAPBOOK, SHOP, TROPHIES and TOP VOIDS;
+         three of them asked the same question — what have I got — and are one
+         profile now. What is left is the two that are genuinely different:
+         what is mine, and what I could have. */
+      .navRow { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0; margin-top: 14px;
         width: 100%; max-width: 420px; margin-inline: auto;
         border-radius: 22px; overflow: hidden;
         background: rgba(18, 9, 38, 0.72); backdrop-filter: blur(9px);
@@ -2551,6 +2561,40 @@
          uses env(safe-area-inset-top) — so on an iPhone 15 Pro the BACK button
          on WORLDS, TROPHIES and TOP VOIDS sat 33pt above the safe area, behind
          the Dynamic Island. An omission, not a decision. */
+      /* ── MY VOID · the profile ────────────────────────────────────────
+         One screen where there were three. Every pane inside it keeps the id
+         and the `.show` semantics it had as a full-screen overlay, so the
+         renderers and the probes that watch them did not have to change. */
+      #profHero { display: flex; align-items: center; justify-content: center; gap: 16px;
+        width: min(660px, 94vw); margin: 4px auto 14px; }
+      #profFace { width: 84px; height: 84px; flex: none; filter: drop-shadow(0 6px 16px rgba(0,0,0,0.5)); }
+      #profFace svg { display: block; width: 100%; height: 100%; }
+      #profWho { display: flex; align-items: center; gap: 12px; }
+      /* the rank chip was centred under a title on its own screen; here it sits
+         beside the face, which is what it is about */
+      #profile #rankChip { margin: 0; }
+      #profile #btnDaily { position: static; width: 44px; height: 44px; flex: none;
+        border: 0; border-radius: 13px; background: rgba(255,255,255,0.10); }
+      #profile #btnDaily svg { display: block; width: 24px; height: 24px; margin: 0 auto; }
+      /* ── THE THREE TABS ── icon over word, because the word is the parent's */
+      .profTabs { display: flex; gap: 8px; width: min(660px, 94vw); margin: 0 auto 16px; }
+      .profTab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+        min-height: 56px; padding: 8px 4px 9px; border: 0; border-radius: var(--r-sm);
+        font-family: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+        white-space: nowrap; cursor: pointer; color: #b9a8e0;
+        background: rgba(255,255,255,0.06); }
+      .profTab svg { display: block; width: 22px; height: 22px; opacity: 0.72; }
+      .profTab.on { color: #fff; background: linear-gradient(180deg, #7a4fe0, #5a2fc0);
+        box-shadow: inset 0 1.5px 0 rgba(255,255,255,0.18); }
+      .profTab.on svg { opacity: 1; }
+      .profTab:active { transform: translateY(2px); }
+      .profBody { width: 100%; display: flex; flex-direction: column; align-items: center; }
+      .profBody > div { display: none; width: 100%; }
+      .profBody > div.show { display: flex; flex-direction: column; align-items: center; }
+      /* #book was a fixed full-screen overlay of its own; inside the profile it
+         is a pane, and its own positioning and backdrop have to stand down */
+      .profBody > #book { position: static; inset: auto; z-index: auto;
+        background: none; padding: 0; }
       .metaScr { position: fixed; inset: 0; z-index: 11; display: none; flex-direction: column; align-items: center;
         background: #0d0821; backdrop-filter: blur(8px);
         padding-top: calc(env(safe-area-inset-top) + 26px);
@@ -3087,6 +3131,19 @@
         <rect fill="#ffd25a" x="10.5" y="6.6" width="3" height="14.2"/>
         <path fill="#ffd25a" d="M12 7.1C10.2 3.4 5.6 2.8 5.6 5.4c0 1.7 3.2 2.1 6.4 1.7zM12 7.1c1.8-3.7 6.4-4.3 6.4-1.7 0 1.7-3.2 2.1-6.4 1.7z"/>
       </symbol>
+      <!-- MY VOID — the profile's own face, at icon size. Same two-eyed read as
+           the portrait inside it, so the cell and the screen are the same thing. -->
+      <radialGradient id="icvg" cx="36%" cy="30%">
+        <stop offset="0%" stop-color="#a562f2"/><stop offset="60%" stop-color="#6b2fbe"/>
+        <stop offset="100%" stop-color="#2d1050"/>
+      </radialGradient>
+      <symbol id="ic-void" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10" fill="url(#icvg)"/>
+        <circle cx="9" cy="10.6" r="3" fill="#fff"/><circle cx="15" cy="10.6" r="3" fill="#fff"/>
+        <circle cx="9.4" cy="11" r="1.7" fill="#160a30"/><circle cx="15.4" cy="11" r="1.7" fill="#160a30"/>
+        <circle cx="8.6" cy="10.1" r="0.7" fill="#fff"/><circle cx="14.6" cy="10.1" r="0.7" fill="#fff"/>
+        <path d="M9.4 15.6q2.6 2.2 5.2 0" stroke="#1a0b33" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      </symbol>
       <!-- THE CHEVRON on the world switcher. currentColor so one symbol serves
            the switcher, the end card's MY NUMBERS and anything else later. -->
       <symbol id="ic-chev" viewBox="0 0 24 24">
@@ -3194,26 +3251,6 @@
            #loadScr .lName, so deleting it would strip the load screen's line
            too; only the markup goes. -->
       <div class="spacer"></div>
-      <div id="menuOrb"><svg viewBox="0 0 200 200" width="100%" height="100%">
-        <defs>
-          <radialGradient id="mvg" cx="38%" cy="32%">
-            <stop offset="0%" stop-color="#a562f2"/><stop offset="34%" stop-color="#7030c0"/>
-            <stop offset="72%" stop-color="#431677"/><stop offset="100%" stop-color="#1c0930"/>
-          </radialGradient>
-          <radialGradient id="mglow" cx="50%" cy="50%">
-            <stop offset="55%" stop-color="rgba(184,117,255,0)"/><stop offset="78%" stop-color="rgba(184,117,255,0.35)"/><stop offset="100%" stop-color="rgba(184,117,255,0)"/>
-          </radialGradient>
-        </defs>
-        <circle cx="100" cy="100" r="99" fill="url(#mglow)"/>
-        <circle cx="100" cy="100" r="76" fill="url(#mvg)"/>
-        <circle cx="74" cy="66" r="9" fill="#ffffff" opacity="0.35"/>
-        <circle cx="82" cy="92" r="17" fill="#fff"/><circle cx="120" cy="92" r="17" fill="#fff"/>
-        <circle cx="85" cy="95" r="9.5" fill="#160a30"/><circle cx="123" cy="95" r="9.5" fill="#160a30"/>
-        <circle cx="82" cy="90" r="3.6" fill="#fff"/><circle cx="120" cy="90" r="3.6" fill="#fff"/>
-        <ellipse cx="62" cy="114" rx="10" ry="6.5" fill="#ff7da8" opacity="0.65"/>
-        <ellipse cx="140" cy="114" rx="10" ry="6.5" fill="#ff7da8" opacity="0.65"/>
-        <path d="M87 122 Q101 136 115 122" stroke="#1a0b33" stroke-width="5.5" fill="none" stroke-linecap="round"/>
-      </svg></div>
       <!-- ── HER LADDER, ON THE FIRST SCREEN ──────────────────────────────
            The owner's ask, in his words: "like hole.io we see them right but
            they're locked and as we progress they unlock like angry birds as
@@ -3242,22 +3279,95 @@
       </div>
       <button id="btnPlay">PLAY</button>
       <div class="navRow">
-        <button class="navCard" id="btnBook"><i><svg viewBox="0 0 24 24"><use href="#ic-book"/></svg></i>SCRAPBOOK<em id="bookCount"></em></button>
+        <button class="navCard" id="btnBook"><i><svg viewBox="0 0 24 24"><use href="#ic-void"/></svg></i>MY VOID<em id="bookCount"></em></button>
         <button class="navCard" id="btnShop"><i><svg viewBox="0 0 24 24"><use href="#ic-bag"/></svg></i>SHOP</button>
-        <button class="navCard" id="btnTrophies"><i><svg viewBox="0 0 24 24"><use href="#ic-cup"/></svg></i>TROPHIES</button>
-        <button class="navCard" id="btnTop"><i><svg viewBox="0 0 24 24"><use href="#ic-crown"/></svg></i>TOP VOIDS</button>
       </div>
       <button id="btnSettings" title="settings" aria-label="settings"><svg viewBox="0 0 24 24"><use href="#ic-gear"/></svg></button>
       <button id="gift" title="free gift!" aria-label="free gift"><svg viewBox="0 0 24 24"><use href="#ic-gift"/></svg></button>
     </div>
 
-    <!-- ── THE SCRAPBOOK ── every hidden thing, found and not yet found ── -->
-    <div id="book">
-      <div class="bkHd">SCRAPBOOK<button id="btnDaily" title="the calendar" aria-label="the calendar"><svg viewBox="0 0 24 24"><use href="#ic-gift"/></svg></button><button id="bookClose">✕</button></div>
-      <div class="bkTabs" id="bookTabs"></div>
-      <div class="bkGrid" id="bookGrid"></div>
-      <div class="bkFoot" id="bookFoot"></div>
+    <!-- ── MY VOID · the profile ─────────────────────────────────────────
+         The owner, choosing this over the three options I offered: "I feel
+         like sticker and trophies are kinda like the same thing right. Could
+         we relabel into one like something Xbox would do? It's like in your
+         gamer profile."
+
+         He is right, and the evidence is in what the three screens were. The
+         scrapbook said "here is what you have found", the trophy shelf said
+         "here is what you have earned" and TOP VOIDS said "here is where you
+         stand" — three full-screen overlays, three ways of asking the same
+         question, each with its own header and its own back button, and three
+         of the four cells on the front door pointing at them.
+
+         An Xbox profile answers all three in one place, under your own face.
+         So this screen is one header, one portrait, one rank bar, and three
+         tabs — and every id inside it is the id it had before, because the
+         renderers (openBook, renderTrophies, renderTop, renderRank) are good
+         and did not need rewriting. The ELEMENTS moved; the code that fills
+         them did not. #book, #trophies and #topvoids even keep their `.show`
+         semantics, so a probe that clicks TROPHIES and waits for #trophies.show
+         still means what it meant.
+
+         THE CALENDAR CAME WITH IT. #btnDaily lived in the scrapbook's header
+         and is the only route to the daily calendar in the entire app; it is
+         in this header now, on the other side of the title from the way out,
+         which is where it was. -->
+    <div id="profile" class="metaScr">
+      <div class="shopHead">
+        <button class="backBtn" data-close="profile">‹ BACK</button>
+        <div class="shopTitle">MY VOID</div>
+      </div>
+      <div id="profHero">
+        <!-- the gamerpic. This is #menuOrb's face, which had been display:none
+             behind two rules since the poster route landed — twenty lines of
+             hand-drawn SVG that nothing could show. It has a job now. -->
+        <div id="profFace" aria-hidden="true"><svg viewBox="0 0 200 200" width="100%" height="100%">
+        <defs>
+          <radialGradient id="pvg" cx="38%" cy="32%">
+            <stop offset="0%" stop-color="#a562f2"/><stop offset="34%" stop-color="#7030c0"/>
+            <stop offset="72%" stop-color="#431677"/><stop offset="100%" stop-color="#1c0930"/>
+          </radialGradient>
+          <radialGradient id="pglow" cx="50%" cy="50%">
+            <stop offset="55%" stop-color="rgba(184,117,255,0)"/><stop offset="78%" stop-color="rgba(184,117,255,0.35)"/><stop offset="100%" stop-color="rgba(184,117,255,0)"/>
+          </radialGradient>
+        </defs>
+        <circle cx="100" cy="100" r="99" fill="url(#pglow)"/>
+        <circle cx="100" cy="100" r="76" fill="url(#pvg)"/>
+        <circle cx="74" cy="66" r="9" fill="#ffffff" opacity="0.35"/>
+        <circle cx="82" cy="92" r="17" fill="#fff"/><circle cx="120" cy="92" r="17" fill="#fff"/>
+        <circle cx="85" cy="95" r="9.5" fill="#160a30"/><circle cx="123" cy="95" r="9.5" fill="#160a30"/>
+        <circle cx="82" cy="90" r="3.6" fill="#fff"/><circle cx="120" cy="90" r="3.6" fill="#fff"/>
+        <ellipse cx="62" cy="114" rx="10" ry="6.5" fill="#ff7da8" opacity="0.65"/>
+        <ellipse cx="140" cy="114" rx="10" ry="6.5" fill="#ff7da8" opacity="0.65"/>
+        <path d="M87 122 Q101 136 115 122" stroke="#1a0b33" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+      </svg></div>
+        <div id="profWho">
+          <div id="rankChip"></div>
+          <button id="btnDaily" title="the calendar" aria-label="the calendar"><svg viewBox="0 0 24 24"><use href="#ic-gift"/></svg></button>
+        </div>
+      </div>
+      <div id="statsRow"></div>
+      <div class="profTabs" id="profTabs">
+        <button class="profTab on" data-pane="book" aria-label="stickers"><svg viewBox="0 0 24 24"><use href="#ic-book"/></svg>STICKERS</button>
+        <button class="profTab" data-pane="trophies" aria-label="trophies"><svg viewBox="0 0 24 24"><use href="#ic-cup"/></svg>TROPHIES</button>
+        <button class="profTab" data-pane="topvoids" aria-label="top voids"><svg viewBox="0 0 24 24"><use href="#ic-crown"/></svg>TOP VOIDS</button>
+      </div>
+      <div class="profBody">
+        <div id="book" class="show">
+          <div class="bkTabs" id="bookTabs"></div>
+          <div class="bkGrid" id="bookGrid"></div>
+          <div class="bkFoot" id="bookFoot"></div>
+        </div>
+        <div id="trophies">
+          <div id="trophyCount"></div>
+          <div id="trophyGrid"></div>
+        </div>
+        <div id="topvoids">
+          <div id="topList"></div>
+        </div>
+      </div>
     </div>
+
 
     <!-- ── settings: sound toggle + about (App Store expects both) ── -->
     <div id="settings">
@@ -3422,26 +3532,7 @@
       <div class="lTip">Waking up…</div>
     </div>
 
-    <!-- ── trophies ── -->
-    <div id="trophies" class="metaScr">
-      <div class="shopHead">
-        <button class="backBtn" data-close="trophies">‹ BACK</button>
-        <div class="shopTitle">TROPHIES</div>
-      </div>
-      <div id="rankChip"></div>
-      <div id="statsRow"></div>
-      <div id="trophyCount"></div>
-      <div id="trophyGrid"></div>
-    </div>
 
-    <!-- ── top voids of the week ── -->
-    <div id="topvoids" class="metaScr">
-      <div class="shopHead">
-        <button class="backBtn" data-close="topvoids">‹ BACK</button>
-        <div class="shopTitle">TOP VOIDS · THIS WEEK</div>
-      </div>
-      <div id="topList"></div>
-    </div>
 
     <!-- ── shop ── -->
     <div id="shop">

@@ -10058,12 +10058,41 @@ function renderBook(): void {
   const f = foundCount(), t = totalCount();
   foot.textContent = f === t ? 'EVERY LAST ONE. Goodness.' : `${f} of ${t} found`;
 }
-function openBook(): void {
+// ── MY VOID ─────────────────────────────────────────────────────────────────
+// The scrapbook, the trophy shelf and the weekly board were three full-screen
+// overlays asking one question three ways — what have I found, what have I
+// earned, where do I stand — and three of the four cells on the front door
+// pointed at them. They are three tabs of one profile now (index.html
+// #profile), which is the shape the owner asked for: "like something Xbox
+// would do. It's like in your gamer profile."
+//
+// EVERY RENDERER IS UNTOUCHED. The panes kept their ids AND their `.show`
+// semantics, so renderBook/renderTrophies/renderTop still fill the same
+// elements and `#trophies.show` still means the trophies are on screen. All
+// this function does is decide which pane is up.
+const PROF_PANES = ['book', 'trophies', 'topvoids'] as const;
+type ProfPane = typeof PROF_PANES[number];
+function openProfile(pane: ProfPane = 'book'): void {
+  // every tab is painted on open, not on first tap: the three are cheap, the
+  // profile is opened from a cold menu, and a tab that renders on tap shows an
+  // empty box for a frame on the one screen that is about what you own.
   bookWorld = pickedWorld; renderBook();
-  el('book').classList.add('show');
+  renderRank(); renderTrophies(); renderTop();
+  for (const id of PROF_PANES) el(id).classList.toggle('show', id === pane);
+  document.querySelectorAll('.profTab').forEach((t) => {
+    t.classList.toggle('on', (t as HTMLElement).dataset.pane === pane);
+  });
+  el('profile').classList.add('show');
 }
-el('btnBook')?.addEventListener('click', () => { openBook(); track('book_open', { found: foundCount() }); });
-el('bookClose')?.addEventListener('click', () => el('book').classList.remove('show'));
+document.querySelectorAll('.profTab').forEach((t) => t.addEventListener('click', () => {
+  const pane = ((t as HTMLElement).dataset.pane || 'book') as ProfPane;
+  track('profile_tab', { pane });
+  openProfile(pane);
+}));
+/** Kept as the scrapbook's own door — endMatch and the sticker card both use
+ *  it, and it is a tab of the profile now rather than a screen of its own. */
+function openBook(): void { openProfile('book'); }
+el('btnBook')?.addEventListener('click', () => { openProfile('book'); track('book_open', { found: foundCount() }); });
 /** the menu chip's own count, refreshed whenever the menu is shown */
 function paintBookChip(): void {
   const e = document.getElementById('bookCount');
@@ -10936,7 +10965,7 @@ function renderTrophies() {
   }).join('');
   el('trophyCount').textContent = `${got} / ${TROPHIES.length} EARNED`;
 }
-el('btnTrophies').addEventListener('click', () => { renderRank(); renderTrophies(); el('trophies').classList.add('show'); });
+el('btnTrophies')?.addEventListener('click', () => openProfile('trophies'));
 
 // ── top voids of the week (local weekly board, seeded with the family) ──────
 function weekKey() { const d = new Date(); const on = new Date(d.getFullYear(), 0, 1); return `voidWeek-${d.getFullYear()}-${Math.ceil((((d.getTime() - on.getTime()) / 86400000) + on.getDay() + 1) / 7)}`; }
@@ -10982,7 +11011,7 @@ function renderTop() {
   el('topList').innerHTML = weeklyBoard().map((r, i) =>
     `<div class="tv ${r.me ? 'me' : ''}"><span class="rk">${medals[i] || i + 1}</span><span class="dot2" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm2">${r.name}</span><span class="sc2">${r.score}</span></div>`).join('');
 }
-el('btnTop').addEventListener('click', () => { renderTop(); el('topvoids').classList.add('show'); });
+el('btnTop')?.addEventListener('click', () => openProfile('topvoids'));
 
 // ── menu gift box RETIRED — the daily calendar owns login rewards now ──
 if (false) {
