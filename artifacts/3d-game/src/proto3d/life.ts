@@ -914,9 +914,28 @@ function propParts(out: Geo[], kind: Prop, s: number, col?: number): void {
   // so a protest, a rally and a heckler all read at any camera height. The
   // colour is passed in through `propCol` — that is where the ribbon lives.
   } else if (kind === 'placard') {
-    out.push(pc(B.tube, 0xb9793f, 0, -0.30 * s, 0.30 * s, 0.075 * s, 2.30 * s, 0.075 * s));
-    out.push(pc(B.box, _propCol, 0, 0.90 * s, 0.30 * s, 1.35 * s, 1.00 * s, 0.07 * s));
-    out.push(pc(B.box, WHITE, 0, 0.90 * s, 0.36 * s, 1.05 * s, 0.62 * s, 0.05 * s));   // the lettering slab
+    // ── THE PANEL WAS WELDED THROUGH THE CARRIER'S OWN HEAD ─────────────────
+    // It hung at z = 0.30*s with a 0.035 half-depth, and the skull's z
+    // half-depth is 0.495 — so the sign was not merely overlapping a bounding
+    // box, it was 0.45 units INSIDE the solid head, on every placard carrier on
+    // every load, in the campaign world. The ellipsoid test at the head's own
+    // centre: (0/0.53)^2 + (0/0.56)^2 + (0.308/0.495)^2 = 0.387, well under 1.
+    //
+    // A sign is held OUT IN FRONT, so the pole tips forward and the panel hangs
+    // off its top. The tilt is not a guess: the pole is 2.30*s long and its
+    // bottom must stay in the hand, which is at (0, -1.01*A, 0.115*A) — and s
+    // IS A here, because propParts is called with the arm length. Solving for a
+    // top at z = 0.90*s gives a run of 0.785, a rise of sqrt(2.30^2 - 0.785^2)
+    // = 2.162, a tilt of atan(0.785/2.162) = 0.3483 rad, and a centre at
+    // (0, 0.0709*s, 0.5075*s). The bottom then lands at (0, -1.0100*s,
+    // 0.1150*s) — the hand, to four places. Move the panel without tipping the
+    // pole and the sign is held by nobody.
+    //
+    // The panel clears the skull by 0.370 in z, and it still reads from
+    // overhead, which is the whole reason this prop exists.
+    out.push(pc(B.tube, 0xb9793f, 0, 0.0709 * s, 0.5075 * s, 0.075 * s, 2.30 * s, 0.075 * s, 0.3483));
+    out.push(pc(B.box, _propCol, 0, 0.90 * s, 0.90 * s, 1.35 * s, 1.00 * s, 0.07 * s));
+    out.push(pc(B.box, WHITE, 0, 0.90 * s, 0.96 * s, 1.05 * s, 0.62 * s, 0.05 * s));   // the lettering slab
   } else if (kind === 'leaflets') {
     // a whole ream, held out flat — the campaigner's entire personality
     for (let i = 0; i < 3; i++)
@@ -1362,6 +1381,7 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
     // placard carried in one hand with leaflets in the other
     if (o?.propL && sx < 0) propParts(p, o.propL, A, o.propCol);
     const sh = new THREE.Group(); sh.position.set(sx, bd.shY, 0);
+    sh.name = 'arm';                 // see hd.name — the held prop is welded in here
     sh.add(weld(p)); g.add(sh); arms.push(sh);
   }
 
@@ -1417,6 +1437,13 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
   }
   const hd = new THREE.Group();
   hd.position.y = bd.headY; hd.scale.setScalar(bd.headS);
+  // NAMED so a prop welded into an arm can be checked against it from outside.
+  // A hand prop is merged into the arm's own mesh, so there is no object to
+  // raycast and nothing in the scene graph that says "this sign is inside that
+  // skull" — qa/headclear.mjs transforms the arm's vertices into this group's
+  // space and tests them against the skull ellipsoid. Same reason sclera is
+  // named: a thing that has to be observable from outside gets a name.
+  hd.name = 'head';
   hd.add(weld(hp)); g.add(hd);
 
   if (bd.scale !== 1) g.scale.setScalar(bd.scale);

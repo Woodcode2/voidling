@@ -549,6 +549,10 @@ const SUITE = [
     cmd: ['node', 'qa/formcall.mjs', '4177', 'maple'], verdict: pf,
     why: 'the new form name lands ABOVE his head and never on his face, along the whole 0.8s path and not merely at one instant — swept over the ladder as pure geometry, with one live check that the box it places from is where the camera says he is (the owner: "instead of level up we use the names")' },
 
+  { id: 'headclear', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 900,
+    cmd: ['node', 'qa/headclear.mjs', '4177', 'maple'], verdict: pf,
+    why: 'no hand prop is drawn through its carrier\'s own face — the arm\'s vertices are transformed into the head group\'s space and tested against the skull ellipsoid, twice seconds apart, so a sign welded into a skull (the placard: 7 of 9 carriers, every frame) is told apart from an arm that swings through one for a frame' },
+
   { id: 'peoplefacet', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/peoplefacet.mjs'], verdict: pf,
     why: 'the walking people are curves and not prisms — every part wide enough for a facet to read carries at least the 14 sides island.ts states, measured as the straight edge in screen pixels at the closest the camera ever settles (the owner, twice: "the people in game as like Lego")' },
