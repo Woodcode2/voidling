@@ -1329,6 +1329,42 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // three's opaque sort these flat discs shuffle against each other and
   // against the sphere depending on camera angle — which is how you end up
   // with a pupil hidden behind its own eye white.
+  // ── THE GHOST HAD NO MOUTH ────────────────────────────────────────────────
+  // ghostFace is the x-ray twin: for each face part, a second mesh sharing its
+  // geometry under a GreaterDepth material, so it draws ONLY where something is
+  // in front of him. It is what keeps him readable behind a palm or a shopfront.
+  //
+  // It was built inside the EYE loop, and only ever pushed outline, white and
+  // pupil. So every occluded void in this game — on five of six world menus, and
+  // any time he passes behind a building mid-match — has been a see-through disc
+  // with two flat eyes and NO MOUTH. Team HERO and ART DIRECTION both opened the
+  // same frame: on Pirate Bay's front door he is a lavender bubble with two dead
+  // grey dots and a palm frond drawn through his face. A mascot without a mouth
+  // is not a cute character seen through a tree; it is a different character.
+  //
+  // The twins are made here rather than in the eye loop because the mouth is
+  // assembled over the next two hundred lines — the rim, the maw, the tongue,
+  // the open gape — and a twin made early would miss whichever part came later.
+  // Collected first and attached after, because adding children inside
+  // traverse() walks nodes it just created.
+  {
+    const hosts: THREE.Mesh[] = [];
+    mouth.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh && !m.userData.ghostTwin) hosts.push(m);
+    });
+    for (const host of hosts) {
+      const src = host.material as THREE.MeshBasicMaterial | undefined;
+      if (!src || !src.color) continue;
+      const gm = new THREE.Mesh(host.geometry, ghostEyeMat(0.9, src.color.getHex(), src.map ?? undefined));
+      gm.userData.ghostTwin = true;
+      gm.position.z = 0.001;          // in front of its host, which never writes depth anyway
+      // NO scale copy. The twin is a CHILD of its host, so it already inherits
+      // the maw's 1.34x0.86 and the tongue's 1.5x0.66 — copying them would
+      // apply each stretch twice. The eye loop does not copy them either.
+      host.add(gm); ghostFace.push(gm);
+    }
+  }
   face.traverse((o) => { o.renderOrder += 1; });
   // set last, and absolutely, so the blanket +1 above cannot slide these under
   // the body silhouette (renderOrder 8) they are meant to sit on top of

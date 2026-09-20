@@ -1479,6 +1479,35 @@ function paintMenuArt(id: string): void {
 
 /** Put the camera on this world's stage and the void in front of it. Idempotent:
  *  every path back to the menu calls it, and several of them call it twice. */
+/** ── THE MENU HERO DRAWS IN FRONT ─────────────────────────────────────────
+ *  On the menu he stands on a stage chosen for how it PHOTOGRAPHS, which puts
+ *  real world geometry between him and the camera — a palm on Pirate Bay, a
+ *  shopfront on the night market, a tree and a walking extra on Maple. The
+ *  depth test then hands most of him to the x-ray silhouette, and the front
+ *  door of the game shows a see-through bubble with a signboard legible inside
+ *  his belly. ART DIRECTION, HERO, UI and CHOREOGRAPHY each filed it, and each
+ *  opened the same frame to do it.
+ *
+ *  This was written, measured and photographed working (qa/out/menufix/) and
+ *  then left reachable only from the debug API, so the shipped menu never got
+ *  it. It costs nothing — no draw call, no triangle, no material, no seeded
+ *  draw — it is three property writes per mesh on a group that is already one
+ *  draw path.
+ *
+ *  ONLY ON THE MENU. In a match the x-ray silhouette is the correct behaviour
+ *  and is what tells a child where she is behind a building, so leaveMenu()
+ *  puts every one of these back. */
+function setMenuFront(on: boolean): void {
+  voidling.group.traverse((o: THREE.Object3D) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    if (m.name === 'occludedSilhouette') { m.visible = !on; return; }
+    const mat = m.material as THREE.Material | THREE.Material[];
+    for (const x of Array.isArray(mat) ? mat : [mat]) { if (x) x.depthTest = !on; }
+    m.renderOrder = on ? 20 : 0;
+  });
+}
+
 function enterMenu(): void {
   const st = (menuStage ??= deriveStage());
   if (!menuMode) menuT = 0;
@@ -1545,6 +1574,8 @@ function enterMenu(): void {
   document.body.classList.toggle('island', DIORAMA);
   paintMenuArt(pickedWorld);
   paintMenuLadder();
+  // last, so it runs over the group as the stage left it
+  setMenuFront(true);
 }
 
 /** Hand the camera back to the match. Called before a world is played. */
@@ -1552,6 +1583,9 @@ function leaveMenu(): void {
   if (!menuMode) return;
   menuMode = false;
   stageCam = null;
+  // …AND HIS DEPTH TEST. The menu draws him in front of the world; a match must
+  // not, or he would show through every building he passes behind.
+  setMenuFront(false);
   // ── THE MENU PUTS EVERYTHING BACK ────────────────────────────────────────
   // HIS PLAY SIZE. The menu scales him to the stage so he reads as a character
   // at eighty units; without this the match begins with a void the size of a
@@ -3852,17 +3886,9 @@ _dbg.__dioDist = (d: number | null): number => {
   if (menuMode) enterMenu();
   return dioDistOverride ?? -1;
 };
-_dbg.__menuFront = (on: boolean): boolean => {
-  voidling.group.traverse((o: THREE.Object3D) => {
-    const m = o as THREE.Mesh;
-    if (!m.isMesh) return;
-    if (m.name === 'occludedSilhouette') { m.visible = !on; return; }
-    const mat = m.material as THREE.Material | THREE.Material[];
-    for (const x of Array.isArray(mat) ? mat : [mat]) { if (x) x.depthTest = !on; }
-    m.renderOrder = on ? 20 : 0;
-  });
-  return on;
-};
+// the shipped menu now does this itself in enterMenu(); the hook stays so a
+// probe can turn it OFF and photograph the difference
+_dbg.__menuFront = (on: boolean): boolean => { setMenuFront(on); return on; };
 _dbg.__menuMark = (s: number | null, lat?: number): number => {
   markOverride = (s === null || s === undefined) ? null : +s;
   latOverride = lat === undefined || lat === null ? 0 : +lat;
