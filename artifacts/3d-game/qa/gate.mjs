@@ -553,6 +553,10 @@ const SUITE = [
     cmd: ['node', 'qa/headclear.mjs', '4177', 'maple'], verdict: pf,
     why: 'no hand prop is drawn through its carrier\'s own face — the arm\'s vertices are transformed into the head group\'s space and tested against the skull ellipsoid, twice seconds apart, so a sign welded into a skull (the placard: 7 of 9 carriers, every frame) is told apart from an arm that swings through one for a frame' },
 
+  { id: 'navtap', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 600,
+    cmd: ['node', 'qa/navtap.mjs', '4177'], verdict: pf,
+    why: 'every control on the front door clears 44x44, no label is cut off inside its own button at 375pt, and the door to the worlds is not smaller than the trophy shelf (the owner: "it\'s basic and over complicated for navigation")' },
+
   { id: 'peoplefacet', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/peoplefacet.mjs'], verdict: pf,
     why: 'the walking people are curves and not prisms — every part wide enough for a facet to read carries at least the 14 sides island.ts states, measured as the straight edge in screen pixels at the closest the camera ever settles (the owner, twice: "the people in game as like Lego")' },

@@ -9379,8 +9379,11 @@ el('btnPlay').addEventListener('click', () => {
   playingGoal = g;
   startFresh(false);
 });
-// the world's name IS the door to the picker
-document.getElementById('mlWorld')?.addEventListener('click', () => {
+// the world's name IS the door to the picker — and it is a BUTTON now, not the
+// bare label. #mlWorld measured 144.8 x 19 at every phone width (qa/navtap.mjs),
+// under half the 44px minimum, so the listener moved out to the pill around it;
+// the label keeps its id because paintLadder writes textContent onto it.
+document.getElementById('worldSwitch')?.addEventListener('click', () => {
   track('worlds_open', { from: pickedWorld });
   el('worlds').classList.add('show');
 });

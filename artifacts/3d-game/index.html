@@ -858,9 +858,31 @@
         background: rgba(18, 9, 38, 0.72); backdrop-filter: blur(9px);
         border: 1.5px solid rgba(184, 117, 255, 0.28);
         box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); }
-      #mlWorld { font-size: 12px; font-weight: 700; letter-spacing: 3px; color: #cbb6f5;
-        cursor: pointer; padding: 2px 10px; border-radius: 999px; }
-      #mlWorld::after { content: ' ▾'; opacity: 0.65; }
+      /* ── THE DOOR TO EVERY WORLD WAS 19 PIXELS TALL ────────────────────
+         MEASURED (qa/navtap.mjs), at 375, 390 and 430pt alike: #mlWorld came
+         out 144.8 x 19 — 2,752px^2 — against 6,061 to 7,106 for each of the
+         four nav cards under PLAY. So the control that chooses which island a
+         child plays was less than half the height Apple has named as the
+         minimum touch target since 2013, and 2.2x SMALLER than the button that
+         opens the trophy shelf. Every screen teaches a child what matters by
+         what is big, and this one was saying the leaderboard.
+
+         It is a BUTTON now, with the chevron drawn inside it rather than
+         hung off ::after as a ' ▾' the bundled font does not carry. The label
+         keeps its own id because prototype3d.ts writes textContent straight
+         onto it (paintLadder) and reads it back for the end card — a chevron
+         parked in that element would be erased by the next repaint, and the
+         first thing anybody would try is putting it back. */
+      #menu #worldSwitch { display: flex; align-items: center; justify-content: center; gap: 7px;
+        min-height: 44px; padding: 0 18px; border-radius: 999px; cursor: pointer; color: #e7dcff;
+        background: rgba(184, 117, 255, 0.15);
+        border: 1.5px solid rgba(184, 117, 255, 0.40);
+        box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.10); }
+      #menu #worldSwitch:active { transform: translateY(1px); background: rgba(184, 117, 255, 0.26); }
+      #worldSwitch .chev { width: 15px; height: 15px; flex: none; opacity: 0.85; }
+      /* letter-spacing puts a 3px gap AFTER the last letter too, which walks
+         the word left of centre in a flex row. Pulled back by exactly that. */
+      #mlWorld { font-size: 13px; font-weight: 700; letter-spacing: 3px; margin-right: -3px; color: #e7dcff; }
       /* ── THE LADDER'S PIPS ARE OBJECTS, NOT HAIRLINES ──────────────────
          Scoped to #mlPips ON PURPOSE. .pipDot is shared with the end card (34px)
          and the world card (18px), and a 4px plinth that reads as a button at
@@ -2267,14 +2289,62 @@
          four-up grid with the padding moved to the vertical axis fits every
          label at 430 and stays centred on a tablet, where max-width keeps the
          cards from stretching into slabs. */
-      .navRow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px;
-        width: 100%; max-width: 420px; margin-inline: auto; }
-      .navCard { font-size: 12px; font-weight: 700; letter-spacing: 0.6px; padding: 10px 4px; border-radius: var(--r-sm);
+      /* ── ONE DOCK, NOT FOUR CARDS ──────────────────────────────────────
+         The owner, on a recording of this screen: "It's basic and over
+         complicated for navigation." Looked at rather than described, the
+         front door below the art was FOUR full-width bands of the same dark
+         panel, the same corner radius and the same plinth — the season ribbon,
+         the ladder card, PLAY, and then four more rectangles in a row. Nothing
+         told the eye which one to look at first, and four of the six things
+         competing with PLAY were places to go AFTER a match.
+
+         The fix is not height, it is COUNT. Four rectangles become one dock in
+         exactly the material the ladder card above it already uses, with a
+         hairline between the cells: the screen now carries two surfaces and one
+         button instead of seven objects. It also gives 15px back to the island,
+         which is the thing the owner said was magic.
+
+         The cells keep their own hit areas — 85.7 x 61 at 375pt, 105 x 61 at
+         430 — so nothing here costs a tap target (qa/navtap.mjs bar a). */
+      .navRow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-top: 14px;
+        width: 100%; max-width: 420px; margin-inline: auto;
+        border-radius: 22px; overflow: hidden;
+        background: rgba(18, 9, 38, 0.72); backdrop-filter: blur(9px);
+        border: 1.5px solid rgba(184, 117, 255, 0.24);
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); }
+      /* ── SCRAPBOOK DID NOT FIT, BY 1.8 PIXELS ──────────────────────────
+         MEASURED with a Range over the text node (qa/navtap.mjs), because
+         scrollWidth is an integer and rounds a 1.8px overflow away: at 375pt
+         the word needed 73.8px and the card's content box is 72. So the
+         headline feature of this whole pass rendered as SCRAPBO… on the
+         narrowest phone still sold, and qa/navfit.mjs could not see it — that
+         probe asks whether the CARD is on screen, and it was, at 100%.
+
+         11px with 0.3px of tracking brings it to 65.0px in 72, which holds at
+         every width with 7px to spare. The label can afford to shrink now: the
+         icon above it carries the meaning for the child who cannot read the
+         word at all, which is most of them. */
+      .navCard { font-size: 11px; font-weight: 700; letter-spacing: 0.3px; padding: 9px 4px 10px;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        background: var(--panel); border: 2px solid var(--edge); border-top-color: var(--rim);
-        box-shadow: inset 0 1.5px 0 var(--rim), 0 4px 0 #150a2c, 0 7px 14px rgba(0,0,0,0.35); }
-      .navCard i { display: block; font-style: normal; font-size: 20px; margin-bottom: 3px; }
-      .navCard:active { transform: translateY(2px); box-shadow: inset 0 1.5px 0 var(--rim), 0 2px 0 #150a2c; }
+        background: none; border: none; border-radius: 0; box-shadow: none; }
+      /* the hairline between cells, drawn INSIDE so the dock's rounded corners
+         are never crossed by a divider */
+      .navCard + .navCard { box-shadow: inset 1.5px 0 0 rgba(184, 117, 255, 0.16); }
+      /* ── THE ICON SHEET, AND WHY IT IS NOT display:none ────────────────
+         Safari will not render a <use> whose <symbol> lives inside a
+         display:none subtree; it has to be in the layout and merely have no
+         size. `position: absolute` also keeps it from opening a line box at
+         the top of <body>. */
+      #iconsheet { position: absolute; width: 0; height: 0; overflow: hidden; }
+      /* one box for every drawn icon, so the four nav cards, the gear and the
+         gift are optically the same size whatever their artwork does */
+      .navCard i { display: block; font-style: normal; width: 24px; height: 24px; margin: 0 auto 4px; }
+      .navCard i svg, #btnSettings svg, #gift svg { display: block; width: 100%; height: 100%; }
+      #btnSettings svg { width: 22px; height: 22px; margin: 0 auto; color: #cbb8ee; }
+      #gift svg { width: 34px; height: 34px; }
+      /* a cell in a dock does not have a plinth to sink into, so the press
+         lights the cell instead of moving it */
+      .navCard:active { background: rgba(184, 117, 255, 0.20); }
       #menu .foot { margin-top: 18px; font-size: 12px; font-weight: 600; letter-spacing: 1px; color: #cbb8ee;
         text-shadow: 0 1px 4px rgba(0,0,0,0.7); }
       /* rank chip under the logo */
@@ -2768,6 +2838,88 @@
     </style>
   </head>
   <body class="menu">
+    <!-- ── THE ICON SHEET ──────────────────────────────────────────────────
+         Every picture on the front door used to be a system emoji: 📗 🛍️ 🏆 👑
+         on the four nav cards, ⚙️ on settings, 🎁 on the gift. Three problems,
+         and the first is the one that shows in a screenshot.
+
+         1 · IT IS SOMEBODY ELSE'S ART. Apple's emoji are glossy, highlit,
+             beautifully drawn and nothing like this game. Four of them in a row
+             under a flat-shaded 3D island read as stickers on a window.
+         2 · IT IS NOT THE SAME ART TWICE. The same four characters are a
+             different drawing on Android, on Windows and in every browser's
+             fallback chain, so the one row of the menu nobody can read the
+             words of is also the one row whose pictures are not ours.
+         3 · THE THIN ONES ARE NOT EVEN COLOUR. ✦ → ▾ ✕ fall outside every
+             Fredoka subset the build ships, so the browser walks its fallback
+             list and lands on the system UI face — a different typeface, at a
+             different weight, inside our own buttons.
+
+         So they are drawn here instead, once, as <symbol>s in the game's own
+         palette, and referenced with <use>. Inline rather than a sprite file
+         because a <use href="#id"> across documents needs a fetch, and the one
+         thing the front door cannot afford is a second round trip before the
+         first paint. Hidden with `position: absolute; width: 0` rather than
+         `display: none` — Safari will not render a <use> of a symbol inside a
+         display:none root.
+         Every icon is a 24x24 box with a 1.5px margin, so they optically match
+         at any size. -->
+    <svg id="iconsheet" aria-hidden="true" focusable="false"><defs>
+      <!-- SCRAPBOOK — a album, cover and pages, with the star it awards -->
+      <symbol id="ic-book" viewBox="0 0 24 24">
+        <path fill="#2f9e54" d="M4.4 5.4A2.4 2.4 0 0 1 6.8 3H19a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6.8a2.4 2.4 0 0 1-2.4-2.4z"/>
+        <path fill="#3fc46a" d="M7.6 3H19a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H7.6z"/>
+        <path fill="#eaf7ee" d="M4.4 18.2h3.2V21H6.8a2.4 2.4 0 0 1-2.4-2.4z"/>
+        <path fill="#ffd25a" d="M13.8 7.7l1.35 2.74 3.02.44-2.18 2.13.51 3.01-2.7-1.42-2.7 1.42.51-3.01-2.18-2.13 3.02-.44z"/>
+      </symbol>
+      <!-- SHOP — two bags, because one bag at 20px is a bucket -->
+      <symbol id="ic-bag" viewBox="0 0 24 24">
+        <path fill="#b875ff" d="M3.4 8.8h8.2l-.72 11.3a1.1 1.1 0 0 1-1.1 1.03H5.22a1.1 1.1 0 0 1-1.1-1.03z"/>
+        <path fill="none" stroke="#e6d2ff" stroke-width="1.5" stroke-linecap="round" d="M5.9 8.8V7.2a1.6 1.6 0 0 1 3.2 0v1.6"/>
+        <path fill="#ff7aa8" d="M11.2 6.4h9.4l-.8 13.7a1.1 1.1 0 0 1-1.1 1.03h-5.6a1.1 1.1 0 0 1-1.1-1.03z"/>
+        <path fill="none" stroke="#ffd9e6" stroke-width="1.6" stroke-linecap="round" d="M14 6.4V4.7a1.9 1.9 0 0 1 3.8 0v1.7"/>
+      </symbol>
+      <!-- TROPHIES — handles behind the cup, so the two reads never touch -->
+      <symbol id="ic-cup" viewBox="0 0 24 24">
+        <path fill="none" stroke="#e0972a" stroke-width="1.9" stroke-linecap="round"
+              d="M7.4 5.4H5.2a2.5 2.5 0 0 0 2.6 4.6M16.6 5.4h2.2a2.5 2.5 0 0 1-2.6 4.6"/>
+        <path fill="#ffd25a" d="M7.2 3.2h9.6v5.9a4.8 4.8 0 0 1-9.6 0z"/>
+        <path fill="#ffe9a8" d="M9.2 3.2h2v5.9a1 1 0 0 1-2 0z"/>
+        <rect fill="#e0972a" x="10.9" y="13.4" width="2.2" height="3.6" rx="0.9"/>
+        <rect fill="#e0972a" x="7.4" y="17" width="9.2" height="3.2" rx="1.3"/>
+      </symbol>
+      <!-- TOP VOIDS — a crown, and its three jewels are the game's own three -->
+      <symbol id="ic-crown" viewBox="0 0 24 24">
+        <path fill="#ffd25a" d="M3.5 17.1 2.2 7.4a.85.85 0 0 1 1.31-.82l4.63 2.96 3.16-5.3a.85.85 0 0 1 1.4 0l3.16 5.3 4.63-2.96a.85.85 0 0 1 1.31.82L20.5 17.1z"/>
+        <rect fill="#e0972a" x="3.4" y="17.3" width="17.2" height="3.3" rx="1.3"/>
+        <circle fill="#ff5d7e" cx="12" cy="12.6" r="1.5"/>
+        <circle fill="#2fd8e8" cx="6.3" cy="13.4" r="1.15"/>
+        <circle fill="#b875ff" cx="17.7" cy="13.4" r="1.15"/>
+      </symbol>
+      <!-- SETTINGS — a ring, not a disc: the gear floats over the live island
+           and a filled hub would punch a coloured hole in it -->
+      <symbol id="ic-gear" viewBox="0 0 24 24">
+        <g fill="currentColor">
+          <g><rect x="10.5" y="1.4" width="3" height="5.2" rx="1.3"/><rect x="10.5" y="17.4" width="3" height="5.2" rx="1.3"/><rect x="1.4" y="10.5" width="5.2" height="3" rx="1.3"/><rect x="17.4" y="10.5" width="5.2" height="3" rx="1.3"/></g>
+          <g transform="rotate(45 12 12)"><rect x="10.5" y="1.4" width="3" height="5.2" rx="1.3"/><rect x="10.5" y="17.4" width="3" height="5.2" rx="1.3"/><rect x="1.4" y="10.5" width="5.2" height="3" rx="1.3"/><rect x="17.4" y="10.5" width="5.2" height="3" rx="1.3"/></g>
+          <path fill-rule="evenodd" d="M12 4.6a7.4 7.4 0 1 0 0 14.8 7.4 7.4 0 0 0 0-14.8zm0 4.3a3.1 3.1 0 1 1 0 6.2 3.1 3.1 0 0 1 0-6.2z"/>
+        </g>
+      </symbol>
+      <!-- A PRESENT -->
+      <symbol id="ic-gift" viewBox="0 0 24 24">
+        <rect fill="#ff3d66" x="3.6" y="10.2" width="16.8" height="10.6" rx="1.7"/>
+        <rect fill="#ff5d7e" x="3.6" y="10.2" width="16.8" height="3.1" rx="1.2"/>
+        <rect fill="#ff7a9c" x="2.2" y="6.6" width="19.6" height="4.4" rx="1.5"/>
+        <rect fill="#ffd25a" x="10.5" y="6.6" width="3" height="14.2"/>
+        <path fill="#ffd25a" d="M12 7.1C10.2 3.4 5.6 2.8 5.6 5.4c0 1.7 3.2 2.1 6.4 1.7zM12 7.1c1.8-3.7 6.4-4.3 6.4-1.7 0 1.7-3.2 2.1-6.4 1.7z"/>
+      </symbol>
+      <!-- THE CHEVRON on the world switcher. currentColor so one symbol serves
+           the switcher, the end card's MY NUMBERS and anything else later. -->
+      <symbol id="ic-chev" viewBox="0 0 24 24">
+        <path fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"
+              stroke-linejoin="round" d="M5.6 9.2 12 15.6l6.4-6.4"/>
+      </symbol>
+    </defs></svg>
     <div id="timer">3:00</div>
     <div id="coins">✦ 0</div>
     <div id="quests"></div>
@@ -2910,19 +3062,19 @@
            reason: the season is an aside, PLAY is the sentence. -->
       <button id="eventRibbon"></button>
       <div id="menuLadder">
-        <div id="mlWorld"></div>
+        <button id="worldSwitch" aria-label="choose a world"><span id="mlWorld"></span><svg class="chev" viewBox="0 0 24 24"><use href="#ic-chev"/></svg></button>
         <div id="mlPips" class="pips"></div>
         <div id="mlGoal"></div>
       </div>
       <button id="btnPlay">PLAY</button>
       <div class="navRow">
-        <button class="navCard" id="btnBook"><i>📗</i>SCRAPBOOK<em id="bookCount"></em></button>
-        <button class="navCard" id="btnShop"><i>🛍️</i>SHOP</button>
-        <button class="navCard" id="btnTrophies"><i>🏆</i>TROPHIES</button>
-        <button class="navCard" id="btnTop"><i>👑</i>TOP VOIDS</button>
+        <button class="navCard" id="btnBook"><i><svg viewBox="0 0 24 24"><use href="#ic-book"/></svg></i>SCRAPBOOK<em id="bookCount"></em></button>
+        <button class="navCard" id="btnShop"><i><svg viewBox="0 0 24 24"><use href="#ic-bag"/></svg></i>SHOP</button>
+        <button class="navCard" id="btnTrophies"><i><svg viewBox="0 0 24 24"><use href="#ic-cup"/></svg></i>TROPHIES</button>
+        <button class="navCard" id="btnTop"><i><svg viewBox="0 0 24 24"><use href="#ic-crown"/></svg></i>TOP VOIDS</button>
       </div>
-      <button id="btnSettings" title="settings">⚙️</button>
-      <button id="gift" title="free gift!">🎁</button>
+      <button id="btnSettings" title="settings" aria-label="settings"><svg viewBox="0 0 24 24"><use href="#ic-gear"/></svg></button>
+      <button id="gift" title="free gift!" aria-label="free gift"><svg viewBox="0 0 24 24"><use href="#ic-gift"/></svg></button>
     </div>
 
     <!-- ── THE SCRAPBOOK ── every hidden thing, found and not yet found ── -->
