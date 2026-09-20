@@ -190,7 +190,13 @@ export function pip(state: PipState, opts: PipOpts = {}): string {
  *  this file draws the ladder, it does not decide it. */
 export function pipRow(states: PipState[], opts: { size?: number; popAt?: number } = {}): string {
   const { size = 28, popAt } = opts;
-  return `<div class="pipRow">` + states.map((s, i) =>
+  // --pipSize ON THE ROW AS WELL AS ON EACH PIP. The menu's gap is
+  // `calc(var(--pipSize) * 0.30)` so the whole row scales from one number —
+  // and a custom property set on the CHILDREN is not visible to the parent's
+  // own declarations. It silently fell back to the 52px default and the row
+  // came out 6px wider than the size it had just been asked for, which is
+  // exactly the amount qa/navtap.mjs bar (e) was still failing by.
+  return `<div class="pipRow" style="--pipSize:${size}px">` + states.map((s, i) =>
     pip(s, { n: i + 1, idx: i, size, cls: popAt === i + 1 ? 'pop' : '' })).join('') + `</div>`;
 }
 

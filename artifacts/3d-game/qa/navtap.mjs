@@ -121,6 +121,30 @@ for (const [W, H, label, world] of SIZES) {
   await pg.waitForFunction(() => (document.getElementById('mlWorld')?.textContent || '').length > 0,
     null, { timeout: 120000 });
   await pg.waitForTimeout(900);
+  // ── FINISH THE INTRO, DO NOT WAIT FOR IT ────────────────────────────────
+  // The ladder's first reveal is `animation: pipIn 240ms ease-out both`, whose
+  // 0% frame is `scale(0.78)` — and `both` applies that backwards fill during
+  // the per-pip delay. A CSS animation's timeline only advances on a rendered
+  // frame, and this box draws the live island at roughly one frame every two
+  // and a half seconds, so a 900ms wait lands BETWEEN frames with the animation
+  // still at currentTime 0. Traced: at t=1.2s all five pips read `running,
+  // t=0, matrix(0.78…)` and measure 36.7px; at t=7.2s they read `finished` and
+  // measure the 47px they were asked for. Bar (a) would have reported five
+  // controls under 44x44 on a screen where nothing is, and no amount of extra
+  // sleeping makes that reliable — only fewer frames make it worse.
+  //
+  // So the animations are FINISHED rather than watched, which is the same
+  // lesson qa/calmcards.mjs records: drive the timeline, do not sample it.
+  // Anything infinite (the HERE flag's bob) is left alone — finish() on an
+  // infinite animation throws, and its resting size is what matters anyway.
+  await pg.evaluate(() => {
+    for (const a of document.getElementById('menu').getAnimations({ subtree: true })) {
+      const t = a.effect && a.effect.getComputedTiming();
+      if (t && t.iterations === Infinity) continue;
+      try { a.finish(); } catch { /* already done, or not finishable */ }
+    }
+  });
+  await pg.waitForTimeout(120);
 
   const r = await pg.evaluate(({ tagged, MIN }) => {
     const menu = document.getElementById('menu');

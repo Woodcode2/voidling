@@ -7648,10 +7648,17 @@ function paintMenuLadder(): void {
     // its pips exist it is 0 wide — clientWidth returned 0, the `|| 324`
     // fallback fired, and the sizing quietly did nothing on the first paint,
     // which is every paint. The card's content box is laid out independently.
+    // FRACTIONAL, AND A PIXEL OF SAFETY. clientWidth is an INTEGER: at 390pt the
+    // card's content box is 309.7 and clientWidth rounds it to 310, which is
+    // just enough to pick a 50px pip and land the row 0.3px over the edge. The
+    // rect is fractional, and the -1 covers the sub-pixel rounding the browser
+    // does on its way back out.
     const cs = getComputedStyle(host);
-    const room = host.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
-      || pips.clientWidth || 324;
-    const size = Math.max(44, Math.min(52, Math.floor(room / 6.2)));
+    const box = host.getBoundingClientRect().width
+      - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth);
+    const room = (box > 0 ? box : pips.clientWidth) || 324;
+    const size = Math.max(44, Math.min(52, Math.floor((room - 1) / 6.2)));
     pips.innerHTML = pipRow(sts, { size, popAt: mark?.pop !== undefined ? mark.pop + 1 : undefined });
     const nodes = [...pips.querySelectorAll('.pip')] as HTMLElement[];
     // THE RING, FORCED. pip() derives `here` from the state, which is right for
