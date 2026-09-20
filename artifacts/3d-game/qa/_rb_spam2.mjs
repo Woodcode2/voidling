@@ -14,7 +14,7 @@ const mk = async (init) => {
 };
 const primed = () => { try { localStorage.setItem('voidPlayed','1'); localStorage.setItem('voidTut','1');
   localStorage.setItem('voidDailyLast', new Date().toDateString()); } catch {} };
-const shown = (pg) => pg.evaluate(() => ['menu','worlds','loadScr','tut','end','daily','book','settings','pause','gate','shop','trophies','topvoids','policy','skinPrev']
+const shown = (pg) => pg.evaluate(() => ['menu','worlds','loadScr','tut','end','daily','book','settings','pause','gate','shop','profile','trophies','topvoids','policy','skinPrev']
   .filter(i => getComputedStyle(document.getElementById(i)).display !== 'none'));
 const st = (pg) => pg.evaluate(() => { try { const m = window.__matchState(); return `t=${m.t.toFixed(1)} clock=${m.clock.toFixed(1)}`; } catch { return 'ERR'; } });
 

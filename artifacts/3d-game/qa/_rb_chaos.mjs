@@ -36,7 +36,7 @@ const probeUI = () => pg.evaluate(() => {
     return (top === e || e.contains(top)) ? 'HIT' : `blocked-by:${top.id || top.className || top.tagName}`;
   };
   const shown = [];
-  for (const id of ['menu','worlds','loadScr','tut','end','daily','book','settings','pause','gate','shop','trophies','topvoids','policy','skinPrev'])
+  for (const id of ['menu','worlds','loadScr','tut','end','daily','book','settings','pause','gate','shop','profile','trophies','topvoids','policy','skinPrev'])
     { const e = document.getElementById(id); if (e && getComputedStyle(e).display !== 'none') shown.push(id); }
   let st = null; try { const m = window.__matchState(); st = { t: +m.t.toFixed(1), clock: +m.clock.toFixed(1) }; } catch (e) { st = 'ERR ' + e.message; }
   return { shown, play: hit('btnPlay'), again: hit('btnAgain'), home: hit('btnHome'), quit: hit('btnQuit'), st,
@@ -62,14 +62,14 @@ await step('baseline menu', async () => {});
 // ── 1. spam every menu button 8x as fast as playwright can ──────────────────
 await step('spam every menu button x8', async () => {
   for (let k = 0; k < 8; k++) {
-    for (const id of ['btnBook','btnShop','btnTrophies','btnTop','btnSettings','btnWorlds','gift','btnSolo'])
+    for (const id of ['btnBook','btnShop','btnSettings','btnWorlds','gift','btnSolo'])
       await pg.evaluate((i) => { const e = document.getElementById(i); if (e) e.click(); }, id);
   }
 });
 // close whatever piled up, by the routes a child has
 await step('close all via visible close buttons', async () => {
   for (let k = 0; k < 8; k++) await pg.evaluate(() => {
-    for (const id of ['bookClose','setClose','polClose','spClose','btnBack']) {
+    for (const id of ['setClose','polClose','spClose','btnBack','profBack']) {
       const e = document.getElementById(id);
       if (e && e.offsetParent !== null) e.click();
     }
@@ -78,13 +78,13 @@ await step('close all via visible close buttons', async () => {
 });
 
 // ── 2. two overlays at once, on purpose ─────────────────────────────────────
-for (const [a, c] of [['btnBook','btnSettings'], ['btnWorlds','btnShop'], ['btnTrophies','btnTop'], ['btnSettings','btnBook']]) {
+for (const [a, c] of [['btnBook','btnSettings'], ['btnWorlds','btnShop'], ['btnBook','btnShop'], ['btnSettings','btnBook']]) {
   await step(`open ${a} then ${c} (two overlays)`, async () => {
     await pg.evaluate(([x, y]) => { document.getElementById(x).click(); document.getElementById(y).click(); }, [a, c]);
   });
   await step(`  ...try to get back to the menu`, async () => {
     for (let k = 0; k < 6; k++) await pg.evaluate(() => {
-      for (const id of ['bookClose','setClose','polClose','spClose','btnBack'])
+      for (const id of ['setClose','polClose','spClose','btnBack','profBack'])
         { const e = document.getElementById(id); if (e && e.offsetParent !== null) e.click(); }
       document.querySelectorAll('.metaScr.show').forEach(s => s.querySelectorAll('button').forEach(x => { if (/BACK|DONE|✕|‹/.test(x.textContent||'')) x.click(); }));
     });

@@ -31,7 +31,8 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloa
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 
 const readTrophies = () => p.evaluate(() => {
-  document.getElementById('btnTrophies').click();
+  document.getElementById('btnBook').click();
+    document.querySelector('.profTab[data-pane="trophies"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   const r = {
     count: document.getElementById('trophyCount')?.textContent,
     got: [...document.querySelectorAll('#trophyGrid .tr.got .nm')].map((e) => e.textContent),
@@ -41,7 +42,7 @@ const readTrophies = () => p.evaluate(() => {
     }),
     stats: JSON.parse(localStorage.getItem('voidStats') || '{}'),
   };
-  document.getElementById('trophies').classList.remove('show');
+  document.getElementById('profile').classList.remove('show');
   return r;
 });
 

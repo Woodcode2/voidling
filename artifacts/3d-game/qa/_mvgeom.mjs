@@ -15,6 +15,12 @@
 //   TEXT  — rendered text under 11 px
 //   CUT   — a scroll container whose content overflows with no way to scroll
 import { chromium } from 'playwright';
+import { openProfile } from './_enter.mjs';
+// #btnTrophies / #btnTop left the front door when the scrapbook, the trophy
+// shelf and the weekly board became three tabs of #profile. Routed through
+// qa/_enter.mjs openProfile() rather than by name, so the next time that door
+// moves this file does not have to.
+
 import fs from 'fs';
 
 const PORT = process.argv[3] || '4237';
@@ -35,8 +41,8 @@ const SCREENS = [
   ['worlds', async (p) => { await p.click('#btnPlay'); }],
   ['book', async (p) => { await p.click('#btnBook'); }],
   ['shop', async (p) => { await p.click('#btnShop'); }],
-  ['trophies', async (p) => { await p.click('#btnTrophies'); }],
-  ['topvoids', async (p) => { await p.click('#btnTop'); }],
+  ['trophies', async (p) => { await openProfile(p, 'trophies'); }],
+  ['topvoids', async (p) => { await openProfile(p, 'topvoids'); }],
   ['settings', async (p) => { await p.click('#btnSettings'); }],
   ['tut', async (p) => { await p.evaluate(() => document.getElementById('tut').classList.add('show')); }],
   ['daily', async (p) => { await p.evaluate(() => document.getElementById('daily').classList.add('show')); }],
@@ -44,7 +50,7 @@ const SCREENS = [
   ['pause', async (p) => { await p.evaluate(() => document.getElementById('pause').classList.add('show')); }],
 ];
 
-const OVERLAYS = ['worlds', 'book', 'shop', 'trophies', 'topvoids', 'settings',
+const OVERLAYS = ['worlds', 'profile', 'book', 'shop', 'trophies', 'topvoids', 'settings',
   'tut', 'daily', 'gate', 'policy', 'pause', 'skinPrev', 'end', 'loadScr'];
 
 const AUDIT = (arg) => {

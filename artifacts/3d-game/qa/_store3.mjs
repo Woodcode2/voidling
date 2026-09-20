@@ -28,7 +28,7 @@ for (const dev of WIDTHS) {
   const r = await p.evaluate(() => {
     const vw = innerWidth;
     const out = [];
-    for (const id of ['btnPlay', 'btnWorlds', 'btnSolo', 'btnBook', 'btnShop', 'btnTrophies', 'btnTop', 'btnSettings']) {
+    for (const id of ['btnPlay', 'btnWorlds', 'btnSolo', 'btnBook', 'btnShop', 'btnSettings']) {
       const e = document.getElementById(id); if (!e) { out.push({ id, missing: true }); continue; }
       const b = e.getBoundingClientRect();
       // the visible LABEL, not just the tile

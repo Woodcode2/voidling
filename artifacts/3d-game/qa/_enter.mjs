@@ -101,3 +101,39 @@ export async function enterAndStart(p, world, timeout = 400000) {
     .catch(() => { });
   return how;
 }
+
+/** ── MY VOID ────────────────────────────────────────────────────────────────
+ *  The scrapbook, the trophy shelf and the weekly board were three separate
+ *  full-screen overlays reached by three cells on the front door. They are
+ *  three TABS of one profile now (index.html #profile), and #btnTrophies and
+ *  #btnTop are not on the menu any more.
+ *
+ *  That is the same shape of breakage this file was written for: a probe that
+ *  names whichever control happens to open a screen this month is a probe that
+ *  breaks the month after. Nine files clicked those two ids straight from the
+ *  menu, and a button inside a closed overlay measures 0x0 — so they would have
+ *  reported a DELETION rather than a move, which is the expensive kind of wrong.
+ *
+ *  Opened through the real door (#btnBook, then the tab) rather than by adding
+ *  `.show` by hand, because the tab state and the pane state are set together by
+ *  openProfile() and a probe that sets one of them is testing a screen the game
+ *  cannot produce.
+ *
+ *  @param p     the Playwright page, already booted
+ *  @param pane  'book' (stickers, the default) | 'trophies' | 'topvoids'
+ */
+export async function openProfile(p, pane = 'book') {
+  await clearOverlays(p);
+  await p.click('#btnBook');
+  await p.waitForSelector('#profile.show', { state: 'visible', timeout: 400000 });
+  if (pane !== 'book') {
+    await p.click(`.profTab[data-pane="${pane}"]`);
+  }
+  await p.waitForSelector(`#${pane}.show`, { state: 'visible', timeout: 60000 });
+}
+
+/** Close it again — the way a child does, not by stripping a class. */
+export async function closeProfile(p) {
+  await p.click('#profile .backBtn[data-close="profile"]').catch(() => { });
+  await p.waitForSelector('#profile.show', { state: 'hidden', timeout: 60000 }).catch(() => { });
+}

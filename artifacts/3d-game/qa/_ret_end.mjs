@@ -52,11 +52,12 @@ for (const [name, prof] of Object.entries(PROFILES)) {
   });
   await p.evaluate(() => document.getElementById('shop').classList.remove('show'));
   const troph = await p.evaluate(() => {
-    document.getElementById('btnTrophies').click();
+    document.getElementById('btnBook').click();
+    document.querySelector('.profTab[data-pane="trophies"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     const r = { count: document.getElementById('trophyCount')?.textContent,
       got: [...document.querySelectorAll('#trophyGrid .tr.got')].length,
       open: [...document.querySelectorAll('#trophyGrid .tr:not(.got)')].map((e) => e.textContent.replace(/\s+/g, ' ').trim()) };
-    document.getElementById('trophies').classList.remove('show');
+    document.getElementById('profile').classList.remove('show');
     return r;
   });
 

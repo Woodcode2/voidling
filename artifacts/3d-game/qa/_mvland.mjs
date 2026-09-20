@@ -34,7 +34,7 @@ for (const [W, H, INS, LABEL] of [
     m.scrollTop = 9999;               // try to scroll it the way a finger would
     const after = m.scrollTop;
     m.scrollTop = before;
-    const btns = ['btnPlay', 'btnWorlds', 'btnSolo', 'btnBook', 'btnShop', 'btnTrophies', 'btnTop', 'btnSettings']
+    const btns = ['btnPlay', 'btnWorlds', 'btnSolo', 'btnBook', 'btnShop', 'btnSettings']
       .map((id) => { const e = document.getElementById(id); if (!e) return null;
         const b = e.getBoundingClientRect();
         const vis = Math.max(0, Math.min(innerWidth, b.right) - Math.max(0, b.left))

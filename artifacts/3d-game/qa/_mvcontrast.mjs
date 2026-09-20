@@ -10,6 +10,12 @@
 //
 // WCAG AA: 4.5:1 for text under 18.66px/24px-bold, 3.0:1 at or above it.
 import { chromium } from 'playwright';
+import { openProfile } from './_enter.mjs';
+// #btnTrophies / #btnTop left the front door when the scrapbook, the trophy
+// shelf and the weekly board became three tabs of #profile. Routed through
+// qa/_enter.mjs openProfile() rather than by name, so the next time that door
+// moves this file does not have to.
+
 
 const PORT = process.argv[2] || '4237';
 const SCREENS = [
@@ -17,14 +23,14 @@ const SCREENS = [
   ['worlds', async (p) => p.click('#btnPlay')],
   ['book', async (p) => p.click('#btnBook')],
   ['shop', async (p) => p.click('#btnShop')],
-  ['trophies', async (p) => p.click('#btnTrophies')],
-  ['topvoids', async (p) => p.click('#btnTop')],
+  ['trophies', async (p) => openProfile(p, 'trophies')],
+  ['topvoids', async (p) => openProfile(p, 'topvoids')],
   ['settings', async (p) => p.click('#btnSettings')],
   ['tut', async (p) => p.evaluate(() => document.getElementById('tut').classList.add('show'))],
   ['gate', async (p) => p.evaluate(() => document.getElementById('gate').classList.add('show'))],
   ['pause', async (p) => p.evaluate(() => document.getElementById('pause').classList.add('show'))],
 ];
-const OVERLAYS = ['worlds', 'book', 'shop', 'trophies', 'topvoids', 'settings', 'tut',
+const OVERLAYS = ['worlds', 'profile', 'book', 'shop', 'trophies', 'topvoids', 'settings', 'tut',
   'daily', 'gate', 'policy', 'pause', 'skinPrev', 'end', 'loadScr'];
 
 const SCAN = (overlays) => {

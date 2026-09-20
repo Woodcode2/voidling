@@ -12,7 +12,7 @@ await pg.addInitScript(() => { try {
 await pg.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
 await pg.waitForFunction(() => window.__matchState, null, { timeout: 300000 });
 const vis = () => pg.evaluate(() => {
-  const ids = ['menu','worlds','loadScr','tut','end','daily','book','settings','pause','gate','shop','trophies','topvoids'];
+  const ids = ['menu','worlds','loadScr','tut','end','daily','book','settings','pause','gate','shop','profile','trophies','topvoids'];
   const o = {};
   for (const id of ids) { const e = document.getElementById(id); if (!e) { o[id] = 'MISSING'; continue; }
     const cs = getComputedStyle(e); o[id] = `${cs.display}/${cs.opacity}/${e.className}`; }

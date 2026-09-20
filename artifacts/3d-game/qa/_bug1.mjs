@@ -3,6 +3,12 @@
 // interactive control for (a) being outside the viewport, (b) being under
 // 44x44 CSS px, (c) horizontal page overflow.
 import { chromium } from 'playwright';
+import { openProfile, closeProfile } from './_enter.mjs';
+// #btnTrophies / #btnTop left the front door when the scrapbook, the trophy
+// shelf and the weekly board became three tabs of #profile. Routed through
+// qa/_enter.mjs openProfile() rather than by name, so the next time that door
+// moves this file does not have to.
+
 const PORT = process.argv[2] || '4177';
 const W = +(process.argv[3] || 320), H = +(process.argv[4] || 568);
 const COLD = process.argv[5] !== 'warm';
@@ -71,12 +77,18 @@ await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
   if (['daily','gift'].includes(e.id)) e.classList.remove('show'); }));
 await p.waitForTimeout(400);
 rep.push(await audit('menu')); await shot('menu');
-await open('#btnBook','book','#bookClose');
+// The three panels that used to be three screens are three tabs now, so each
+// one is opened through the real door and audited where it actually lives —
+// dropping the audit for them would have quietly cut this probe's coverage
+// from six panels to three while it went on reporting a clean sweep.
+for (const pane of ['book', 'trophies', 'topvoids']) {
+  await openProfile(p, pane);
+  await p.waitForTimeout(700);
+  rep.push(await audit(pane)); await shot(pane);
+  await closeProfile(p);
+  await p.waitForTimeout(400);
+}
 await open('#btnShop','shop','#btnBack');
-await open('#btnTrophies','trophies','.metaScr#trophies .mBack, #trophies button');
-await p.evaluate(() => document.querySelectorAll('#trophies.show,#topvoids.show,#shop.show,#book.show').forEach(e=>e.classList.remove('show')));
-await open('#btnTop','topvoids', null);
-await p.evaluate(() => document.querySelectorAll('#topvoids.show').forEach(e=>e.classList.remove('show')));
 await open('#btnSettings','settings','#setClose');
 await open('#btnWorlds','worlds', null);
 await p.evaluate(() => document.querySelectorAll('#worlds.show').forEach(e=>e.classList.remove('show')));
