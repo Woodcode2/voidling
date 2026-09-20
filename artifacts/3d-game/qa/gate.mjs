@@ -553,6 +553,10 @@ const SUITE = [
     cmd: ['node', 'qa/headclear.mjs', '4177', 'maple'], verdict: pf,
     why: 'no hand prop is drawn through its carrier\'s own face — the arm\'s vertices are transformed into the head group\'s space and tested against the skull ellipsoid, twice seconds apart, so a sign welded into a skull (the placard: 7 of 9 carriers, every frame) is told apart from an arm that swings through one for a frame' },
 
+  { id: 'assetrefs', tier: 'build', profiles: ['push', 'live', 'quality'], timeout: 30,
+    cmd: ['node', 'qa/assetrefs.mjs'], verdict: pf,
+    why: 'every /assets path the game asks for resolves somewhere — 153 references expanded from the same tables the game reads, classified on-disk / rewritten / nowhere, with the 35 that resolve nowhere frozen BY NAME so the debt can only shrink (scripts/asset-refs.mjs matches one pattern and sees 16 of them, which is how a whole world shipped with no stickers)' },
+
   { id: 'ladderflag', tier: 'ui', profiles: ['push', 'live'], timeout: 600,
     cmd: ['node', 'qa/ladderflag.mjs', '4177'], verdict: pf,
     why: 'the flag points at the dot she is on and clears the world switcher, and a world she has BEATEN (five passed, not four passed and one ran out of clock) drops the flag, goes gold, says PICK ANY LEVEL and keeps the ring on the dot PLAY launches (the owner: "after they beat the last level for that world that world become permanently unlocked in like a level picker")' },

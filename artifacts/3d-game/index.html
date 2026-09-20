@@ -852,8 +852,15 @@
          live 3D world with a moving camera. Anything a child has to read on
          this screen needs its own backing, so the ladder gets the same dark
          pill every other chip in the game uses, and sits above the orb. */
+      /* 96%, NOT 94%, AND THE TWO PERCENT ARE LOAD-BEARING. Five 52px pips need
+         324px at a 16px gap, plus 32 of padding and 3 of border — 359 — and
+         94% of a 375pt screen is 352.5. The row did not fit in its own card and
+         nothing noticed, because every bar here graded a pip and not the row.
+         qa/navtap.mjs bar (e) grades the row against the card's CONTENT box
+         now, which is the measurement that was missing; the gap clamp below
+         does the rest. */
       #menuLadder { display: flex; flex-direction: column; align-items: center; gap: 8px;
-        margin: 0 auto 14px; width: min(94%, 420px); position: relative; z-index: 3;
+        margin: 0 auto 14px; width: min(96%, 420px); position: relative; z-index: 3;
         padding: 12px 16px 13px; box-sizing: border-box; border-radius: 22px;
         background: rgba(18, 9, 38, 0.72); backdrop-filter: blur(9px);
         border: 1.5px solid rgba(184, 117, 255, 0.28);
@@ -873,8 +880,17 @@
          onto it (paintLadder) and reads it back for the end card — a chevron
          parked in that element would be erased by the next repaint, and the
          first thing anybody would try is putting it back. */
+      /* MIN-WIDTH, AND IT IS NOT TASTE. This pill is as wide as the world's
+         name, and the names run from GAME DAY (8 characters) to LANTERN NIGHT
+         (13) — about 60px of spread at 13px with 3px of tracking. qa/navtap.mjs
+         bar (c) asks that the door to the worlds is not smaller than the
+         smallest after-play cell, and on the short names it would lose that
+         comparison while the probe, which used to boot only MAPLE FALLS, could
+         never see it. 200px floors the door at 8,800px^2 on every world.
+         The probe now sweeps the shortest and longest names too; do not remove
+         this line to tidy up. */
       #menu #worldSwitch { display: flex; align-items: center; justify-content: center; gap: 7px;
-        min-height: 44px; padding: 0 18px; border-radius: 999px; cursor: pointer; color: #e7dcff;
+        min-height: 44px; min-width: 200px; padding: 0 18px; border-radius: 999px; cursor: pointer; color: #e7dcff;
         background: rgba(184, 117, 255, 0.15);
         border: 1.5px solid rgba(184, 117, 255, 0.40);
         box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.10); }
@@ -894,7 +910,26 @@
          current dot then scales ABOVE its neighbours, which is what hole.io
          does with its green 7 — the eye finds where you are before it reads a
          single number. */
-      #mlPips .pipRow { gap: 16px; }
+      /* ── THE ROW WAS WIDER THAN THE CARD IT SITS IN ────────────────────
+         MEASURED at four sizes and three profiles: five 52px pips with a fixed
+         16px gap is a fixed 324px (.pip is `flex: 0 0 auto`, index.html:709),
+         and #menuLadder is `min(94%, 420px)` with 16px of side padding — so at
+         375pt the card's content box is 322.4px and the row is 324. Dots 1 and
+         5 hung 0.8px past the card's OUTER border and ate 100% of its padding;
+         at 390 they ate all but 6.3px of it. The ladder is the one thing on
+         this screen a child taps to choose, and its end dots were breaking out
+         of their own container on the narrowest phone still sold.
+
+         The gap gives, not the dots: a 52px pip is a 44px+ touch target and
+         the here-ring is already painted 8.3px outside its box. At 375 this is
+         12px, which puts the row at 308 inside 322.4 — and it is still the
+         full 16 above 500pt, where there was never a problem.
+         qa/navtap.mjs bar (e) holds it. */
+      /* PROPORTIONAL TO THE DOT, NOT TO THE VIEWPORT. paintMenuLadder picks the
+         pip size from the room it actually has (see the comment at the `size:`
+         argument) and the gap follows it, so the row can never be wider than
+         the card again at any width — including ones no phone has yet. */
+      #mlPips .pipRow { gap: calc(var(--pipSize, 52px) * 0.30); }
       #mlPips .pip { cursor: pointer; }
       /* ── THE FLAG OVER THE DOT SHE IS ON ───────────────────────────────
          A pill with a point, bobbing, injected into the .here pip by
@@ -1266,6 +1301,10 @@
          exactly on top of the close — and the one that lost would be invisible
          and still tappable. */
       .bkHd #btnDaily { right: auto; left: 0; }
+      /* the drawn present, at the same box the four dock icons use. This is the
+         only route to the daily calendar in the whole app and it was the last
+         system emoji on the path in from the front door. */
+      .bkHd #btnDaily svg { display: block; width: 22px; height: 22px; margin: 0 auto; }
       .bkTabs { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; padding-bottom: 10px; }
       .bkTabs button { border: 0; border-radius: 999px; padding: 8px 13px; font-size: 12.5px;
         font-weight: 600; letter-spacing: 0.6px; background: rgba(255,255,255,0.09); color: #cbb8e8; }
@@ -1769,7 +1808,11 @@
       #menu > * { position: relative; z-index: 1; }
       @media (orientation: portrait) {
         #menu .foot { margin-top: 8px; }
-        .navRow { margin-top: 10px; }
+        /* (`.navRow { margin-top: 10px }` lived here and had never applied — a
+           media query adds no specificity, so it tied with the unconditional
+           .navRow rule 578 lines below and lost on source order. Exactly the
+           trap the note under this one records for #btnPlay. Removed rather
+           than left for somebody to "fix" and see nothing change.) */
         /* (`#btnPlay { padding: 14px 64px }` lived here and had never once
            applied. A media query adds no specificity, so it tied with the
            #btnPlay rule further down this sheet and lost on source order —
@@ -2255,7 +2298,40 @@
       /* A CHIP, NOT A SECOND BUTTON. It kept a 4px plinth and a 22px glow —
          the same furniture PLAY uses to say "press me" — so it read as an equal
          offer. Flattened to a label: smaller, no plinth, a whisper of glow. */
-      #eventRibbon { display: none; position: relative; overflow: hidden; margin-bottom: 10px;
+      /* ── IT HAS BEEN WHITE ON GOLD ─────────────────────────────────────
+         `#eventRibbon { color: #1c0930 }` is specificity 1-0-0 and
+         `#menu button { color: #fff }` twenty lines above it is 1-0-1, so the
+         ink this rule asks for has never once won. Measured on the rendered
+         chip: white against its own gradient is 1.44:1 at the light end and
+         2.17:1 at the dark end, against the 4.5:1 floor the rest of this sheet
+         holds itself to — on the one element that exists to announce something.
+         Scoped to #menu #eventRibbon (1-1-0) so it outranks the reset without
+         an !important that the next reader would have to argue with. */
+      #menu #eventRibbon { color: #1c0930; }
+      /* ── A CHIP TO LOOK AT, A FINGER-SIZED BOX TO HIT ──────────────────
+         This is a real control — prototype3d.ts binds a click that switches to
+         the world in season — and it measured 211.4 x 26 (qa/navtap.mjs bar a),
+         41% under the 44px minimum. It only surfaced when the probe learned to
+         boot a world with a live season; before that it was display:none on
+         every run, which is how a control stays 26px tall for months.
+
+         The obvious fix, growing it to 44px of gold, undoes the decision
+         recorded right above this rule: it was DELIBERATELY flattened from a
+         second button to a label, because two bright things stacked sent the
+         eye to the announcement instead of to PLAY.
+
+         So the ink stays a chip and the BOX becomes a finger. A 9px transparent
+         border adds 18px to the border box — which is what a hit test and
+         getBoundingClientRect both use — while `background-clip: padding-box`
+         keeps the gradient, and the ::after sweep that is positioned against
+         the padding box, exactly where they were. The 9px comes back off the
+         bottom margin so the column does not move. */
+      /* ON #menu #eventRibbon, NOT #eventRibbon. `#menu button { border: none }`
+         is 1-0-1 and ate the first version of this rule whole — the same trap,
+         on the same element, that swallowed its colour ten lines above. The
+         ribbon measured 26px tall on the next run and said nothing about why. */
+      #menu #eventRibbon { border: 9px solid transparent; background-clip: padding-box; }
+      #eventRibbon { display: none; position: relative; overflow: hidden; margin-bottom: 1px;
         padding: 6px 15px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 1.1px;
         color: #1c0930; background: var(--evc, #ffd23f);
         background: linear-gradient(180deg, var(--evc, #ffd23f), color-mix(in srgb, var(--evc, #ffd23f) 82%, #000));
@@ -2793,10 +2869,12 @@
          (The sheen itself is gone now: the bar steps on a bite, so it no longer
          needs a travelling highlight to prove it is alive. The lesson is what
          is left, and qa/_calmleak.mjs enforces it on every run.) */
+      /* (#gift .gRay, #gift .gBox and #shopFloat were named here and match no
+         element in the app. In a hand-kept list they read as coverage that is
+         not there, which is the one failure this list cannot afford.) */
       body.calm #growth .gFill,
-      body.calm #end.show #btnAgain, body.calm #gift .gRay,
-      body.calm #gift .gBox, body.calm #dailyGrid .dCell.now,
-      body.calm #dailyGrid .dCell.now::after, body.calm #btnAgain, body.calm #shopFloat,
+      body.calm #end.show #btnAgain, body.calm #dailyGrid .dCell.now,
+      body.calm #dailyGrid .dCell.now::after, body.calm #btnAgain,
       body.calm #skinPrev .spCard, body.calm #daily .dCard, body.calm .skCard .rib,
       body.calm .skCard.bought, body.calm .burst > i, body.calm #shopWallet.bump,
       body.calm .skCard.isnew::before, body.calm #skinPrev.win .spWin,
@@ -2861,9 +2939,14 @@
       body.calm #menuArt .leaf { opacity: 0 !important; }
       body.calm #menuArt .tw { opacity: 0.55 !important; }
       @media (prefers-reduced-motion: reduce) {
-        #growth .gFill, #end.show #btnAgain, #gift .gRay, #gift .gBox,
+        /* (#gift .gRay, #gift .gBox and #shopFloat were in this list and match
+           no element in the app — the gift ladder never had those children and
+           #shopFloat is retired. In a list whose own header says every
+           animation must be named here BY HAND, a name that matches nothing
+           reads as coverage that is not there.) */
+        #growth .gFill, #end.show #btnAgain,
         #dailyGrid .dCell.now, #dailyGrid .dCell.now::after, #btnAgain,
-        #shopFloat, #skinPrev .spCard, #daily .dCard, .skCard .rib,
+        #skinPrev .spCard, #daily .dCard, .skCard .rib,
         .skCard.bought, .burst > i, #shopWallet.bump, .skCard.isnew::before,
         #skinPrev.win .spWin {
           animation: none !important;
@@ -3170,7 +3253,7 @@
 
     <!-- ── THE SCRAPBOOK ── every hidden thing, found and not yet found ── -->
     <div id="book">
-      <div class="bkHd">SCRAPBOOK<button id="btnDaily" title="the calendar">🎁</button><button id="bookClose">✕</button></div>
+      <div class="bkHd">SCRAPBOOK<button id="btnDaily" title="the calendar" aria-label="the calendar"><svg viewBox="0 0 24 24"><use href="#ic-gift"/></svg></button><button id="bookClose">✕</button></div>
       <div class="bkTabs" id="bookTabs"></div>
       <div class="bkGrid" id="bookGrid"></div>
       <div class="bkFoot" id="bookFoot"></div>

@@ -56,7 +56,7 @@ import { allLevels, current as levelCurrent, recordLevelResult, trackLevelStart,
   type Goal, type LevelState } from './game/levels';
 // (PIP_WORD left this import with the duplicate miss card that used to spell the
 // state out a second time — pipHead writes the word itself.)
-import { ensurePipDefs, pipRow, pipHead, pip,
+import { ensurePipDefs, pipRow, pipHead, pip, PIP_WORD,
   PIP_FLIP_MS, PIP_HOP_MS, PIP_REVEAL_STEP_MS } from './proto3d/pips';
 import { recentEvents } from './proto3d/telemetry';
 import { bumpMatch, deal, type Deal } from './game/matchdeck';
@@ -7582,7 +7582,17 @@ function paintMenuLadder(): void {
   const states = rows.map((r) => r.st as LevelState);
   const cur = levelCurrent(pickedWorld);
   const w = document.getElementById('mlWorld');
-  if (w) w.textContent = (WORLD_LABEL[pickedWorld as WorldKey] ?? pickedWorld).toUpperCase();
+  const wName = (WORLD_LABEL[pickedWorld as WorldKey] ?? pickedWorld).toUpperCase();
+  if (w) w.textContent = wName;
+  // ── THE STATIC LABEL WAS REPLACING THE WORLD'S NAME ─────────────────────
+  // index.html gives #worldSwitch `aria-label="choose a world"`, and an
+  // aria-label OVERRIDES an element's own text for a screen reader. So
+  // VoiceOver read "choose a world, button" and never said which world she was
+  // on — on the control whose entire job is to say which world she is on.
+  // Written here, beside the textContent it has to agree with, so the two
+  // cannot drift.
+  document.getElementById('worldSwitch')
+    ?.setAttribute('aria-label', `${wName} — choose a world`);
   const pips = document.getElementById('mlPips');
   const line = document.getElementById('mlGoal');
   // ── A FINISHED WORLD STOPS BEING A QUEUE AND BECOMES A SHELF ────────────
@@ -7622,7 +7632,27 @@ function paintMenuLadder(): void {
     // the button. The size lives here rather than in CSS because pipRow bakes
     // it into --pipSize per call, and the end card (34) and world card (18)
     // must not move with it.
-    pips.innerHTML = pipRow(sts, { size: 52, popAt: mark?.pop !== undefined ? mark.pop + 1 : undefined });
+    // ── THE ROW IS SIZED FROM THE ROOM IT HAS ────────────────────────────
+    // 52px was written as a constant and five of them with a 16px gap is a
+    // fixed 324px, in a card that is a percentage of a padded column: at 375pt
+    // the content box is 308 and the row broke out of its own border. Every bar
+    // in qa/ graded a PIP; none graded the ROW, so it shipped.
+    //
+    // The gap is `calc(var(--pipSize) * 0.30)` in CSS, so the whole row is
+    // 5s + 4(0.30s) = 6.2s and one number decides it. 44 is the floor because
+    // that is the touch target; 52 is the ceiling because that is the size the
+    // ladder was designed at and the end card (34) and world card (18) must not
+    // move with it.
+    // MEASURED ON THE CARD, NOT ON #mlPips. The row's own container is a
+    // shrink-to-fit flex child of a column with align-items:center, so before
+    // its pips exist it is 0 wide — clientWidth returned 0, the `|| 324`
+    // fallback fired, and the sizing quietly did nothing on the first paint,
+    // which is every paint. The card's content box is laid out independently.
+    const cs = getComputedStyle(host);
+    const room = host.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      || pips.clientWidth || 324;
+    const size = Math.max(44, Math.min(52, Math.floor(room / 6.2)));
+    pips.innerHTML = pipRow(sts, { size, popAt: mark?.pop !== undefined ? mark.pop + 1 : undefined });
     const nodes = [...pips.querySelectorAll('.pip')] as HTMLElement[];
     // THE RING, FORCED. pip() derives `here` from the state, which is right for
     // every still frame and wrong for exactly one: the flip, where the dot has
@@ -7672,6 +7702,26 @@ function paintMenuLadder(): void {
     // look exactly like the buttons they are.
     nodes.forEach((node, i) => {
       const g = (i + 1) as Goal;
+      // ── THE FIVE DOTS WERE NOT CONTROLS TO A SCREEN READER ──────────────
+      // pips.ts emits `aria-hidden="true"` on every pip unless a caption is
+      // passed, which is right for the end card's row and the world card's —
+      // those are a picture of progress beside a heading that already says it.
+      // On THIS row each dot is a button that starts a match, and a hidden
+      // <span> with no role and no name is nothing at all to VoiceOver. Set
+      // here rather than in pips.ts so the 34px and 18px rows keep the
+      // decorative treatment that suits them.
+      node.removeAttribute('aria-hidden');
+      node.setAttribute('role', 'button');
+      node.setAttribute('tabindex', '0');
+      node.setAttribute('aria-label', `LEVEL ${g} — ${PIP_WORD[sts[i]]}`);
+      // …and a focusable thing that cannot be operated from the keyboard is a
+      // worse state than one that was never focusable.
+      node.addEventListener('keydown', (e) => {
+        const k = (e as KeyboardEvent).key;
+        if (k !== 'Enter' && k !== ' ') return;
+        e.preventDefault();
+        node.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
       node.addEventListener('click', () => {
         if (sts[i] === 'locked') {
           // never silent, and never a scold: the answer is the dot before it,
@@ -9730,7 +9780,12 @@ const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) 
   const ev = liveEvents().find((e) => isUnlocked(e.world)) ?? null;
   if (rib && ev) {
     rib.style.setProperty('--evc', `#${ev.accent.toString(16).padStart(6, '0')}`);
-    rib.innerHTML = `${ev.icon} ${ev.name} — ${WORLD_NAMES[ev.world]}`
+    // NO ev.icon. It was the last system emoji on the front door — Apple's
+    // artwork under a flat-shaded island, a different drawing on every other
+    // platform — and it was also the 20px that pushed "HOMECOMING — GAME DAY"
+    // past its own chip at 375pt (181.4px of ink in a 181px box, measured).
+    // The accent colour already says which season this is.
+    rib.innerHTML = `${ev.name} — ${WORLD_NAMES[ev.world]}`
       + `<em>${ev.line.toUpperCase()} · ${eventEndLabel(ev)}</em>`;
     rib.classList.add('show');
     rib.addEventListener('click', () => {

@@ -1455,6 +1455,16 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
   // by now, so this is the only way the runtime can tell a camera from a
   // clipboard — the look-up (addWanderer) fires a flash on one and not the other.
   if (o?.prop) g.userData.prop = o.prop;   // only when there is one: every other world's userData stays byte-identical
+  // …AND THE LEFT HAND. `propL` is the other half of the three two-handed jobs
+  // in the kit — the campaigner with leaflets and a clipboard, the cheerleader
+  // with two pompoms, the sweeper with a broom and a bucket — and it was welded
+  // into the left arm at line 1382 without ever being written down. So the
+  // runtime, and every probe, has been reading those people as one-handed:
+  // qa/headclear.mjs built its "what is this person carrying" census from both
+  // keys and only ever saw one, which tagged a leaflets+clipboard campaigner as
+  // plain leaflets and left the clipboard's own carrier count short. Same guard
+  // as above — absent unless there is one, so no other world's userData moves.
+  if (o?.propL) g.userData.propL = o.propL;
   return g;
 }
 

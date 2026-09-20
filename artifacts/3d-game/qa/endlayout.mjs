@@ -70,7 +70,7 @@ for (const [W, H] of SIZES) {
     const seen = [];
     // leaf-ish visible elements with content: texts, buttons, tiles
     const want = end.querySelectorAll('#endHd,#endSub,#drop,.dropLbl,#endList,#endFinds,'
-      + '#endStats .es,#endNext,#endQuests .q,#btnAgain,#btnHome,#coins');
+      + '#endStats .es,#endNext,#endQuests .eq,#btnAgain,#btnHome,#coins');
     for (const e of want) {
       const b = e.getBoundingClientRect();
       const cs = getComputedStyle(e);
@@ -105,7 +105,7 @@ for (const [W, H] of SIZES) {
     end.scrollTop = end.scrollHeight;
     const goTop = document.querySelector('.endGo').getBoundingClientRect().y;
     let buried = null;
-    for (const e of end.querySelectorAll('#endQuests .q,#endNext')) {
+    for (const e of end.querySelectorAll('#endQuests .eq,#endNext')) {
       const b = e.getBoundingClientRect();
       if (b.height > 4 && b.y + b.height > goTop + 6) buried = (e.id || e.className) + ` bottom ${Math.round(b.y + b.height)} vs row top ${Math.round(goTop)}`;
     }

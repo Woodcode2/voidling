@@ -91,18 +91,31 @@ const br = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 
 // 375pt is the narrowest phone still sold and the width SCRAPBOOK loses at.
-for (const [W, H, label] of [[375, 812, 'SE / 13 mini'], [390, 844, 'iPhone 15'], [430, 932, 'Pro Max']]) {
+//
+// AND MORE THAN ONE WORLD. The first cut of this probe booted the default and
+// graded MAPLE FALLS every time — and bar (c) compares the WIDTH of the world
+// door against the nav cells, on a pill whose width IS the world's name.
+// WORLD_LABEL runs from GAME DAY (8 characters) to LANTERN NIGHT (13), so a
+// probe that only ever sees an 11-character name can green a hierarchy that is
+// inverted in the field on two of the six worlds. The shortest and the longest
+// name are swept at the narrowest width, where the comparison is tightest.
+const SIZES = [[375, 812, 'SE / 13 mini', 'maple'], [390, 844, 'iPhone 15', 'maple'],
+  [430, 932, 'Pro Max', 'maple'],
+  [375, 812, 'SE · shortest name', 'gameday'], [375, 812, 'SE · longest name', 'lantern']];
+for (const [W, H, label, world] of SIZES) {
   const pg = await br.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   pg.on('pageerror', (e) => console.log(`  [pageerror] ${e.message.split('\n')[0]}`));
   await pg.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
   // a RETURNING player: a first launch autoplays straight into the world by
   // design, and ?manual stops AUTO_START firing on navigator.webdriver.
-  await pg.addInitScript(() => { try {
+  await pg.addInitScript((w) => { try {
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
     localStorage.setItem('voidMute', '1');
     localStorage.setItem('voidDailyLast', new Date().toDateString());
-  } catch { } });
-  await pg.goto(`http://127.0.0.1:${PORT}/?manual=1`, { waitUntil: 'domcontentloaded', timeout: 400000 });
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
+    localStorage.setItem('voidWorld', w);
+  } catch { } }, world);
+  await pg.goto(`http://127.0.0.1:${PORT}/?w=${world}&manual=1`, { waitUntil: 'domcontentloaded', timeout: 400000 });
   await pg.waitForFunction(() => !!window.__voidState, null, { timeout: 600000 });
   // the menu's own paint has to have run: #mlWorld is written by paintLadder
   await pg.waitForFunction(() => (document.getElementById('mlWorld')?.textContent || '').length > 0,
@@ -150,11 +163,18 @@ for (const [W, H, label] of [[375, 812, 'SE / 13 mini'], [390, 844, 'iPhone 15']
         w: +b.width.toFixed(1), h: +b.height.toFixed(1), area: Math.round(b.width * b.height), how, clip, tight });
     };
     for (const b of menu.querySelectorAll('button')) add(b, 'button');
+    // …and anything the page has PROMOTED to a control. The five ladder dots
+    // are <span>s that paintMenuLadder gives role="button", tabindex and an
+    // aria-label to, and their click is bound on the node rather than through
+    // getElementById — so neither half of the derivation above can see them,
+    // and the five controls a child taps most would go ungraded.
+    for (const b of menu.querySelectorAll('[role="button"]')) add(b, 'role');
     for (const id of tagged) add(document.getElementById(id), 'click');
     return [...seen.values()];
   }, { tagged: taggedIds, MIN });
 
-  console.log(`\n  ${label} (${W}x${H}) — ${r.length} live control(s) on the front door`);
+  const shown = await pg.evaluate(() => document.getElementById('mlWorld')?.textContent || '?');
+  console.log(`\n  ${label} (${W}x${H}, ${shown}) — ${r.length} live control(s) on the front door`);
   const rows = [...r].sort((a, b) => a.area - b.area);
   for (const c of rows) {
     const flagSize = c.w < MIN || c.h < MIN ? '  <-- under 44x44' : '';
@@ -180,38 +200,66 @@ for (const [W, H, label] of [[375, 812, 'SE / 13 mini'], [390, 844, 'iPhone 15']
   // id="mlWorld"> and is now a <button id="worldSwitch"> wrapped around that
   // same label — and a bar that names one of them reports the screen as broken
   // the day the fix lands. What is being measured is the DOOR, not its id.
-  const world = rows.find((c) => c.id === 'worldSwitch' || c.id === 'mlWorld');
+  const door = rows.find((c) => c.id === 'worldSwitch' || c.id === 'mlWorld');
   // BY CLASS, NOT BY ID. The first cut of this bar matched `/^\.navCard/` against
   // the display name — and the display name falls back to the class only when the
   // element has no id. All four cards have one, so the bar reported "no .navCard
   // found" on a screen with four of them. A guard that fails for the wrong reason
   // sends somebody looking for a deletion that never happened.
   const navs = rows.filter((c) => /\bnavCard\b/.test(c.cls || ''));
-  if (!world) {
+  if (!door) {
     no(`(c) ${label}: neither #worldSwitch nor #mlWorld is a live control on the front door — the probe cannot judge the hierarchy it was written for`);
   } else if (!navs.length) {
     no(`(c) ${label}: no .navCard found — the after-play shelf the hierarchy is measured against is gone`);
   } else {
     const smallestNav = Math.min(...navs.map((c) => c.area));
-    if (world.area >= smallestNav) {
-      ok(`(c) ${label}: the world door (${world.area}px²) is not smaller than the after-play shelf (smallest ${smallestNav}px²)`);
+    if (door.area >= smallestNav) {
+      ok(`(c) ${label}: the world door (${door.w}x${door.h} = ${door.area}px²) is not smaller than the after-play shelf (smallest ${smallestNav}px²)`);
     } else {
-      no(`(c) ${label}: the hierarchy is inverted — the door to every world is ${world.area}px² `
+      no(`(c) ${label}: the hierarchy is inverted — the door to every world is ${door.w}x${door.h} = ${door.area}px² `
         + `against ${smallestNav}px² for the smallest after-play destination `
-        + `(${(smallestNav / world.area).toFixed(1)}x bigger)`);
+        + `(${(smallestNav / door.area).toFixed(1)}x bigger)`);
     }
   }
+  // (e) — THE LADDER FITS INSIDE ITS OWN CARD. Five pips at a fixed 52px with a
+  // fixed gap is a fixed width, and the card around them is a percentage: the
+  // two only agree above a certain viewport. Below it the end dots break out of
+  // the rounded border, which no other bar here can see — (a) grades each pip's
+  // own size and passes a dot that is half outside its container.
+  {
+    const fit = await pg.evaluate(() => {
+      const card = document.getElementById('menuLadder');
+      const row = document.querySelector('#mlPips .pipRow');
+      if (!card || !row) return null;
+      const c = card.getBoundingClientRect(), r = row.getBoundingClientRect();
+      const cs = getComputedStyle(card);
+      const inner = c.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+        - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth);
+      return { card: +c.width.toFixed(1), inner: +inner.toFixed(1), row: +r.width.toFixed(1),
+        pastBorder: +(Math.max(c.left - r.left, r.right - c.right)).toFixed(1),
+        slack: +(inner - r.width).toFixed(1) };
+    });
+    if (!fit) {
+      no(`(e) ${label}: no #menuLadder or no .pipRow — the ladder the bar was written for is not on the screen`);
+    } else if (fit.slack >= 0) {
+      ok(`(e) ${label}: the five dots fit inside the ladder card with ${fit.slack}px to spare (row ${fit.row} in ${fit.inner})`);
+    } else {
+      no(`(e) ${label}: the dot row is ${fit.row}px inside a ${fit.inner}px content box — it overflows by `
+        + `${(-fit.slack).toFixed(1)}px and hangs ${fit.pastBorder}px past the card's outer border`);
+    }
+  }
+
   // (d) — AND IT STILL OPENS. This bar exists because the change that made the
   // world door a button MOVED its click listener from the label to the pill
   // around it, and a measurement of size cannot tell a 44px button that works
   // from a 44px button that does nothing. Only run where the door was found.
-  if (world) {
+  if (door) {
     const opened = await pg.evaluate(async (id) => {
       document.getElementById('worlds')?.classList.remove('show');
       document.getElementById(id)?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       await new Promise((r) => setTimeout(r, 250));
       return !!document.getElementById('worlds')?.classList.contains('show');
-    }, world.id);
+    }, door.id);
     if (opened) ok(`(d) ${label}: tapping the world door opens the picker`);
     else no(`(d) ${label}: #${world.id} is ${world.w}x${world.h} and does nothing — the picker did not open`);
   }
