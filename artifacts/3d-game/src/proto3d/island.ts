@@ -8241,6 +8241,14 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     if (!legalSite(wx, wy, r, foot)) { dropSkip++; return false; }
     place(mesh, w(wx), w(wy), r);
     MS.claimSpot(wx, wy, r * 20, foot);
+    // QA: DID THIS PROP'S CLAIM ACTUALLY HAPPEN. qa/placement.mjs measured
+    // eleven of Maple's benches holding no claim at all, every one from the
+    // forest pass, and three facts about that cannot all be true: this is the
+    // only drop in scope there, it claims unconditionally on the line above,
+    // and those benches have nothing in the hash. The stamp says which fact is
+    // lying — set here and nowhere else, so a prop wearing it went through this
+    // function and a prop without it did not.
+    mesh.userData.claimed = foot ? 'rect' : 'circle';
     return true;
   };
   const dropGlb = (name: string, wx: number, wy: number, r: number, h: number,
@@ -8826,13 +8834,23 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const cxB = bcW(gx), cyB = bcW(5);
       const cx = w(cxB), cz = w(cyB);
       const half = wLen(BLOCK_SIZE / 2) - 6;
+      const halfW = half / SCALE;   // the same half-block, in the world units drop() takes
       // the boardwalk colonnade at the top of the sand (the bake paints the
       // planks at world y 9475..9660 — these stand just behind it)
       for (const ux of [-0.62, -0.21, 0.21, 0.62]) {
         // palms in maple country read as leftover content from the other world
         place(mchance(0.5) ? MS.makeMapleTree() : makePine(), cx + ux * half, cz - half * 0.82, 2.6);
       }
-      for (const ux of [-0.4, 0.4]) place(makeBench(), cx + ux * half, cz - half * 1.02, 2.4);
+      // drop(), NOT place(). These twelve boardwalk benches were the only benches
+      // on the island placed straight through place(), which sets a prop down
+      // and reserves NOTHING — so footOf's 2.8 units of legroom, the whole
+      // reason a bench claims more ground than it stands on, never reached the
+      // hash. qa/placement.mjs measured it once it could ask: eleven of Maple's
+      // thirty-eight benches held no claim at all, every one of them these, and
+      // the country fill then legitimately filled the seat's view because
+      // nothing had told it not to. That is Maple's entire bench category.
+      // drop() takes WORLD coordinates where place() takes 3D, hence halfW.
+      for (const ux of [-0.4, 0.4]) drop(makeBench(), cxB + ux * halfW, cyB - halfW * 1.02, 2.4);
       for (const [ux, vz] of [[-0.55, -0.1], [-0.18, 0.14], [0.18, -0.1], [0.55, 0.14], [-0.36, 0.44], [0.36, 0.44]] as const) {
         placeGlb3('umbrella', cx + ux * half, cz + vz * half, 1.8, 3.2, makeUmbrellaFB, mr(0, 6.28));
       }

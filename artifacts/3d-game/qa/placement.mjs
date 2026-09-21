@@ -312,6 +312,7 @@ const auditFn = (D) => {
       // island.ts place() stamps the pass that placed it; "?" is a pass that
       // has no marker yet, which is a gap in the instrument and not in the game
       pass: ud.pass || '?',
+      claimed: ud.claimed || '',
       // a SOLID is a building-class thing with walls: eat radius >= 2, a front
       // (trees/bushes/rocks tag userData.spin and have none), 2+ tall, 2.4+ wide
       solid: e.radius >= 2 && !ud.spin && (maxY - Math.min(0, minY)) >= 2 && Math.min(2 * ghx, 2 * ghz) >= 2.4 });
@@ -463,7 +464,7 @@ const auditFn = (D) => {
     // nothing, or do ALL of them?" is the question that separates a bug in one
     // pass from a bug in footOf/claimSpot, and it is one line to answer.
     if (window.__claimAt && window.__claimAt(p.x, p.z, 4, p.r) === null)
-      cat('benchbare').push({ p, d: `${desc(p)} reserved no ground at all`, x: p.cx, z: p.cz, depth: 1 });
+      cat('benchbare').push({ p, d: `${desc(p)} reserved no ground at all (drop stamp: ${p.claimed || 'NONE — never went through drop()'})`, x: p.cx, z: p.cz, depth: 1 });
     const fx = p.sy, fz = p.cy;   // makeBench: the seat looks down local +z (the back slat is at z=-0.36)
     for (const dd of [1.2, 2.0, 2.8]) {
       const px = p.cx + fx * dd, pz = p.cz + fz * dd; let hit = null;
