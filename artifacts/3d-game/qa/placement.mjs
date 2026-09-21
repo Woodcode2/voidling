@@ -452,13 +452,18 @@ const auditFn = (D) => {
   // hash directly, in the 3D units this file works in, and prints the answer
   // beside the offence so the next reader starts from a fact.
   const claimNote = (p) => {
-    const c = window.__claimAt ? window.__claimAt(p.x, p.z) : undefined;
+    const c = window.__claimAt ? window.__claimAt(p.x, p.z, 4, p.r) : undefined;
     if (c === undefined) return '';                       // build without the hook
     if (c === null) return '  [RESERVED NOTHING]';
     return c.strict ? `  [reserved ${c.reach3}u, strict]` : `  [reserved r${c.r3}, no legroom rect]`;
   };
   for (const p of props) {
     if (!p.bench) continue;
+    // EVERY bench, not only the offending ones. "Do these three benches reserve
+    // nothing, or do ALL of them?" is the question that separates a bug in one
+    // pass from a bug in footOf/claimSpot, and it is one line to answer.
+    if (window.__claimAt && window.__claimAt(p.x, p.z, 4, p.r) === null)
+      cat('benchbare').push({ p, d: `${desc(p)} reserved no ground at all`, x: p.cx, z: p.cz, depth: 1 });
     const fx = p.sy, fz = p.cy;   // makeBench: the seat looks down local +z (the back slat is at z=-0.36)
     for (const dd of [1.2, 2.0, 2.8]) {
       const px = p.cx + fx * dd, pz = p.cz + fz * dd; let hit = null;
@@ -488,7 +493,7 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
 const results = {};
 let anyFail = false;
 const FAIL_CATS = ['road', 'water', 'offisland', 'float', 'inside', 'overlap', 'roadend', 'door', 'bench'];
-const ALL_CATS = ['road', 'water', 'offisland', 'overhang', 'float', 'sunk', 'inside', 'under', 'overlap', 'clutter', 'roadend', 'door', 'bench', 'benchaway', 'piste', 'ice'];
+const ALL_CATS = ['road', 'water', 'offisland', 'overhang', 'float', 'sunk', 'inside', 'under', 'overlap', 'clutter', 'roadend', 'door', 'bench', 'benchaway', 'benchbare', 'piste', 'ice'];
 for (const wid of WORLDS) {
   const D = worldData(wid);
   const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });

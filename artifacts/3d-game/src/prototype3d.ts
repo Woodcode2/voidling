@@ -3288,7 +3288,7 @@ const _dbg = new Proxy(_dbgStore, {
   __wayState: () => { on: boolean; x: number; y: number; ang: number; cued: boolean; chip: string; goalN: number; haveProp: boolean; r: number; need: number; pad: number; top: number; bot: number };
   __claimsNear: (x: number, y: number, r: number) => { x: number; y: number; r: number; f?: unknown }[];
   __claimStats: () => { n: number; maxR: number };
-  __claimAt: (x3: number, z3: number, tol3?: number) => { r3: number; off3: number; strict: boolean; reach3: number | null } | null;
+  __claimAt: (x3: number, z3: number, tol3?: number, r3?: number) => { r3: number; off3: number; strict: boolean; reach3: number | null } | null;
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void; __settle: () => { inside: number; through: number; doorstep: number; feet: number; ms: number }; __settleAgain: () => string[]; __introLen: () => number; __authored: () => { hours: number; mid: (string | undefined)[] };
   __life: Life; __moverStats: (gate: number) => { near: number; total: number }; __crowdGate: number;
   __hatSheet: (ids: string[]) => Promise<unknown>;

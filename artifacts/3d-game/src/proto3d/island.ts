@@ -33,9 +33,15 @@ export const qaClaimStats = () => BAY.claimStats();
  *  told, which is the other half of every placement diagnosis and was missing
  *  from all of them. Returns null when the prop reserved nothing at all — the
  *  answer no amount of source reading produces. */
-export const qaClaimAt = (x3: number, z3: number, tol3 = 0.3) => {
+export const qaClaimAt = (x3: number, z3: number, tol3 = 0.3, r3?: number) => {
   const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
-  const near = BAY.claimsNear(wx, wy, tol3 * 20);
+  // MATCHED BY RADIUS, NOT ONLY BY PROXIMITY. The first cut took the nearest
+  // claim and reported it as the prop's own, which at any useful tolerance is
+  // simply a neighbour: widening from 0.3 to 4 units turned three benches from
+  // "RESERVED NOTHING" into "reserved r0.9" — a claim belonging to something
+  // else entirely. A prop claims at its own eat radius, so that is the key.
+  const near = BAY.claimsNear(wx, wy, tol3 * 20)
+    .filter((c) => r3 === undefined || Math.abs(c.r / 20 - r3) < 0.05);
   let best: { d: number; c: BAY.Claim } | null = null;
   for (const c of near) {
     const d = Math.hypot(c.x - wx, c.y - wy);
