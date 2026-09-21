@@ -5974,6 +5974,24 @@ function makeFenceRun(len: number, col = 0xf4f0e2): THREE.Group {
 async function populate(scene: THREE.Scene, addEdible: AddEdible,
                         breathe: (l: string) => Promise<void>) {
   const setShadow = (m: THREE.Object3D) => m.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  // ── WHICH PASS PUT THIS PROP HERE ──────────────────────────────────────
+  // Every placement red starts with the same question and the audit could not
+  // answer it. qa/placement.mjs reports an offender by index, position and
+  // footprint — "#4552 prop r=1.4 foot=4.0x3.3 at (-56.0,182.0)" — and finding
+  // the pass that put it there meant reading a thousand lines of populate()
+  // and guessing. Three wrong guesses on one bench offence is what this exists
+  // to end.
+  //
+  // A STRING, NOT A STACK TRACE. The obvious instrument is new Error().stack in
+  // place(), which needs no markers and cannot go stale. It is useless here:
+  // the probes run against `vite preview`, i.e. the MINIFIED bundle, where
+  // island.ts line numbers do not survive. A literal does.
+  //
+  // Unmarked passes stamp nothing and print as "?" in the audit, so a gap is
+  // visible rather than silent — the same reason the gate treats a missing
+  // verdict as a failure instead of a pass.
+  let PASS = '';
+  const pass = (n: string) => { PASS = n; };
   const place = (mesh: THREE.Object3D, x3: number, z3: number, r: number) => {
     if (!insideIsland3(x3, z3)) return;   // never place props off the coastline
     // …or IN the lagoon — WHICH IS MAPLE'S, AND ONLY MAPLE'S.
@@ -5988,6 +6006,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // guard should have been a sweep of the existing ones". place() is the
     // predicate that sweep missed, three worlds running.
     if (WORLD_ID === 'maple' && inLagoon3(x3, z3, 40)) return;
+    if (PASS && !mesh.userData.pass) mesh.userData.pass = PASS;
     mesh.position.set(x3, 0, z3);
     // A PROP WITH NO FRONT HAS NO REASON TO FACE NORTH. Measured on the pre-fix
     // build with qa/variety.mjs: 5,043 of Maple Falls' 5,782 props sat at
@@ -8323,6 +8342,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     const SHOP_D = 250;   // how far the shop fronts stand back from the kerb
     for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
       if (PLAN[gy][gx] !== 'downtown') continue;
+      pass(`downtown ${gx},${gy}`);
       const cxB = bcW(gx), cyB = bcW(gy);
       const face = cxB < MAIN_ST_X ? 1 : -1;                // +1 = shop faces east
       const line = MAIN_ST_X - face * SHOP_D;               // the shop-front line
@@ -8387,6 +8407,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
   // every yard has taken a side, and the neighbours disagree.
   for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
     if (PLAN[gy][gx] !== 'cozy') continue;
+    pass(`cozy ${gx},${gy}`);
     const cxB = bcW(gx), cyB = bcW(gy);
     const cx = w(cxB), cz = w(cyB);
     const half = wLen(BLOCK_SIZE / 2) - 6;
@@ -8483,6 +8504,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
   }
 
   await breathe('Planting the farm…');
+  pass('farm');
   // ══ THE FARM ══════════════════════════════════════════════════════════════
   // The bottomland east of town: blocks (3,0) and (3..5, 1). The barnyard, the
   // grain elevator on the rail, the corn maze, the pumpkin patch, and the 4-H
@@ -8683,6 +8705,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
   }
 
   await breathe('Raking the park…');
+  pass('park');
   // ══ THE PARK ══════════════════════════════════════════════════════════════
   // Blocks (4..5, 2). The town green's bigger cousin: the pond, the nine-hole
   // municipal course the mayor's brother-in-law runs, picnic tables and grills.
@@ -8720,6 +8743,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
   const TOWERS: [number, number][] = [[bcW(4) + 520, bcW(0) - 420], [3980, 1600]];
   for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
     if (PLAN[gy][gx] !== 'forest') continue;
+    pass(`forest ${gx},${gy}`);
     const cxB = bcW(gx), cyB = bcW(gy);
     const cx = w(cxB), cz = w(cyB);
     const half = wLen(BLOCK_SIZE / 2) - 6;
@@ -8793,6 +8817,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     }
   }
 
+  pass('snack carpet');
   // ── the snack carpet ──────────────────────────────────────────────────────
   // A speck-sized void must always have something to nibble, in every block,
   // in the biome's own vocabulary.
@@ -8813,6 +8838,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     for (let t = 0; t < 3; t++) place(makeCoins(), cx + mr(-half, half), cz + mr(-half, half), 0.55);
   }
 
+  pass('roads');
   // ── the roads ─────────────────────────────────────────────────────────────
   // Cones and streetlamps on the shoulder, and — because the fair is on — a
   // sign on every verge, alternating sides of the road and cycling the three
@@ -8875,6 +8901,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     }
   }
 
+  pass('river banks');
   // ── the river banks + the bridge railings ─────────────────────────────────
   {
     const RIVER_W: [number, number][] = [
@@ -8967,6 +8994,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     //    Affordable because the camera moved. At PLAY_DIST 29 this fill cost
     //    +21% draw calls; at 22 the frame measured 320 against the old 445, so
     //    the density is paid for out of what pulling in already gave back.
+    pass('country fill: verge');
     for (let t = 0; t < 62000 && filled < 5200; t++) {
       const wx = mr(LO, HI), wy = mr(LO, HI);
       const { m, r3 } = pickTiny();
@@ -8997,6 +9025,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     //    or above, and NOTHING above 7, so a WORLD ENDER sixteen metres across
     //    had nothing left worth swallowing. A mature maple is the most
     //    obviously right big object this world could possibly have.
+    pass('country fill: big trees');
     for (let t = 0; t < 4000 && bigTrees < 150; t++) {
       const wx = mr(LO, HI), wy = mr(LO, HI);
       const r3 = mr(4.2, 5.4);
@@ -9024,6 +9053,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // 3. THE OUTBUILDINGS. Barns, silos and a grain elevator on the outskirts,
     //    which the prop kit already had and the world was not using. These are
     //    the 5-to-7 rung: the thing a COLOSSUS drives across town FOR.
+    pass('country fill: outbuildings');
     for (let t = 0; t < 2600 && outbuildings < 46; t++) {
       const wx = mr(LO, HI), wy = mr(LO, HI);
       // outskirts only — a silo on the town green is a different game
@@ -9044,6 +9074,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
   }
 
   await breathe('Growing the wildflowers…');
+  pass('coast fringe');
   // ── the coast fringe ──────────────────────────────────────────────────────
   // The band between the block grid and the cliff. North and west it is scrub
   // and boulders, east it is pine, south it is the lake shore.

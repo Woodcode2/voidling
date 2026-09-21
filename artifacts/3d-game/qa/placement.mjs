@@ -309,13 +309,19 @@ const auditFn = (D) => {
     props.push({ i: props.length, mesh: m, x: m.position.x, z: m.position.z, cx, cz, lgx, lgz, ghx, ghz, corners, grounded,
       h: maxY - Math.min(0, minY), minY, maxY, rIn: Math.min(ghx, ghz), rOut: Math.hypot(ghx, ghz), r: e.radius,
       ry: m.rotation.y, cy, sy, qk: ud.qk || '', building: !!ud.building, afloat: !!ud.afloat, bench, door, nv, spin: !!ud.spin,
+      // island.ts place() stamps the pass that placed it; "?" is a pass that
+      // has no marker yet, which is a gap in the instrument and not in the game
+      pass: ud.pass || '?',
       // a SOLID is a building-class thing with walls: eat radius >= 2, a front
       // (trees/bushes/rocks tag userData.spin and have none), 2+ tall, 2.4+ wide
       solid: e.radius >= 2 && !ud.spin && (maxY - Math.min(0, minY)) >= 2 && Math.min(2 * ghx, 2 * ghz) >= 2.4 });
   }
   const out = { world: D.world, n: props.length, cats: {}, benches: props.filter((p) => p.bench).length, houses: props.filter((p) => p.door).length, dbgBench };
   const cat = (k) => (out.cats[k] = out.cats[k] || []);
-  const desc = (p) => `#${p.i} ${p.qk || (p.bench ? 'bench' : p.building ? 'bldg' : 'prop')} r=${+p.r.toFixed(2)} foot=${(2 * p.ghx).toFixed(1)}x${(2 * p.ghz).toFixed(1)} h=${p.h.toFixed(1)} at (${p.cx.toFixed(1)},${p.cz.toFixed(1)})`;
+  // NAME THE PASS. An offender used to be "#4552 prop r=1.4 at (-56.0,182.0)",
+  // which says what is wrong and nothing about who did it; the pass name is the
+  // difference between reading the audit and searching populate() by hand.
+  const desc = (p) => `#${p.i} ${p.qk || (p.bench ? 'bench' : p.building ? 'bldg' : 'prop')} r=${+p.r.toFixed(2)} foot=${(2 * p.ghx).toFixed(1)}x${(2 * p.ghz).toFixed(1)} h=${p.h.toFixed(1)} at (${p.cx.toFixed(1)},${p.cz.toFixed(1)}) «${p.pass}»`;
   // world point → inside q's oriented ground rect (margin m)?
   const inRect = (q, x, z, m = 0) => { const dx = x - q.x, dz = z - q.z; const lx = dx * q.cy - dz * q.sy, lz = dx * q.sy + dz * q.cy;
     return Math.abs(lx - q.lgx) < q.ghx + m && Math.abs(lz - q.lgz) < q.ghz + m; };
