@@ -942,7 +942,25 @@
          paintMenuLadder. The ring and the 1.14 scale already mark that dot and
          both are quiet at arm's length: a child's eye lands on the biggest
          bright thing, which is PLAY, and then has to go looking for where she
-         is. This is the thing that will not sit still.
+         is. So it moves when she arrives, and then it stops.
+
+         IT USED TO BOB FOREVER, on the Candy Crush argument, and that is the
+         same argument day 7 made for `pipHere ... infinite` on the ring
+         directly underneath — which MENU-BRIEF §5.1 bar 4 had already ruled
+         out and qa/reveal.mjs bar 2 caught (1,203 of 26,988 px changing on a
+         settled menu, 'Running: pipFlagBob@pipFlag'). A ring that never
+         settles is a screen that never settles; a flag over that ring is no
+         different, and two different answers to one question on one row is
+         worse than either.
+
+         THE COUNT IS ON THE BASE RULE ON PURPOSE. paintMenuLadder rewrites
+         `pips.innerHTML` (prototype3d.ts:7662) and re-injects this span
+         (:7689) on every paint, so a fresh node restarts the animation and a
+         finite count re-fires on EVERY entry to the menu — the same contract
+         `#end.show #btnAgain` has. Scoping it to `#mlPips.reveal`
+         instead would have looked equivalent and fired ONCE PER INSTALL:
+         markLadderSeen() (:7847) runs before the class is added, and :7619
+         strips it at the top of every later paint.
 
          `overflow: visible` on .pip is not needed — the dot is not clipped —
          but the ROW is 52px tall with a 16px gap and the flag lives above it,
@@ -953,20 +971,28 @@
       .pipFlag { position: absolute; left: 50%; bottom: calc(100% + 9px); transform: translate(-50%, 0);
         z-index: 3; pointer-events: none; white-space: nowrap;
         padding: 3px 9px 4px; border-radius: 8px;
-        font-size: 10px; font-weight: 700; letter-spacing: 1.6px; color: #2a1206;
+        font-size: 12px; line-height: 1; font-weight: 700; letter-spacing: 1.6px; color: #2a1206;
         background: linear-gradient(180deg, #ffe08a, #ffb82a);
         box-shadow: 0 3px 0 rgba(140, 78, 8, 0.55), 0 4px 12px rgba(0, 0, 0, 0.45);
-        animation: pipFlagBob 1.5s ease-in-out infinite; }
+        animation: pipFlagBob 660ms ease-in-out 3; }
       /* the point, aimed at the dot */
       .pipFlag::after { content: ''; position: absolute; left: 50%; top: 100%;
         transform: translateX(-50%); width: 0; height: 0;
         border-left: 5px solid transparent; border-right: 5px solid transparent;
         border-top: 6px solid #ffb82a; }
+      /* NOT DURING THE FIRST REVEAL. On that one screen the ring on this very
+         dot is already pulsing three times (`#mlPips.reveal .pip.here::after`
+         below), and the flag is a label for that ring — bobbing it at the same
+         instant on the same dot is the two-animations-on-one-dot that §2.5's
+         motion budget refuses and a six-year-old reads as a glitch. The
+         introduction has a signal; every ordinary visit after it is the one
+         that needs this. `body.calm .pipFlag` turns the rest off. */
+      #mlPips.reveal .pipFlag { animation: none; }
       /* TRANSFORM, NOT `bottom`. The flag already carries translateX(-50%) to
          centre itself, so the bob has to travel in the same property or the two
-         fight; animating `bottom` also relayouts the pip on every frame of an
-         infinite loop, on the one screen that is already rendering a live 3D
-         island behind it. */
+         fight; animating `bottom` would also relayout the pip on every frame,
+         on the one screen that is already rendering a live 3D island behind
+         it. */
       @keyframes pipFlagBob {
         0%, 100% { transform: translate(-50%, 0); }
         50% { transform: translate(-50%, -6px); }
