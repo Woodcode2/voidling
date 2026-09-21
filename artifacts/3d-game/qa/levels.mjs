@@ -1060,6 +1060,79 @@ if (ONLY.includes('d')) {
     }
   }
 
+  // ── (d5) THE CARD'S PROMISE IS THE RULE THAT DECIDES ────────────────────
+  // MAPLE FALLS' dot 4 card reads FINISH TOP 3 (goalLine case 4, from
+  // LEVEL_SPEC.rank) and both places that DECIDED the dot asked for first
+  // place. Four of the six worlds promised a podium and accepted only a win:
+  // finish second having done exactly what the card said, and the game tells a
+  // six-year-old she failed.
+  //
+  // THIS BAR DERIVES NOTHING FROM THE RESOLVER. It reads the rank the CARD
+  // asks for out of the card's own text, then drives the board to exactly that
+  // placing and to one worse, and requires the two to disagree. A change to
+  // either side alone fails it; only moving both together passes, which is the
+  // definition of them not drifting apart.
+  {
+    const place = async (ahead) => {
+      const p = await open({ voidUnlocked: UNLOCK_ALL }, '?w=maple&g=4&len=12');
+      await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0, null, { timeout: 600000 }).catch(() => { });
+      await VIRTUALISE(p);
+      // BRACKET HER, DO NOT RACE HER. Two facts make the obvious driver wrong,
+      // and it flip-flopped between runs until both were read rather than
+      // assumed: __setRivalScores clamps with Math.max(0, ...) (:4240), so a
+      // "below" rival set to -1000 is a rival on ZERO, tied with a player who
+      // has not eaten; and the player HAS been eating — an AUTO_START match
+      // drifts and scores, so on some runs she simply out-scored the rivals
+      // meant to be ahead of her and came home rank 1.
+      // So: `ahead` joined rivals at 2000, every other rival at 0, and her own
+      // score pinned between them with __setScore, which the file's own note
+      // (:4173) calls the one hook that may write a number directly because
+      // playerScore IS the number. Her placing is then ahead+1 by construction,
+      // whatever she ate.
+      const r = await p.evaluate(([n, step, ahead]) => {
+        const set = () => {
+          const list = window.__matchState().rivals;
+          let up = 0;
+          window.__setRivalScores(list.map((q) => (q.joined && up++ < ahead ? 2000 : 0)));
+          window.__setScore(1000);
+          return list.filter((q) => q.joined).length;
+        };
+        let joined = set();
+        for (let i = 0; i < n; i++) {
+          const due = window.__q; window.__q = [];
+          if (!due.length) return { broke: true };
+          window.__virt += step;
+          for (const cb of due) cb(window.__virt);
+          joined = set();
+          const ms = window.__matchState();
+          if (document.getElementById('end')?.classList.contains('show'))
+            return { rank: ms.rank, joined, you: Math.round(ms.score),
+              board: ms.rivals.map((q) => (q.joined ? '' : 'x') + Math.round(q.score)).join(' '),
+              hdState: (document.querySelector('#endHd .pip')?.className.match(/s-(\w+)/) || [])[1] ?? '' };
+        }
+        return { timeout: true };
+      }, [60 * 40, 1000 / 60, ahead]);
+      const line = await p.evaluate(() => (window.__goalLine ? window.__goalLine('maple', 4) : ''));
+      await p.close();
+      return { ...r, line };
+    };
+    const want = await place(0);
+    const cap = /TOP (\d+)/.test(want.line) ? +want.line.match(/TOP (\d+)/)[1] : 1;
+    if (!want.line) bad('(d) podium: __goalLine is absent, so the card’s promise could not be read and nothing below was tested');
+    else {
+      const at = await place(cap - 1), past = await place(cap);
+      if (at.broke || at.timeout || past.broke || past.timeout) bad('(d) podium: a harness match never reached the end card');
+      else {
+        if (at.rank !== cap) bad(`(d) podium: wanted to land on rank ${cap} and the board says ${at.rank} — the driver is wrong, not the game`);
+        else if (['done', 'clear'].includes(at.hdState)) ok(`(d) podium: the card says "${want.line}" and rank ${at.rank} resolved as ${at.hdState}`);
+        else bad(`(d) podium: the card says "${want.line}" and rank ${at.rank} gave the "${at.hdState}" pip — the game broke its own promise`);
+        if (past.joined < cap) console.log(`  ··   (d) podium: only ${past.joined} rival(s) joined, so rank ${cap + 1} could not be staged — NOT COVERED`);
+        else if (past.rank !== cap + 1) bad(`(d) podium: wanted to land on rank ${cap + 1} with ${past.joined} rivals joined and the board says ${past.rank} — the driver is wrong, not the game. you=${past.you} rivals=[${past.board}]`);
+        else if (['done', 'clear'].includes(past.hdState)) bad(`(d) podium: rank ${past.rank} also resolved as ${past.hdState} against a card reading "${want.line}" — the promise is not a bar at all`);
+        else ok(`(d) podium: and rank ${past.rank} does not pass it (${past.hdState})`);
+      }
+    }
+  }
   // ── (d5) THE ORDINAL IS FOR THE END CARD, NOT THE MENU ──────────────────
   {
     const p = await open({ voidUnlocked: UNLOCK_ALL }, '?w=maple');

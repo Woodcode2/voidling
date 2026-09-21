@@ -2584,6 +2584,18 @@ let goalProp: Edible | null = null;
  *  RIVALS is the one kind that cannot answer early and returns false always:
  *  a rank is only true at the buzzer, because the family is still eating.
  *  §4.2 — "resolves at the buzzer only". The buzzer resolves it. */
+/** DOT 4'S RULE, WRITTEN ONCE. The card has always promised what LEVEL_SPEC
+ *  says — goalLine (:2625) renders "FINISH TOP 3" on maple and pirate, "TOP 2"
+ *  on gameday and lantern, and "BE THE BIGGEST VOID" only where rank is 1 —
+ *  while both places that DECIDED the dot hardcoded first place. Four of the
+ *  six worlds therefore asked a child for a podium and accepted nothing but a
+ *  win: finish second on MAPLE FALLS, having done exactly what the card said,
+ *  and the game tells you that you failed. A promise the game does not keep is
+ *  the worst thing it can do to a six-year-old, and it is worse than a bug
+ *  because she cannot tell it is one.
+ *  0 means she is not on the board at all, which is not a placing. */
+const rivalsMet = (r: number): boolean => r >= 1 && r <= LEVEL_SPEC[pickedWorld].rank;
+
 function goalMet(): boolean {
   if (!goal) return false;
   const sp = LEVEL_SPEC[pickedWorld];
@@ -3287,6 +3299,7 @@ const _dbg = new Proxy(_dbgStore, {
   __wayAim: (x: number, y: number, z: number) => { x: number; y: number; ang: number; onScreen: boolean; inFront: boolean } | null;
   __wayState: () => { on: boolean; x: number; y: number; ang: number; cued: boolean; chip: string; goalN: number; haveProp: boolean; r: number; need: number; pad: number; top: number; bot: number };
   __claimsNear: (x: number, y: number, r: number) => { x: number; y: number; r: number; f?: unknown }[];
+  __goalLine: (w: string, n: number) => string;
   __claimStats: () => { n: number; maxR: number };
   __claimAt: (x3: number, z3: number, tol3?: number, r3?: number) => { r3: number; off3: number; strict: boolean; reach3: number | null } | null;
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void; __settle: () => { inside: number; through: number; doorstep: number; feet: number; ms: number }; __settleAgain: () => string[]; __introLen: () => number; __authored: () => { hours: number; mid: (string | undefined)[] };
@@ -3450,6 +3463,9 @@ _dbg.__eatNearest = (rel: number) => {
   return best ? { r: best.radius, R } : null;
 };
 _dbg.__fadeStats = () => fadeStats;   // QA: why a prop did or did not get its own material
+// QA: the promise dot 4's card makes, so qa/levels.mjs can require the rule
+// that DECIDES the dot to agree with it without deriving either from the other.
+_dbg.__goalLine = (w: string, n: number) => goalLine(w as WorldId, n as Goal);
 _dbg.__claimsNear = qaClaimsNear; _dbg.__claimStats = qaClaimStats; _dbg.__claimAt = qaClaimAt;
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
 /** QA: the establishing shot's length for the world actually loaded. Read it,
@@ -12908,7 +12924,7 @@ function animate() {
       // level there is never anything to hurry for: unmet, the nag is the
       // pressure the owner's floor forbids; met, the match is already over.
       const hurry = !goal;
-      const bell = hurry || (goal !== null && goal.n === 4 && lastRank === 1);
+      const bell = hurry || (goal !== null && goal.n === 4 && rivalsMet(lastRank));
       if (hurry) timerEl.style.color = '#ff8a8a';
       // The warning used to fire at 30s — the exact frame the TREASURE FEAST
       // beat fires — and announce() overwrote the beat banner in the same
@@ -12976,7 +12992,7 @@ function animate() {
         // — which is lastRank AFTER endMatch recomputed it — against a result
         // decided moments earlier from the 5 Hz copy. Two ranks, one match.
         lastRank = currentRank();
-        const won = goal.n === 4 && lastRank === 1;
+        const won = goal.n === 4 && rivalsMet(lastRank);
         goal.met = won; goal.result = won ? 'win' : 'time';
       }
       outroT = 2.0;   // slow-mo push-in beat before the results panel
