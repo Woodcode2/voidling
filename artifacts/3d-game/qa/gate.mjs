@@ -565,6 +565,10 @@ const SUITE = [
     cmd: ['node', 'qa/calmcards.mjs', '4177'], verdict: pf,
     why: 'nothing a child has to read disappears when the phone asks for less motion — every card whose animation IS its visibility keeps its full run under prefers-reduced-motion (before: all four at 0ms), measured by walking the card\'s own timeline rather than watching wall-clock frames' },
 
+  { id: 'calmlist', tier: 'ui', profiles: ['push', 'live'], timeout: 600,
+    cmd: ['node', 'qa/calmlist.mjs', '4177'], verdict: pf,
+    why: 'the reduced-motion contract is a hand-written list and this reads it back — every rule that STARTS an animation must have one that stops it under calm, asked of the CSSOM rather than of the file. It found the drag tutorial ignoring the setting entirely (an infinitely looping hand for a child who asked for less motion) and a locked-tap shake that named wShake against a keyframes called wshake and so had never once played. Twenty-nine further offenders are frozen BY NAME, so a fix is a deletion and a new omission is a red' },
+
   { id: 'navtap', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 600,
     cmd: ['node', 'qa/navtap.mjs', '4177'], verdict: pf,
     why: 'every control on the front door clears 44x44, no label is cut off inside its own button at 375pt, and the door to the worlds is not smaller than the trophy shelf (the owner: "it\'s basic and over complicated for navigation")' },

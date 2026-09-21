@@ -411,7 +411,14 @@
       /* the hand group is authored with the FINGERTIP at (0,0): translate puts
          the touch point itself on the lemniscate. x=160+120sin(t),
          y=105-45sin(2t), sampled every π/8; linear timing between samples. */
-      .handG { transform-origin: 0 0; animation: handMove 3.8s linear infinite; }
+      /* A BASE TRANSFORM, BECAUSE THE KEYFRAMES ARE NOT ALWAYS THERE. The
+         position came only from handMove, so the moment the animation is
+         silenced — which is what Reduce Motion is for — this falls back to
+         transform:none and the hand jumps to the SVG origin, the top-left
+         corner, instead of the middle of the figure-eight. This is the 0%/100%
+         frame written down, so it costs nothing while the animation runs. */
+      .handG { transform-origin: 0 0; transform: translate(160px, 105px) scale(0.92);
+        animation: handMove 3.8s linear infinite; }
       @keyframes handMove {
         0%     { transform: translate(160px, 105px) scale(0.92); }
         6.25%  { transform: translate(206px, 73px)  scale(0.92); }
@@ -432,7 +439,10 @@
         100%   { transform: translate(160px, 105px) scale(0.92); }
       }
       /* the glow under the fingertip — the finger is "down" the whole loop */
-      .hTouch { animation: hTouch 1.9s ease-in-out infinite; }
+      /* same trap as .handG: the 0.3-0.55 ghosting lives only in the keyframes,
+         so silenced this circle renders at opacity 1 — a solid white disc over
+         the fingertip instead of a halo under it. */
+      .hTouch { opacity: 0.4; animation: hTouch 1.9s ease-in-out infinite; }
       @keyframes hTouch { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.55; } }
       /* hunger / power meter */
       #hunger { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 5;
@@ -1023,13 +1033,20 @@
         text-shadow: 0 2px 8px rgba(0,0,0,0.6); }
       /* a locked dot that is tapped says why, in the same shake the locked
          world cards use — a padlock with no answer is a broken button */
-      .pip.shake { animation: wShake 420ms ease; }
+      /* wshake, NOT wShake. animation-name is case-sensitive and the only
+         keyframes in this file is `@keyframes wshake` (:2183), so this rule and
+         the one below named an animation that does not exist and the locked-tap
+         apology has never played — while prototype3d.ts:7773 does the full
+         remove/reflow/add restart dance for it every time a child taps a dot
+         she has not reached. Found by qa/calmlist.mjs, which had to resolve
+         every animation-name to answer its own question. */
+      .pip.shake { animation: wshake 420ms ease; }
       /* AND IT HAS TO BEAT THE REVEAL. `#mlPips.reveal .pip` is an id plus two
          classes, so it outranks `.pip.shake` — and the reveal class stays on
          until the next paint. Without this, a child who taps a padlock during
          her ladder's introduction gets the sound and the sentence and no shake:
          the one thing on that dot that answers without words. */
-      #mlPips .pip.shake { animation: wShake 420ms ease; }
+      #mlPips .pip.shake { animation: wshake 420ms ease; }
       /* ── ALL THIRTY, AT A GLANCE ───────────────────────────────────────
          The picker's own row, small and untappable: the card is the target
          here, and what these five are for is showing the SHAPE of the world —
@@ -2990,6 +3007,17 @@
       /* the flag stays, it just stops bobbing — its visibility is CSS, not a
          keyframe, so silencing it does not take it away (see calmcards) */
       body.calm .pipFlag { animation: none !important; }
+      /* THE DRAG LESSON IS THE ONE THING A PRE-READER GETS, and it ignored this
+         contract entirely: none of .handG, .hTrail or .hTouch appeared in this
+         list or in the @media block that mirrors it, so a child who had asked
+         for less motion still got an infinitely looping hand. Silenced, the
+         hand rests at the centre of the drawn lemniscate with the path still
+         stroked around it — a diagram instead of a gesture, which is what
+         "a hard cut is the accessible version of a flip" means for a movement.
+         The two .shake rules join them because they are motion for its own
+         sake and carry no state a child needs. */
+      body.calm .handG, body.calm .hTrail, body.calm .hTouch,
+      body.calm .pip.shake, body.calm #mlPips .pip.shake { animation: none !important; }
       /* ── TWO CARDS THAT MUST NOT SIMPLY BE SILENCED ──────────────────────
          #evolve.show and #news.show are not decorations on a visible element:
          their animations ARE their visibility. Both elements sit at opacity 0
@@ -3031,7 +3059,8 @@
         #dailyGrid .dCell.now, #dailyGrid .dCell.now::after, #btnAgain,
         #skinPrev .spCard, #daily .dCard, .skCard .rib,
         .skCard.bought, .burst > i, #shopWallet.bump, .skCard.isnew::before,
-        #skinPrev.win .spWin {
+        #skinPrev.win .spWin,
+        .handG, .hTrail, .hTouch, .pip.shake, #mlPips .pip.shake {
           animation: none !important;
         }
         /* the sparkles are pure animation: with none, they would sit in a pile
