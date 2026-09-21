@@ -6514,6 +6514,21 @@ let heroProp: Edible | null = null;
  *  — and a probe that re-derives it from the score list gets that wrong on
  *  every match before the last rival walks in. */
 let lastRank = 0;
+/** THE PLAYER'S PLACE ON THE BOARD RIGHT NOW, not at the last 5 Hz tick.
+ *  lastRank is written from renderRank()'s board, which runs on the HUD's 5 Hz
+ *  tick, so it can be 200 ms old — and the buzzer used to resolve RIVALS from
+ *  it. The authoritative recompute already existed at endMatch, under the
+ *  comment "the rank at the buzzer, which is what RIVALS resolves on", and it
+ *  runs AFTER the 2.0 s outro: the right number was computed and thrown away
+ *  while the decision had already been made on the stale one.
+ *  For a child that is the whole game: take first place in the last fifth of a
+ *  second of a RIVALS match and be told you lost.
+ *  Only the NUMBER is shared. Both boards keep building their own rows, because
+ *  they need names and colours to draw; this needs neither. */
+const currentRank = (): number =>
+  [{ score: playerScore, me: true },
+    ...rivals.list.filter((r) => r.joined).map((r) => ({ score: r.score, me: false }))]
+    .sort((a, b) => b.score - a.score).findIndex((r) => r.me) + 1;
 let heroCued = false, heroAte = false;
 /** dot 3's own cue, which the hero landmark had been collecting instead. */
 let goalCued = false;
@@ -12951,6 +12966,12 @@ function animate() {
       // when the family has stopped eating, which is now. Everything else that
       // reaches this line has already been asked every frame and said no.
       if (goal && !goal.result) {
+        // TAKE THE RANK AT THE BUZZER, since the comment above says the rank is
+        // only true now. qa/levels.mjs (d4) caught the difference: it reported
+        // "rank 1 at the buzzer gave the fin pip", reading __matchState().rank
+        // — which is lastRank AFTER endMatch recomputed it — against a result
+        // decided moments earlier from the 5 Hz copy. Two ranks, one match.
+        lastRank = currentRank();
         const won = goal.n === 4 && lastRank === 1;
         goal.met = won; goal.result = won ? 'win' : 'time';
       }
