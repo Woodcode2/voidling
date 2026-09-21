@@ -27,7 +27,7 @@ import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid, makeVoidBody, applySkinToBody, type Mood } from './proto3d/void3d';
-import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, onIce3, setWorld, setMeshFade, fadeStats, installPropShader, part, mergedProp, type WorldId } from './proto3d/island';
+import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, onIce3, setWorld, setMeshFade, fadeStats, installPropShader, part, mergedProp, qaClaimsNear, qaClaimStats, qaClaimAt, type WorldId } from './proto3d/island';
 import { groundFootprint } from './proto3d/footprint';
 import { createLife, pickFresh, type Life } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
@@ -3286,6 +3286,9 @@ const _dbg = new Proxy(_dbgStore, {
   __formCall: (t: string) => void;
   __wayAim: (x: number, y: number, z: number) => { x: number; y: number; ang: number; onScreen: boolean; inFront: boolean } | null;
   __wayState: () => { on: boolean; x: number; y: number; ang: number; cued: boolean; chip: string; goalN: number; haveProp: boolean; r: number; need: number; pad: number; top: number; bot: number };
+  __claimsNear: (x: number, y: number, r: number) => { x: number; y: number; r: number; f?: unknown }[];
+  __claimStats: () => { n: number; maxR: number };
+  __claimAt: (x3: number, z3: number, tol3?: number) => { r3: number; off3: number; strict: boolean; reach3: number | null } | null;
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void; __settle: () => { inside: number; through: number; doorstep: number; feet: number; ms: number }; __settleAgain: () => string[]; __introLen: () => number; __authored: () => { hours: number; mid: (string | undefined)[] };
   __life: Life; __moverStats: (gate: number) => { near: number; total: number }; __crowdGate: number;
   __hatSheet: (ids: string[]) => Promise<unknown>;
@@ -3447,6 +3450,7 @@ _dbg.__eatNearest = (rel: number) => {
   return best ? { r: best.radius, R } : null;
 };
 _dbg.__fadeStats = () => fadeStats;   // QA: why a prop did or did not get its own material
+_dbg.__claimsNear = qaClaimsNear; _dbg.__claimStats = qaClaimStats; _dbg.__claimAt = qaClaimAt;
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
 /** QA: the establishing shot's length for the world actually loaded. Read it,
  *  never copy it — qa/firstframe.mjs kept its own {maple:2.2, …} table and

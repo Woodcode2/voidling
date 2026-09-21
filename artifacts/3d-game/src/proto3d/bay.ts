@@ -354,7 +354,7 @@ export function pointInRegion(poly: Pt[], rnd: () => number): Pt | null {
 // the ground it uses in a coarse spatial hash and refuses to sample on top of
 // something already there.
 const CELL = 400;                       // world units; a 3D radius of 10 is 200 world
-interface Claim { x: number; y: number; r: number; f?: Rect }
+export interface Claim { x: number; y: number; r: number; f?: Rect }
 const claims = new Map<string, Claim[]>();
 const cellKey = (x: number, y: number) => `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
 
@@ -443,6 +443,33 @@ const distToRect = (px: number, py: number, f: Rect): number => {
 };
 
 export function resetPlacement(): void { claims.clear(); maxClaimR = 0; }
+
+/** QA ONLY. "Was this ground actually reserved?" is the question every
+ *  placement offence raises, and the audit could only ever infer the answer:
+ *  qa/placement.mjs sees where props ENDED UP, never what the hash was told.
+ *  Maple's bench offences cost four wrong diagnoses for exactly that reason —
+ *  each one a chain of reasoning about a store nobody had read.
+ *  Returns every claim whose point is within `rWorld` of (x, y), rectangle and
+ *  all, so a probe can set the reservation beside the offence. */
+export function claimsNear(x: number, y: number, rWorld: number): Claim[] {
+  const out: Claim[] = [];
+  const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
+  const reach = blockFor(rWorld) + 1;
+  for (let i = -reach; i <= reach; i++) for (let j = -reach; j <= reach; j++) {
+    const bucket = claims.get((cx + i) + ',' + (cy + j));
+    if (!bucket) continue;
+    for (const c of bucket) if (Math.hypot(c.x - x, c.y - y) <= rWorld) out.push(c);
+  }
+  return out;
+}
+/** QA ONLY: how many claims the store holds and the widest one. A store that is
+ *  EMPTY where a probe expected it full is the one answer no amount of source
+ *  reading produces. */
+export function claimStats(): { n: number; maxR: number } {
+  let n = 0;
+  for (const b of claims.values()) n += b.length;
+  return { n, maxR: maxClaimR };
+}
 
 /** rWorld is the prop's footprint in WORLD units (3D radius × 20). */
 export function spotFree(x: number, y: number, rWorld: number): boolean {

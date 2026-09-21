@@ -23,6 +23,29 @@ import * as NM from './nightmarket';
 import * as TG from './tailgate';
 import * as LUXE from './luxe';
 import * as MS from './mainstreet';   // MAPLE FALLS prop kit + its seeded RNG
+// QA: the placement hash's own view of the island, for qa/placement.mjs. All
+// six worlds funnel through this one store (mainstreet re-exports bay's), so
+// one pair of hooks answers for every world.
+export const qaClaimsNear = (x: number, y: number, r: number) => BAY.claimsNear(x, y, r);
+export const qaClaimStats = () => BAY.claimStats();
+/** QA: THE CLAIM A PROP ACTUALLY MADE, asked in the 3D units qa/placement.mjs
+ *  works in. An offence says where a prop ENDED UP; this says what the hash was
+ *  told, which is the other half of every placement diagnosis and was missing
+ *  from all of them. Returns null when the prop reserved nothing at all — the
+ *  answer no amount of source reading produces. */
+export const qaClaimAt = (x3: number, z3: number, tol3 = 0.3) => {
+  const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
+  const near = BAY.claimsNear(wx, wy, tol3 * 20);
+  let best: { d: number; c: BAY.Claim } | null = null;
+  for (const c of near) {
+    const d = Math.hypot(c.x - wx, c.y - wy);
+    if (!best || d < best.d) best = { d, c };
+  }
+  if (!best) return null;
+  const f = best.c.f;
+  return { r3: +(best.c.r / 20).toFixed(2), off3: +(best.d / 20).toFixed(2),
+    strict: !!(f && f.strict), reach3: f ? +(f.hz / 20).toFixed(2) : null };
+};
 
 export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' | 'beach' | 'zoo' | 'airport' | 'military'
   | 'village' | 'lake' | 'pinewood' | 'piste' | 'lodge' | 'rim'   // POWDER PASS — all new words, no boundary renames

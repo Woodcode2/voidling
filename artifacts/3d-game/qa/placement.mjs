@@ -442,13 +442,28 @@ const auditFn = (D) => {
     if (reasons.length) cat('door').push({ p, d: `${desc(p)}: ${reasons.join('; ')}`, x: d.x, z: d.z, depth: reasons.length });
   }
   // ── benches ──────────────────────────────────────────────────────────────
+  // AND WHAT THE BENCH ACTUALLY RESERVED, not only what ended up in front of
+  // it. island.ts footOf() widens a bench's claim by its userData.legroom so
+  // the ground it needs to see over is reserved before anything else asks —
+  // but an offence line could never say whether that reservation was MADE.
+  // Four diagnoses of Maple's bench offences were built on assuming it was;
+  // measured, the three worst offenders sit in front of benches with no claim
+  // within 200 world units of them, strict or otherwise. __claimAt asks the
+  // hash directly, in the 3D units this file works in, and prints the answer
+  // beside the offence so the next reader starts from a fact.
+  const claimNote = (p) => {
+    const c = window.__claimAt ? window.__claimAt(p.x, p.z) : undefined;
+    if (c === undefined) return '';                       // build without the hook
+    if (c === null) return '  [RESERVED NOTHING]';
+    return c.strict ? `  [reserved ${c.reach3}u, strict]` : `  [reserved r${c.r3}, no legroom rect]`;
+  };
   for (const p of props) {
     if (!p.bench) continue;
     const fx = p.sy, fz = p.cy;   // makeBench: the seat looks down local +z (the back slat is at z=-0.36)
     for (const dd of [1.2, 2.0, 2.8]) {
       const px = p.cx + fx * dd, pz = p.cz + fz * dd; let hit = null;
       for (const q of near(px, pz, 1)) if (q !== p && !q.afloat && inRect(q, px, pz, 0.1)) { hit = q; break; }
-      if (hit) { cat('bench').push({ p, d: `${desc(p)} faces ${desc(hit)} ${dd}u in front`, x: p.cx, z: p.cz, depth: +(3 - dd).toFixed(1) }); break; }
+      if (hit) { cat('bench').push({ p, d: `${desc(p)}${claimNote(p)} faces ${desc(hit)} ${dd}u in front`, x: p.cx, z: p.cz, depth: +(3 - dd).toFixed(1) }); break; }
       if (!window.__insideIsland3(px, pz)) { cat('bench').push({ p, d: `${desc(p)} faces off the island ${dd}u in front`, x: p.cx, z: p.cz, depth: +(3 - dd).toFixed(1) }); break; }
     }
     let target = null;
