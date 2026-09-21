@@ -172,9 +172,7 @@ try {
   if (anim === 'ABSENT') bad('FAIL — #wayfind is not in the document.');
   else if (anim.off !== 'none' || anim.on !== 'none') bad(`FAIL — #wayfind carries an animation (${anim.off} / ${anim.on}); it must be shown by a class, not by a keyframe's last frame.`);
   else console.log('  (c) no @keyframes on #wayfind, shown and hidden by a class.');
-  // ── (e) END TO END: GROW HER UNTIL THE BARN IS EDIBLE ─────────────────────
-  // __eatKind('snack', n) is qa/levels.mjs's own dot-3 driver: it eats things
-  // smaller than 1 unit, which grows the void and can never take the landmark.
+  // ── (e) THE CROSSING: HAND HER THE RADIUS, DO NOT GROW IT ────────────────
   // Three things must happen together at the crossing, and until this probe
   // none of them was asserted anywhere: the chip must stop saying GROW BIGGER,
   // the cue must fire for the LANDMARK (it used to fire only for the largest
@@ -191,26 +189,76 @@ try {
   if (before.cued) bad('FAIL — the landmark cue fired before she was big enough to eat it.');
   if (before.on) bad('FAIL — the arrow is up before the crossing.');
 
-  let grew = 0;
-  for (let i = 0; i < 40; i++) {
-    const st2 = await pg.evaluate(() => window.__wayState());
-    if (st2.r >= st2.need) break;
-    grew += await pg.evaluate(() => window.__eatKind('snack', 60));
-    await pg.waitForTimeout(400);
-  }
+  // ── THIS BAR USED TO EAT ITS WAY THERE, AND IT WAS MEASURING THE CLAMP ───
+  // It grew the void with __eatKind('snack', 60) in a loop that broke on the
+  // FIRST sample where r >= need. That loop can never deliver a SUSTAINED
+  // crossing, and prototype3d.ts ~3653 already said why: "In a match the growth
+  // law owns the radius and would walk this back on the next frame; the probe
+  // would then be measuring the clamp."
+  //
+  // The law has two walls and __eatKind defeats neither. prototype3d.ts:13027
+  // rate-limits growth to lastR + maxStep, at most ~0.0135 per RENDERED frame;
+  // :13028 caps it at lawCap, a function of MATCH-elapsed seconds, and match
+  // time advances at the clamped dt of 0.05s per frame (:12659). So on a box
+  // rendering one frame per ~2.5 wall-seconds, 0.90 -> 4.50 is hundreds of
+  // frames and many wall-minutes. __eatKind writes the radius directly, the
+  // next frame takes it straight back, and a read between those two moments
+  // sees a number the game has already revoked. That is exactly what the gate
+  // captured: "ate 1320 snacks: r 0.90 -> 4.76 against 4.5 needed" and then
+  // "cue false -> false". The game was right; the probe was measuring the clamp.
+  //
+  // __setVoidR (prototype3d.ts:3662) is the instrument that exists for this. It
+  // sets frozenR — the flag every one of those clamps tests, and :13027, :13028
+  // and :13091 are its only three readers — and it sets radius AND lastR
+  // together, which matters because lastR is what the rate limiter measures
+  // from. The crossing it hands over is one the growth law cannot take back.
+  //
+  // + 0.25, NOT + 0. The chip (:2695) and the arrow (:2785) trigger on
+  // sp.landmarkR = 4.50, but the CUE (:14378) asks the real eat question —
+  // goalProp.radius <= voidling.radius * EAT_RATIO — and maple's barn is r 5.0
+  // (:2527), so the cue actually needs 5.0 / 1.11 = 4.5045. Sitting exactly on
+  // 4.50 lights two of the three signals and hangs on the third.
+  // (|| 1) mirrors the fallback the chip and the arrow use; __wayState's own
+  // `need` falls back to 0 (:4081), which would freeze her under START_R on a
+  // world that has no landmark.
+  //
+  // The supply-wall reading the old loop gave for free is kept as a REPORT: a
+  // caller that asks __eatKind for sixty and gets nine is looking at an island
+  // with nothing left to eat, and that is worth printing even though it is no
+  // longer what this bar turns on.
+  const grew = await pg.evaluate(() => window.__eatKind('snack', 60));
+  await pg.evaluate(() => { const s = window.__wayState(); window.__setVoidR((s.need || 1) + 0.25); });
   const crossed = await pg.evaluate(() => window.__wayState());
-  console.log(`  (e) ate ${grew} snacks: r ${before.r.toFixed(2)} -> ${crossed.r.toFixed(2)} against ${crossed.need} needed.`);
+  console.log(`  (e) asked __eatKind for 60 snacks and got ${grew}; radius handed over the law: `
+    + `r ${before.r.toFixed(2)} -> ${crossed.r.toFixed(2)} against ${crossed.need} needed.`);
   if (crossed.r < crossed.need) {
-    bad(`FAIL — could not grow past the landmark radius (${crossed.r.toFixed(2)} of ${crossed.need}); the crossing was never reached, so nothing below was tested.`);
+    bad(`FAIL — __setVoidR did not take (${crossed.r.toFixed(2)} of ${crossed.need}); the crossing was never reached, so nothing below was tested.`);
   } else {
     // give the frame loop and the 5 Hz chip a fair chance to notice
-    await pg.waitForFunction(() => { const s = window.__wayState(); return s.on && s.cued && s.chip === 'EAT IT NOW'; },
-      null, { timeout: 240000 }).catch(() => { });
+    // …AND RE-ASSERT ON THE WAY. frozenR turns the three growth clamps off, but
+    // the HUNTER SHRINK at prototype3d.ts:4972 and :4988 does not test it — so
+    // one bite during this wait would drop her back under the threshold and
+    // this bar would report the arrow down for a reason that is not the arrow's
+    // fault. A bite is not a verdict; re-arming inside the poll is.
+    await pg.waitForFunction(() => {
+      const s = window.__wayState();
+      if (s.r < (s.need || 1)) window.__setVoidR((s.need || 1) + 0.25);
+      return s.on && s.cued && s.chip === 'EAT IT NOW';
+    }, null, { timeout: 240000 }).catch(() => { });
     const after = await pg.evaluate(() => window.__wayState());
     console.log(`      chip "${before.chip}" -> "${after.chip}", cue ${before.cued} -> ${after.cued}, arrow ${before.on} -> ${after.on}`);
     if (after.chip !== 'EAT IT NOW') bad(`FAIL — past the crossing the chip reads "${after.chip}", not EAT IT NOW.`);
     if (!after.cued) bad('FAIL — the landmark came into range and the game said nothing: no banner, no ring, no sound. That moment belongs to the goal, not to the biggest building on the island.');
     if (!after.on) bad('FAIL — the landmark is edible and the arrow is still down.');
+    // WHEN THIS GOES RED AGAIN, SAY WHICH KIND OF RED IT IS. __law() publishes
+    // lawCap, maxStep and fed (prototype3d.ts:3527). Printed only on a failure,
+    // it separates "the game did not react" from "the radius was taken back",
+    // which printed identically before and cost a wrong diagnosis out loud.
+    if (after.chip !== 'EAT IT NOW' || !after.cued || !after.on) {
+      const law = await pg.evaluate(() => ({ ...window.__law(), r: window.__wayState().r }));
+      console.log('      law at the verdict: ' + Object.entries(law)
+        .map(([k, v]) => `${k}=${typeof v === 'number' ? +v.toFixed(3) : v}`).join(' '));
+    }
   }
 } catch (e) {
   bad(`FAIL — wayfind threw: ${e.message}`);
