@@ -10788,10 +10788,27 @@ function resetMatch() {
   // frames with no hero in them, and TEAM ART filed "the void is missing from
   // the play frames" as a ship blocker against a game that renders him fine.
   //
-  // A human cannot reach it today — every path into beginMatch runs from the
-  // menu, and endMatch clears `started` on the way there — so this is a
-  // landmine rather than a live defect. Clearing it here is what the function
-  // already promises: "nothing from the last match may speak in this one".
+  // ── AND THIS WAS LIVE, NOT A LANDMINE. THE FIRST VERSION OF THIS NOTE WAS
+  //    WRONG, AND WRONG IN THE DIRECTION THAT LET IT SHIP ────────────────────
+  // It read: "A human cannot reach it today — every path into beginMatch runs
+  // from the menu, and endMatch clears `started` on the way there." endMatch
+  // does no such thing. There are exactly four writes to `started` in this
+  // file — the declaration (:8857), startMatch (:9316), this line, and the
+  // #btnHome handler (:10901). endMatch (:8021) sets `ended = true` and
+  // nothing else.
+  //
+  // So before this line existed, the ONLY thing that cleared `started` was
+  // going HOME. Every PLAY AGAIN — #btnAgain (:10820) calls resetMatch()
+  // directly — re-armed with `started` still true, and both things that lower
+  // the hero read it: the fall is gated on `armed && !started` (:12718) and
+  // startMatch's own arriveY(0) sits behind `if (started || ...) return`
+  // (:9315). The rematch therefore opened with the hero twenty-six units above
+  // the town and startMatch's whole body skipped — no clock reset, no music
+  // stage, no beat schedule, no match_start.
+  //
+  // It was found sideways, chasing why a QA frame had no hero in it, and the
+  // first diagnosis stopped at the probe and called the rest theoretical. It
+  // was not. PLAY AGAIN is the second-most-pressed button in the game.
   started = false;
   // colours and dusk reset to the shipped rig here, and then beginMatch DEALS
   // the hour on top (applyHour) — so hour 0 is exactly this reset, and a

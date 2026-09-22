@@ -199,6 +199,30 @@ if (want(1)) {
 if (want(2)) {
   const ctx = await b.newContext({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });
   const p = await open(ctx, { levels: SEED_OPEN });   // seen:1 — no reveal to wait out
+  // ── WAIT FOR THE PAINT, NOT FOR THE BOOT ─────────────────────────────────
+  // This bar used to read its clip box and start its 3.5s settle the moment
+  // open() returned — and open() returns on window.__menuState, which is
+  // defined roughly two thousand lines and TWO awaited boot stages before the
+  // top-level enterMenu() that first paints the row. So the clock started
+  // before the thing it is timing existed.
+  //
+  // That is a false-FAIL generator, and it fired: the same build on the same
+  // box failed this bar at 488s with a loaded machine and passed it at 389s
+  // with a quiet one. The HERE flag's bob is `pipFlagBob 660ms ... 3` — a
+  // FINITE 1.98s, deliberately finite so a settled menu goes still — and it
+  // starts when the flag span is injected. Push the paint later than
+  // open()+1.5s and the four shots land inside a bob that is behaving exactly
+  // as designed.
+  //
+  // Neither suppressor covers this screen: index.html scopes one to
+  // `#mlPips.reveal .pipFlag` (this page is seeded seen:1, so no reveal class)
+  // and the other to `body.calm .pipFlag` (that is bar 5's page, not this one).
+  //
+  // So: wait on a painted pip, THEN read the box, THEN settle. The settle is
+  // 2500ms measured from the paint, which clears the 1.98s bob with room and
+  // is still shorter than the 3500ms it replaces on a quiet box. A probe that
+  // times from the wrong event is not flaky, it is wrong.
+  await p.waitForSelector('#mlPips .pip', { timeout: 180000 }).catch(() => { });
   const box = await p.evaluate(() => {
     const e = document.getElementById('mlPips');
     if (!e) return null;
@@ -215,7 +239,9 @@ if (want(2)) {
   if (!box || box.width < 40 || box.height < 20) {
     no(`#2 #mlPips has no box to photograph (${JSON.stringify(box)}) — the ladder is not on screen`);
   } else {
-    await nap(3500);   // past any reveal tail: 4 steps + 3 pulses is ~2.5s
+    await nap(2500);   // from the PAINT above: past the 1.98s pipFlagBob, and past
+                       // any reveal tail (4 steps + 3 pulses is ~2.5s on this page
+                       // there is no reveal, but the margin costs nothing)
     const { PNG } = await import('pngjs');
     const px = box.width * box.height;
     /** worst consecutive-pair difference over four shots 150ms apart — a quarter
@@ -280,7 +306,7 @@ if (want(2)) {
         }));
       no(`#2 the settled ladder is MOVING with the canvas hidden — ${still.worst} of ${px} px `
         + `(${(still.worst / px * 100).toFixed(1)}%) changed between shots ${still.pair}, 150ms apart, `
-        + `3.5s after the menu came up. Nothing but a CSS animation can do that, and MENU-BRIEF §5.1 bar 4 asks for 0. `
+        + `2.5s after the row was painted. Nothing but a CSS animation can do that, and MENU-BRIEF §5.1 bar 4 asks for 0. `
         + `Running: ${live.length ? live.join(', ') : '(none — so it is not CSS; look at what the freeze did not hide)'}`);
     }
   }
