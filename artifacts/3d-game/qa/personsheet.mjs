@@ -42,9 +42,16 @@ await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 // angles without noticing. Same sequence qa/ground.mjs uses.
 await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
+// PLAY NO LONGER OPENS THE PICKER, and this probe went on clicking through it
+// until it timed out — "element is not visible", 77s, four angles never shot.
+// #btnPlay is startFresh(false) now: it launches the dot the ring is on and the
+// world picker never appears, so `?w=${WORLD}` is already the whole world
+// selection. The click below waited for a screen that stopped existing.
+//
+// It failed LOUDLY, which is the lucky half. qa/uisystem.mjs walks a screen it
+// calls "picker" through the same dead door and simply finds nothing there, so
+// it has been reporting that screen clean without opening it.
 await p.click('#btnPlay');
-await p.waitForTimeout(1400);
-await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
 await p.waitForTimeout(2500);
 // the match opens on a TAP TO PLAY gate, and the camera sits PULLED BACK on
 // the overview until it is taken. The first working version of this probe shot

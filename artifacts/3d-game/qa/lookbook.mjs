@@ -22,16 +22,23 @@ import { ALL_WORLDS } from './worlds.mjs';
 const PORT = process.argv[2] || '4177';
 const WORLDS = process.argv.slice(3).length ? process.argv.slice(3) : ALL_WORLDS;
 
-const run = (cmd, args, label) => new Promise((res) => {
+// ONE BUDGET FOR ONE SHOT IS NOT ONE BUDGET FOR EIGHTEEN. Every sub-probe got
+// the same 600s, and `_dioshot --views` takes eighteen shots across six worlds
+// inside it — it was killed mid-run with fourteen written, so powder and
+// skylark lost their small and tablet frames and the pack came back incomplete
+// without anything saying WHY. A kill now says so, and a caller that knows it
+// is asking for many shots asks for the time to take them.
+const run = (cmd, args, label, budget = 600000) => new Promise((res) => {
   const t0 = Date.now();
   const c = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-  let out = '';
-  const timer = setTimeout(() => c.kill('SIGKILL'), 600000);
+  let out = '', killed = false;
+  const timer = setTimeout(() => { killed = true; c.kill('SIGKILL'); }, budget);
   c.stdout.on('data', (d) => { out += d; });
   c.stderr.on('data', (d) => { out += d; });
   c.on('close', (code) => {
     clearTimeout(timer);
-    console.log(`   ${code === 0 ? '·' : '✗'} ${label.padEnd(28)} ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+    console.log(`   ${code === 0 ? '·' : '✗'} ${label.padEnd(28)} ${((Date.now() - t0) / 1000).toFixed(0)}s`
+      + (killed ? `  KILLED at its ${(budget / 1000).toFixed(0)}s budget — the shots it had not taken yet are the missing ones` : ''));
     res({ code, out });
   });
 });
@@ -78,7 +85,7 @@ await strays();
 // azimuth off the island's own scatter) rather than authored — so Maple looking
 // right is not evidence about Powder Pass, and day 8 got the framing wrong four
 // times, every one of them caught by looking rather than by a number.
-await run('node', ['qa/_dioshot.mjs', PORT, '--views'], 'menu diorama: 6 worlds x 3 views');
+await run('node', ['qa/_dioshot.mjs', PORT, '--views'], 'menu diorama: 6 worlds x 3 views', 2400000);
 for (const w of ALL_WORLDS) {
   shots.push({ path: `qa/out/dioshot/${w}.png`, world: w,
     shows: `the menu as a child first sees ${w} — STATIC's framing, LIGHT's hour and `

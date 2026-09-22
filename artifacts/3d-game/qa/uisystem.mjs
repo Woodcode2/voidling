@@ -30,14 +30,34 @@ await p.evaluate(() => document.querySelectorAll('.show')
   .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
 
 const fails = [];
+// ── THE DOOR HAS TO STILL BE THERE ─────────────────────────────────────────
+// 'picker' opened with `#btnPlay.click()`, and #btnPlay stopped opening the
+// picker when it became startFresh(false) — it launches the dot the ring is on.
+// So this walked no picker at all, found nothing wrong with it, and printed
+// "picker ok" on every run. Worse, the click STARTS A MATCH, so 'shop' and
+// 'settings' were then measured over a live match rather than over the menu:
+// three of four screens in the wrong state, all four reported clean.
+//
+// The same dead door timed out qa/personsheet.mjs at 77s and cost the studio
+// its entire character sheet. That one failed loudly. This one did not, which
+// is the more expensive way to be wrong.
+//
+// So each screen now names the element that PROVES it is open, and a door that
+// does not lead there is a FAIL rather than a quiet pass.
 const SCREENS = [
-  ['menu', null],
-  ['picker', () => document.getElementById('btnPlay')?.click()],
-  ['shop', () => { document.getElementById('worlds')?.classList.remove('show'); document.getElementById('btnShop')?.click(); }],
-  ['settings', () => { document.getElementById('shop')?.classList.remove('show'); document.getElementById('btnSettings')?.click(); }],
+  ['menu', null, '#menuLadder'],
+  ['picker', () => document.getElementById('worldSwitch')?.click(), '#worlds.show'],
+  ['shop', () => { document.getElementById('worlds')?.classList.remove('show'); document.getElementById('btnShop')?.click(); }, '#shop.show'],
+  ['settings', () => { document.getElementById('shop')?.classList.remove('show'); document.getElementById('btnSettings')?.click(); }, '#settings.show'],
 ];
-for (const [name, open] of SCREENS) {
+for (const [name, open, proof] of SCREENS) {
   if (open) { await p.evaluate(open); await p.waitForTimeout(600); }
+  const there = await p.evaluate((sel) => !!document.querySelector(sel), proof);
+  if (!there) {
+    console.log(`  ${name.padEnd(9)} BAD: the door did not open — ${proof} is not in the document, so nothing on this screen was measured`);
+    fails.push(`${name}: door`);
+    continue;
+  }
   const bad = await p.evaluate(() => {
     const out = [];
     const ok = new Set(['400', '500', '600', '700']);
