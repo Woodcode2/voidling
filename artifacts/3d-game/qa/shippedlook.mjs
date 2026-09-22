@@ -80,9 +80,30 @@ await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show');
 }));
+// ── ONE MATCH, NOT TWO. THIS IS WHY THE HERO WAS NOT IN THE PACK ──────────
+// This used to click #btnPlay and then click a world card behind it. #btnPlay
+// stopped opening the picker (it is startFresh(false) — it launches the dot the
+// ring is on); aadebff fixed the two probes that broke LOUDLY on that and did
+// not reach this one, because this one broke silently. personsheet used
+// Playwright's click(), which waits for visibility and timed out. This uses
+// evaluate + .click(), which fires a hidden element's handler perfectly well —
+// so the card ran a SECOND beginMatch on top of a live match.
+//
+// Under AUTO_START (any webdriver browser arms and starts in the same tick) the
+// second beginMatch found `started` already true, so it lifted the hero to
+// ARRIVE_HIGH for the drop-in and neither of the two things that put him back
+// down could run — both are gated on `started`. Every frame in the pack was
+// taken with the hero twenty-six world units above the town, off the top of the
+// viewport, while every debug hook reported him present, visible, correctly
+// sized and correctly placed in x and z.
+//
+// TEAM ART filed "the void is missing from the play frames" as a SHIP BLOCKER
+// off these frames, and it was right about the frames and wrong about the game.
+// src/prototype3d.ts resetMatch() now clears `started` so the second begin
+// cannot strand him; this probe stops making a second begin at all.
+//
+// ?w=<world> was always the whole world selection — same finding as aadebff.
 await p.evaluate(() => document.getElementById('btnPlay')?.click());
-await p.waitForTimeout(1400);
-await p.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`)?.click(), WORLD);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
 await p.evaluate(() => {
   const cv = document.querySelector('canvas');
@@ -100,7 +121,16 @@ await p.evaluate(() => {
 // lets the adapter wander is reading a rung nobody chose.
 await p.evaluate(() => window.__pinQuality(0));
 await p.evaluate(() => window.__setVoidR(4));
-await p.waitForTimeout(3400);   // evolution burst, see qa/heroface.mjs
+// ── WAIT IN FRAMES, NOT IN MILLISECONDS ───────────────────────────────────
+// This was `waitForTimeout(3400)`, copied from qa/heroface.mjs and described
+// as the evolution burst. Under swiftshader with no GPU a frame takes about
+// 2.5 wall-seconds, so 3400 ms buys ONE — measured: the match clock advanced
+// 0.05 s, which is exactly one dt, across the whole wait. Everything the burst
+// is being waited out (dispR springing to the new radius, the stage swap, the
+// ribbons) needs frames and not time. The match clock only moves when a frame
+// runs, so waiting on it is waiting on the renderer.
+await p.waitForFunction((t0) => (window.__matchState?.().t ?? 0) > t0 + 0.6,
+  await p.evaluate(() => window.__matchState().t), { timeout: 400000 }).catch(() => { });
 // ── PIN THE FACE, OR PHOTOGRAPH A DIFFERENT CHARACTER IN EVERY WORLD ──────
 // The studio reviewed a pack in which the mascot wore a small round gasp in
 // Maple, Pirate, Game Day and Lantern and a wide grin with a tongue in Powder.
@@ -122,7 +152,8 @@ await p.evaluate(() => {
   window.__pinMouth?.(true);
   window.__calm?.();          // and no leftover evolve ribbons across the shot
 });
-await p.waitForTimeout(600);
+await p.waitForFunction((t0) => (window.__matchState?.().t ?? 0) > t0 + 0.15,
+  await p.evaluate(() => window.__matchState().t), { timeout: 400000 }).catch(() => { });
 
 const box = await p.evaluate(() => {
   const THREE = window.__THREE, cam = window.__cam;
@@ -155,13 +186,82 @@ try {
 } catch { /* not fatal to a shot */ }
 await b.close();
 
-// measure the void disc out of the PNG — the canvas, as shipped
-const { createCanvas, loadImage } = await import('canvas').catch(() => ({}));
-if (!createCanvas) {
-  console.log(`  frame: ${path}`);
-  console.log(`  rung ${box.q.level} pinned=${box.q.pinned} pr=${box.q.pr} shadows=${box.q.shadows}`);
-  console.log(`  void at (${box.cx.toFixed(0)}, ${box.cy.toFixed(0)}) r=${box.pxR.toFixed(0)} css px`);
-  console.log('  (node-canvas unavailable — measure the PNG externally)');
-  console.log(JSON.stringify({ path, ...box }));
-  process.exit(0);
-}
+// ══ AND NOW MEASURE IT — WHICH THIS FILE HAS NEVER ONCE DONE ═══════════════
+// Everything above this line is the picture. Everything below it was the point:
+// "So this one measures the CANVAS, via a screenshot, exactly as a player's eye
+// and a store screenshot would." It was written against node-canvas, which is
+// not installed and never has been, so every run since the file was created hit
+//
+//     if (!createCanvas) { ...console.log('measure the PNG externally'); exit(0) }
+//
+// printed four lines of geometry and exited GREEN. Not one pixel was ever read.
+// The file's whole reason to exist — it is slower and less precise than reading
+// a buffer, and it is the only thing that can catch a whole-pipeline swap — was
+// dead code behind a module that isn't there, and the dead branch exited 0, so
+// nothing anywhere said so.
+//
+// What it cost: six play frames with no hero in them went into the studio's
+// evidence pack, TEAM ART filed a ship blocker off them, and the pack was
+// reshot twice through the same silence.
+//
+// pngjs is already a dependency (qa/_crop.mjs reads frames with it) and decodes
+// what we need. No new install, and the measurement runs on every invocation.
+import { PNG } from 'pngjs';
+
+const DSF = 2;                      // deviceScaleFactor above
+const img = PNG.sync.read(readFileSync(path));
+const lumaAt = (ix, iy) => {
+  const i = (iy * img.width + ix) * 4;
+  return { r: img.data[i], g: img.data[i + 1], b: img.data[i + 2],
+    // Rec.709 on the sRGB values, which is what an eye weights
+    y: (0.2126 * img.data[i] + 0.7152 * img.data[i + 1] + 0.0722 * img.data[i + 2]) / 255 };
+};
+// Sample a disc over the hero and an annulus of town around him. The disc is
+// 0.55 of his radius so the rim ring and the silhouette edge stay out of it;
+// the annulus is 1.5-1.9r, past him and short of the frame edge.
+const ring = (r0, r1) => {
+  const px = [];
+  const cx = box.cx * DSF, cy = box.cy * DSF, R = box.pxR * DSF;
+  for (let a = 0; a < 512; a++) {
+    const th = (a / 512) * Math.PI * 2;
+    for (let k = 0; k <= 8; k++) {
+      const rr = R * (r0 + (r1 - r0) * (k / 8));
+      const ix = Math.round(cx + Math.cos(th) * rr), iy = Math.round(cy + Math.sin(th) * rr);
+      if (ix < 0 || iy < 0 || ix >= img.width || iy >= img.height) continue;
+      px.push(lumaAt(ix, iy));
+    }
+  }
+  return px;
+};
+const mean = (px, k) => px.reduce((t, q) => t + q[k], 0) / Math.max(1, px.length);
+const disc = ring(0, 0.55), town = ring(1.5, 1.9);
+const dY = mean(disc, 'y'), tY = mean(town, 'y');
+// HOW MUCH OF HIS OWN DISC IS HIM. The void is a dark body under the same sun
+// as the town, so his pixels sit well below the town's. A frame with no hero in
+// it has town in that disc and this lands near zero.
+const cut = tY - 0.12;
+const cover = disc.filter((q) => q.y < cut).length / Math.max(1, disc.length);
+// …and the colour of the body, because "Sometimes that light purple wash is
+// still showing rather than our crisp dark one" is the complaint this file was
+// built to answer with a number.
+const dark = disc.filter((q) => q.y < cut);
+const mR = mean(dark, 'r'), mG = mean(dark, 'g'), mB = mean(dark, 'b');
+const mx = Math.max(mR, mG, mB), mn = Math.min(mR, mG, mB);
+const sat = mx <= 0 ? 0 : (mx - mn) / mx;
+
+// THE BAR. Not frozen debt and not a tuned constant: a hero who fills at least
+// a third of the inner 55% of his own disc is the weakest claim that can still
+// only be true when he is drawn there. The frames this file has been producing
+// score 0.00. A real hero fills most of it.
+const COVER_MIN = 0.33;
+console.log(`\n  frame: ${path}`);
+console.log(`  rung ${box.q.level} pinned=${box.q.pinned} pr=${box.q.pr} shadows=${box.q.shadows}`);
+console.log(`  void at (${box.cx.toFixed(0)}, ${box.cy.toFixed(0)}) r=${box.pxR.toFixed(0)} css px`);
+console.log(`  disc luma ${dY.toFixed(3)} vs town ${tY.toFixed(3)}  -> hero covers ${(cover * 100).toFixed(1)}% of it`);
+console.log(`  body rgb(${mR.toFixed(0)}, ${mG.toFixed(0)}, ${mB.toFixed(0)}) sat ${sat.toFixed(3)}`
+  + (dark.length ? '' : '  (no body pixels to describe)'));
+const ok = cover >= COVER_MIN;
+console.log(`\n  ${ok ? 'PASS' : 'FAIL'} — the hero ${ok ? 'is' : 'is NOT'} in the frame this pack hands the studio`
+  + (ok ? '' : `\n  ${(cover * 100).toFixed(1)}% of his own disc is him, against a bar of ${(COVER_MIN * 100).toFixed(0)}%.`
+    + '\n  Nothing below that can be a rendering nuance: he is somewhere else, or he is not drawn.'));
+process.exit(ok ? 0 : 1);

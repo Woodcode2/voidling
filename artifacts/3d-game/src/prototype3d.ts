@@ -10771,6 +10771,28 @@ function resetMatch() {
   countTick = 0;
   renderQuests();
   ended = false;
+  // ── AND `started`, WHICH THIS FUNCTION HAS NEVER CLEARED ──────────────────
+  // resetMatch ends with beginMatch(), and beginMatch lifts the hero to
+  // ARRIVE_HIGH (26 world units) for the drop-in. Two things put him back down:
+  // the fall in the frame loop, which is gated on `armed && !started`, and
+  // startMatch's own `arriveY(0)`, which is behind `if (started || ...) return`.
+  // Both read `started`. So a reset while `started` was still true left the
+  // hero twenty-six units above the town, in the sky, off the top of the frame,
+  // for the whole of the next match — with every debug hook still reporting him
+  // present, visible, correctly sized and correctly positioned in x and z.
+  //
+  // That is not a hypothetical. It is what the studio's entire evidence pack
+  // has been photographing: qa/shippedlook.mjs started a match, then started a
+  // SECOND one, and under AUTO_START (any webdriver browser arms and starts in
+  // the same tick) the second beginMatch found `started` already true. Six play
+  // frames with no hero in them, and TEAM ART filed "the void is missing from
+  // the play frames" as a ship blocker against a game that renders him fine.
+  //
+  // A human cannot reach it today — every path into beginMatch runs from the
+  // menu, and endMatch clears `started` on the way there — so this is a
+  // landmine rather than a live defect. Clearing it here is what the function
+  // already promises: "nothing from the last match may speak in this one".
+  started = false;
   // colours and dusk reset to the shipped rig here, and then beginMatch DEALS
   // the hour on top (applyHour) — so hour 0 is exactly this reset, and a
   // rematch is relit by its hand, not by whatever the last match left behind

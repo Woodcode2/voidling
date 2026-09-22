@@ -53,9 +53,23 @@ const strays = () => new Promise((res) => {
 mkdirSync('qa/out', { recursive: true });
 console.log(`\n  LOOKBOOK — ${WORLDS.length} world(s) on :${PORT}\n`);
 
+// ── A SHOT THAT WAS TAKEN IS NOT A SHOT THAT IS RIGHT ─────────────────────
+// This file's verdict was existsSync() and nothing else: a probe could exit
+// non-zero, print its own FAIL, and the pack still came back "PASS — every
+// surface the studio reviews has a picture of itself", because a picture did
+// land on disk. That is exactly what happened to the six play frames. Six
+// consecutive runs of qa/shippedlook.mjs photographed a town with no hero in
+// it, the ✗ went past in the progress column, and the pack was handed over
+// clean. TEAM ART filed a ship blocker off it.
+//
+// So a non-zero exit is now recorded against the shot it was taking, and it
+// fails the pack by name alongside the missing ones. `run` already has the
+// code; nothing was reading it.
+const bad = [];
 const shots = [];
 for (const w of WORLDS) {
-  await run('node', ['qa/shippedlook.mjs', PORT, w, 'look'], `play frame: ${w}`);
+  const r = await run('node', ['qa/shippedlook.mjs', PORT, w, 'look'], `play frame: ${w}`);
+  if (r.code !== 0) bad.push({ path: `qa/out/shippedlook/${w}_look.png`, out: r.out });
   shots.push({ path: `qa/out/shippedlook/${w}_look.png`, world: w,
     shows: 'the shipped canvas at the play camera — STATIC, MOTION, GROUND, LIGHT and HERO all appear here' });
   await strays();
@@ -126,5 +140,16 @@ if (missing.length) {
   console.log(`\n  ${missing.length} MISSING — a team pointed at one of these would be reviewing nothing:`);
   for (const m of missing) console.log(`   ✗ ${m.path}`);
 }
-console.log('\n  ' + (missing.length ? `FAIL — ${missing.length} shot(s) did not render`
+if (bad.length) {
+  console.log(`\n  ${bad.length} WRONG — the file is there and the probe that took it says it is not the shot:`);
+  for (const b of bad) {
+    console.log(`   ✗ ${b.path}`);
+    // the probe's own last words, which is where the reason is
+    for (const line of b.out.trim().split('\n').slice(-4)) console.log(`       ${line.trim()}`);
+  }
+}
+const broke = missing.length + bad.length;
+console.log('\n  ' + (broke
+  ? `FAIL — ${missing.length} shot(s) did not render, ${bad.length} rendered the wrong thing`
   : 'PASS — every surface the studio reviews has a picture of itself') + '\n');
+process.exitCode = broke ? 1 : 0;
