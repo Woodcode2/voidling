@@ -16,6 +16,19 @@
 // ALL cylinders. The probe that exists to stop faceted things shipping cannot
 // see the most-looked-at faceted thing in the game.
 //
+// ── AND IT COVERS BOTH POPULATIONS, WHICH IT DID NOT ─────────────────────────
+// There are two townsperson species in this game and they share no code.
+// src/proto3d/life.ts makePerson is the WALKING crowd; src/proto3d/mainstreet.ts
+// personParts is the STATIC crowd — the people standing still on a path while
+// the void rolls past, which is the longest a child ever looks at a person.
+// This file read life.ts and nothing else, and roundlod cannot see mainstreet
+// either (its spheres go through a helper whose segment counts are
+// identifiers, not literals). So the static half of the population had never
+// been under any geometry bar at all. What that hid: an 8x6 shoe showing
+// 14.8px of straight edge, and a ten-sided leg that passed on a short
+// townsperson and failed on a tall one. Both are fixed; both would now fail
+// this probe loudly. The second half of the file is the parser for them.
+//
 // ── THE ARITHMETIC ───────────────────────────────────────────────────────────
 // A regular N-gon of radius r has a facet chord of 2*r*sin(PI/N). The camera:
 // fov 32 vertical, 430x932, so tan(fovx/2) = 0.1323 and the frustum is
@@ -106,6 +119,72 @@ for (const [name, p] of prim) {
   const r = p.r * s;                             // pc scales the base radius
   rows.push({ name, n: p.n, kind: p.kind, deliberate: p.deliberate, wpx: 2 * r * PXU, facet: 2 * r * Math.sin(Math.PI / p.n) * PXU });
 }
+
+// ══ AND THE OTHER HALF OF THE POPULATION, WHICH THIS FILE HAS NEVER READ ════
+// Everything above reads src/proto3d/life.ts and nothing else. There are TWO
+// townsperson species in this game and they do not share a line of code:
+// life.ts makePerson is the WALKING crowd, a six-mesh rig off the B cache;
+// src/proto3d/mainstreet.ts personParts is the STATIC crowd, sixteen
+// primitives welded into one mesh. The statics are the ones standing still on
+// the path while the void rolls past, which is the longest a child ever looks
+// at a person — and the 14-side bar has never been applied to one of them.
+//
+// qa/roundlod.mjs does not cover them either, for a different reason: it
+// matches `SphereGeometry(<expr>, <int>, <int>)` written literally on one
+// line, and every sphere in mainstreet.ts goes through the helper
+//     const sph = (r, s = 8, t = 6) => new THREE.SphereGeometry(r, s, t);
+// whose W and H are identifiers. Both probes were blind to the same file, and
+// what they missed was an 8x6 shoe showing 14.8px of straight edge — the only
+// part in either population that failed BOTH halves of the bar at once.
+//
+// THE UNIT CONVERSION IS THE WHOLE TRICK. life.ts writes radii against body
+// symbols (gr, th, L) whose reference value is 1, which is why num() above can
+// simply strip them. mainstreet.ts writes them against T, the per-person
+// height, which is S * (0.94 + v2 * 0.12) with S read from the source — so a
+// radius of `0.155 * T` is 0.155 * 1.41 * up-to-1.06 world units. The bar is a
+// worst case, so this takes the TOP of the jitter.
+//
+// …AND part()'s SCALE ARGUMENTS COUNT. part(geo, col, x, y, z, rx, ry, rz,
+// sx, sy, sz) scales before it rotates, so a ball stretched 1.42 along the
+// facing has a 1.42x semi-major axis and a 1.42x facet chord with it. That is
+// exactly the difference between the shoe passing at twelve sides and failing:
+// 7.1px on the written radius, 10.0px on the axis actually drawn.
+const MS = readFileSync('src/proto3d/mainstreet.ts', 'utf8');
+const sm = MS.match(/const S = ([0-9.]+);/);
+if (!sm) { console.log('ABORTED — the S body scale in mainstreet.ts did not parse. Something moved.'); process.exit(2); }
+const T_MAX = Number(sm[1]) * 1.06;      // the top of the per-person height jitter
+// radii are written as `<number> * T`; anything else is not a people radius
+const rad = (str) => {
+  const m = String(str).trim().match(/^([0-9.]+)\s*\*\s*T$/);
+  return m ? Number(m[1]) * T_MAX : NaN;
+};
+const msRows = [];
+// part(sph(r, W, H), col, x, y, z, rx, ry, rz, sx, sy, sz)
+for (const m of MS.matchAll(/\bpart\(\s*sph\(([^,]+),\s*(\d+)\s*,\s*(\d+)\s*\)([^;]*?)\);/g)) {
+  const r = rad(m[1]); if (!Number.isFinite(r)) continue;
+  const tail = m[4].split(',').map((q) => q.trim());
+  // args after the geometry: col, x, y, z, rx, ry, rz, sx, sy, sz -> indices 8/10
+  const sx = Number(tail[8]), sz = Number(tail[10]);
+  const k = Math.max(Number.isFinite(sx) ? sx : 1, Number.isFinite(sz) ? sz : 1);
+  msRows.push({ r: r * k, n: Number(m[2]), line: m[0].slice(0, 46) });
+}
+// part(cyl(rTop, rBot, h, N), ...)
+for (const m of MS.matchAll(/\bpart\(\s*cyl\(([^,]+),\s*([^,]+),\s*([^,]+),\s*(\d+)\s*\)([^;]*?)\);/g)) {
+  const r = Math.max(rad(m[1]), rad(m[2])); if (!Number.isFinite(r)) continue;
+  msRows.push({ r, n: Number(m[4]), line: m[0].slice(0, 46) });
+}
+if (msRows.length < 10) {
+  console.log(`ABORTED — only ${msRows.length} static-townsfolk parts parsed out of mainstreet.ts.`);
+  process.exit(2);
+}
+// the widest use of each side count, which is the one that can fail
+const bySides = new Map();
+for (const q of msRows) if (!(bySides.get(q.n)?.r >= q.r)) bySides.set(q.n, q);
+for (const [n, q] of bySides) rows.push({
+  name: `ms:${n}-gon`, n, kind: 'static', deliberate: false,
+  wpx: 2 * q.r * PXU, facet: 2 * q.r * Math.sin(Math.PI / n) * PXU,
+});
+
 rows.sort((a, b) => b.facet - a.facet);
 
 console.log(`\n  PEOPLE FACETS — ${PXU.toFixed(1)} css px per world unit at d=26, the closest the camera settles\n`);

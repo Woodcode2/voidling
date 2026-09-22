@@ -297,15 +297,41 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
   const T = S * (0.94 + v2 * 0.12);
 
   const [lgxL, lgzL] = at(-0.17 * T, 0), [lgxR, lgzR] = at(0.17 * T, 0);
-  out.push(part(cyl(0.155 * T, 0.175 * T, 0.86 * T, 10), leg, lgxL, 0.43 * T, lgzL, 0, ry, 0));
-  out.push(part(cyl(0.155 * T, 0.175 * T, 0.86 * T, 10), leg, lgxR, 0.43 * T, lgzR, 0, ry, 0));
+  // TEN SIDES MISSES BY A TENTH OF A PIXEL, AND ONLY ON THE TALL ONES. The
+  // widest radius here is 0.175 T, and T is S * (0.94 + v2 * 0.12) — so the
+  // shortest townsperson's leg shows 9.5px of straight edge and the tallest
+  // shows 10.1px, across the ten-pixel escape hatch. A bar that a sixth of the
+  // population fails is a bar that fails. Twelve takes the worst case to 8.5px
+  // for eight triangles a leg. (qa/peoplefacet.mjs measures the TOP of the
+  // jitter for exactly this reason; it is a worst case, not an average.)
+  out.push(part(cyl(0.155 * T, 0.175 * T, 0.86 * T, 12), leg, lgxL, 0.43 * T, lgzL, 0, ry, 0));
+  out.push(part(cyl(0.155 * T, 0.175 * T, 0.86 * T, 12), leg, lgxR, 0.43 * T, lgzR, 0, ry, 0));
   // ── SHOES ── two dark cylinders ending flat on the pavement is a chess
   // piece. life.ts calls its feet "loaves" and the note there is the same one:
   // at spawn distance a pair of hard rectangles under each person was "the
   // second-loudest Lego tell after the hair". A squashed sphere, longer along
   // the way the person is pointing, is a rounded toe box.
   for (const [fx, fz] of [at(-0.17 * T, 0.05 * T), at(0.17 * T, 0.05 * T)])
-    out.push(part(sph(0.155 * T, 8, 6), shoeCol, fx, 0.085 * T, fz, 0, ry, 0, 1, 0.56, 1.42));
+    // ── AND EIGHT SIDES IS AN OCTAGON, WHICH IS THE THING THIS FIXED ──────
+    // The loaf went in at 8x6 — the exact primitive life.ts:560 names as "an
+    // octagon in silhouette" and the exact one the walking crowd paid to leave
+    // behind. Measured in qa/peoplefacet.mjs's own currency (62.5 css px per
+    // world unit at the camera's 26-unit floor), a 0.155 T shoe stretched 1.42
+    // along the facing is 38.8px wide and shows 14.8px of dead-straight edge.
+    // That is the ONLY part on either population that fails BOTH halves of the
+    // stated bar: under fourteen sides AND over the ten-pixel escape hatch.
+    // It survived because no probe could see it — qa/peoplefacet.mjs reads
+    // src/proto3d/life.ts and nothing else, and qa/roundlod.mjs matches a
+    // literal SphereGeometry(r, W, H) while every sphere in this file goes
+    // through sph(), whose segment counts are identifiers. Both are fixed in
+    // the same commit as this line.
+    // THE STRETCH IS WHY TWELVE IS NOT ENOUGH. part() scales this ball by 1.42
+    // along the facing before it is drawn, so the chord to measure is against
+    // the 0.310-unit SEMI-MAJOR axis, not the 0.219 radius in the source.
+    // 12 sides lands on 10.04px — over the hatch by four hundredths, and under
+    // fourteen sides, so it would fail on both counts by a whisker. 14x8 shows
+    // 8.6px and carries the side count outright, for +116 triangles a foot.
+    out.push(part(sph(0.155 * T, 14, 8), shoeCol, fx, 0.085 * T, fz, 0, ry, 0, 1, 0.56, 1.42));
   out.push(part(cyl(0.30 * T, 0.26 * T, 0.30 * T, 14), leg, x, 0.96 * T, z, 0, ry, 0));          // hips
   out.push(part(cyl(0.40 * T, 0.31 * T, 0.82 * T, 14), shirt, x, 1.44 * T, z, 0, ry, 0));        // chest
   out.push(part(sph(0.40 * T, 14, 10), shirt, x, 1.78 * T, z));                                  // shoulder yoke
