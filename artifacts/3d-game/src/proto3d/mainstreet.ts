@@ -412,16 +412,79 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
       // 3% proud of the surface where a drawn eye should be, and 0.195 of
       // lateral extent against a 0.36 silhouette, so invisible from the side
       // and hidden by the skull from behind. Which is how a face works.
-      const ex = x + rgtX * side * 0.125 * T + fwdX * 0.27 * T;
-      const ez = z + rgtZ * side * 0.125 * T + fwdZ * 0.27 * T;
+      // ── AND THE MARK HAS TO BEAT THE SKULL'S OWN FACETS ─────────────────
+      // 0.27 T forward put the eye's centre 0.302 T from the head centre, so
+      // with a 0.07 dot its surface stood 0.009 T proud of a 0.36 T skull. That
+      // number is smaller than the error bar it is measured against. The skull
+      // is sph(0.36 T, 16, 11): between two of its rings the drawn surface sags
+      // r(1 - cos(pi/16)) + r(1 - cos(pi/22)) ~= 0.0106 T below the nominal
+      // sphere, and ON a ring it reaches the full 0.36 T. The eye is itself a
+      // 9x7 ball, which eats another ~0.006 T of its own. So whether an eye was
+      // drawn at all depended on where the two tessellations happened to land —
+      // which is why the character sheet shows one clean oval and one ragged
+      // half-eaten smudge on the SAME face, mirrored parts that should be
+      // identical. 0.295 T forward puts the surface 0.0318 T proud: three times
+      // the sag, so the mark survives every facet on both sides.
+      //
+      // Lateral extent is untouched at 0.195 T against a 0.36 T silhouette, so
+      // this does not make an eye visible from the side — the thing the long
+      // note above is protecting.
+      const ex = x + rgtX * side * 0.125 * T + fwdX * 0.295 * T;
+      const ez = z + rgtZ * side * 0.125 * T + fwdZ * 0.295 * T;
       out.push(part(sph(0.07 * T, 9, 7), INK, ex, 2.25 * T, ez));
     }
+    // ── AND A MOUTH ───────────────────────────────────────────────────────
+    // Two eyes and nothing else is a MANNEQUIN. It is the single thing art
+    // direction named as the highest-value change left on the population: the
+    // hero is a face — eyes, brows, blush, a mouth that opens — and he spends
+    // three minutes eating a town of heads that have two dots on them. A pair
+    // of eyes with no mouth is the uncanny end of the trade, not the cheap end.
+    //
+    // A SQUASHED BALL, NOT A BOX. A flat plate across a curved face stands
+    // proud at its corners and flush at its middle, which reads as a plank
+    // stuck to a head. This ellipsoid is widest where a mouth should be widest
+    // and sinks back into the skull at both ends, so the mark it draws tapers
+    // off exactly the way a drawn mouth does. Same primitive family as the
+    // eyes, so the face is one idea rather than two.
+    //
+    // Arithmetic, against the same 0.36 T skull: centre 0.305 T forward and
+    // 0.09 T below the head centre, front pole 0.383 T out where the skull is
+    // 0.349 T — 0.035 T proud, three times the 0.0106 T facet sag. It goes back
+    // inside the skull at +/-0.151 T of lateral extent, giving a drawn width of
+    // 0.30 T on a 0.72 T head.
+    //
+    // DETERMINISM: no mpick, no mrnd. Still exactly the two seeded draws at the
+    // top of this function, in the same order.
+    const [mx, mz] = at(0, 0.305 * T);
+    out.push(part(sph(0.09 * T, 12, 6), INK, mx, 2.13 * T, mz, 0, ry, 0, 1.7, 0.42, 0.75));
   }
   // T, NOT S. The per-person height jitter scales the whole body, and the hat
   // and the eyes were left on the un-jittered S when it was added — so a
   // slightly short townsperson wore their hat floating above their head with
   // daylight under the brim, which is exactly how it photographed.
-  if (hat !== undefined) out.push(part(cyl(0.34 * T, 0.42 * T, 0.22 * T, 14), hat, x, 2.52 * T, z));
+  // ── AND THE HAT WAS A PAINT POT ─────────────────────────────────────────
+  // One truncated cone, 0.34 T across the top, 0.22 T tall, flat lid. The play
+  // camera sits 46 degrees above the ground, which makes the TOP of a hat the
+  // single biggest surface a hatted townsperson presents — and that surface was
+  // a flat fourteen-sided disc with a hard rim all the way round it. life.ts
+  // builds nearly every one of its hats out of B.hemi for exactly this reason,
+  // and the one static hat in the game was the shape the rest of the kit had
+  // already rejected.
+  //
+  // A DOME AND A BRIM. The crown is a squashed ball, so from above it is a
+  // curve rather than a lid; the brim is the ring that says "hat" at the size
+  // a townsperson actually occupies, and it is what the old cone had none of.
+  // Arithmetic: at the brim's height the skull's own radius is 0.312 T, so a
+  // 0.47 T brim stands 0.16 T out all round, and the crown is 0.365 T there.
+  // The crown is deliberately a hair's breadth WIDER than the hair cap above
+  // (0.355 T): a hat that is narrower than the hair it covers shows a ring of
+  // scalp around its own lower edge. Overhanging the SKULL is what a hat is
+  // for — the note on the hair cap is about hair, which is not.
+  // Two parts instead of one, in the mesh this function already merges.
+  if (hat !== undefined) {
+    out.push(part(sph(0.365 * T, 16, 9), hat, x, 2.40 * T, z, 0, ry, 0, 1, 0.74, 1));
+    out.push(part(cyl(0.47 * T, 0.49 * T, 0.05 * T, 16), hat, x, 2.40 * T, z, 0, ry, 0));
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

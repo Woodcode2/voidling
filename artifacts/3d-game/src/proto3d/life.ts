@@ -1422,12 +1422,59 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
   //
   // Head here is an ellipsoid, 0.53 x 0.56 x 0.495, so the placement is
   // checked against that rather than against a sphere: at x 0.185 the surface
-  // sits at z 0.459, and a 0.08 dot centred at z 0.40 ends at 0.48 — two
-  // hundredths proud, which is a drawn eye. Lateral extent 0.265 against a
-  // 0.53 silhouette, so it cannot be seen from the side at all.
+  // sits at z 0.469, and the eye has to end PAST that. Lateral extent 0.265
+  // against a 0.53 silhouette, so it cannot be seen from the side at all.
+  //
+  // ── AND THE ARITHMETIC ABOVE WAS DONE AGAINST THE WRONG HALF-EXTENT ──────
+  // It read "a 0.08 dot centred at z 0.40 ends at 0.48 — two hundredths
+  // proud". 0.08 is the dot's LATERAL half-extent (sx 0.16 on a 0.5 ball). Its
+  // DEPTH half-extent is sz 0.12 -> 0.06, because an eye is squashed, so the
+  // dot ended at 0.46 — 0.009 SHORT of a skull surface at 0.469. Every
+  // townsperson's eyes were nine thousandths INSIDE their own head.
+  //
+  // They are visible anyway, and that is the tell: B.sph is 16x11, so between
+  // its rings the drawn surface sags 0.0159 below the nominal ellipsoid and ON
+  // a ring it reaches the full radius. So an eye showed through the facet
+  // valleys and was eaten on the facet ridges, and which happened depended on
+  // where two tessellations landed. qa/out/person/maple_front_3.png shows it
+  // plainly: one clean oval and one ragged half-eaten smudge on the SAME face,
+  // from two mirror-image parts that should be identical.
+  //
+  // z 0.43 ends the dot at 0.490 against a surface at 0.469 — 0.021 proud. The
+  // dot is itself a 12x8 ball and sags 0.0045 of its own, so the WORST case —
+  // the eye at its facet valley, the skull at its ring — still stands 0.016
+  // proud. Both eyes are drawn on every head at every facet, which is the only
+  // bar worth setting. Nothing else moves: same primitive, same size, same
+  // lateral extent, still no white.
   if (!o?.glasses) for (const ex of [-0.185, 0.185]) {
-    hp.push(pc(B.dot, INK, ex, 0.075, 0.40, 0.16, 0.18, 0.12));
+    hp.push(pc(B.dot, INK, ex, 0.075, 0.43, 0.16, 0.18, 0.12));
   }
+  // ── AND A MOUTH ──────────────────────────────────────────────────────────
+  // Two eyes and nothing else is a MANNEQUIN, and a mannequin is further from
+  // a person than the bare ball it replaced — the uncanny end of the trade
+  // rather than the cheap end. It is the single change art direction named as
+  // the highest-value one left on the population: the hero is a FACE, with
+  // eyebrows, blush and a mouth that opens, and he spends three minutes eating
+  // a town of heads wearing two dots.
+  //
+  // A SQUASHED BALL, NOT A BAR. A flat plate laid across a curved face stands
+  // proud at its corners and flush in its middle, which reads as a plank
+  // glued to a head. This ellipsoid is widest where a mouth is widest and
+  // sinks back INTO the skull at both ends, so the mark it draws tapers off
+  // the way a drawn mouth does. Same primitive as the eyes, so the face is one
+  // idea rather than two.
+  //
+  // Against the same 0.53 x 0.56 x 0.495 ellipsoid: centre (0, -0.17, 0.44),
+  // half-extents (0.15, 0.04, 0.07), so the front pole is 0.028 proud of a
+  // surface at 0.482 — comfortably past the 0.014 facet sag — and the ends go
+  // back inside the skull at about x 0.14, giving a drawn width of 0.28 on a
+  // 1.06 head. No white here either, for the reason above: at the size a
+  // townsperson occupies there is room for a mark and not for a feature.
+  //
+  // Unconditional: nothing in the kit covers a mouth. The face options are
+  // glasses, an eyepatch and headphones, and all three sit at or above the
+  // eyes — there is no beard and no mask to make an exception for.
+  hp.push(pc(B.dot, INK, 0, -0.17, 0.44, 0.30, 0.08, 0.14));
   if (o?.glasses) hp.push(pc(B.box, INK, 0, 0.08, 0.46, 0.58, 0.10, 0.13));
   if (o?.eyepatch) hp.push(pc(B.box, 0x1a1620, -0.18, 0.11, 0.46, 0.23, 0.19, 0.09));
   if (o?.headphones) {
