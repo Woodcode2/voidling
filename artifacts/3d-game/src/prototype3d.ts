@@ -166,7 +166,32 @@ let composer: EffectComposer | null = null;
 let bloomPass: UnrealBloomPass | null = null;
 function ensureComposer(): EffectComposer {
   if (composer) return composer;
-  composer = new EffectComposer(renderer);
+  // ── THE BEST RUNGS HAD NO ANTI-ALIASING ──────────────────────────────────
+  // The renderer asks for `antialias: true`, and that flag only governs drawing
+  // STRAIGHT to the screen. Rungs 0 and 1 turn bloom on, which routes every
+  // frame through this composer — and three's EffectComposer, handed nothing,
+  // builds its scene target with NO multisampling. Rungs 2+ draw direct and
+  // kept their AA. So the ladder was inverted on edges: the two BEST rungs, the
+  // ones a good phone runs and a store screenshot is taken on, were the only
+  // ones with staircased edges. Research governor G10; qa/aamsaa.mjs.
+  //
+  // The scene target is built here with samples, and handed in. Only
+  // renderTarget1 needs them: RenderPass draws the scene into it, bloom
+  // composites onto it without a swap, and OutputPass takes it to the screen —
+  // nothing on this chain ever renders into renderTarget2, which the composer
+  // clones from the first. So the clone goes back to 0 samples before its first
+  // use (three allocates GPU storage lazily), which keeps the multisample cost
+  // to the one target that earns it. Size is corrected by the per-frame
+  // setSize() below exactly as before; this only has to be the right KIND.
+  {
+    const pr = renderer.getPixelRatio();
+    const w = Math.max(1, Math.floor(window.innerWidth * pr));
+    const h = Math.max(1, Math.floor(window.innerHeight * pr));
+    const samples = Math.min(4, renderer.capabilities.maxSamples || 0);
+    composer = new EffectComposer(renderer,
+      new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples }));
+    composer.renderTarget2.samples = 0;
+  }
   composer.addPass(new RenderPass(scene, camera));
   bloomPass = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
