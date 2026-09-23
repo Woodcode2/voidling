@@ -55,6 +55,11 @@
 // law, and the descent's bar is the motion read above.
 import { readFileSync } from 'node:fs';
 
+// a run that throws or rejects anywhere below prints a verdict, not a stack
+const die = (e) => { console.log(`\nFAIL — motionlaw aborted before a verdict: ${String((e && e.message) || e).split('\n')[0]}`); process.exit(1); };
+process.on('uncaughtException', die);
+process.on('unhandledRejection', die);
+
 const MIN_MOVE = 0.85;
 const SPOTS = [0.9, 8];          // the spec's two named sizes
 const LEAN_FULL = 0.11;          // the spec's lean at full stick, rad (−vx/vRef·0.11)
@@ -81,7 +86,9 @@ const expr = (src, what) => {
   catch (e) { console.log(`FAIL — ${what} did not parse: ${e.message}\n  ${src}`); process.exit(1); }
 };
 const run = (f, scope, what) => {
-  const v = f(scope);
+  let v;
+  try { v = f(scope); }
+  catch (e) { console.log(`FAIL — ${what} did not evaluate: ${e.message}`); process.exit(1); }
   if (!Number.isFinite(v)) { console.log(`FAIL — ${what} is not finite (${v})`); process.exit(1); }
   return v;
 };
