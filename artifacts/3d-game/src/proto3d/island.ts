@@ -3951,27 +3951,22 @@ const QUIET_LEDGER: number[][] = [];
   //             IS 'fair', on the midway, 14.3 units from the fairground centre.
   const FERRIS: [number, number] = WORLD_ID === 'pirate'
     ? [w(6650), w(10600)] : [w(blockCenter(1) - 120), w(blockCenter(1) + 260)];   // MAPLE: the county fairground
-  new GLTFLoader().load('/assets/hf3d/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/f1918f07-d6ac-4589-abe2-eeaf7ca703b2.glb', (gltf) => {
-    const model = gltf.scene;
-    const box = new THREE.Box3().setFromObject(model);
-    const size = box.getSize(new THREE.Vector3());
-    const s = 16 / Math.max(size.y, 0.001);            // ~16u tall landmark
-    model.scale.setScalar(s);
-    box.setFromObject(model);
-    model.position.y -= box.min.y;                      // feet on the ground
-    const grp = new THREE.Group();
-    grp.add(model);
-    grp.position.set(FERRIS[0], 0, FERRIS[1]);   // beach fairground / dance cove
-    grp.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    scene.add(grp);
-    addEdible(grp, 5.6);   // ferris wheel: dessert, not decoration
-  }, undefined, () => {
-    // asset unreachable: the FAIR still exists — procedural wheel stand-in
-    const fb = makeFerrisFB();
-    fb.position.set(FERRIS[0], 0, FERRIS[1]);
-    fb.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    scene.add(fb); addEdible(fb, 5.6);
-  });
+  // ── NO LOADER. THE WHEEL IS OURS NOW ──────────────────────────────────────
+  // This used to fetch a Higgsfield image-to-3D GLB and fall back to a
+  // procedural wheel when the fetch failed. The GLB was never committed and the
+  // generation cannot be recovered (two lookups by id: `lookup_failed`), so the
+  // fallback has been the shipping path on every run since it was written —
+  // behind a network request that could only ever fail, on the critical path of
+  // building the island.
+  //
+  // Owner's call, 2026-09-22: promote it. So the wheel is built directly, it is
+  // built properly (see makeFerrisWheel), and the island stops asking the
+  // network for a file that is not there.
+  const wheel = makeFerrisWheel();
+  wheel.position.set(FERRIS[0], 0, FERRIS[1]);   // beach fairground / dance cove
+  wheel.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  scene.add(wheel);
+  addEdible(wheel, 5.6);   // ferris wheel: dessert, not decoration
 
   // ══ THE BAY'S WATER SURFACE ═══════════════════════════════════════════════
   // The bay is the centrepiece of Pirate Bay and it was a flat cyan shape
@@ -5953,23 +5948,111 @@ function makeFoodtruckFB(): THREE.Group {
   }
   return g;
 }
-function makeFerrisFB(): THREE.Group {
-  const g = new THREE.Group(); const steel = std(0xff8fb8, 0.5);
-  const wheel = new THREE.Mesh(new THREE.TorusGeometry(6.5, 0.28, 8, 28), steel); wheel.position.y = 8; g.add(wheel);
-  for (let i = 0; i < 6; i++) {
-    const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 13, 6), steel);
-    spoke.position.y = 8; spoke.rotation.z = (i / 6) * Math.PI; g.add(spoke);
+/** THE FAIRGROUND'S HERO LANDMARK — sixteen units tall, and no longer a
+ *  stand-in for anything.
+ *
+ *  This was makeFerrisFB(), the fallback behind a Higgsfield image-to-3D GLB in
+ *  the retired hf3d pack (job 7d051b5a). That file was never committed and
+ *  the generation cannot be recovered — two lookups by id came back
+ *  `lookup_failed` — so the loader's error branch has been the shipping path
+ *  for every player on every run since it was written. The prop the owner
+ *  actually sees has always been this one; the only thing the GLB contributed
+ *  was a network round-trip that always failed.
+ *
+ *  So the owner's call: promote it. That means building it like the landmark it
+ *  is rather than like the apology it was. What a stand-in could get away with
+ *  and a hero prop cannot:
+ *
+ *    ONE RIM. A single torus is a hoop. A ferris wheel is two rims with the
+ *    cars slung between them, and from the play camera's three-quarter angle
+ *    that second rim is the entire difference between a wheel and a drawing of
+ *    a wheel. Two rims, braced to each other, on a real axle.
+ *
+ *    NO HUB. Six cylinders crossing at a point, with nothing where they meet.
+ *    A hub and an axle are four parts and they are what the spokes are FOR.
+ *
+ *    BOXES ON THE RIM. The gondolas were boxes centred exactly on the rim line,
+ *    so they read as beads threaded on a hoop. A car hangs BELOW its pivot, on
+ *    a hanger, with a roof — and hanging is the thing that says it swings.
+ *
+ *    TWO LEGS. A wheel on two legs is a bicycle. Four, as two A-frames with a
+ *    tie beam, is what holds a real one up.
+ *
+ *  NO SPHERES, DELIBERATELY. qa/roundlod.mjs freezes the game's total sphere
+ *  spend at TRI_BASELINE and states that the one legitimate reason to raise it
+ *  is paying under-bar debt down — which this is not. Everything here is torus,
+ *  cylinder, cone and box, so the ratchet does not move and this prop cannot
+ *  quietly spend somebody else's budget.
+ *
+ *  ONE DRAW CALL. The old group was ~15 meshes; this is merged through
+ *  mergedProp() like makeFenceRun and the other thirty-odd props, so the
+ *  landmark costs the frame one call and gets bakeContactAO on its legs for
+ *  free. ~2,400 triangles, once per island.
+ */
+function makeFerrisWheel(): THREE.Group {
+  const STEEL = 0xff8fb8, TRIM = 0xf4f6fa, HUB_C = 0xffd23f;
+  const R = 6.5;                 // rim radius
+  const HY = 8;                  // hub height — unchanged, the prop still stands 16u
+  const HALF = 0.95;             // half the gap between the two rims
+  const N = 8;                   // gondolas, and the spoke pairs that carry them
+  const p: THREE.BufferGeometry[] = [];
+
+  // ── THE TWO RIMS ────────────────────────────────────────────────────────
+  // 36 segments around, not 28: this is the biggest circle in the game after
+  // the void himself, and at 13 units across a 28-gon shows its corners.
+  for (const dz of [-HALF, HALF])
+    p.push(part(new THREE.TorusGeometry(R, 0.26, 8, 36), STEEL, 0, HY, dz));
+
+  // ── HUB AND AXLE ────────────────────────────────────────────────────────
+  // A cylinder's own axis is +Y, so rotateX(PI/2) lays it along Z — across the
+  // wheel, which is where an axle goes.
+  p.push(part(new THREE.CylinderGeometry(0.62, 0.62, HALF * 2 + 0.5, 14), HUB_C, 0, HY, 0, Math.PI / 2));
+  p.push(part(new THREE.CylinderGeometry(0.26, 0.26, HALF * 2 + 1.9, 10), TRIM, 0, HY, 0, Math.PI / 2));
+
+  // ── SPOKES ──────────────────────────────────────────────────────────────
+  // One diameter per pair of opposite gondolas, on BOTH rims, so the wheel is
+  // braced in its own plane twice over. N/2 diameters x 2 rims = 8 members.
+  for (let i = 0; i < N / 2; i++) {
+    const a = (i / (N / 2)) * Math.PI;
+    for (const dz of [-HALF, HALF])
+      p.push(part(new THREE.CylinderGeometry(0.11, 0.11, R * 2, 8), STEEL, 0, HY, dz, 0, 0, a));
   }
-  const GOND = [0x5ec8d8, 0xffd23f, 0x7ed57a, 0xf06fb0, 0xb98cff, 0xff9a3a];
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2;
-    const gd = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.1, 1.1), std(GOND[i]));
-    gd.position.set(Math.cos(a) * 6.5, 8 + Math.sin(a) * 6.5 - 0.8, 0); g.add(gd);
+
+  // ── CROSS-BRACING ───────────────────────────────────────────────────────
+  // Short members along Z joining the rims at every gondola station. This is
+  // the part that makes the wheel read as an object with depth rather than as
+  // two hoops that happen to overlap.
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    p.push(part(new THREE.CylinderGeometry(0.09, 0.09, HALF * 2, 6), TRIM,
+      Math.cos(a) * R, HY + Math.sin(a) * R, 0, Math.PI / 2));
   }
-  for (const sx of [-2.6, 2.6]) {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 8.6, 8), std(0xf4f6fa));
-    leg.position.set(sx, 4.1, 0); leg.rotation.z = sx > 0 ? -0.3 : 0.3; g.add(leg);
+
+  // ── THE CARS ────────────────────────────────────────────────────────────
+  // Hung below the rim on a hanger, upright — a gondola stays level however far
+  // round the wheel it is, which is the whole charm of the ride. Roofs are
+  // cones so the silhouette is not eight identical bricks.
+  const GOND = [0x5ec8d8, 0xffd23f, 0x7ed57a, 0xf06fb0, 0xb98cff, 0xff9a3a, 0x4fd1a5, 0xff7a6b];
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    const cx = Math.cos(a) * R, cy = HY + Math.sin(a) * R;
+    p.push(part(new THREE.CylinderGeometry(0.07, 0.07, 0.9, 6), TRIM, cx, cy - 0.45, 0));   // hanger
+    p.push(part(new THREE.BoxGeometry(1.5, 1.05, 1.35), GOND[i % GOND.length], cx, cy - 1.45, 0));
+    p.push(part(new THREE.ConeGeometry(1.15, 0.42, 4), TRIM, cx, cy - 0.78, 0, 0, Math.PI / 4));
   }
+
+  // ── THE FRAME ───────────────────────────────────────────────────────────
+  // Two A-frames, one either side of the wheel, tied together at the foot.
+  for (const dz of [-HALF - 0.7, HALF + 0.7]) {
+    for (const sx of [-2.9, 2.9]) {
+      p.push(part(new THREE.CylinderGeometry(0.24, 0.38, 8.6, 8), TRIM,
+        sx, HY / 2 - 0.05, dz, 0, 0, sx > 0 ? -0.33 : 0.33));
+    }
+    p.push(part(new THREE.BoxGeometry(5.6, 0.26, 0.26), TRIM, 0, 1.5, dz));       // tie beam
+  }
+  p.push(part(new THREE.BoxGeometry(0.3, 0.3, HALF * 2 + 1.4), TRIM, 0, 1.5, 0)); // cross tie
+
+  const g = new THREE.Group(); g.add(mergedProp(p));
   return g;
 }
 function makeBeachChairFB(): THREE.Group {

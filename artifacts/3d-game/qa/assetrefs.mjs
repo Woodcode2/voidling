@@ -56,8 +56,8 @@ process.on('unhandledRejection', die);
 // the bar checks set equality, so a stale entry fails just as loudly as a new
 // defect and the list cannot rot.
 const KNOWN_NOWHERE = new Set([
-  // the ferris wheel still loading from the retired GLB pack
-  '/assets/hf3d/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/f1918f07-d6ac-4589-abe2-eeaf7ca703b2.glb',
+  // (the ferris wheel's retired hf3d GLB was here. Paid down 2026-09-22: the
+  // wheel is built procedurally as the real prop now, and nothing asks for it.)
   // SKYLARK FIELD is the only one of six worlds with no match track
   '/assets/music/skylark.mp3',
   // OPTIONAL BY DESIGN, not a defect: audio3d.ts:3915 only reaches for
