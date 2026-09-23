@@ -239,9 +239,33 @@ if (want(2)) {
   if (!box || box.width < 40 || box.height < 20) {
     no(`#2 #mlPips has no box to photograph (${JSON.stringify(box)}) — the ladder is not on screen`);
   } else {
-    await nap(2500);   // from the PAINT above: past the 1.98s pipFlagBob, and past
-                       // any reveal tail (4 steps + 3 pulses is ~2.5s on this page
-                       // there is no reveal, but the margin costs nothing)
+    // ── WAIT FOR THE BOB TO FINISH, NOT FOR A NUMBER OF MILLISECONDS ────────
+    // This was nap(2500) "from the PAINT above: past the 1.98s pipFlagBob", and
+    // it still failed this bar in two push gates running (1 of 18, 6 px). The
+    // paint is the DOM insert; a CSS animation STARTS on the next rendered
+    // frame, and under the software renderer that frame can be seconds away:
+    // measured with qa/_ladderanims.mjs, pipFlagBob's animationstart landed
+    // 0.03 s, 3.9 s and 0.02 s after the insert on three loads of the same
+    // build, and its animationend 3.9-4.0 s after the insert on all three. So
+    // the four shots sometimes landed inside a bob behaving exactly as
+    // designed. GOVERNOR.md rule 4: wait on the thing itself. Every FINITE
+    // animation in the menu panel is awaited to its end; an INFINITE one is
+    // the failure this bar exists for, named on the spot.
+    const inf = await p.evaluate(async () => {
+      const panel = document.getElementById('mlPips')?.closest('#menu') || document.body;
+      const mine = () => document.getAnimations().filter((a) => {
+        const t = a.effect && a.effect.target;
+        return t && panel.contains(t);
+      });
+      const endless = mine().filter((a) => a.effect.getComputedTiming().iterations === Infinity)
+        .map((a) => `${a.animationName || a.constructor.name}@${a.effect.target.id || a.effect.target.className}`);
+      await Promise.race([Promise.all(mine().filter((a) => a.effect.getComputedTiming().iterations !== Infinity)
+        .map((a) => a.finished.catch(() => {}))), new Promise((r) => setTimeout(r, 20000))]);
+      return endless;
+    });
+    if (inf.length) no(`#2 the menu panel runs ${inf.length} animation(s) that never end: ${inf.join(', ')} — a settled ladder cannot be still`);
+    else {
+    await nap(300);
     const { PNG } = await import('pngjs');
     const px = box.width * box.height;
     /** worst consecutive-pair difference over four shots 150ms apart — a quarter
@@ -308,6 +332,7 @@ if (want(2)) {
         + `(${(still.worst / px * 100).toFixed(1)}%) changed between shots ${still.pair}, 150ms apart, `
         + `2.5s after the row was painted. Nothing but a CSS animation can do that, and MENU-BRIEF §5.1 bar 4 asks for 0. `
         + `Running: ${live.length ? live.join(', ') : '(none — so it is not CSS; look at what the freeze did not hide)'}`);
+    }
     }
   }
   await ctx.close();
