@@ -382,6 +382,12 @@ export interface Life {
    *  every frame with or without it, so this is the honest answer to "does
    *  gating change what the player sees". */
   moverStats(gate: number): { near: number; total: number; panicked: number; peds: number; calm: number };
+  /** QA only (qa/faceline.mjs, studio round 4 I-3): one walking person built
+   *  by makePerson with the head asked for, so a probe can line up every
+   *  Hair x Hat facing the camera. Not in the scene, not a mover, not edible —
+   *  the caller places it and disposes of it. Colours left out are picked the
+   *  way the dress code picks them, so the line-up shows the hat-colour rule. */
+  person(o: { hair: Hair; hat: Hat | null; biome?: string; hairCol?: number; hatCol?: number }): THREE.Group;
   /** How bad has it got, 0..1. Drives what the crowd says and how often.
    *  Fed from the match loop off the same devoured/form signal the newsroom
    *  uses for its tier, so the street and the broadcast escalate together. */
@@ -765,14 +771,68 @@ interface PersonOpts {
 // into one mesh. Coordinates are local to the pivot that owns them.
 
 // HEAD PIVOT space: origin at the head centre, head radius ≈ 0.53.
+//
+// ── A HAT SITS ON THE HAIRLINE, NOT ON THE EYES ──────────────────────────
+// Studio round 4, B4. Every hat here was drawn the way the hair was: level on
+// the head, with a rim that came down past the eyes, so under a cap, a
+// beanie, a hood, a bandana, a helmet or a flower garland the camera saw hat
+// where a face should be. qa/faceray.mjs builds every Hair x Hat through this
+// function and makePerson's own head block and raycasts each eye from the
+// play camera at 46, 55 and 65 degrees. Before this change the worst eye read
+// 0/0/0 under every hat in this function. For the toque and the bellhop that
+// was the hair underneath (on a bald head they read 100); for every other hat
+// it was the hat itself (bald, 0 to 8%). The cap alone is the default hat of
+// 21 dress codes.
+//
+// The fix is the hair's (see hairParts): tip the hat back about the head
+// centre, so its front rim rises above the brows and its back drops to the
+// nape, which is where a hat pushed back on a head sits anyway. It is ONE
+// rigid rotation of a hat's parts together — each centre turned about the
+// origin, each part given the same ninth argument — so no hat changes shape,
+// size, colour or triangle count, only its seat. Worst eye across all nine
+// hairs, 46/55/65 degrees, qa/faceray.mjs, from 0/0/0 on each:
+//
+//   cap, postal  100/100/85   the governor's numbers: crown -0.5 at y 0.16,
+//                             z -0.04, peak from the skeptic's visor sweep
+//   beanie       100/ 93/69   -0.55, the hair's own tilt (-0.5 held 43% at 65)
+//   bandana      100/100/98   -0.55; the knot swings down to the nape
+//   hood          99/ 91/73   dome only, -0.55 and 0.04 further back (-0.55 in
+//                             place held 26% at 65); the collar stays on the neck
+//   flower       100/100/92   the garland on the hairline, -0.55 and 0.04 back
+//                             (in place: 48% at 65); the flowers ride on it
+//   visor        100/100/97   -0.6 (-0.55 read 59% at 65, too thin a margin)
+//   bucket       100/100/98   -0.5 (-0.4 read 23% at 65)
+//   tricorn      100/100/98   -0.4 (-0.3 read 65% at 65)
+//   helmet        99/ 94/85   shell and rim -0.55 and 0.08 back, the cap's peak;
+//                             tipped in place even -0.6 read 0% at 65, with the
+//                             rim band, tipped up in front of the brows, doing
+//                             most of the covering
+//   shako         91/ 88/81   the peak ONLY, tipped to -0.9 and brought in to
+//                             z 0.42; tipping the whole hat -0.55 cleared 98%
+//                             but lays the drum and plume back 31 degrees, and
+//                             a marching band's shako leaning back reads as
+//                             falling off
+//
+// (Single-hat alternatives are from the same probe run over a copy of this
+// file, FACERAY_SRC, across five of the nine hairs.)
+//
+// FOUR HATS KEEP THEIR EYES COVERED, BY DECISION, and qa/faceray.mjs exempts
+// them by name: the sun hat, the straw hat and the captain's cap, because a
+// brim or a low dark peak shading the eyes is how those hats are drawn and
+// the brim is what reads from the top of the camera's travel (the governor's
+// convention); and the snorkel, because a dive mask over the eyes IS the eyes
+// — the same call makePerson already makes for sunglasses, which draw no eyes
+// at all. The tricorn and the bucket are brims too, and are NOT exempt: the
+// tricorn is on 62% of the costumed pirates, and the bucket on the kids, and
+// a small tilt clears both.
 function hatParts(out: Geo[], kind: Hat, col: number): void {
   if (kind === 'tricorn') {
-    out.push(pc(B.tri, INK, 0, 0.24, 0, 2.0, 0.09, 2.0));            // TRIANGLE brim, not a cone
-    out.push(pc(B.hemi, INK, 0, 0.18, 0, 1.06, 1.15, 1.06));
-    out.push(pc(B.dot, GOLD, 0, 0.35, 0.40, 0.34, 0.30, 0.20));      // cockade on the front point
+    out.push(pc(B.tri, INK, 0, 0.221, -0.093, 2.0, 0.09, 2.0, -0.4));   // TRIANGLE brim, not a cone
+    out.push(pc(B.hemi, INK, 0, 0.166, -0.070, 1.06, 1.15, 1.06, -0.4));
+    out.push(pc(B.dot, GOLD, 0, 0.478, 0.232, 0.34, 0.30, 0.20, -0.4)); // cockade on the front point
   } else if (kind === 'bandana') {
-    out.push(pc(B.hemi, col, 0, 0.08, 0, 1.13, 0.74, 1.13));
-    out.push(pc(B.dot, col, 0, 0.0, -0.54, 0.32, 0.26, 0.50));       // knot at the back
+    out.push(pc(B.hemi, col, 0, 0.068, -0.042, 1.13, 0.74, 1.13, -0.55));
+    out.push(pc(B.dot, col, 0, -0.282, -0.460, 0.32, 0.26, 0.50, -0.55));   // knot at the back
   } else if (kind === 'captain') {
     out.push(pc(B.hemi, WHITE, 0, 0.11, 0, 1.16, 0.92, 1.16));
     out.push(pc(B.cyl, GOLD, 0, 0.10, 0, 1.18, 0.12, 1.18));
@@ -781,8 +841,8 @@ function hatParts(out: Geo[], kind: Hat, col: number): void {
     out.push(pc(B.disc, col, 0, 0.26, 0, 2.26, 0.07, 2.26, 0.07));   // wide, faintly floppy
     out.push(pc(B.hemi, col, 0, 0.19, 0, 1.15, 0.82, 1.15));
   } else if (kind === 'visor') {
-    out.push(pc(B.cyl, col, 0, 0.16, 0, 1.18, 0.13, 1.18));
-    out.push(pc(B.box, col, 0, 0.17, 0.62, 0.62, 0.07, 0.50));
+    out.push(pc(B.cyl, col, 0, 0.132, -0.090, 1.18, 0.13, 1.18, -0.6));
+    out.push(pc(B.box, col, 0, 0.490, 0.416, 0.62, 0.07, 0.50, -0.6));
   } else if (kind === 'snorkel') {
     out.push(pc(B.box, 0x63d6f0, 0, 0.06, 0.44, 0.62, 0.26, 0.20));
     out.push(pc(B.tube, 0xffd23f, 0.44, 0.30, 0.14, 0.09, 0.70, 0.09, 0, 0, -0.2));
@@ -793,15 +853,18 @@ function hatParts(out: Geo[], kind: Hat, col: number): void {
     out.push(pc(B.cyl, col, 0, 0.30, 0, 0.92, 0.34, 0.92));
     out.push(pc(B.cyl, GOLD, 0, 0.15, 0, 0.96, 0.10, 0.96));
   } else if (kind === 'flower') {
-    out.push(pc(B.ring, 0x4fae62, 0, 0.14, 0, 1.30, 1.30, 1.30, Math.PI / 2));
-    for (const a of [0.4, 2.5, 4.6])
-      out.push(pc(B.dot, pick([0xff7fb0, 0xffd54f, 0xffffff]), Math.sin(a) * 0.55, 0.17, Math.cos(a) * 0.55, 0.24));
+    out.push(pc(B.ring, 0x4fae62, 0, 0.14, -0.04, 1.30, 1.30, 1.30, Math.PI / 2 - 0.55));
+    for (const a of [0.4, 2.5, 4.6]) {
+      const fz = Math.cos(a) * 0.55;
+      out.push(pc(B.dot, pick([0xff7fb0, 0xffd54f, 0xffffff]), Math.sin(a) * 0.55,
+        0.14 + 0.03 * Math.cos(0.55) + fz * Math.sin(0.55), -0.04 - 0.03 * Math.sin(0.55) + fz * Math.cos(0.55), 0.24));
+    }
   } else if (kind === 'bucket') {   // kids' floppy bucket hat
-    out.push(pc(B.disc, col, 0, 0.22, 0, 1.66, 0.09, 1.66));
-    out.push(pc(B.cyl, col, 0, 0.34, 0, 1.16, 0.40, 1.16));
+    out.push(pc(B.disc, col, 0, 0.193, -0.105, 1.66, 0.09, 1.66, -0.5));
+    out.push(pc(B.cyl, col, 0, 0.298, -0.163, 1.16, 0.40, 1.16, -0.5));
   } else if (kind === 'cap') {
-    out.push(pc(B.hemi, col, 0, 0.14, -0.02, 1.17, 0.94, 1.17));
-    out.push(pc(B.box, col, 0, 0.16, 0.56, 0.54, 0.08, 0.42));
+    out.push(pc(B.hemi, col, 0, 0.16, -0.04, 1.17, 0.94, 1.17, -0.5));
+    out.push(pc(B.box, col, 0, 0.36, 0.44, 0.54, 0.08, 0.30, -0.7));
   } else if (kind === 'straw') {
     // the widest brim in the game — a farmer is legible from the top of the
     // camera's travel purely because of this disc
@@ -811,25 +874,25 @@ function hatParts(out: Geo[], kind: Hat, col: number): void {
   } else if (kind === 'hood') {
     // hood UP: a dome a size too big, sitting back off the face, with the
     // drawstring collar showing under it
-    out.push(pc(B.hemi, col, 0, 0.02, -0.10, 1.40, 1.24, 1.44));
+    out.push(pc(B.hemi, col, 0, -0.035, -0.136, 1.40, 1.24, 1.44, -0.55));
     out.push(pc(B.cyl, col, 0, -0.34, -0.06, 1.30, 0.30, 1.34));
   } else if (kind === 'helmet') {
-    out.push(pc(B.hemi, col, 0, 0.02, 0, 1.24, 1.06, 1.24));
-    out.push(pc(B.cyl, col, 0, -0.06, 0, 1.26, 0.20, 1.26));
-    out.push(pc(B.box, col, 0, 0.10, 0.60, 0.60, 0.08, 0.44));         // peak
+    out.push(pc(B.hemi, col, 0, 0.06, -0.08, 1.24, 1.06, 1.24, -0.55));
+    out.push(pc(B.cyl, col, 0, -0.03, -0.08, 1.26, 0.20, 1.26, -0.55));
+    out.push(pc(B.box, col, 0, 0.40, 0.42, 0.60, 0.08, 0.36, -0.7));   // peak
     out.push(pc(B.box, WHITE, 0, -0.20, 0.50, 0.52, 0.06, 0.30));      // face bar
   } else if (kind === 'shako') {   // marching band: tall drum, peak, and a PLUME
     out.push(pc(B.cyl, col, 0, 0.52, 0, 0.96, 0.86, 0.96));
     out.push(pc(B.cyl, GOLD, 0, 0.20, 0, 1.00, 0.10, 1.00));
-    out.push(pc(B.box, INK, 0, 0.16, 0.56, 0.56, 0.08, 0.40));
+    out.push(pc(B.box, INK, 0, 0.26, 0.42, 0.56, 0.08, 0.30, -0.9));   // peak
     out.push(pc(B.cone, 0xf3f0e6, 0, 1.14, 0, 0.26, 0.62, 0.26));      // the plume
   } else if (kind === 'postal') {
-    out.push(pc(B.hemi, 0x2f4f8a, 0, 0.14, -0.02, 1.17, 0.94, 1.17));
-    out.push(pc(B.box, 0x2f4f8a, 0, 0.16, 0.56, 0.54, 0.08, 0.42));
+    out.push(pc(B.hemi, 0x2f4f8a, 0, 0.16, -0.04, 1.17, 0.94, 1.17, -0.5));
+    out.push(pc(B.box, 0x2f4f8a, 0, 0.36, 0.44, 0.54, 0.08, 0.30, -0.7));
     out.push(pc(B.box, 0xd8d4cc, 0, 0.30, 0.02, 0.72, 0.07, 0.30));    // service flash
   } else {   // beanie: dome + rolled brim
-    out.push(pc(B.hemi, col, 0, 0.10, 0, 1.16, 1.18, 1.16));
-    out.push(pc(B.cyl, col, 0, 0.02, 0, 1.21, 0.16, 1.21));
+    out.push(pc(B.hemi, col, 0, 0.085, -0.052, 1.16, 1.18, 1.16, -0.55));
+    out.push(pc(B.cyl, col, 0, 0.017, -0.010, 1.21, 0.16, 1.21, -0.55));
   }
 }
 
@@ -857,20 +920,41 @@ function hatParts(out: Geo[], kind: Hat, col: number): void {
 //
 // Each shell now clears the skull by about 0.04, which is enough that two
 // 16-segment spheres do not interpenetrate into a rim of triangles.
+//
+// ── AND THEN THE CROWN COVERED THE FACE (studio round 4, B3) ─────────────
+// Raising the shells to cover the scalp brought their rim down with them. A
+// B.hemi runs to 100.8 degrees from its pole, so the shared crown (y 0.05,
+// y-scale 1.10) ended at y -0.05 all the way round — BELOW the eyes, which sit
+// at y 0.075 — and across the eyes it stood at z 0.52, in front of eyes whose
+// front face is at z 0.49. Every person with hair wore it like a diving
+// helmet with no window. qa/faceray.mjs, the worst eye at 46/55/65 degrees:
+// 0/0/0 for short, bob, long, bun, pony and braids — 10 of the 14 HAIRS draws
+// — 43/42/41 for buzz and 55/53/52 for curly. qa/_headcover.mjs printed
+// "hair crown 0.0% of the eye is outside it" and exited 0.
+//
+// The ninth argument, -0.55, tips each shell back about its own centre: the
+// front rim rises to about y 0.26, above the brows, the sides stay at the ears
+// and the back drops to the nape (y -0.33) — a hairline, which is what a head
+// of hair has and a helmet does not. After: 100/100/98 for the shared crown,
+// 100/100/100 for buzz and curly. The scalp stays covered: _headcover still
+// reads 0.0% of the up-facing skull bare for every style: a shell 0.04 clear
+// of the skull can turn a long way before its pole leaves the top of the head.
+// No triangles move in or out. The ponytail, bun, braids, bob and long hair
+// are placed on the head, not on the shell, and are untouched.
 function hairParts(out: Geo[], style: Hair, col: number): void {
   if (style === 'bald') return;
   // 1.10, not 0.66: a buzz cut is hair over the WHOLE scalp, just very short,
   // so it stays tight to the skull in x/z and simply has to reach the top of it.
-  if (style === 'buzz') { out.push(pc(B.hemi, col, 0, 0.03, -0.02, 1.09, 1.10, 1.09)); return; }
+  if (style === 'buzz') { out.push(pc(B.hemi, col, 0, 0.03, -0.02, 1.09, 1.10, 1.09, -0.55)); return; }
   if (style === 'curly') {   // lumpy crown — the most distinctive top-down read
-    out.push(pc(B.hemi, col, 0, 0.04, -0.02, 1.08, 1.12, 1.08));
+    out.push(pc(B.hemi, col, 0, 0.04, -0.02, 1.08, 1.12, 1.08, -0.55));
     for (let i = 0; i < 5; i++) {
       const a = i * 1.2566;
       out.push(pc(B.dot, col, Math.sin(a) * 0.35, 0.28 + (i % 2) * 0.11, Math.cos(a) * 0.35 - 0.03, 0.38));
     }
     return;
   }
-  out.push(pc(B.hemi, col, 0, 0.05, -0.02, 1.14, 1.10, 1.14));   // shared crown
+  out.push(pc(B.hemi, col, 0, 0.05, -0.02, 1.14, 1.10, 1.14, -0.55));   // shared crown
   if (style === 'bob') out.push(pc(B.flare, col, 0, -0.16, -0.03, 1.24, 0.48, 1.24));
   else if (style === 'long') out.push(pc(B.box, col, 0, -0.38, -0.30, 0.70, 0.86, 0.34));
   else if (style === 'bun') out.push(pc(B.sphS, col, 0, 0.34, -0.30, 0.44));
@@ -1208,6 +1292,53 @@ interface Build { hipY: number; shY: number; headY: number; girth: number; armL:
 const ADULT: Build = { hipY: 1.24, shY: 2.18, headY: 2.90, girth: 1.00, armL: 1.06, headS: 1.00, scale: 1 };
 const CHILD: Build = { hipY: 0.86, shY: 1.62, headY: 2.20, girth: 1.17, armL: 0.82, headS: 1.16, scale: 0.80 };
 
+// ── A CREAM CAP ON A PALE HEAD IS A BALD HEAD ────────────────────────────
+// Studio round 4 (B4, the governor's crop of Game Day): from the play camera a
+// hat is the top of a person, and a hat the colour of the skin under it is
+// read as the skin. The dress-code palette below was picked from blind, so
+// the cream cap (#f6e3b8) went onto the palest skin (#ffdcb8) at CIE76 dE 7.1
+// and the next one (#f6c9a0) at 12.8 — the same value as the forehead under
+// it, which reads as a bald dome. And a hat the colour of the shirt melts the
+// head into the body from above, which is the other half of the rule.
+//
+// So the pick is made only among the colours more than dE 15 from BOTH the
+// shirt and the skin. qa/faceray.mjs bar (H) runs the head block over every
+// skin in SKIN against every shirt in OUTFIT (528 pairs) and makes pick()
+// return each candidate in turn: before, 132 outcomes were within 15 of the
+// skin and 128 within 15 of the shirt; after, none, the closest being 17.2.
+// Against the skin the filter only ever removes the cream, and only on the
+// two palest skins (white is 25.4 from the palest). Over that whole domain at
+// least one colour always survives — if the fallback below had run for any
+// pair, its colour would be within 15 of something and bar (H) would fail —
+// so it exists for a shirt passed in from outside the dress codes: the
+// least-bad colour, not a crash.
+//
+// CIE76 on the sRGB hex, the same arithmetic as qa/formsep.mjs — the gamut
+// here is a dozen swatches, and that is the formula every other colour rule
+// in this repo is written against. At most ten dE76 calls a person, at build.
+// Still ONE pick() draw, the same as the palette pick it replaces, and the
+// crowd draws from Math.random, not the seeded stream.
+const HAT_COLS = [0xf6e3b8, 0xff6f91, 0xffffff, 0xe8604d, 0x4da3ff];
+const _lin = (v: number) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+const _lf = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+function labOf(hex: number): [number, number, number] {
+  const r = _lin(((hex >> 16) & 255) / 255), g = _lin(((hex >> 8) & 255) / 255), b = _lin((hex & 255) / 255);
+  const fx = _lf((r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047);
+  const fy = _lf(r * 0.2126 + g * 0.7152 + b * 0.0722);
+  const fz = _lf((r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883);
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+function dE76(a: number, b: number): number {
+  const p = labOf(a), q = labOf(b);
+  return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+}
+function hatColFor(shirt: number, skin: number): number {
+  const ok = HAT_COLS.filter((c) => dE76(c, shirt) > 15 && dE76(c, skin) > 15);
+  if (ok.length) return pick(ok);
+  let best = HAT_COLS[0], bestD = -1;
+  for (const c of HAT_COLS) { const d = Math.min(dE76(c, shirt), dE76(c, skin)); if (d > bestD) { bestD = d; best = c; } }
+  return best;
+}
 const HAIRS: Hair[] = ['short', 'short', 'buzz', 'bob', 'bob', 'long', 'long', 'bun', 'pony', 'pony', 'curly', 'curly', 'braids', 'bald'];
 const PATTERNS: Pattern[] = ['plain', 'plain', 'plain', 'stripe', 'floral', 'twotone', 'sash'];
 const FLIP_COL = [0xff5d7e, 0x2fd8e8, 0xffd23f, 0x7ef05a, 0xffffff];
@@ -1389,10 +1520,18 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
   // play camera spends all its time looking at, so it gets the vertex budget.
   const hp: Geo[] = [];
   hp.push(pc(B.sph, skin, 0, 0, 0.01, 1.06, 1.12, 0.99));
-  hairParts(hp, hair, hairCol);
+  // THE HAT IS DECIDED BEFORE THE HAIR, because curly hair under a hat is
+  // drawn as the shared short crown. The five curl lumps sit on top of the
+  // head (y 0.28-0.39, radius 0.19) exactly where every crowned hat sits, so
+  // under one they either poke through it as five bumps or are buried inside
+  // it as 840 triangles nobody sees (5 x the 168 of a 12x8 B.dot, counted off
+  // the geometry). Same Math.random draws in the same order as before — hk was
+  // the only draw here and hairParts takes none — and it is not the seeded
+  // stream either way.
   const hk: Hat | null = (o && o.hat !== undefined) ? o.hat
     : (fit.hat && Math.random() < (fit.hatOdds ?? 0.4) ? fit.hat : null);
-  if (hk) hatParts(hp, hk, o?.hatCol ?? pick([0xf6e3b8, 0xff6f91, 0xffffff, 0xe8604d, 0x4da3ff]));
+  hairParts(hp, hk && hair === 'curly' ? 'short' : hair, hairCol);
+  if (hk) hatParts(hp, hk, o?.hatCol ?? hatColFor(shirt, skin));
   // ── THE FACE ── the comment at the head of this block has promised "skull,
   // hair, hat, face" since the crowd was written, and there has never been a
   // single eye in this game's entire population. Every townsperson is a bare
@@ -7105,6 +7244,9 @@ export function createLife(
       let panicked = 0;
       for (const pd of peds) if (pd.panic > 0) panicked++;
       return { near, total: movers.length, panicked, peds: peds.length, calm: calmT };
+    },
+    person(o) {
+      return makePerson(o.biome, undefined, { hair: o.hair, hat: o.hat, hairCol: o.hairCol, hatCol: o.hatCol });
     },
     // SET, not max — Infinity has to be clearable. The AMBIENT chatter waits
     // too: chatCd starts at 2 s, so the first crowd line landed at 2.0 match-s

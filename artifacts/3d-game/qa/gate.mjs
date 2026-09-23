@@ -606,6 +606,14 @@ const SUITE = [
     cmd: ['node', 'qa/peoplefacet.mjs'], verdict: pf,
     why: 'the walking people are curves and not prisms — every part wide enough for a facet to read carries at least the 14 sides island.ts states, measured as the straight edge in screen pixels at the closest the camera ever settles (the owner, twice: "the people in game as like Lego")' },
 
+  { id: 'faceray', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 180,
+    cmd: ['node', 'qa/faceray.mjs'], verdict: pf,
+    why: 'a walking person has a face: every Hair x Hat, built by life.ts\'s own head code and raycast from the play camera at 46/55/65 degrees, shows at least half of each eye (studio round 4, B3/B4: the hair and the caps buried both eyes on 10 of 14 hair draws), and no dress-code hat is the colour of the skin or the shirt under it (a cream cap on a pale face read as a bald head)' },
+
+  { id: 'headcover', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 60,
+    cmd: ['node', 'qa/_headcover.mjs'], verdict: pf,
+    why: 'no hair or hat shell swallows an eye whole, the eye stands proud of its own skull, and tipping the shells off the face has not bared the scalp the camera looks down on' },
+
   { id: 'safety', tier: 'words', profiles: ['push', 'live'], timeout: 60,
     cmd: ['node', 'scripts/safety-scan.mjs'], verdict: exitCode,
     why: 'no retired vocabulary in any string a child can read — the 4+ rating depends on it' },
