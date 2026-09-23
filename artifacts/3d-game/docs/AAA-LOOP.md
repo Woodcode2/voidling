@@ -115,7 +115,7 @@ frame is qa/out/hudshots/maple-noms.png.
 | Job 0 / I-1 | The pack photographs what a child sees: `__settleCam()`, hide-HUD stylesheet, width check (frames are ~37% too close) | QA | queued, day 1 |
 | B2 / Job 2 | Maple crowns carry 603 faceted "dapple" spheres — one mass each | STATIC | **DONE** b8cda42 — dapples deleted (−480 tris a tree, ~289k across Maple, seeded stream untouched); roundlod ratchet 153→152 / 39320→39240: FAIL before, PASS after. The crop of the nearest maple waits for Job 0's settled frame. |
 | B1 / Job 3 | Leaf drifts painted onto the square's walks (two coffee stains in the opening frame); Pirate sand chroma rider | GROUND | **Maple half DONE** — qa/leafsurface.mjs (bake diffed against ?qaleaves=0, Math.random seeded in both): leaf texels off the grass **16,866 → 7** (bar 20); on grass 39,651 → 37,212. Lobes are filled only on green-dominant ground, every dr() still drawn; the protest patch is a worn-grass falloff on grass only. The probe's first two designs measured the wrong thing (colour-only flagged 1,520 texels of plain cream sand; the unseeded diff counted randomly placed beach towels) — both recorded in the probe. Pirate sand rider waits for Job 0's settled frame. |
-| B7 / Job 5 | Paint glows (Maple planters halo in the first frame) | LIGHT | queued, day 1 |
+| B7 / Job 5 | Paint glows (Maple planters halo in the first frame) | LIGHT | **fix in, after-reading pending** — see X2 below: measured on all six worlds (Maple and Pirate fail), per-world bloom cut + petal sheen |
 | B3, B4 / Job 4 | Walking people's eyes buried by hair shells and caps | MOTION | queued, day 2 |
 | Job 6 | The first two people she sees: chest ruff, eyes proud of the skull | MOTION | queued, day 2 |
 | Job 7 | One HUD, and screens without ghosts (timer/news behind the card, countdown stroke, chips, glyphs) | UI | queued, day 2 |
@@ -123,6 +123,32 @@ frame is qa/out/hudshots/maple-noms.png.
 | B7 / Job 9 | Lantern Night's lanterns light up; umbrella and moss rock | LIGHT + STATIC | after 0-8 |
 | Job 10 | The alarm means danger and only danger; no square waves | AUDIO + PLAY | after 0-8 |
 | Job 11 | The bite pays off on the swallow (sound lands 170-290 ms before the sink) | CHOREOGRAPHY | after G4/G6 verified |
+
+### Every world, not only Maple — and the verify pass (2026-09-23)
+
+The owner asked whether the round's work was "just for maple or every level".
+It had been measured on Maple. Each probe below was then run on all six
+worlds; what failed was fixed and re-measured. And the verify pass on the
+pre-merge fixes (5 verifiers + a regression hunter) left residuals and three
+minor regressions, each closed here against a probe that failed first.
+
+| id | item | before | after |
+|---|---|---|---|
+| X1 / G6 | Flights sized so a big bank looks big — on every world | qa/nomstream.mjs on the G6 build: Maple, Pirate, Powder, Skylark 8/8; **Gameday (c) 1.36x, Lantern (c) 1.31x** (bar 1.4x). The flights in order showed why: below the recent average the scale stopped at 1, so a +21 after a run of +50s flew at the same 20px as the +35 that opened the spree | the same law runs down to 0.85 (17px): **Gameday 1.60x PASS**; Lantern PENDING |
+| X2 / Job 5 | Glow means a light — on every world | qa/halocensus.mjs v2 (below): **Maple FAIL 75 cells** (white planters and sign lettering lit to L 1.177 against a 1.05 cut); **Pirate FAIL 2 cells** (specular sparks at 2.6 off blossoms that four of mainstreet's "lacquered round things" hexes make gloss 0.42 in every world); Gameday, Lantern, Powder, Skylark PASS (paint ceilings 0.70, 0.31, 0.62, 0.42; Lantern's 26,606 over-cut pixels are all lanterns) | per-world `WorldLight.bloomCut` (Maple 1.25, scaled by the hour's sun, floored at 1.05) and blossoms at the canopy's 0.14 sheen: PENDING |
+| X3 | The end beat belongs to the whistle | qa/endbeat.mjs on 641b9cd: **4/6 BAD** — the winning bite crowned the chain (nomCrown, then the whistle a frame later); LEAVE from a pause inside the outro still raised the results card and the finale on the menu; the outro ran out under the pause sheet | PENDING |
+| X4 | The end beat's rival is heard | qa/chomp.mjs part 6: the plain pop() the review fix used, 20 ms after a bite: **-183 dBFS** (silent — pop's 75 ms gate) | chomp(…, plain): **-30.5 dBFS**, tail identical to a bare pop (no glock, no duck). PASS |
+| X5 | The top of the crown ladder is not a whistle in her ear | qa/chomp.mjs part 7, energy above 7 kHz by FFT: crown at 110 **-8.3 dB** (sparkle at 6.3/8.4/10.5 kHz) against the old ceiling's -34.1 | partials over 6 kHz fold down an octave: **-35.5 dB**. PASS. (The first reading used a one-pole cascade that leaked the crown's own 2-3 kHz triad into the band; replaced by an FFT and A/B'd on the same measure.) |
+| X6 | PLAY honours BY MYSELF | menu PLAY and the pips called startFresh(false): the persisted toggle held only through the world picker. qa/solotog.mjs re-pointed at one-tap PLAY (it still clicked PLAY expecting the picker) with a PLAY bar | PENDING |
+| X7 | Smaller residuals | duckMusic's deeper floor survived the release ramp; OPEN SHOP and LEAVE did not cancel a queued cheer; the bite bank paid under the pause sheet; the ferris wheel's cross tie ran through both rims | fixed in bd38108 (by reading; the cheer and pause paths are inside X3's drive) |
+
+**halocensus v2, and why v1 was retired.** v1 measured the RESULT — pixels
+bloom lifted by 3+ L* more than 16 px from a light — and condemned Lantern's
+lanterns (a lit table's haze reaches ~200 px, all 405 "hot" cells) while
+reading "nothing measured" on three worlds where nothing crosses. v2 measures
+the SOURCES: the frame rendered linear as RenderPass hands it to bloom, every
+pixel's luminance against the pass's own threshold, and a mask of the things
+that are lights. Same bar size (no 32 px cell of 40+ off-light sources).
 
 Research items G5, G7-G29 wait until these blockers close (governor).
 
