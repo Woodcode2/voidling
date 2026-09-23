@@ -12703,8 +12703,13 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { beginMatch(); }
     if (!host) return;
     let cv = host.querySelector('canvas') as HTMLCanvasElement | null;
     if (!cv) { cv = document.createElement('canvas'); host.appendChild(cv); }
-    // sized once, from the element, at the screen's own density
-    if (!PREV_S) PREV_S = Math.round((host.getBoundingClientRect().width || 190) * DPR);
+    // sized once, from the element, at the screen's own density — its LAYOUT
+    // width (offsetWidth), not its rect: #skinPrev's card arrives on modalIn,
+    // and a rect read inside it would include that scale. (openPreview calls
+    // this before #skinPrev gains .show, so on that path the element is
+    // display:none here and both reads give 0 and the 190 fallback; read from
+    // the source, not measured. This line does not change that.)
+    if (!PREV_S) PREV_S = Math.round((host.offsetWidth || 190) * DPR);
     cv.width = PREV_S; cv.height = PREV_S;
     const ctx = cv.getContext('2d');
     const { sc, cam, rig } = voidStudio();
@@ -12859,8 +12864,17 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { beginMatch(); }
     // measured off a real card so the hats tab gets the same native-resolution
     // treatment as the voids tab, rather than a constant that goes stale the
     // next time the grid changes columns
+    // THE LAYOUT BOX, NOT THE RECT. With the hats tab remembered, both shop
+    // doors reach this through __shopTab in the rAF after #shop gains .show,
+    // and #shop arrives on modalIn, whose first
+    // keyframe is scale(0.94). A rect includes every ancestor's transform, so
+    // a rect read on that frame reads the card at 0.94 of its width, and the
+    // buffer sized from it is kept until the skin changes (thumbsFor). That is
+    // read from the source, not measured in a browser. offsetWidth is the
+    // untransformed layout width, to a whole CSS px; qa/sheetbox.mjs bars a
+    // rect read inside a sheet that arrives on a transform.
     const cw = (document.querySelector('#hatGrid .hatCard canvas') as HTMLElement | null)
-      ?.getBoundingClientRect().width || 110;
+      ?.offsetWidth || 110;
     const S = Math.min(512, Math.round(cw * DPR));
     const { sc, cam, rig } = voidStudio();
     rig.setSkin(sk);

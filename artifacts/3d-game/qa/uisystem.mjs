@@ -1,6 +1,7 @@
 // THE TYPE SYSTEM'S CONTRACT — weights that exist, sizes a child can read.
 //
-//   node qa/uisystem.mjs [port] [world]
+//   node qa/uisystem.mjs [port] [world]             the four screens + two targets
+//   node qa/uisystem.mjs [port] [world] --match     the live-match walk (below)
 //
 // Fredoka ships 300/400/500/600/700. The CSS used to demand 800 (26x) and
 // 900 (83x), and the browser synthesised fake bold from the 700 face —
@@ -30,6 +31,15 @@
 //     world tabs, #soloTog on the picker, MY NUMBERS on a level's results
 //     card — for rendered height and for a Fredoka family, because a <button>
 //     that forgets `font-family: inherit` draws in the platform's face
+//
+// ── TWO HALVES, BECAUSE ONE OF THEM HAS NEVER RUN ────────────────────────────
+// Without --match this walks the four screens (the probe as it was, which the
+// push gate has run: 32 s in its run of 2026-09-23 10:54) plus #soloTog and the
+// scrapbook tabs, which open from the same front door. With --match it runs
+// ONLY the live-match walk: the four chips, the blur sweep and MY NUMBERS on
+// the results card. The match walk was written while a browser gate held this
+// machine and has not been run, so qa/gate.mjs registers it as its own step
+// (`uisystem-match`) outside the push profile until a run has read it.
 import { chromium } from 'playwright';
 
 process.on('uncaughtException', (e) => {
@@ -37,10 +47,68 @@ process.on('uncaughtException', (e) => {
 process.on('unhandledRejection', (e) => {
   console.log(`\nFAIL — uisystem rejected: ${String(e && e.message || e).split('\n')[0]}`); process.exit(1); });
 
-const PORT = process.argv[2] || '4177';
-const WORLD = process.argv[3] || 'maple';
+const POS = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const PORT = POS[0] || '4177';
+const WORLD = POS[1] || 'maple';
+const MATCH = process.argv.includes('--match');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
+const fails = [];
+
+// ── A BUTTON IS A TARGET, AND IT IS SET IN OUR FACE ─────────────────────────
+// Rendered height (44 is Apple's floor, and the one this sheet already holds
+// #btnHome, .goShop, #btnRestore, #pauseQuit and .gateCancel to) and computed
+// family. A door that does not lead to its screen is a FAIL, and so is a
+// selector that matches nothing once the door is open — both would otherwise
+// pass on absence.
+//
+// FINISH THE ARRIVAL, DO NOT MEASURE IT. #worlds and #profile arrive on
+// modalIn, whose first keyframe is scale(0.94), and a rect includes every
+// ancestor's transform: a 44px button read on that frame would come out at
+// 44 x 0.94 = 41.4px. CSS animation time only advances on a rendered frame,
+// and qa/navtap.mjs traced this box drawing the island about once every 2.5 s,
+// with its pips still at t=0 1.2 s after they started — so a 600 ms wait is no
+// promise of getting past the first keyframe. Every finite animation on the
+// target and on each of its ancestors is finished first, the way navtap does
+// it (anything infinite is left alone: finish() throws on it). Rendered height
+// is still the reading, so a transform in the resting state still counts.
+const targets = async (pg, where, sel) => {
+  await pg.evaluate((s) => {
+    // a CSS animation exists only once style has been computed with the .show
+    // class on, and no frame may have been drawn since the door was opened —
+    // so compute it here, before asking for the animations
+    void document.documentElement.getBoundingClientRect();
+    for (const e of document.querySelectorAll(s)) {
+      for (let a = e; a; a = a.parentElement) {
+        for (const an of a.getAnimations()) {
+          const t = an.effect && an.effect.getComputedTiming();
+          if (!t || t.iterations === Infinity) continue;
+          try { an.finish(); } catch { /* not finishable */ }
+        }
+      }
+    }
+  }, sel);
+  await pg.waitForTimeout(120);
+  const got = await pg.evaluate((s) => [...document.querySelectorAll(s)]
+    .filter((e) => e.getClientRects().length)
+    .map((e) => ({ h: e.getBoundingClientRect().height, fam: getComputedStyle(e).fontFamily,
+      t: (e.textContent || '').trim().slice(0, 18) })), sel);
+  if (!got.length) {
+    console.log(`  ${where.padEnd(9)} BAD: ${sel} is not on screen — nothing was measured`);
+    fails.push(`${where}: ${sel} absent`);
+    return;
+  }
+  const bad = [];
+  for (const g of got) {
+    if (g.h < 43.5) bad.push(`${sel} "${g.t}" ${g.h.toFixed(1)}px tall`);
+    if (!/^\s*"?Fredoka/i.test(g.fam)) bad.push(`${sel} "${g.t}" set in ${g.fam.split(',')[0]}`);
+  }
+  console.log(`  ${where.padEnd(9)} ${bad.length ? 'BAD: ' + [...new Set(bad)].slice(0, 6).join(', ')
+    : `ok (${got.length}× ${sel}, ${Math.min(...got.map((g) => g.h)).toFixed(1)}px or taller, Fredoka)`}`);
+  [...new Set(bad)].forEach((x) => fails.push(`${where}: ${x}`));
+};
+
+if (!MATCH) {
 const p = await b.newPage({ viewport: { width: 430, height: 932 } });
 await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
 await p.addInitScript(() => { try {
@@ -54,7 +122,6 @@ await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show')
   .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
 
-const fails = [];
 // ── THE DOOR HAS TO STILL BE THERE ─────────────────────────────────────────
 // 'picker' opened with `#btnPlay.click()`, and #btnPlay stopped opening the
 // picker when it became startFresh(false) — it launches the dot the ring is on.
@@ -105,31 +172,6 @@ for (const [name, open, proof] of SCREENS) {
   bad.forEach((x) => fails.push(`${name}: ${x}`));
 }
 
-// ── A BUTTON IS A TARGET, AND IT IS SET IN OUR FACE ─────────────────────────
-// Rendered height (44 is Apple's floor, and the one this sheet already holds
-// #btnHome, .goShop, #btnRestore, #pauseQuit and .gateCancel to) and computed
-// family. A door that does not lead to its screen is a FAIL, and so is a
-// selector that matches nothing once the door is open — both would otherwise
-// pass on absence.
-const targets = async (pg, where, sel) => {
-  const got = await pg.evaluate((s) => [...document.querySelectorAll(s)]
-    .filter((e) => e.getClientRects().length)
-    .map((e) => ({ h: e.getBoundingClientRect().height, fam: getComputedStyle(e).fontFamily,
-      t: (e.textContent || '').trim().slice(0, 18) })), sel);
-  if (!got.length) {
-    console.log(`  ${where.padEnd(9)} BAD: ${sel} is not on screen — nothing was measured`);
-    fails.push(`${where}: ${sel} absent`);
-    return;
-  }
-  const bad = [];
-  for (const g of got) {
-    if (g.h < 43.5) bad.push(`${sel} "${g.t}" ${g.h.toFixed(1)}px tall`);
-    if (!/^\s*"?Fredoka/i.test(g.fam)) bad.push(`${sel} "${g.t}" set in ${g.fam.split(',')[0]}`);
-  }
-  console.log(`  ${where.padEnd(9)} ${bad.length ? 'BAD: ' + [...new Set(bad)].slice(0, 6).join(', ')
-    : `ok (${got.length}× ${sel}, ${Math.min(...got.map((g) => g.h)).toFixed(1)}px or taller, Fredoka)`}`);
-  [...new Set(bad)].forEach((x) => fails.push(`${where}: ${x}`));
-};
 {
   await p.evaluate(() => { document.getElementById('settings')?.classList.remove('show');
     document.getElementById('worldSwitch')?.click(); });
@@ -143,12 +185,13 @@ const targets = async (pg, where, sel) => {
   else { console.log('  scrapbook BAD: the door did not open MY VOID on its stickers pane'); fails.push('scrapbook: door'); }
 }
 await p.close();
+} // end of the front-door half (no --match)
 
 // ── THE FOUR CHIPS, IN A LIVE MATCH ──────────────────────────────────────────
 // A LEVEL match, because the goal chip is hidden on every match nobody chose a
 // dot for (index.html #goal[hidden]) and a probe that grades an absent chip
 // passes it. `?len=` makes a harness match start on its own.
-{
+if (MATCH) {
   const m = await b.newPage({ viewport: { width: 430, height: 932 } });
   await m.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
   await m.addInitScript(() => { try {
@@ -230,5 +273,7 @@ await p.close();
   await m.close();
 }
 await b.close();
-console.log('\n  ' + (fails.length ? `FAIL — ${fails.length} violations` : 'PASS — every weight is a real face, every size is readable, the HUD is one system') + '\n');
+console.log('\n  ' + (fails.length ? `FAIL — ${fails.length} violations${MATCH ? ' in the live match' : ''}`
+  : MATCH ? 'PASS — the four HUD chips are one system, no backdrop blur over the match, MY NUMBERS is a 44px target in our face'
+    : 'PASS — every weight is a real face, every size is readable, the front door\'s 44px targets are set in our face') + '\n');
 process.exit(fails.length ? 1 : 0);

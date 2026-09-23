@@ -86,8 +86,10 @@
       b, strong { font-weight: 700; }
       /* ── A BUTTON DOES NOT INHERIT THE PAGE'S FACE, UNLESS TOLD ────────────
          The user agent gives every <button> `font: -webkit-small-control`,
-         which resets the family to the system UI face. Twenty-five rules in
-         this sheet each remembered `font-family: inherit` on their own button;
+         which resets the family to the system UI face. Twenty-four rules in
+         this sheet each remembered `font-family: inherit` for their own
+         control (counted in the <style> block before this rule was added:
+         twenty-three buttons and the parental gate's number field);
          at least two never did — the scrapbook's world tabs and MY NUMBERS on
          the results card — and drew their labels in the platform's face inside
          a Fredoka game. One rule, so the next button cannot forget. */
@@ -618,6 +620,10 @@
          scale with a glyph up to 150px tall the way #timer's 3px scales with
          a 40px one; paint-order puts the fill over the inner half, so what
          shows is a 4px contour outside the letterform on any ground.
+         The glow is GONE with it, gold and hot alike (the 0 0 38px and 0 0
+         42px shadows): round 3's fix says to drop it at the same time,
+         because it is what softened the edge the stroke is there to draw.
+         The 5px offset drop stays; it is a hard shadow, not a glow.
 
          WHERE IT SITS IS STILL top: 33%, AND THAT IS OWED, NOT DECIDED. The
          studio's placement is "the free band below the void, measured on the
@@ -628,13 +634,16 @@
          at clock 7, and the card's height out of Fredoka's line metrics. A
          percentage typed here without that frame would be a guess with a
          comment on it. qa/countdown.mjs reads both edges at ?len=15, clock 7,
-         prints the band and the centred `top`, and fails today on overlap —
-         the number to write here is the one it prints. */
+         prints the band and the centred `top`, and is expected to fail on
+         overlap until then (it has not been run yet) — the number to write
+         here is the one it prints. It is registered in qa/gate.mjs's live and
+         quality profiles as `countdown`, so until this is placed those two
+         profiles say so. */
       #count span { font-size: min(30vw, 150px); font-weight: 700; color: #ffd23f;
         -webkit-text-stroke: 8px rgba(12,6,26,0.92); paint-order: stroke fill;
-        text-shadow: 0 5px 0 rgba(60,20,10,0.5), 0 0 38px rgba(255,180,60,0.55);
+        text-shadow: 0 5px 0 rgba(60,20,10,0.5);
         opacity: 0; transform: scale(0.6); }
-      #count span.hot { color: #ff6a5e; text-shadow: 0 5px 0 rgba(60,10,10,0.55), 0 0 42px rgba(255,90,74,0.6); }
+      #count span.hot { color: #ff6a5e; text-shadow: 0 5px 0 rgba(60,10,10,0.55); }
       #count span.pop { animation: countPop 0.92s cubic-bezier(.2,1.4,.4,1) forwards; }
       @keyframes countPop {
         0% { opacity: 0; transform: scale(1.7); }

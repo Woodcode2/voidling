@@ -525,16 +525,21 @@ const SUITE = [
     cmd: ['node', 'qa/worldreg.mjs'], verdict: pf,
     why: 'every per-world table knows every world the game renders — a missing row is never a crash, it is a silent `?? maple` and a world quietly running on another world\'s numbers' },
 
-  // Studio round 4, Job 7. Both static, both observed failing on ea6b384 and
-  // passing on the commit that registered them; the browser halves of the same
-  // job (endghost, modalin, countdown, and uisystem's match walk) are not
-  // registered until a run on this machine has read them.
+  // Studio round 4, Job 7. The static halves, each observed failing on the
+  // commit before its fix and passing on the fix: glyphs and ovlwire on ea6b384
+  // -> 3a5170c, sheetbox on 3a5170c -> the commit that registered it. The
+  // browser halves of the same job (uisystem-match, endghost, modalin,
+  // countdown) have NOT been run: they sit in live and quality only, next to
+  // uisystem below, until a run has read them.
   { id: 'glyphs', tier: 'build', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/glyphs.mjs'], verdict: pf,
     why: 'no → ▾ ▴ ▶ ⌂ in text a child sees — each is outside every unicode-range the Fredoka imports declare, read from the @fontsource CSS, so it would come out of the platform\'s fallback face; every drawn <use> resolves to a symbol' },
   { id: 'ovlwire', tier: 'build', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/ovlwire.mjs'], verdict: pf,
     why: 'the body.ovl observer runs on every build, not only inside the DEV build-stamp guard; its list names #end and only top-level sheets (a pane keeps .show after its sheet closes and would pin the HUD down)' },
+  { id: 'sheetbox', tier: 'build', profiles: ['push', 'live', 'art'], timeout: 30,
+    cmd: ['node', 'qa/sheetbox.mjs'], verdict: pf,
+    why: 'no getBoundingClientRect in src/ measures an element inside a sheet or card that arrives on a transform keyframe — the shop\'s hat thumbnails were sized off a card still at modalIn\'s scale(0.94) and cached that way' },
 
   { id: 'skyland', tier: 'quality', profiles: ['push', 'live'], timeout: 90,
     cmd: ['node', 'qa/skyland.mjs'], verdict: pf,
@@ -682,13 +687,43 @@ const SUITE = [
     cmd: ['node', 'qa/aftermatch.mjs', PORT], verdict: pf,
     why: 'the menu theme comes home after TIME!, by both ways out' },
 
-  // 900, not 300: since studio round 4 (Job 7) it boots a second page into a
-  // level match and runs it to the results card, on top of the four screens.
-  // Unmeasured on this machine when raised — the first gate run sets the real
-  // number, and this should come down to it with margin.
-  { id: 'uisystem', tier: 'ui', profiles: ['push', 'live', 'art'], timeout: 900,
+  // THE FRONT-DOOR HALF STAYS IN PUSH; THE MATCH WALK DOES NOT. Job 7 added a
+  // live-match walk to this probe and raised the timeout to 900 for it, so a
+  // walk that had never run went into the push gate inside a step that had.
+  // It is `--match` now, registered below outside push. This step is the four
+  // screens it always walked (32 s in the push gate's 2026-09-23 10:54 report,
+  // against the 300 it had) plus #soloTog and the scrapbook tabs: two 600 ms
+  // waits, with every finite arrival animation finished before the height is
+  // read (modalIn starts at scale 0.94; see targets() in the probe).
+  { id: 'uisystem', tier: 'ui', profiles: ['push', 'live', 'art'], timeout: 300,
     cmd: ['node', 'qa/uisystem.mjs', PORT], verdict: pf,
-    why: 'every computed font weight is a face that exists and every size is readable; the four match chips are one .clay system; no backdrop blur over a match; 44px buttons in our face' },
+    why: 'every computed font weight is a face that exists and every size is readable; #soloTog and the scrapbook tabs are 44px targets set in our face' },
+
+  // ── STUDIO ROUND 4, JOB 7: THE BROWSER HALVES, NOT YET RUN ────────────────
+  // All four were written while another browser gate held this machine, and
+  // none has been run. So: live and quality only, never push, until a run has
+  // read each one's FAIL on ea6b384 and PASS on the fix and recorded its wall
+  // time. The timeouts are NOT measured. They are sized from the source: the
+  // match clock advances by a dt clamped to 0.05 s a frame (animate() in
+  // prototype3d.ts) and qa/navtap.mjs traced this box drawing about one frame
+  // per 2.5 s, which puts one second of match clock near 50 s of wall — and
+  // from the timeouts the steps that play a match to its end already carry
+  // (endbeat 3000, pausechain 1800). Each comes down to its first run.
+  // countdown is EXPECTED to fail bar (b) until #count is placed from its own
+  // printed number (index.html's #count note) — that failure is the job's
+  // open item, not the probe's.
+  { id: 'uisystem-match', tier: 'ui', profiles: ['live', 'quality'], timeout: 1200,
+    cmd: ['node', 'qa/uisystem.mjs', PORT, 'maple', '--match'], verdict: pf,
+    why: 'studio round 4\'s uisystem, walked through a live level match: #goal, #coins, #growth and #btnQuit are .clay, solid, radius on the 12/18/26/999 scale, no blur; no backdrop blur over the match frame with a banner up; MY NUMBERS on the results card is 44px in our face' },
+  { id: 'endghost', tier: 'ui', profiles: ['live', 'quality'], timeout: 1800,
+    cmd: ['node', 'qa/endghost.mjs', PORT, 'maple'], verdict: pf,
+    why: 'the results card is not a window onto the match — no clock, pause button, goal chip or growth bar on its first frame or 1.2 s in, none of eight staged in-flight pieces shows through, the wallet stays; on the production build this gate serves, body.ovl is clear on the menu, set with the shop open, and clears on BACK from TROPHIES' },
+  { id: 'modalin', tier: 'ui', profiles: ['live', 'quality'], timeout: 1800,
+    cmd: ['node', 'qa/modalin.mjs', PORT, 'maple'], verdict: pf,
+    why: 'the picker, the shop, MY VOID and the pause card each arrive on modalIn through their real doors, and the results card on a 0.28 s opacity-only fade from 0' },
+  { id: 'countdown', tier: 'ui', profiles: ['live', 'quality'], timeout: 3000,
+    cmd: ['node', 'qa/countdown.mjs', PORT, 'maple'], verdict: pf,
+    why: 'the final-ten numeral carries a contour of at least 4px and covers under 10% of the hero\'s face box at ?len=15, clock 7, on 430x932, 390x844 and 360x780' },
 
   ...WORLDS.map(w => ({ id: `postpipe:${w}`, tier: 'art', profiles: ['live', 'art'], timeout: 420,
     cmd: ['node', 'qa/postpipe.mjs', w, PORT, '--gate'], verdict: exitCode,
