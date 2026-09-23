@@ -67,7 +67,7 @@ compacted conversation loses nothing.
 | A1 | LEAD | **SKYLARK FIELD has no match music** — plays the generic synth bed while five worlds play composed tracks | assetrefs KNOWN_NOWHERE `/assets/music/skylark.mp3` | owner may need to fetch a generated track (CDN egress is blocked here) |
 | C1 | LEAD | **Two scrapbooks have no art** — POWDER and SKYLARK, 16 of 16 stickers missing each | assetrefs, 32 entries | |
 | U1 | LEAD | **Ten emoji on shop / picker / profile** — platform art beside a hand-drawn HUD | qa/pictograph.mjs KNOWN (10) | freeze-by-name list must reach 0 |
-| S1 | LEAD | **Privacy policy vs telemetry** — policy says "no persistent identifier of any kind" while events flush to Supabase | readiness audit (kids), unverified by skeptic | read policy + ingest path; fix the copy or the data |
+| S4 | P1 | **Analytics has been silently dropped since the COPPA fix.** The deployed `ingest-events` (v1, unversioned until now) REQUIRES `user_id`; the client correctly stopped sending one. Every batch -> 400 `missing fields`. | read of the deployed function via the Supabase connector, 2026-09-23 | fix written: `supabase/functions/ingest-events/index.ts`. Deploy is production infra -> OWNER QUEUE |
 | S2 | LEAD | **All 8 App Store screenshots show a menu the game no longer has** | readiness audit (store) | reshoot at the required sizes |
 | S3 | LEAD | **`?iapmock=1` hands out every paid item free on the public web URL** | readiness audit (money) | |
 | D1 | LEAD | **RELEASE-GATE.md is stale** — 5 push steps documented vs 55 run; "five worlds" vs six; no `quality` profile | readiness audit (web) | |
@@ -84,10 +84,17 @@ compacted conversation loses nothing.
 
 | item | why only him |
 |---|---|
+| Approve deploying the fixed `ingest-events` function (S4), and check `vd_events.user_id` is nullable first | production Supabase — outward-facing infra |
 | Download the two missing posters into `public/assets/hf/` (maple, skylark) | CDN egress is blocked from the crew's environment. URLs are in the 2026-09-22 conversation and resolve from any browser |
 | Decide on ads | reopens a standing constraint — see Fixed |
 | App Store Connect: record, 17 IAP products, Paid Applications agreement, banking/tax, support URL, age-rating questionnaire, privacy label | account-holder only |
 | A real iPhone + TestFlight | nothing has ever run on a GPU; every frame measured to date is software-rendered |
+
+### Refuted
+
+| id | lead | why it died |
+|---|---|---|
+| S1 | "The privacy policy promises no persistent identifier while telemetry sends the child's IP to Supabase" | Read the deployed function: it writes client_ts, user_id, session_id, event, props, app_version, platform — no IP column. Analytics is off by default behind the parental gate, `vd_uid` is removed AND actively deleted on load, and the session id is never persisted. The policy is accurate about what is kept. (What the read turned up instead is S4.) |
 
 ### Done this loop
 
