@@ -40,10 +40,27 @@
 // named for. 0.85 because the new law divides by 0.85·vRef: a void doing 85% of
 // his own top speed reads as fully moving, which is the headroom the camera's
 // ease and the steering blend need.
+//
+// …AND THE SPEC'S OTHER TWO CHANGES, which this probe once printed as columns
+// and gated on nothing (a copy of the Job 8 tree with the lean put back to
+// `-s.vx / 520` and the flip to `speed > 10 && pm > 10` still printed PASS). At
+// every settled radius:
+//   · THE LEAN. Full stick along x tips rotation.z, and along z tips
+//     rotation.x, by at least 0.9 of the spec's 0.11 rad (5.67°), each through
+//     the clamp the file writes. Before Job 8, /520 gave 1.6° at spawn size.
+//   · THE FLIP. The direction-flip squash arms at a speed between 0.2 and 0.3
+//     of top speed (the spec's 0.25·vRef). Before Job 8, a constant 10 armed
+//     it at 0.70 of top speed at spawn size and 0.14 at r 8.
+// Settled only: during the descent top speed is still easing to the settled
+// law, and the descent's bar is the motion read above.
 import { readFileSync } from 'node:fs';
 
 const MIN_MOVE = 0.85;
 const SPOTS = [0.9, 8];          // the spec's two named sizes
+const LEAN_FULL = 0.11;          // the spec's lean at full stick, rad (−vx/vRef·0.11)
+const LEAN_SHARE = 0.9;
+const LEAN_MIN = LEAN_SHARE * LEAN_FULL;
+const FLIP_BAND = [0.2, 0.3];    // the spec's flip at 0.25·vRef, as a share of top speed
 
 const VOID = readFileSync('src/proto3d/void3d.ts', 'utf8');
 const GAME = readFileSync('src/prototype3d.ts', 'utf8');
@@ -75,8 +92,15 @@ const target = expr(need(VOID, /moveAmt \+= \((.+?) - moveAmt\) \* Math\.min\(1,
 const rigDefault = VOID.match(/const vRef = s\.vRef \?\? ([\d.]+);/);
 const flipLine = need(VOID, /if \(speed > (.+?) && pm > .+? < -0\.25\) flipT = /, 'the direction-flip trigger')[1];
 const flipAt = expr(flipLine, 'the flip threshold');
-const lean = expr(need(VOID, /bob\.rotation\.z = THREE\.MathUtils\.clamp\((.+?), -0\.11, 0\.11\);/,
-  'the travel lean on bob.rotation.z')[1], 'the lean');
+// Both axes of the lean, each with the clamp bounds the file writes (the cap
+// is part of what is measured: a lean clamped under the bar cannot reach it).
+const leanOf = (axis) => {
+  const m = need(VOID, new RegExp(`bob\\.rotation\\.${axis} = THREE\\.MathUtils\\.clamp\\((.+?), (-?[\\d.]+), (-?[\\d.]+)\\);`),
+    `the travel lean on bob.rotation.${axis}`);
+  return { f: expr(m[1], `the lean on rotation.${axis}`), lo: Number(m[2]), hi: Number(m[3]) };
+};
+const leanZ = leanOf('z'), leanX = leanOf('x');
+const clampTo = (v, L) => Math.min(L.hi, Math.max(L.lo, v));
 
 // ── the game (prototype3d.ts) ──────────────────────────────────────────────
 const SPAWN_SPEED = Number(need(GAME, /const SPAWN_SPEED = ([\d.]+);/, 'SPAWN_SPEED')[1]);
@@ -128,13 +152,16 @@ function frame({ R, introT, camDist, camAim }) {
     if (aimF) S[aimF[0]] = run(aimF[1], S, aimF[0]);
     vRef = run(refF, S, 'the frame loop\'s vRef');
   } else if (rigDefault) vRef = Number(rigDefault[1]);
+  // full stick along x (what rotation.z reads) and along z (rotation.x)
   const T = { Math, speed, vRef, s: { vx: speed, vz: 0, vRef } };
+  const Tz = { Math, speed, vRef, s: { vx: 0, vz: speed, vRef } };
   return {
     speed, vRef,
     move: run(target, T, 'the motion target'),
     flip: run(flipAt, T, 'the flip threshold'),
-    // the clamp's bounds are part of the regex above, so they are the file's
-    lean: Math.min(0.11, Math.abs(run(lean, T, 'the lean'))),
+    // the clamp's bounds are the file's own (see leanOf)
+    lean: Math.abs(clampTo(run(leanZ.f, T, 'the lean on rotation.z'), leanZ)),
+    leanX: Math.abs(clampTo(run(leanX.f, Tz, 'the lean on rotation.x'), leanX)),
   };
 }
 
@@ -174,12 +201,21 @@ console.log('');
 console.log(`  rig: target ${need(VOID, /moveAmt \+= \((.+?) - moveAmt\)/, '')[1]}`
   + `   vRef ${passKey ? `passed by the frame loop (${passKey[1]})` : rigDefault ? `rig default ${rigDefault[1]}` : 'not in the law'}`);
 console.log('');
-console.log('  SETTLED, full stick          r     cd    speed   vRef   move   lean°  flip/top');
+const deg = (rad) => (rad * 180 / Math.PI).toFixed(1).padStart(6);
+console.log('  SETTLED, full stick          r     cd    speed   vRef   move  lean°z lean°x  flip/top');
 const show = (r) => console.log(`  ${' '.repeat(26)}${r.R.toFixed(1).padStart(5)} ${r.d.toFixed(1).padStart(6)} ${f2(r.speed)} ${f2(r.vRef)} ${f2(r.move)} `
-  + `${(r.lean * 180 / Math.PI).toFixed(1).padStart(6)}  ${(r.flip / r.speed).toFixed(2).padStart(6)}`);
+  + `${deg(r.lean)} ${deg(r.leanX)}  ${(r.flip / r.speed).toFixed(2).padStart(6)}`);
 for (const R of [0.9, 1.5, 2, 3, 4, 6, 8, 10, 12, R_CAP]) { const r = rows.find((x) => Math.abs(x.R - R) < 1e-9); if (r) show(r); }
 const worstSettled = rows.reduce((a, b) => (b.move < a.move ? b : a));
 console.log(`  worst settled radius: r ${worstSettled.R.toFixed(1)} reads ${worstSettled.move.toFixed(3)}`);
+const leanLo = (r) => Math.min(r.lean, r.leanX);
+const worstLean = rows.reduce((a, b) => (leanLo(b) < leanLo(a) ? b : a));
+const flipTop = (r) => r.flip / r.speed;
+const flipLo = rows.reduce((a, b) => (flipTop(b) < flipTop(a) ? b : a));
+const flipHi = rows.reduce((a, b) => (flipTop(b) > flipTop(a) ? b : a));
+console.log(`  lean at full stick: worst ${(leanLo(worstLean) * 180 / Math.PI).toFixed(2)}° at r ${worstLean.R.toFixed(1)} `
+  + `(bar ${(LEAN_MIN * 180 / Math.PI).toFixed(2)}° on both axes)   flip/top: ${flipTop(flipLo).toFixed(3)} at r ${flipLo.R.toFixed(1)} `
+  + `to ${flipTop(flipHi).toFixed(3)} at r ${flipHi.R.toFixed(1)} (bar ${FLIP_BAND[0]}-${FLIP_BAND[1]})`);
 console.log('');
 const worstDescent = descent.reduce((a, b) => (b.move < a.move ? b : a));
 const firstDescent = descent[0];
@@ -198,10 +234,21 @@ if (worstSettled.move < MIN_MOVE && !SPOTS.includes(worstSettled.R)) fails.push(
   + `full stick reads ${worstSettled.move.toFixed(3)} (bar ${MIN_MOVE})`);
 if (worstDescent.move < MIN_MOVE) fails.push(`the descent: full stick reads ${worstDescent.move.toFixed(3)} at `
   + `t ${worstDescent.t.toFixed(2)}s (bar ${MIN_MOVE}) — the first drag of every match is made here`);
+// the lean and the flip, at every settled radius
+const leanBad = rows.filter((r) => leanLo(r) < LEAN_MIN);
+if (leanBad.length) fails.push(`the lean: full stick tips him ${(leanLo(worstLean) * 180 / Math.PI).toFixed(2)}° at r ${worstLean.R.toFixed(1)} `
+  + `(bar ${(LEAN_MIN * 180 / Math.PI).toFixed(2)}°, i.e. ${LEAN_SHARE} of the spec's ${LEAN_FULL} rad, on rotation.z and on rotation.x) — `
+  + `short at ${leanBad.length} of ${rows.length} settled radii, r ${leanBad[0].R.toFixed(1)}-${leanBad[leanBad.length - 1].R.toFixed(1)}`);
+const flipBad = rows.filter((r) => !(flipTop(r) >= FLIP_BAND[0] && flipTop(r) <= FLIP_BAND[1]));
+if (flipBad.length) fails.push(`the flip: the direction-flip squash arms at ${flipTop(flipLo).toFixed(3)} (r ${flipLo.R.toFixed(1)}) to `
+  + `${flipTop(flipHi).toFixed(3)} (r ${flipHi.R.toFixed(1)}) of top speed — the spec's quarter of top speed, `
+  + `within ${FLIP_BAND[0]}-${FLIP_BAND[1]}, is missed at ${flipBad.length} of ${rows.length} settled radii`);
 if (fails.length) {
   for (const x of fails) console.log(`  · ${x}`);
-  console.log(`\nFAIL — full stick does not read as moving (${fails.length} finding(s))`);
+  console.log(`\nFAIL — full stick does not read as moving at every size (${fails.length} finding(s))`);
   process.exit(1);
 }
 console.log(`PASS — full stick reads motion >= ${MIN_MOVE} at every settled radius 0.9-${R_CAP} `
-  + `(worst ${worstSettled.move.toFixed(3)} at r ${worstSettled.R.toFixed(1)}) and through the descent (worst ${worstDescent.move.toFixed(3)})`);
+  + `(worst ${worstSettled.move.toFixed(3)} at r ${worstSettled.R.toFixed(1)}) and through the descent (worst ${worstDescent.move.toFixed(3)}); `
+  + `leans >= ${(LEAN_MIN * 180 / Math.PI).toFixed(2)}° on both axes (worst ${(leanLo(worstLean) * 180 / Math.PI).toFixed(2)}°); `
+  + `the flip arms at ${flipTop(flipLo).toFixed(2)}-${flipTop(flipHi).toFixed(2)} of top speed`);

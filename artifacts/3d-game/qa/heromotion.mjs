@@ -47,6 +47,11 @@
 import { chromium } from 'playwright';
 import { enterMatch } from './_enter.mjs';
 
+// a run that throws or rejects anywhere below prints a verdict, not a stack
+const die = (e) => { console.log(`\nFAIL — heromotion aborted before a verdict: ${String((e && e.message) || e).split('\n')[0]}`); process.exit(1); };
+process.on('uncaughtException', die);
+process.on('unhandledRejection', die);
+
 const PORT = process.argv[2] || '4177';
 const WORLD = process.argv[3] || 'maple';
 const SIZES = [0.9, 8];

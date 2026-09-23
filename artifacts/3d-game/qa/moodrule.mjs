@@ -48,6 +48,11 @@
 // hook, and a probe that cannot read the thing has not measured it.
 import { readFileSync } from 'node:fs';
 
+// a run that throws or rejects anywhere below prints a verdict, not a stack
+const die = (e) => { console.log(`\nFAIL — moodrule aborted before a verdict: ${String((e && e.message) || e).split('\n')[0]}`); process.exit(1); };
+process.on('uncaughtException', die);
+process.on('unhandledRejection', die);
+
 const LID_OPEN_MIN = 0.6;
 const LID_SHUT_MAX = 0.25;
 const SHUT_AT = 0.5;

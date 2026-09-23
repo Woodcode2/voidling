@@ -2226,14 +2226,31 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       //
       // So the BODY winds up instead: for the first 60 ms of a bite from a
       // closed mouth he gathers in by up to 4% of his size on a full bite
-      // (0.48% on a snack, at chomp's own 0.12 grade floor), and is exactly his
-      // own size again as the jaw appears. 4% is 2.5x his idle breath (1.6%),
-      // so it reads as an action rather than as the breathing he is already
-      // doing. It rides uniformK, the pure size term the evolution pop uses, so
-      // the hat and the face ride it rigidly and nothing is sheared. mouthAge
-      // only restarts from a closed mouth, so a hoover spree gathers once, not
-      // on every mouthful. qa/mouthwind.mjs.
-      if (mouthAge < 0.06) uniformK -= 0.04 * windG * Math.sin(Math.PI * Math.min(1, mouthAge / 0.06));
+      // (0.48% on a snack, at chomp's own 0.12 grade floor). 4% is 2.5x his
+      // idle breath (1.6%), so it reads as an action rather than as the
+      // breathing he is already doing. It rides uniformK, the pure size term
+      // the evolution pop uses, so the hat and the face ride it rigidly and
+      // nothing is sheared. mouthAge only restarts from a closed mouth, so a
+      // hoover spree gathers once, not on every mouthful.
+      //
+      // ONE CLOCK, ADVANCED ONCE, BEFORE EITHER READER. The advance used to sit
+      // in the mouth block below, after this line, so the gather read LAST
+      // frame's age while the jaw read this frame's: the first frame after a
+      // bite never dipped, and at 30 Hz and at the 0.05 dt clamp the only
+      // dipped frame was the frame the jaw was first drawn on — the gather
+      // landed on the gape instead of before it. Advanced here, both read the
+      // same age. Stepped through this update() in node (qa/mouthwind.mjs), a
+      // full bite from a closed mouth now reads 0.9694, 0.9606, 0.98 and then
+      // 1 on the jaw's first drawn frame at 60 Hz; 0.9606 then 1 at 30 Hz;
+      // 0.98 then 1 at 20 Hz.
+      //
+      // …and only while a bite is live. mouthAge stands still whenever mouthT
+      // is 0, so a QA pin that zeroed mouthT inside these 60 ms (__pinGape(0),
+      // which qa/moodsheet, gapesheet and moodrule call on a live match) froze
+      // the gather until the next bite from a closed mouth: pinned two 60 Hz
+      // frames into a full bite, uniformK read 0.9606 at 1, 2, 3, 4 and 5 s.
+      if (mouthT > 0) { mouthT -= dt; mouthAge += dt; }
+      if (mouthT > 0 && mouthAge < 0.06) uniformK -= 0.04 * windG * Math.sin(Math.PI * Math.min(1, mouthAge / 0.06));
       uniformKNow = uniformK;
       const lat = uniformK - breathe;
       squash *= uniformK;
@@ -2376,7 +2393,8 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // the anticipation every polished eat animation has), a spring open
       // with ~10% overshoot at ~220ms, settled by ~400ms; the existing
       // mouthT*8 term stays as the CLOSING ease so the jaw never snaps shut.
-      if (mouthT > 0) { mouthT -= dt; mouthAge += dt; }
+      // (mouthT and mouthAge were advanced for this frame above the body's
+      // wind-up, so the jaw and the gather read one age.)
       let openEnv = 1;
       if (mouthAge < 0.045) openEnv = (mouthAge / 0.045) * 0.12;
       else {

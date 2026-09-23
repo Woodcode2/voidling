@@ -32,6 +32,11 @@
 import { chromium } from 'playwright';
 import { enterMatch } from './_enter.mjs';
 
+// a run that throws or rejects anywhere below prints a verdict, not a stack
+const die = (e) => { console.log(`\nFAIL — juice aborted before a verdict: ${String((e && e.message) || e).split('\n')[0]}`); process.exit(1); };
+process.on('uncaughtException', die);
+process.on('unhandledRejection', die);
+
 const PORT = process.argv[2] || '4177';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
@@ -74,11 +79,6 @@ const faceVerdict = !face.fired
   : faceOk ? `PASS — (b) the face answers the evolution: ${face.seen[face.seen.length - 1]} on frame ${face.seen.length}`
     : `FAIL — (b) three frames after the evolution the face still reads ${face.seen[face.seen.length - 1]} `
       + '(contract: smug or victory within 3 frames)';
-// The ceremony punches the lens too (camPunch). Let that spring home before (a)
-// reads its own lens channel, or (a) would be crediting the bite with the
-// evolution's punch.
-await p.waitForFunction(() => { const j = window.__juiceState(); return j.fovKick <= 0.02 && j.stop <= 0; },
-  null, { timeout: 900000 });
 
 // a size where houses are a big-but-legal bite, near a built-up district
 await p.evaluate(() => { window.__setVoidR(4); });
@@ -90,11 +90,18 @@ const out = await p.evaluate(() => {
   const after = window.__juiceState();
   return { before, ate, after };
 });
+// ── (a) UNMEASURED IS NOT (a) PASSED ─────────────────────────────────────
+// Before (b) this branch printed a note, no verdict, and exit 0 — which the
+// gate reads as silence, and fails. The commit that added (b) printed (b)'s
+// verdict here instead, so (b)'s PASS was the only verdict line and the
+// gate's reader (a PASS and no FAIL) passed the step with (a) never measured.
+// So an unmeasured (a) says FAIL out loud, and (b)'s line is still printed
+// for what it is worth.
 if (!out.ate) {
-  console.log('  (a) no big edible in range — inconclusive, not a failure');
   await b.close();
-  console.log('\n  ' + faceVerdict + '\n');
-  process.exit(faceOk ? 0 : 1);
+  console.log('\n  FAIL — (a) inconclusive: no big edible in range at r 4, so the bite\'s four channels were not measured');
+  console.log('  ' + faceVerdict + '\n');
+  process.exit(1);
 }
 
 const ch = {
