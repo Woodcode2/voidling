@@ -613,6 +613,16 @@ const SUITE = [
     cmd: ['node', 'qa/firstrun.mjs', PORT], verdict: pf,
     why: 'a cold install opens on Maple dot 1, no match nags with a red clock, and solo cannot turn the dot-4 race into a free win' },
 
+  // G6 (research governor, P1): one number stream a child can read — no
+  // per-bite '+N', no decimal COMBO, flights sized against her own recent
+  // average, crowns at every tenth link, one cash-in when the chain lapses,
+  // the NOMS pill off his face, the beat's colour on the numbers. Measured
+  // 8/8 BAD on the pre-fix build, 8/8 PASS after. Quality + live until a
+  // second green reading promotes it to push.
+  { id: 'nomstream', tier: 'feel', profiles: ['live', 'quality'], timeout: 3000,
+    cmd: ['node', 'qa/nomstream.mjs', PORT], verdict: pf,
+    why: 'one number stream a child can read, and an eating chain she can see and hear pay out' },
+
   { id: 'questable', tier: 'money', profiles: ['live'], timeout: 1600,
     cmd: ['node', 'qa/questable.mjs', PORT, ...WORLDS], verdict: pf,
     why: 'over a year of draws, no world can show a daily chip a child cannot clear' },

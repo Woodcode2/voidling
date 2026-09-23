@@ -92,7 +92,7 @@ const bar = (ok, id, msg) => { bars++; console.log(`  ${ok ? 'ok  ' : 'BAD '} ($
 console.log(`\n  END PARTY — how a match ends, on :${PORT}\n`);
 
 if (ONLY.includes('a')) {
-  const p = await open('?w=maple&g=1');
+  const p = await open('?w=maple&g=1&len=60');   // ?len= is what makes a harness match auto-start; ?g= alone waits on the menu
   const setup = await p.evaluate(() => {
     const eat = window.__levelSpec().eat;
     window.__setRivalScores([eat * 6, eat * 5]);
