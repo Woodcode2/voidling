@@ -3431,6 +3431,7 @@ const _dbg = new Proxy(_dbgStore, {
   __solidAt: (x: number, z: number, r: number) => boolean;
   __voidGroup: () => THREE.Group;
   __camAim: () => { aim: number; now: number };
+  __settleCam: (frames?: number) => void;
   __forceEvolve: () => void;
   __law: () => Record<string, number | boolean>;
   __barDbg: () => { gShown: number; gDebt: number; gBiteK: number; pays: number; rect: number | null };
@@ -3647,6 +3648,14 @@ let camAim = 0;
 // sleeps and then measures is reading the second number while meaning the
 // first. qa/_voidframe.mjs reads both and says which it is quoting.
 _dbg.__camAim = () => ({ aim: camAim, now: camDist });
+// QA: put the camera WHERE IT IS GOING, now. The studio's whole pack was shot
+// mid-ease — the hero 0.544-0.572 of the frame width against 0.405 once the
+// camera has settled — so every team judged a town 37% closer than a child
+// sees it (studio round 4, Job 0 / I-1). For the next `frames` frames the
+// distance takes its aim and the follow position its target exactly, the way
+// the descent already bypasses the spring. The player never calls this.
+let settleFrames = 0;
+_dbg.__settleCam = (frames = 3) => { settleFrames = Math.max(1, Math.round(frames)); };
 let _forceEvolve = false;
 // QA: fire the NEXT form change on the following frame, without touching the
 // radius. The ceremony is the single biggest moment in a match and it is also
@@ -14467,7 +14476,9 @@ function animate() {
     // to work around that — this is the settled distance, read off the
     // build. qa/_voidframe.mjs.
     camAim = targetDist;
-    camDist += (targetDist - camDist) * (1 - Math.exp(-1.6 * dt));
+    const settleNow = settleFrames > 0;
+    if (settleNow) { settleFrames--; camDist = targetDist; }
+    else camDist += (targetDist - camDist) * (1 - Math.exp(-1.6 * dt));
     // steepen the camera as the void grows (hole.io): big hole ⇒ near-top-down,
     // so towers and trees stop hiding the hero
     const steep = THREE.MathUtils.clamp((R - 2.5) / 5.5, 0, 1);
@@ -14521,7 +14532,7 @@ function animate() {
     // was measurably eating the top of the arc (the probe found the camera peaking
     // at camDist 220 of an authored 300). During the descent the authored value is
     // taken exactly; the spring resumes the moment the match settles.
-    camFollow.lerp(tmpV, (introT > 0 || (armed && !started)) ? 1 : 1 - Math.exp(-5.0 * dt));
+    camFollow.lerp(tmpV, (settleNow || introT > 0 || (armed && !started)) ? 1 : 1 - Math.exp(-5.0 * dt));
     camera.position.copy(camFollow);
     camera.lookAt(lookX, R * 0.5 + 18 * lk, lookZ);
     // the lens punch: widen, then spring home on WALL time (a punch that

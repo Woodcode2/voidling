@@ -111,11 +111,18 @@ await p.evaluate(() => {
     pointerId: 1, clientX: innerWidth / 2, clientY: innerHeight / 2, bubbles: true }));
 });
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 400000 });
+// HIDE THE HUD WITH A STYLESHEET, NOT INLINE STYLES. addCoins() rewrites the
+// coin chip's inline style every time she earns, so "✦ 35" came back into
+// maple_look.png alone of the six (studio round 4, Job 0). A marked class and
+// an !important rule outrank anything the game writes inline.
 await p.evaluate(() => {
   const cv = document.querySelector('canvas');
   for (const el of Array.from(document.body.children)) {
-    if (el !== cv && !el.contains(cv)) el.style.display = 'none';
+    if (el !== cv && !el.contains(cv)) el.setAttribute('data-qahide', '');
   }
+  const st = document.createElement('style');
+  st.textContent = '[data-qahide]{display:none !important}';
+  document.head.appendChild(st);
 });
 // PIN THE RUNG. The whole point is which path rung 0 takes, and a probe that
 // lets the adapter wander is reading a rung nobody chose.
@@ -152,6 +159,13 @@ await p.evaluate(() => {
   window.__pinMouth?.(true);
   window.__calm?.();          // and no leftover evolve ribbons across the shot
 });
+// ── THE CAMERA WHERE A CHILD HAS IT ───────────────────────────────────────
+// Waiting out the ease under the software renderer takes ~57 frames, and the
+// pack used to be shot after 0.75 match-seconds of it: every play frame had the
+// hero at 0.544-0.572 of the frame width against 0.405 settled, a town 37%
+// closer than a child ever sees it (studio round 4, Job 0 / I-1). __settleCam
+// puts the distance on its aim and the follow on its target for a few frames.
+const settled = await p.evaluate(() => { if (typeof window.__settleCam !== 'function') return false; window.__settleCam(4); return true; });
 await p.waitForFunction((t0) => (window.__matchState?.().t ?? 0) > t0 + 0.15,
   await p.evaluate(() => window.__matchState().t), { timeout: 400000 }).catch(() => { });
 
@@ -166,6 +180,7 @@ const box = await p.evaluate(() => {
     cy: (1 - (sp.y * 0.5 + 0.5)) * innerHeight,
     pxR: (innerHeight / (2 * camD * Math.tan(cam.fov * Math.PI / 360))) * vs.r,
     q: window.__quality(),
+    r: vs.r, aim: window.__camAim?.().aim ?? 0, now: window.__camAim?.().now ?? 0, vw: innerWidth,
   };
 });
 const path = `${OUT}/${WORLD}_${TAG}.png`;
@@ -260,8 +275,19 @@ console.log(`  void at (${box.cx.toFixed(0)}, ${box.cy.toFixed(0)}) r=${box.pxR.
 console.log(`  disc luma ${dY.toFixed(3)} vs town ${tY.toFixed(3)}  -> hero covers ${(cover * 100).toFixed(1)}% of it`);
 console.log(`  body rgb(${mR.toFixed(0)}, ${mG.toFixed(0)}, ${mB.toFixed(0)}) sat ${sat.toFixed(3)}`
   + (dark.length ? '' : '  (no body pixels to describe)'));
-const ok = cover >= COVER_MIN;
-console.log(`\n  ${ok ? 'PASS' : 'FAIL'} — the hero ${ok ? 'is' : 'is NOT'} in the frame this pack hands the studio`
-  + (ok ? '' : `\n  ${(cover * 100).toFixed(1)}% of his own disc is him, against a bar of ${(COVER_MIN * 100).toFixed(0)}%.`
-    + '\n  Nothing below that can be a rendering nuance: he is somewhere else, or he is not drawn.'));
-process.exit(ok ? 0 : 1);
+// THE WIDTH CHECK (Job 0's gate). At the settled camera the hero's width as a
+// share of the frame is (R / aim) / 0.1323 — the studio's derivation from the
+// lens; 0.405 at R 4. A frame more than 5% off it was not shot where a child
+// has the camera, and every judgement made on it inherits the error.
+const wFrac = (2 * box.pxR) / box.vw, wWant = box.aim > 0 ? (box.r / box.aim) / 0.1323 : 0;
+const wOff = wWant > 0 ? Math.abs(wFrac / wWant - 1) : 1;
+console.log(`  hero width ${wFrac.toFixed(3)} of the frame against ${wWant.toFixed(3)} settled (camera at ${box.now.toFixed(1)}, aim ${box.aim.toFixed(1)}; `
+  + `${settled ? 'settled by __settleCam' : 'no __settleCam in this build'}) -> ${(wOff * 100).toFixed(1)}% off`);
+const inFrame = cover >= COVER_MIN, atAim = wOff <= 0.05;
+if (!inFrame) console.log(`\n  ${(cover * 100).toFixed(1)}% of his own disc is him, against a bar of ${(COVER_MIN * 100).toFixed(0)}%.`
+  + '\n  Nothing below that can be a rendering nuance: he is somewhere else, or he is not drawn.');
+if (!atAim) console.log(`\n  the frame is ${(wOff * 100).toFixed(1)}% off the settled width (bar 5%): shot mid-ease, a town closer than a child sees it.`);
+// two literal verdicts for qa/idiomguard.mjs (#2a)
+if (inFrame && atAim) console.log('\n  PASS — the hero is in the frame this pack hands the studio, at the distance a child has the camera');
+else console.log(`\n  FAIL — ${!inFrame ? 'the hero is NOT in the frame' : 'the frame is not at the settled camera'}`);
+process.exit(inFrame && atAim ? 0 : 1);
