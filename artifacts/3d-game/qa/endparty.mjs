@@ -1,6 +1,6 @@
 // EVERY MATCH ENDS AS A PARTY, WITH ITS OWN WHISTLE
 //
-//   node qa/endparty.mjs [port] [--only=a,b]
+//   node qa/endparty.mjs [port] [world] [--only=a,b]
 //
 // Research governor G4. The end of a match is the moment a child decides
 // whether to press PLAY AGAIN, and it was the least authored minute in the
@@ -36,7 +36,9 @@
 //       play on; a build without wall stamps falls back to tClock.
 import { chromium } from 'playwright';
 
-const PORT = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : '4177';
+const POS = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const PORT = POS[0] || '4177';
+const WORLD = POS[1] || 'maple';
 const onlyArg = process.argv.find((a) => a.startsWith('--only='));
 const ONLY = onlyArg ? onlyArg.slice(7).split(',') : ['a', 'b'];
 
@@ -101,10 +103,10 @@ const stacked = (calls, fromT) => {
 
 let bad = 0, bars = 0;
 const bar = (ok, id, msg) => { bars++; console.log(`  ${ok ? 'ok  ' : 'BAD '} (${id}) ${msg}`); if (!ok) bad++; };
-console.log(`\n  END PARTY — how a match ends, on :${PORT}\n`);
+console.log(`\n  END PARTY — how a match ends, ${WORLD} on :${PORT}\n`);
 
 if (ONLY.includes('a')) {
-  const p = await open('?w=maple&g=1&len=60');   // ?len= is what makes a harness match auto-start; ?g= alone waits on the menu
+  const p = await open(`?w=${WORLD}&g=1&len=60`);   // ?len= is what makes a harness match auto-start; ?g= alone waits on the menu
   const setup = await p.evaluate(() => {
     const eat = window.__levelSpec().eat;
     window.__setRivalScores([eat * 6, eat * 5]);
@@ -140,7 +142,7 @@ if (ONLY.includes('a')) {
 }
 
 if (ONLY.includes('b')) {
-  const p = await open('?w=maple&len=14');
+  const p = await open(`?w=${WORLD}&len=14`);
   const g = await p.evaluate(() => window.__goalState());
   if (g) die(`the ?len= harness match carried a level (${JSON.stringify(g)}) — part B needs a match with no goal`);
   await p.evaluate(() => window.__setRivalScores([9e6, 8e6]));

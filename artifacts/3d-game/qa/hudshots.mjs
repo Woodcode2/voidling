@@ -1,6 +1,6 @@
 // THE HUD AND THE END, PHOTOGRAPHED — frames a person reads before G4 and G6 ship
 //
-//   node qa/hudshots.mjs [port]
+//   node qa/hudshots.mjs [port] [world]
 //
 // The studio governor (round 3, 2026-09-23) held the push until G4 and G6
 // each had a frame a person had read: both are visual, and qa/nomstream.mjs
@@ -25,6 +25,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'fs';
 
 const PORT = process.argv[2] || '4177';
+const WORLD = process.argv[3] || 'maple';
 const OUT = 'qa/out/hudshots';
 mkdirSync(OUT, { recursive: true });
 const die = (m) => { console.log(`FAIL — ${m}`); process.exit(1); };
@@ -40,7 +41,7 @@ await p.addInitScript(() => { try {
   localStorage.setItem('voidFirstNom', '1'); localStorage.setItem('voidMute', '1');
   localStorage.setItem('voidDailyLast', new Date().toDateString());
 } catch {} });
-await p.goto(`http://127.0.0.1:${PORT}/?w=maple&g=1&len=60`, { waitUntil: 'domcontentloaded', timeout: 300000 });
+await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}&g=1&len=60`, { waitUntil: 'domcontentloaded', timeout: 300000 });
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
@@ -70,8 +71,8 @@ await p.waitForFunction(() => [...document.querySelectorAll('.vf.fly')].some((e)
   && document.getElementById('noms')?.classList.contains('on'), null, { timeout: 600000, polling: 50 }).catch(() => {});
 const s1 = await p.evaluate(() => ({ combo: window.__matchState().combo, pill: document.getElementById('noms')?.textContent,
   fly: [...document.querySelectorAll('.vf.fly')].map((e) => e.textContent).filter(Boolean) }));
-await p.screenshot({ path: `${OUT}/maple-noms.png` });
-console.log(`  1  ${OUT}/maple-noms.png — chain ${s1.combo}, pill "${s1.pill}", in flight: ${s1.fly.join(' ') || 'none'}`);
+await p.screenshot({ path: `${OUT}/${WORLD}-noms.png` });
+console.log(`  1  ${OUT}/${WORLD}-noms.png — chain ${s1.combo}, pill "${s1.pill}", in flight: ${s1.fly.join(' ') || 'none'}`);
 console.log('     look for: the pill beside the void (gold at 10+), off his face; one number flying to the bar; no "+N" rising off props');
 
 // 2 — the dot won from third: the party before the card
@@ -83,10 +84,10 @@ await p.evaluate((e) => window.__setScore(e + 1), eat);
 await p.waitForFunction(() => document.querySelectorAll('.wConf').length > 0, null, { timeout: 600000, polling: 20 });
 const froze2 = await freeze('.wConf', 450);   // ~0.45 s into the burst, as a phone would show it
 const s2 = await p.evaluate(() => ({ conf: document.querySelectorAll('.wConf').length, mood: window.__matchState().mood }));
-await p.screenshot({ path: `${OUT}/maple-party.png` });
+await p.screenshot({ path: `${OUT}/${WORLD}-party.png` });
 await thaw('.wConf');
 console.log(`     (${froze2} confetti animations frozen at 450 ms for the shutter)`);
-console.log(`  2  ${OUT}/maple-party.png — ${s2.conf} confetti scraps, mood '${s2.mood}'`);
+console.log(`  2  ${OUT}/${WORLD}-party.png — ${s2.conf} confetti scraps, mood '${s2.mood}'`);
 console.log('     look for: paper confetti bursting up out of the void over the town; no card yet');
 
 // 3 — the card
@@ -104,11 +105,11 @@ await p.waitForFunction(() => document.getElementById('end')?.classList.contains
 // confetti is removed 3.2 s (wall) after it lands: freeze both at ~0.9 s
 const froze3 = await freeze('#end, #end *', 900);
 const s3 = await p.evaluate(() => ({ hd: document.getElementById('endHd')?.textContent, conf: document.querySelectorAll('#end .endConf').length }));
-await p.screenshot({ path: `${OUT}/maple-endcard.png` });
+await p.screenshot({ path: `${OUT}/${WORLD}-endcard.png` });
 await thaw('#end, #end *');
 await p.evaluate(() => { window.__holdConf = false; document.querySelectorAll('.endConf').forEach((e) => e.remove()); });
 console.log(`     (${froze3} card animations frozen at 900 ms for the shutter)`);
-console.log(`  3  ${OUT}/maple-endcard.png — "${s3.hd}", ${s3.conf} card confetti`);
+console.log(`  3  ${OUT}/${WORLD}-endcard.png — "${s3.hd}", ${s3.conf} card confetti`);
 console.log('     look for: the win headline and the confetti falling over the card; no match HUD left showing through');
 
 await b.close();
