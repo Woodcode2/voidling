@@ -152,6 +152,10 @@ nothing in them is a game check failing. Re-run alone on the same dist with
 nothing else on the machine: 13/13 PASS. Lesson kept: the gate runs with the
 box to itself, and no agent work of any kind overlaps it.
 
+**Merged to main at cf34244 (2026-09-23), push gate 67/67 in one run**, the box
+to itself: studio Jobs 4, 6, 7, 8, the countdown placed, the pictograph and
+picker probes at rest, menuquiet on the game clock.
+
 **halocensus v2, and why v1 was retired.** v1 measured the RESULT — pixels
 bloom lifted by 3+ L* more than 16 px from a light — and condemned Lantern's
 lanterns (a lit table's haze reaches ~200 px, all 405 "hot" cells) while
