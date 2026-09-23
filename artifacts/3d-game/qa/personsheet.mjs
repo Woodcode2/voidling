@@ -18,13 +18,51 @@
 // TRAP: the render loop owns the camera every frame, so the camera cannot be
 // moved from a probe. The people are moved and turned instead, which the loop
 // does not touch, and the shot is the ordinary play camera.
+//
+// ── AND "FRONT" HAS TO MEAN THE FACE IS TOWARD THE CAMERA ────────────────────
+// makeTownsfolk bakes a random facing, mr(0, 2pi), INTO the merged geometry.
+// Setting rotation.y turns the mesh, not the face inside it, so this probe's
+// "front" frame was front for the protesters (built facing +z) and a random
+// angle for everyone else: maple_front.png shows the bowler from behind. The
+// facing now rides on the mesh as userData.faceRy and is subtracted here.
+//
+// And the sheet asserts it rather than hoping: in the front frame every subject
+// whose face this probe can find must have its EYE CENTRE nearer the camera
+// than its HEAD CENTRE. The eyes are found by their colour — mainstreet.ts's
+// INK, read out of that file, not copied — in the head band, and the upper of
+// the two INK clusters there is the eyes (the lower is the mouth). The head
+// centre is the mesh's own vertical axis at the eyes' height, because
+// makeTownsfolk and makeProtester build their person at x = z = 0. Not every
+// personParts call does: the diner's arguing pair is built at (7.6, 5.6) and
+// (9.2, 5.2) inside the diner's Group, which this check already skips as not
+// one vertex-coloured mesh. So a subject is judged only if its eye centroid
+// lies within 0.6 geometry units of its own vertical axis. personParts'
+// eyes, run in node through this same clustering, sit 0.3205 T off it —
+// 0.425-0.479 units across the height jitter, whichever way the person faces.
+// One built anywhere else is reported and not asserted, because its head
+// centre is not on that axis. That is a check on the face, not on faceRy: it
+// reads the vertices the camera sees, so a wrong faceRy, a missing one or a
+// face built facing the wrong way all fail it the same way.
+//
+//   PASS — every found face in the front frame looks at the camera
+//   FAIL — a subject shows the camera the back of its head
+//
+// Any way out before the verdict prints a FAIL line: a pf reader takes a run
+// that printed nothing but its setup as silence, and one that threw after a
+// PASS as consent.
 import { chromium } from 'playwright';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
+
+process.on('uncaughtException', (e) => { console.log(`FAIL — ABORTED — the probe threw: ${String(e?.stack || e).split('\n')[0]}`); process.exit(2); });
+process.on('unhandledRejection', (e) => { console.log(`FAIL — ABORTED — the probe threw: ${String(e?.stack || e).split('\n')[0]}`); process.exit(2); });
 
 const PORT = process.argv[2] || '4177';
 const WORLD = process.argv[3] || 'maple';
 const OUT = 'qa/out/person';
 mkdirSync(OUT, { recursive: true });
+const INK_M = readFileSync('src/proto3d/mainstreet.ts', 'utf8').match(/\nconst INK = (0x[0-9a-fA-F]{6});/);
+if (!INK_M) { console.log('FAIL — ABORTED — const INK is not in src/proto3d/mainstreet.ts; the face colour moved.'); process.exit(2); }
+const INK = Number(INK_M[1]);
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
@@ -102,6 +140,7 @@ const stillVisible = await p.evaluate((sel) => [...document.querySelectorAll(sel
 if (stillVisible.length)
   console.log(`  ! HUD still on screen, the sheet is dirty: ${stillVisible.join(', ')}`);
 
+let frontVerdict = 'FAIL — the front frame was never judged';
 for (const [tag, turn] of [['front', 0], ['threequarter', Math.PI * 0.25], ['side', Math.PI * 0.5], ['back', Math.PI]]) {
   const found = await p.evaluate(({ turn }) => {
     const THREE = window.__THREE, cam = window.__cam, vs = window.__voidState();
@@ -130,6 +169,7 @@ for (const [tag, turn] of [['front', 0], ['threequarter', Math.PI * 0.25], ['sid
     }
     people.sort((a, c) => a.d - c.d);
     const picked = people.slice(0, 6);
+    window.__sheetPicked = picked.map((q) => q.m);    // the front-frame check reads these same six
     // stand them in a row just in front of the void, all turned the same way,
     // and lift them clear of anything they were standing behind
     const out = [];
@@ -138,7 +178,10 @@ for (const [tag, turn] of [['front', 0], ['threequarter', Math.PI * 0.25], ['sid
       // hero overlaps them, at a spacing that fills the frame at spawn radius
       const off = (i - (picked.length - 1) / 2) * 2.6;
       q.m.position.set(vs.x + off * 0.71 - 2.5, 0, vs.z - off * 0.71 - 2.5);
-      q.m.rotation.y = faceCam + turn;
+      // the face inside the geometry already looks along faceRy (see the
+      // header), and rotation.y adds to it — so take it back out, or "front"
+      // is front only for the people who happened to be built facing +z
+      q.m.rotation.y = faceCam + turn - (q.m.userData.faceRy ?? 0);
       q.m.updateMatrixWorld(true);
       const v = new THREE.Vector3(q.m.position.x, 2.0, q.m.position.z).project(cam);
       out.push({ i, verts: q.verts, r: +q.r.toFixed(2),
@@ -148,6 +191,69 @@ for (const [tag, turn] of [['front', 0], ['threequarter', Math.PI * 0.25], ['sid
   }, { turn });
   await p.waitForTimeout(900);
   await p.screenshot({ path: `${OUT}/${WORLD}_${tag}.png` });
+  // ── THE FRONT FRAME HAS TO SHOW FACES ────────────────────────────────────
+  // Read against the camera that just took the shot, from the vertices
+  // themselves (header). Only the front frame carries a verdict: the other
+  // three angles are for a person to judge.
+  if (tag === 'front') {
+    const faces = await p.evaluate(({ INK }) => {
+      const THREE = window.__THREE, cam = window.__cam;
+      const ink = new THREE.Color().setHex(INK);        // linear, the way part() wrote it
+      const rows = [];
+      for (const [i, m] of (window.__sheetPicked || []).entries()) {
+        if (!m.isMesh || !m.geometry?.attributes?.color) { rows.push({ i, why: 'not one vertex-coloured mesh' }); continue; }
+        const pos = m.geometry.attributes.position, col = m.geometry.attributes.color;
+        let y0 = Infinity, y1 = -Infinity;
+        for (let k = 0; k < pos.count; k++) { const y = pos.getY(k); if (y < y0) y0 = y; if (y > y1) y1 = y; }
+        // INK after part()'s bake is INK times ONE factor on all three channels:
+        // the skylight k, 0.91-1.18 for a colour this dark. Shoes can be the
+        // same hex, so only the top 35% of the body counts as the head band.
+        const band = y1 - 0.35 * (y1 - y0);
+        const hs = [], at = [];
+        for (let k = 0; k < pos.count; k++) {
+          const y = pos.getY(k); if (y < band) continue;
+          const kr = col.getX(k) / ink.r, kg = col.getY(k) / ink.g, kb = col.getZ(k) / ink.b;
+          const lo = Math.min(kr, kg, kb), hi = Math.max(kr, kg, kb);
+          if (lo < 0.85 || hi > 1.25 || hi - lo > 0.01) continue;
+          hs.push(y); at.push(k);
+        }
+        if (at.length < 12) { rows.push({ i, why: `${at.length} INK vertices in the head band — no mainstreet face found` }); continue; }
+        // two clusters by height, the eyes over the mouth
+        let a = Math.min(...hs), b = Math.max(...hs);
+        for (let it = 0; it < 30; it++) {
+          let sa = 0, na = 0, sb = 0, nb = 0;
+          for (const y of hs) if (Math.abs(y - a) <= Math.abs(y - b)) { sa += y; na++; } else { sb += y; nb++; }
+          if (!na || !nb) break;
+          a = sa / na; b = sb / nb;
+        }
+        const eye = new THREE.Vector3(); let n = 0;
+        for (let j = 0; j < at.length; j++) if (Math.abs(hs[j] - b) < Math.abs(hs[j] - a)) {
+          eye.x += pos.getX(at[j]); eye.y += pos.getY(at[j]); eye.z += pos.getZ(at[j]); n++;
+        }
+        if (!n) { rows.push({ i, why: 'the INK in the head band is one height cluster — no eyes over a mouth' }); continue; }
+        eye.multiplyScalar(1 / n);
+        const offAxis = Math.hypot(eye.x, eye.z);
+        // built off the origin (header): its head centre is not on this axis
+        if (offAxis > 0.6) { rows.push({ i, why: `eyes ${offAxis.toFixed(2)} off the mesh's own vertical axis — built away from x = z = 0, so the head centre is not known` }); continue; }
+        const head = new THREE.Vector3(0, eye.y, 0);
+        m.localToWorld(eye); m.localToWorld(head);
+        const de = eye.distanceTo(cam.position), dh = head.distanceTo(cam.position);
+        rows.push({ i, faceRy: m.userData.faceRy ?? null, offAxis: +offAxis.toFixed(3), nearer: +(dh - de).toFixed(3), ok: de < dh });
+      }
+      return rows;
+    }, { INK });
+    for (const f of faces) {
+      if (f.why) { console.log(`    subject ${f.i}: not asserted — ${f.why}`); continue; }
+      console.log(`    subject ${f.i}: eyes ${f.nearer >= 0 ? f.nearer.toFixed(3) + ' nearer' : (-f.nearer).toFixed(3) + ' FURTHER'} than the head centre`
+        + ` (eyes ${f.offAxis} off the head axis, faceRy ${f.faceRy === null ? 'none' : f.faceRy.toFixed(3)})`);
+    }
+    const judged = faces.filter((f) => !f.why), back = judged.filter((f) => !f.ok);
+    frontVerdict = !judged.length
+      ? `FAIL — no subject in the front frame carried a face this probe could find; nothing was judged`
+      : back.length
+        ? `FAIL — ${back.length} of ${judged.length} subject(s) show the camera the back of the head in the FRONT frame (subject ${back.map((f) => f.i).join(', ')})`
+        : `PASS — every found face in the front frame looks at the camera (${judged.length} subject(s))`;
+  }
   // ── THE TIGHT CROPS THIS HEADER HAS ALWAYS PROMISED ──────────────────────
   // "one tight crop per person" was in the header from the first version and
   // the loop never wrote one — the only close-ups on disk were hand-cropped
@@ -166,3 +272,5 @@ for (const [tag, turn] of [['front', 0], ['threequarter', Math.PI * 0.25], ['sid
 }
 await b.close();
 console.log(`\n  wrote ${OUT}/${WORLD}_{front,threequarter,side,back}.png\n`);
+console.log(frontVerdict);
+if (!frontVerdict.startsWith('PASS')) process.exit(1);

@@ -333,7 +333,20 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
     // 8.6px and carries the side count outright, for +116 triangles a foot.
     out.push(part(sph(0.155 * T, 14, 8), shoeCol, fx, 0.085 * T, fz, 0, ry, 0, 1, 0.56, 1.42));
   out.push(part(cyl(0.30 * T, 0.26 * T, 0.30 * T, 14), leg, x, 0.96 * T, z, 0, ry, 0));          // hips
-  out.push(part(cyl(0.40 * T, 0.31 * T, 0.82 * T, 14), shirt, x, 1.44 * T, z, 0, ry, 0));        // chest
+  // ── THE COLLAR WAS A RUFF ───────────────────────────────────────────────
+  // The chest's top cap sits at 1.44 + 0.82/2 = 1.85 T, which is 0.07 T above
+  // the shoulder yoke's centre, and at that height the 0.40 T yoke is
+  // sqrt(0.40^2 - 0.07^2) = 0.394 T across. The chest was 0.40 T there: its
+  // rim ran 0.006 T OUTSIDE the yoke, in the same shirt colour, which is less
+  // than either shape's own facet error: the 14-sided rim sags 0.010 T between
+  // its corners and the 14x10 yoke's cross-section there sags 0.015 T. Two
+  // tessellations of one colour that close interleave along one line and draw
+  // a scalloped collar. That is the ruff art direction found on the first two
+  // people in the first frame.
+  // 0.34 T puts the rim 0.054 T inside the yoke — more than twice both sags
+  // put together — so the yoke overhangs the chest the way a shoulder does.
+  // qa/townface.mjs check 6 holds every same-colour pair to 0.03 T.
+  out.push(part(cyl(0.34 * T, 0.31 * T, 0.82 * T, 14), shirt, x, 1.44 * T, z, 0, ry, 0));        // chest
   out.push(part(sph(0.40 * T, 14, 10), shirt, x, 1.78 * T, z));                                  // shoulder yoke
   // ── ARMS, AND WHY THEY ARE AIMED RATHER THAN PLACED ─────────────────────
   // Every townsperson in the game stood in the identical rigid A-pose: two
@@ -376,7 +389,16 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
     out.push(part(sph(0.115 * T, 7, 5), skin, a.hx, a.hy, a.hz));
   }
   out.push(part(cyl(0.13 * T, 0.13 * T, 0.16 * T, 10), skin, x, 1.98 * T, z));                   // neck
-  out.push(part(sph(0.36 * T, 16, 11), skin, x, 2.22 * T, z));
+  // ── THE SKULL TURNS WITH THE FACE ───────────────────────────────────────
+  // It was the one part of the head built without `ry`, because a ball looks
+  // the same from every side and nothing showed it. The face marks DO turn, so
+  // where the eyes landed on the skull's sixteen columns was different for
+  // every townsperson — and an eye that has to clear the drawn skull without
+  // leaving the head's outline (see the eyes below) needs the SAME facet under
+  // it every time. `+ PI / 16` is half a column: it puts the middle of a
+  // facet, not a ridge, on the facing and 22.5 degrees either side of it,
+  // which is where the eyes sit. A rotation: no triangles, no draw.
+  out.push(part(sph(0.36 * T, 16, 11), skin, x, 2.22 * T, z, 0, ry + Math.PI / 16, 0));
   // ── HAIR ── a bare skin-coloured ball is the loudest cheap tell on a person,
   // and every static townsperson in the game had one. life.ts's crowd carries
   // nine hairstyles and this carried none, which is most of why the two read as
@@ -386,7 +408,9 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
   // back, so it covers the crown and the back and leaves the face. The
   // arithmetic is checked against the eyes rather than eyeballed — at the eyes'
   // forward offset the cap's lower edge sits at 2.307 T and the eyes at 2.25 T,
-  // so they clear it by about a twentieth of a head.
+  // so they clear it by about a twentieth of a head. (The eyes have since moved
+  // onto the skull's facets at 2.2275 T, and each eye's centre is 0.394 T from
+  // the cap's axis — outside the cap's 0.355 T radius altogether.)
   {
     // ── AND IT MUST NOT OVERHANG THE SKULL ────────────────────────────────
     // The first cap was sph(0.38T) at 2.42T. At that height the skull's own
@@ -414,8 +438,6 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
   // of this function are still the only two, in the same order, which is the
   // contract every authored placement in Maple Falls downstream depends on.
   {
-    const fwdX = Math.sin(ry), fwdZ = Math.cos(ry);
-    const rgtX = Math.cos(ry), rgtZ = -Math.sin(ry);
     for (const side of [-1, 1]) {
       // NO WHITE. THE WHITE WAS THE WHOLE MISTAKE.
       //
@@ -449,15 +471,67 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
       // drawn at all depended on where the two tessellations happened to land —
       // which is why the character sheet shows one clean oval and one ragged
       // half-eaten smudge on the SAME face, mirrored parts that should be
-      // identical. 0.295 T forward puts the surface 0.0318 T proud: three times
-      // the sag, so the mark survives every facet on both sides.
+      // identical. The fix was 0.295 T forward and 0.03 T up, which put the
+      // surface 0.0318 T proud: three times the sag, so the mark survived
+      // every facet on both sides.
+      // ── AND THAT PUSHED THE MARK OUT OF THE HEAD ────────────────────────
+      // Proud of every facet meant a dark ball reaching 0.391 T from the head
+      // centre (qa/townface.mjs, drawn geometry). The skull's widest ring is
+      // 0.356 T: eleven rows put no ring on the equator, so it is
+      // 0.36 x sin(5 pi/11). Against the skull's drawn outline, from every side
+      // at the play camera's 46-65 degrees, the ball stood up to 0.039 T past
+      // it, and within a tenth of that with the person turned anywhere from 57
+      // to 151 degrees from the camera — side-on or further, which the play
+      // camera sees all the time. Art direction found that lump on the first two
+      // people in the first frame.
       //
-      // Lateral extent is untouched at 0.195 T against a 0.36 T silhouette, so
-      // this does not make an eye visible from the side — the thing the long
-      // note above is protecting.
-      const ex = x + rgtX * side * 0.125 * T + fwdX * 0.295 * T;
-      const ez = z + rgtZ * side * 0.125 * T + fwdZ * 0.295 * T;
-      out.push(part(sph(0.07 * T, 9, 7), INK, ex, 2.25 * T, ez));
+      // Clearing the drawn skull AND staying inside 0.356 T leaves a window of
+      // 0.007 T, because the drawn skull is 0.3495 T out at a facet's middle.
+      // Flattening the ball where it stood — the studio's first answer — does
+      // not fit that window. While the skull did not turn with the person, a
+      // column ridge, where the drawn skull reaches 0.358 T, landed under a
+      // different part of every eye. Measured with qa/townface.mjs, that eye
+      // sank 0.0027 T UNDER the skull on its worst facing and drew 0.0%: some
+      // townsfolk would have had no eyes at all. That is why the skull now
+      // turns with the face (above): every eye has a facet's middle under it,
+      // the same facet on every person.
+      //
+      // So each eye is a LENS SEATED ON ITS FACET. The same 9x7 ball, no more
+      // triangles, its pole laid along the facet's normal so the apex is a
+      // drawn vertex: 0.75 across (the studio's number), 0.85 up and 0.12
+      // along the normal — 0.0525 x 0.0595 x 0.0084 T. The facet's plane is
+      // 0.36 cos(pi/16) cos(pi/22) = 0.3495 T out; the lens's centre sits at
+      // 0.3469 T, 0.0026 T inside it, so the apex lands at 0.3553 T: 0.0058 T
+      // proud of the facet and inside the 0.356 T ring. Within the facet the
+      // plane passes between the lens's second and third drawn rings, just
+      // outside the widest one, so by the arithmetic of those rings the drawn
+      // rim crosses the skin at 16-18 degrees (the nominal ellipsoid's at
+      // 23-26): a shallow angle, not square-on. A square-on rim would need the
+      // centre ON the plane, and that puts the apex at 0.3579 T, past the ring.
+      //
+      // IT SHOWS LESS INK THAN THE BALL DID, AND THAT IS THE PRICE. Looking
+      // the person in the face, each eye shows 0.00522 / 0.00436 / 0.00323 T^2
+      // of ink from 46 / 55 / 65 degrees, against the ball's 0.00873 / 0.00782
+      // / 0.00673: 40-52% less. The first lens here, 0.70 up and 0.01 T above
+      // the equator, showed 0.00421 / 0.00349 / 0.00258: 52-62% less, and no
+      // number held it. The lens cannot grow much more than it has. Upward,
+      // its top rim leaves the ring: 0.85 up at 0.01 T above the equator
+      // reaches 0.3566 T. Downward, it meets the mouth. Where an eye's lower
+      // rim comes nearest a mouth corner, the EYE is the further out (0.326-
+      // 0.327 against 0.320-0.321 T forward) and 0.026-0.027 T higher. From a
+      // raised camera a point further out draws lower, so from above the eye
+      // drops toward the corner while that height foreshortens. 0.90
+      // up centred on the equator (0.00335 T^2 from 65 degrees) puts an eye
+      // against a mouth corner, which is where the ball was. 0.85 up and
+      // 0.0075 T above the equator keeps about 0.006 T between them in the
+      // image from 65 degrees and 0.014 T from 46. On the
+      // drawn geometry, the same on every townsperson: no point further than
+      // 0.3562 T from the head centre, and from 46, 55 and 65 degrees at least
+      // 86% of each eye draws in front of the skull. qa/townface.mjs checks
+      // 3-5 and 7, with a floor of 0.0031 T^2 under the ink.
+      const yaw = ry + side * Math.PI / 8;           // the facet 22.5 degrees off the facing
+      const ex = x + Math.sin(yaw) * 0.3469 * T, ez = z + Math.cos(yaw) * 0.3469 * T;
+      out.push(part(sph(0.07 * T, 9, 7), INK, ex, 2.2275 * T, ez, Math.PI / 2, yaw, 0, 0.75, 0.12, 0.85));
     }
     // ── AND A MOUTH ───────────────────────────────────────────────────────
     // Two eyes and nothing else is a MANNEQUIN. It is the single thing art
@@ -478,6 +552,17 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
     // 0.349 T — 0.035 T proud, three times the 0.0106 T facet sag. It goes back
     // inside the skull at +/-0.151 T of lateral extent, giving a drawn width of
     // 0.30 T on a 0.72 T head.
+    //
+    // IT STILL STANDS OUT OF THE OUTLINE, and that is frozen, not fixed.
+    // qa/townface.mjs measures its drawn reach at 0.383 T against the skull's
+    // 0.356 T widest ring — the same kind of lump the eyes had, 0.027 T past
+    // it. The eyes' cure does not carry over: a lens has to sit inside ONE
+    // facet to clear the skull without leaving the ring, a facet is about
+    // 0.135 T wide at this height, and this mouth is 0.30 T. Cutting it to one
+    // facet changes every face in the town, which is an art call and not part
+    // of the job that fixed the eyes. Until it is made, the probe holds the
+    // mouth where it is: FAIL if it reaches past 0.3833 T or draws less than
+    // 32.8% in front of the skull.
     //
     // DETERMINISM: no mpick, no mrnd. Still exactly the two seeded draws at the
     // top of this function, in the same order.
@@ -914,8 +999,27 @@ export function makeProtester(side: number): THREE.Mesh {
  *  face — the fair judges, the farmhands, the crowd at the drive-in. */
 export function makeTownsfolk(hat = false): THREE.Mesh {
   const p: G[] = [];
-  personParts(p, 0, 0, mpick(SHIRTS), mr(0, Math.PI * 2), hat ? mpick([0xd8b878, 0x5b6070, RED, BLUE]) : undefined);
-  return mergedProp(p, PROP_SMOOTH_MAT);   // a face is not architecture
+  // ── THE FACING IS BAKED IN, SO IT HAS TO BE WRITTEN DOWN ─────────────────
+  // personParts turns the person by `ry` INSIDE the merged geometry, so the
+  // mesh's own rotation says nothing about which way the face looks — and
+  // qa/personsheet.mjs, which turns subjects by rotation.y to face the camera,
+  // photographed the back of the bowler's head in the front frame. The facing
+  // rides on the mesh as userData.faceRy for anything that needs the face.
+  //
+  // THE ORDER IS THE CONTRACT. These three were arguments to one call, and
+  // arguments evaluate left to right: shirt, then facing, then hat — then
+  // personParts draws skin and trousers. Hoisting only the mr() to get at its
+  // value would have put the facing BEFORE the shirt, swapped two draws, and
+  // moved every authored placement in Maple Falls after the first townsperson.
+  // So all three come out, in the order they already ran. qa/townface.mjs
+  // check 1 freezes the sequence: shirt, facing, [hat], skin, trousers.
+  const shirt = mpick(SHIRTS);
+  const ry = mr(0, Math.PI * 2);
+  const hc = hat ? mpick([0xd8b878, 0x5b6070, RED, BLUE]) : undefined;
+  personParts(p, 0, 0, shirt, ry, hc);
+  const m = mergedProp(p, PROP_SMOOTH_MAT);   // a face is not architecture
+  m.userData.faceRy = ry;
+  return m;
 }
 
 /** THE TOWN NOTICEBOARD — every flyer in Maple Falls, layered six deep. */
