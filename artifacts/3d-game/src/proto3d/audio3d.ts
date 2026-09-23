@@ -41,6 +41,9 @@ export interface Audio3D {
   hit(): void;                     // took a shot
   alert(): void;                   // defense wave banner
   bigEat(): void;                  // crunching a building
+  /** the HEADLINE bite — a CHOMP, or a rival devoured. Keeps the tuned note and
+   *  lays a crunch and a gulp over it, all above 250 Hz (see the method). */
+  chomp(mealR?: number, voidR?: number, kind?: 'prop' | 'rival'): void;
   ready(): void;                   // a power just charged
   startMusic(): void;              // the match loop — tempo + layers ride the stage
   setMusicStage(n: number): void;
@@ -340,18 +343,38 @@ export function createAudio(): Audio3D {
   function noise(dur: number, vol: number, fc0: number, fc1: number, when = 0) {
     const c = ensure(); if (!c || !master) return;
     const t = c.currentTime + when;
-    const len = Math.max(1, Math.floor(c.sampleRate * dur));
-    const buf = c.createBuffer(1, len, c.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-    const src = c.createBufferSource(); src.buffer = buf;
+    // ── ONE SHARED BUFFER, NOT ONE PER CALL ────────────────────────────────
+    // This allocated and filled a fresh AudioBuffer on every call, and pop()
+    // calls it on every bite — qa/chomp.mjs counted fifty buffers for fifty
+    // bites. white() below already exists for exactly this reason ("rebuilding
+    // a noise buffer per hit is the classic mobile-audio leak"); it just had
+    // never been used here. The baked linear fade (1 - i/len) is dropped: the
+    // gain ramp beneath already takes the burst to silence over `dur`.
+    const src = c.createBufferSource(); src.buffer = white(c);
+    const off = Math.random() * Math.max(0, 2 - dur - 0.05);
     const f = c.createBiquadFilter(); f.type = 'lowpass';
     f.frequency.setValueAtTime(fc0, t);
     f.frequency.exponentialRampToValueAtTime(Math.max(60, fc1), t + dur);
     const g = c.createGain(); g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
     src.connect(f); f.connect(g); g.connect(master);
-    src.start(t);
+    src.start(t, off, dur + 0.05);
+  }
+  /** a short bandpassed burst read from the shared white buffer — one grain of
+   *  crunch. Everything that makes a bite sound CRISP on a phone lives in the
+   *  1.5-4 kHz band, where the speaker actually works. */
+  function grain(fc: number, q: number, dur: number, vol: number, when = 0) {
+    const c = ensure(); if (!c || !master) return;
+    const t = c.currentTime + when;
+    const src = c.createBufferSource(); src.buffer = white(c);
+    const f = c.createBiquadFilter(); f.type = 'bandpass';
+    f.frequency.setValueAtTime(fc, t); f.Q.setValueAtTime(q, t);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start(t, Math.random() * 1.9, dur + 0.03);
   }
 
   // ── recorded sample kit: the produced audio in /assets/audio. Buffers decode
@@ -4332,6 +4355,46 @@ export function createAudio(): Audio3D {
       // damn drums". The swallow is a soft dark WHOOSH now: filtered noise
       // only, longer and quieter, no tonal thump to mistake for percussion.
       noise(0.34, 0.14, 480, 120);
+    },
+    // ── THE HEADLINE BITE ────────────────────────────────────────────────
+    // A CHOMP (a meal bigger than you) and a rival devoured are the two biggest
+    // bites in the game, and both called bigEat() INSTEAD of pop() — so they
+    // lost the tuned note and played noise(0.34, 0.14, 480, 120): low-passed
+    // noise sweeping 480 -> 120 Hz, all of it below where a phone speaker
+    // works. qa/chomp.mjs, on the build before this: the CHOMP measured 20.6 dB
+    // QUIETER above 450 Hz than an ordinary big bite, and a rival eaten was
+    // 0.0 dB over the old whoosh because it WAS the old whoosh. The headline
+    // bite was the one a child could not hear. (Research governor G3.)
+    //
+    // So it builds UP, never down. The owner called the old 160 Hz drop "an
+    // 8-bit thud" and "those damn drums" (bigEat's note above), and that veto
+    // stands: nothing here sits below 250 Hz, and qa/chomp.mjs bar (b) holds
+    // it there.
+    //   1. the TUNED NOTE first — the bite keeps its place in the melody
+    //   2. a CRUNCH — four bandpassed grains, 1.5-4 kHz, 30 ms apart
+    //   3. a GULP — a sine that swallows 900 -> 300 Hz, 0.18 s in
+    //   4. a rival adds a rising GLOCK arpeggio and the score steps aside
+    // The bay's squeezebox joke rides every fifth one, as it did on bigEat.
+    chomp(mealR = 3.2, voidR = 3.0, kind: 'prop' | 'rival' = 'prop') {
+      const c = ensure(); if (!c || !master) return;
+      const now = c.currentTime;
+      if (isPirate() && ++bigEatCount % 5 === 2) yoHo(now + 0.1);
+      // pop() skips a bite inside 75 ms of the last one. The headline bite must
+      // never be the one skipped, so it is let through — without resetting the
+      // melody (a gap under 1.1 s keeps walking the ladder).
+      lastPop = Math.min(lastPop, now - 0.08);
+      this.pop(0, mealR, voidR);
+      const big = kind === 'rival';
+      [1500, 2200, 3000, 4000].forEach((fc, i) =>
+        grain(fc * (big ? 0.9 : 1), 1.2, 0.022, (big ? 0.16 : 0.13) - i * 0.005, 0.012 + i * 0.03));
+      tone(900, 300, 0.16, 'sine', big ? 0.11 : 0.09, 0.18);
+      tone(1800, 600, 0.12, 'triangle', big ? 0.035 : 0.028, 0.18);   // the gulp's overtone, where the speaker is
+      if (big) {
+        // C6 E6 G6 C7 — the family member is gone and the room knows it
+        for (const [k, f] of [1047, 1319, 1568, 2093].entries())
+          tone(f, f, 0.22, 'sine', 0.05 - k * 0.004, 0.3 + k * 0.07);
+        duckMusic(4, 0.6);
+      }
     },
     gulp() {
       noise(0.4, 0.34, 2200, 220);
