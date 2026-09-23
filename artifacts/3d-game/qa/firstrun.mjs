@@ -28,6 +28,8 @@ import { chromium } from 'playwright';
 import { openPicker } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4177';
+const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7);
+const want = (k) => !ONLY || ONLY.includes(k);
 const RED = 'rgb(255, 138, 138)';   // the nag colour, '#ff8a8a'
 let bad = 0, bars = 0;
 const ok = (m) => { bars++; console.log(`  ok   ${m}`); };
@@ -61,7 +63,7 @@ const t = (p) => p.evaluate(() => window.__matchState?.().t ?? 0);
 console.log('\n  FIRST RUN — the first match a child ever plays, and whether any match nags\n');
 
 // ── (a) a cold install: no storage at all, no query ─────────────────────────
-{
+if (want('a')) {
   const p = await page({}, '');
   await p.waitForFunction(() => window.__matchState?.().armed === true, null, { timeout: 400000 }).catch(() => { });
   const g = await p.evaluate(() => ({ goalN: window.__wayState?.().goalN ?? -1, armed: window.__matchState?.().armed }));
@@ -73,7 +75,7 @@ console.log('\n  FIRST RUN — the first match a child ever plays, and whether a
 }
 
 // ── (b) no match nags ───────────────────────────────────────────────────────
-{
+if (want('b')) {
   const p = await page({ voidPlayed: '1', voidTut: '1', voidMute: '1',
     voidDailyLast: new Date().toDateString() }, '?w=maple&len=40');
   // len=40 puts the clock under 35 s about five match-seconds in; sample past it
@@ -95,7 +97,7 @@ console.log('\n  FIRST RUN — the first match a child ever plays, and whether a
 }
 
 // ── (c) solo cannot take dot 4 ──────────────────────────────────────────────
-{
+if (want('c')) {
   const SEED = JSON.stringify({ v: 1, w: { maple: {
     1: { st: 'clear', best: 24100, pct: 31, n: 1 },
     2: { st: 'clear', best: 3, pct: 22, n: 1 },
@@ -105,6 +107,15 @@ console.log('\n  FIRST RUN — the first match a child ever plays, and whether a
     voidUnlocked: 'maple,pirate,gameday,lantern,powder,skylark' }, '?w=maple&manual=1');
   await openPicker(p);
   await p.evaluate(() => document.querySelector('#worldRow .wCard[data-world="maple"]')?.click());
+  // ?manual=1 switches AUTO_START off (it keeps the menu up for the picker), so
+  // the armed match waits for a touch exactly as it does for a child. The first
+  // version of this bar never touched, sat at t=0 for ten minutes, and reported
+  // "cannot answer" — which is the right verdict for a probe that did not play.
+  await p.waitForFunction(() => window.__matchState?.().armed === true, null, { timeout: 400000 }).catch(() => { });
+  await p.evaluate(() => {
+    const cv = document.querySelector('canvas');
+    cv.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: innerWidth / 2, clientY: innerHeight / 2, bubbles: true }));
+  });
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 }).catch(() => { });
   const g0 = await p.evaluate(() => window.__wayState?.().goalN ?? -1);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 16, null, { timeout: 600000 }).catch(() => { });
