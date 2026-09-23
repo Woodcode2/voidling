@@ -1,9 +1,10 @@
 // DOES A WALKING PERSON HAVE A FACE? — the node face raycast (studio round 4, Job 4 / I-7)
 //
-//   node qa/faceray.mjs [--hat=cap,beanie] [--hair=short] [--rows] [--only=E|H]
+//   node qa/faceray.mjs [--hat=cap,beanie] [--hair=short] [--rows] [--only=EMH]
 //
-// --hat/--hair narrow bar (E) to a slice (a sweep over one hat's numbers runs
-// in a second); --rows adds the mouth under each cell; --only runs one bar.
+// --hat/--hair narrow bars (E) and (M) to a slice (a sweep over one hat's
+// numbers runs in a second); --rows adds the mouth under each cell; --only
+// runs the bars named (E, M, H, or any run of them).
 // FACERAY_SRC=<path> reads a copy of life.ts instead, which is how a candidate
 // number is tried without touching the source.
 //
@@ -61,58 +62,101 @@
 //     samples land on ink. Half a drawn eye still reads as an eye at thirty
 //     pixels; less than half reads as a smudge under a hat. The governor's
 //     bar, set before the fix.
-//     BRIMS ARE A CONVENTION, NOT A DEFECT. A sun hat, a straw hat and a
-//     captain's cap shade the eyes from above in every drawing of one, and
-//     the brim is what makes the hat read at all from the top of the camera's
-//     travel. Those are measured and printed, and exempt by name below, with
-//     the reason next to each. So is ONE mask, the snorkel, and that one is
-//     this probe's call rather than the governor's: a dive mask over the eyes
-//     is the eyes, the same decision makePerson already makes for sunglasses
-//     (under glasses no eye is drawn at all). The tricorn and the bucket hat
-//     are brims too and are NOT exempt — a small tilt clears both, and the
-//     tricorn is on most of the costumed pirates.
-// (H) The hat colour the dress code picks is more than CIE76 dE 15 from the
+//     BRIMS ARE A CONVENTION, NOT A DEFECT, and only the three the governor
+//     named: a sun hat, a straw hat and a captain's cap shade the eyes from
+//     above in every drawing of one, and the brim is what makes the hat read
+//     at all from the top of the camera's travel. Those are measured and
+//     printed, and exempt by name below, with the reason next to each. No
+//     other hat is: the tricorn and the bucket hat are brims too and a small
+//     tilt clears both, and the snorkel — which an earlier version of this
+//     probe exempted on its own authority ("a dive mask over the eyes is the
+//     eyes"), although the mask is a light cyan (0x63d6f0) box with nothing
+//     dark drawn on it and the eyes under it read 0/0/0 — now wears the mask
+//     up on the forehead and is held to the bar like the rest.
+// (M) The mouth, measured on the same heads the same way (its samples are the
+//     rays whose first hit on the bald face is the mouth). A FROZEN RATCHET,
+//     not a design bar: the spec sets none, and nothing in the kit is meant to
+//     cover a mouth, but two hats did without any probe seeing it — the
+//     helmet's white face bar, left hanging across the chin when the helmet was
+//     tipped back (88/90/96), and the snorkel mask (96/62/22). Outside the
+//     three conventions (whose brims shade the whole face, 0/0/0), every Hair x
+//     Hat must show at least MOUTH_FLOOR of the mouth at every angle. The floor
+//     is this build's lowest reading, bob hair under the tricorn at 65 degrees
+//     (88.6%; the bob alone reads 96 there, the tricorn over short hair 92),
+//     rounded down to 88.
+//     A change that pushes any mouth below it fails here and has to lower this
+//     number in the open, with its reason.
+// (H) Every hat colour a head is handed is more than CIE76 dE 15 from the
 //     person's shirt AND their skin. A cream cap over a pale face is the same
 //     value as the skull under it, and from above it reads as a bald head (the
-//     governor's crop of Game Day, gdcap.png). Checked over every skin in
-//     SKIN against every shirt in OUTFIT, on the path that picks the colour
-//     (a hat with no hatCol of its own), by making the dress code's pick()
-//     return each of its candidates in turn. dE is CIE76 on the sRGB hex, the
-//     same arithmetic as qa/formsep.mjs.
-//
-// The mouth is measured and printed; it has no bar here (nothing in the kit is
-// meant to cover it, but a bob does, and that is a hair decision).
+//     governor's crop of Game Day, gdcap.png). Measured on the colour the head
+//     block hands hatParts — makePerson's own statements, run with no geometry
+//     — for two sources of colour:
+//       1. the dress code's pick, for a hat with no colour of its own: pick()
+//          is made to return each candidate in turn;
+//       2. every colour a role AUTHORS (`hatCol:` in castFor — a uniform, a
+//          campaign colour, a role's own palette). An earlier version checked
+//          only (1), and the cream #f0e6d2 cap on the protester's cream shirt
+//          (dE 0), the cream sun hats on the palest skin (dE 7.1) and the
+//          pilot's cream cap (13.3) went through. The authored colours are read
+//          by running castFor itself for every Role, with makePerson replaced by
+//          a recorder, not by copying its lists.
+//     Each is tried on every skin in SKIN and every shirt any dress code or
+//     role can hand makePerson — a superset of the pairs the cast really
+//     builds; a failure on a pair a role really builds is named by role. dE is
+//     CIE76 on the sRGB hex, the same arithmetic as qa/formsep.mjs.
 //
 // ── MEASURED, 2026-09-23 (Job 4) ────────────────────────────────────────────
-//   before  FAIL (E) 120 of 126: short/bob/long/bun/pony/braids 0/0/0 bare-
+//   before Job 4 (ea6b384), the first version of this probe:
+//           FAIL (E) 120 of 126: short/bob/long/bun/pony/braids 0/0/0 bare-
 //           headed, buzz 43/42/41, curly 55/53/52, every hat 0/0/0
-//           FAIL (H) 254 of the outcomes: 132 against the skin (worst the
-//           cream cap on the palest skin, dE 7.1), 128 against the shirt
+//           FAIL (H) 254 of the dress-code outcomes: 132 against the skin
+//           (worst the cream cap on the palest skin, dE 7.1), 128 against the
+//           shirt
+//   Job 4's first commit (4174709), this version:
+//           FAIL (E) 9 of 135: snorkel 0/0/0 on every hair
+//           FAIL (M) 18 of 135: snorkel 96/62/22, helmet 88/90/96 (bob 85/87/93)
+//           FAIL (H) 1771 of 31478 outcomes within dE 15, 297 of them on a pair
+//           a role builds (the protester's cream cap on a cream shirt, dE 0;
+//           the gossip's cream sun hat on the palest skin, dE 7.1)
 //   after   PASS (E) 162 built, lowest outside the conventions 69 (beanie, 65)
-//           PASS (H) closest 17.2
+//           PASS (M) lowest bob/tricorn 97/97/89
+//           PASS (H) every outcome clears, closest 15.0 (the nearest shade
+//           that clears is chosen, so the re-shaded ones sit just past 15)
 // The studio record quotes a skeptic's raycast (eyes 72/68/61 for the tipped
 // crown, 73/67/53 for the cap). That instrument is not in the repo, so what it
 // divided by cannot be checked; its numbers and these are not comparable, and
 // neither is evidence for the other.
 import { readFileSync } from 'node:fs';
-import * as THREE from 'three';
-import ts from 'typescript';
+// AN ABORTED RUN IS A FAIL, NOT SILENCE. Every throw below means "the source
+// changed shape and this probe cannot measure it", and the gate reads a probe
+// that printed no verdict as a failure — but a person reading the output reads
+// a stack trace as a crash of the tool, not a verdict on the build. So any
+// throw, and a missing module, ends in one FAIL line and exit 1.
+const abort = (e) => { console.log(`FAIL — faceray aborted before a verdict: ${e && e.message ? e.message : e}`); process.exit(1); };
+process.on('uncaughtException', abort);
+process.on('unhandledRejection', abort);
+const THREE = await import('three');
+const ts = (await import('typescript')).default;
 
 const FILE = process.env.FACERAY_SRC || 'src/proto3d/life.ts';
 const SRC = readFileSync(FILE, 'utf8');
 const argv = (k) => { const a = process.argv.find((s) => s.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3).split(',') : null; };
 const ONLY_HAT = argv('hat'), ONLY_HAIR = argv('hair'), ROWS = process.argv.includes('--rows');
-const ONLY = argv('only') ? argv('only')[0].split('') : ['E', 'H'];
+const ONLY = argv('only') ? argv('only')[0].split('') : ['E', 'M', 'H'];
 
 const PITCHES = [46, 55, 65];
 const EYE_BAR = 0.50;
 const DE_BAR = 15;
-// by name, with the reason. Anything not listed here is under bar (E).
+const MOUTH_FLOOR = 0.88;   // a frozen ratchet: see (M) above
+// by name, with the reason. Anything not listed here is under bars (E) and (M).
+// The three brims the governor named (docs/STUDIO-ROUND-4.md, Job 4). Nothing
+// else: the snorkel was exempted here once on this probe's own say-so, and now
+// wears its mask on the forehead and is measured like every other hat.
 const CONVENTION = {
   sun: 'a wide brim shades the eyes from above by design; the brim is the read',
   straw: 'the farmer\'s brim, the widest in the game on purpose (life.ts says so)',
   captain: 'a peaked cap with a dark peak worn low is the captain; the peak is the read',
-  snorkel: 'a dive mask over the eyes IS the eyes, the call makePerson already makes for glasses (no eyes drawn at all)',
 };
 
 // ── the source, as the compiler sees it ────────────────────────────────────
@@ -291,18 +335,23 @@ function faceOf(parts) {
   if (pairs.length !== 1) throw new Error(`faceray: expected ONE mirrored INK pair on the face (the eyes), found ${pairs.length} — `
     + 'the face changed; teach this probe what an eye is before it reports on one');
   const eyes = pairs[0];
+  // the mouth is the one INK part on the centre line below the eyes; bar (M)
+  // needs it, so a face with none or two is a throw, as for the eyes
   const mouth = ink.filter((p) => p.args[0] === 0 && p.args[1] < eyes[0].args[1]);
-  return { face, occ, eyes, mouth: mouth.length === 1 ? mouth[0] : null };
+  if (mouth.length !== 1) throw new Error(`faceray: expected ONE INK mouth on the centre line below the eyes, found ${mouth.length} — `
+    + 'the face changed; teach this probe what a mouth is before it reports on one');
+  return { face, occ, eyes, mouth: mouth[0] };
 }
 
-// ── (E) the sweep ───────────────────────────────────────────────────────────
+// ── (E) the sweep, and (M) the mouth from the same heads ───────────────────
 const hats = [null, ...HATS].filter((h) => !ONLY_HAT || ONLY_HAT.includes(String(h)));
 const hairs = HAIRS.filter((h) => !ONLY_HAIR || ONLY_HAIR.includes(h));
 const nConv = hats.filter((h) => CONVENTION[h]).length * hairs.length;
 const pc3 = (a) => a.map((x) => (Number.isNaN(x) ? '  -' : String(Math.round(100 * x)).padStart(3))).join('/');
-const fails = [];
-let nCombos = 0;
-if (ONLY.includes('E')) {
+const fails = [], mouthFails = [];
+let nCombos = 0, mouthLow = null;
+const doEM = ONLY.includes('E') || ONLY.includes('M');
+if (doEM) {
   const eyeAt0 = faceOf(head({ hair: 'bald', hat: null, hatCol: 0x4da3ff })).eyes[0].args;
   console.log(`\nTHE FACE (parsed from ${FILE}): eyes at x ±${Math.abs(eyeAt0[0])}, y ${eyeAt0[1]}, z ${eyeAt0[2]}; `
     + `${HAIRS.length} hairs x ${HATS.length + 1} hats (incl. none) at ${PITCHES.join('/')} deg\n`);
@@ -312,9 +361,15 @@ if (ONLY.includes('E')) {
     for (const hair of hairs) {
       const f = faceOf(head({ hair, hat, hatCol: 0x4da3ff }));
       const eye = PITCHES.map((p) => Math.min(visible(f.eyes[0], f.face, f.occ, p), visible(f.eyes[1], f.face, f.occ, p)));
-      const mouth = f.mouth ? PITCHES.map((p) => visible(f.mouth, f.face, f.occ, p)) : null;
+      const mouth = PITCHES.map((p) => visible(f.mouth, f.face, f.occ, p));
       nCombos++;
-      if (eye.some((e) => !(e >= EYE_BAR)) && !(hat && CONVENTION[hat])) fails.push({ hair, hat: hat || 'none', eye });
+      const conv = !!(hat && CONVENTION[hat]);
+      if (eye.some((e) => !(e >= EYE_BAR)) && !conv) fails.push({ hair, hat: hat || 'none', eye });
+      if (!conv) {
+        const lo = Math.min(...mouth);
+        if (!mouthLow || !(lo >= mouthLow.lo)) mouthLow = { lo, hair, hat: hat || 'none', mouth };
+        if (mouth.some((m) => !(m >= MOUTH_FLOOR))) mouthFails.push({ hair, hat: hat || 'none', mouth });
+      }
       cells.push({ hair, eye, mouth });
     }
     rows.push({ hat: hat || 'none', cells });
@@ -324,12 +379,12 @@ if (ONLY.includes('E')) {
   for (const r of rows) {
     const tag = CONVENTION[r.hat] ? ' (convention)' : '';
     console.log(`  ${r.hat.padEnd(9)}${r.cells.map((c) => pc3(c.eye).padStart(13)).join('')}${tag}`);
-    if (ROWS) console.log(`  ${''.padEnd(9)}${r.cells.map((c) => (c.mouth ? `[${pc3(c.mouth)}]` : '[-]').padStart(13)).join('')}`);
+    if (ROWS) console.log(`  ${''.padEnd(9)}${r.cells.map((c) => `[${pc3(c.mouth)}]`.padStart(13)).join('')}`);
   }
   const noHat = rows.find((r) => r.hat === 'none');
-  const m = noHat ? noHat.cells.filter((c) => c.mouth) : [];
-  if (m.length) console.log(`\n  mouth, bare head, ${PITCHES.join('/')} deg: `
-    + m.map((c) => `${c.hair} ${pc3(c.mouth).replace(/ /g, '')}`).join(' · '));
+  if (noHat) console.log(`\n  mouth, bare head, ${PITCHES.join('/')} deg: `
+    + noHat.cells.map((c) => `${c.hair} ${pc3(c.mouth).replace(/ /g, '')}`).join(' · '));
+  if (mouthLow) console.log(`  mouth, lowest outside the conventions: ${mouthLow.hair}/${mouthLow.hat} ${pc3(mouthLow.mouth).replace(/ /g, '')}`);
   for (const [h, why] of Object.entries(CONVENTION)) if (hats.includes(h)) console.log(`  convention: ${h} — ${why}`);
 }
 
@@ -345,29 +400,94 @@ function lab(hex) {
 }
 const dE = (a, b) => { const p = lab(a), q = lab(b); return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
 const hex = (c) => `#${c.toString(16).padStart(6, '0')}`;
-let pairs = 0, worst = null;
 const hatFails = [];
+let worst = null, nOut = 0, nAuth = 0, nShirts = 0, nSamples = 0, nRoles = 0;
+const moved = new Map();   // "role hat>out on shirt/skin" -> example, for the reader
 if (ONLY.includes('H')) {
-  const shirts = [...new Set(Object.values(OUTFIT).flatMap((f) => f.shirt || []))];
-  for (const skin of SKIN) for (const shirt of shirts) {
-    pairs++;
-    // enumerate every colour the default path can land on for this person:
-    // pick() returns each candidate of its first call in turn
-    const outcomes = new Set();
+  // ── the colour the head block hands hatParts, and nothing else ──
+  // makePerson's own head statements again, with pc() and hairParts stubbed
+  // out (no geometry: the colour is decided before any is built) and hatParts
+  // recording the colour it is given. Compiled once and called per outcome.
+  const hk = { col: undefined, pick: (a) => a[0] };
+  const colourHead = run(`
+{ void pc; void hairParts; void hatParts;
+  pc = function () { return null; };
+  hairParts = function () {};
+  hatParts = function (out, kind, col) { __hooks.col = col; }; }
+const __f = function (__o, __shirt, __skin) {
+  o = __o; shirt = __shirt; skin = __skin; __hooks.col = undefined;
+${HEAD_JS}
+  return __hooks.col;
+};
+// called here once down each branch, so that every declaration the colour
+// path reads is found by run() now rather than failing later outside it
+__f({ hair: 'bald', hat: 'cap', hatCol: SKIN[0] }, SKIN[0], SKIN[0]);
+__f({ hair: 'bald', hat: 'cap', hatCol: undefined }, SKIN[0], SKIN[0]);
+return __f;`, { o: {}, fit: {}, kid: false, hair: 'bald', hairCol: 0x8a5a30, shirt: 0, skin: 0,
+    pick: (a) => hk.pick(a), pants: 0x3a4a6a, accent: 0xffffff, wear: 'tee' }, hk);
+
+  // ── every colour the CAST hands makePerson, from castFor itself ──
+  // castFor (life.ts) is run for every Role with makePerson replaced by a
+  // recorder and Math.random by a fixed-seed generator, 3000 times a role,
+  // cycling through every dress code and every Skylark district (the kid's
+  // branch turns on the district). The recorder keeps what each call would
+  // have built from: the shirt (or the colour override), the dress code, the
+  // hat and its colour. Nothing is copied out of life.ts.
+  const roles = typeUnion('Role');
+  const dresses = [...Object.keys(OUTFIT), ...run('return [...SK_IDS];', {}, {})];
+  let seed = 0x5eed;
+  const rnd = () => { seed = (seed + 0x6d2b79f5) | 0; let t = seed; t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const fakeMath = Object.create(Math); fakeMath.random = rnd;
+  const PER_ROLE = 3000;
+  const cast = { seen: [], cur: null, roles, dresses, n: PER_ROLE };
+  const recorder = (biome, colOverride, o) => {
+    cast.seen.push({ role: cast.cur, biome: biome ?? 'cozy', shirt: o?.shirt ?? colOverride, hat: o?.hat, hatCol: o?.hatCol });
+    return { userData: {} };
+  };
+  run(`__hooks.seen = []; __resetSeed();
+for (const role of __hooks.roles) for (let n = 0; n < __hooks.n; n++) {
+  __hooks.cur = role; castFor(role, __hooks.dresses[n % __hooks.dresses.length]);
+}`, { makePerson: recorder, Math: fakeMath, __resetSeed: () => { seed = 0x5eed; } }, cast);
+  nSamples = cast.seen.length; nRoles = roles.length;
+  const shirtsOf = (r) => (r.shirt !== undefined ? [r.shirt] : (OUTFIT[r.biome] ?? OUTFIT.cozy).shirt);
+  const SHIRTS = [...new Set([...Object.values(OUTFIT).flatMap((f) => f.shirt || []), ...cast.seen.flatMap(shirtsOf)])];
+  // which (hat colour, shirt) pairs a role really builds together, for naming
+  const byPair = new Map();
+  for (const r of cast.seen) if (r.hat !== null && r.hatCol !== undefined)
+    for (const sh of shirtsOf(r)) { const k = `${r.hatCol}|${sh}`; if (!byPair.has(k)) byPair.set(k, new Set()); byPair.get(k).add(r.role); }
+  const AUTH = [...new Set(cast.seen.filter((r) => r.hatCol !== undefined).map((r) => r.hatCol))];
+  nAuth = AUTH.length; nShirts = SHIRTS.length;
+
+  const judge = (hin, c, shirt, skin, how) => {
+    nOut++;
+    const m = Math.min(dE(c, shirt), dE(c, skin));
+    if (!worst || m < worst.m) worst = { m, c, shirt, skin, how };
+    if (m <= DE_BAR) hatFails.push({ hin, c, shirt, skin, ds: dE(c, shirt), dk: dE(c, skin), how });
+  };
+  for (const skin of SKIN) for (const shirt of SHIRTS) {
+    // 1. the dress code's own pick: pick() returns each candidate in turn
     let len = 1;
     for (let k = 0; k < len; k++) {
       let calls = 0;
-      const pick = (a) => { calls++; if (calls === 1) { len = a.length; return a[k]; } return a[0]; };
-      const parts = head({ hair: 'bald', hat: 'cap', hatCol: undefined, shirt, skin, pick });
-      const h = parts.find((p) => p.tag === 'hat');
-      if (!h) throw new Error('faceray: a cap produced no hat part');
-      outcomes.add(h.col);
+      hk.pick = (a) => { calls++; if (calls === 1) { len = a.length; return a[k]; } return a[0]; };
+      const c = colourHead({ hair: 'bald', hat: 'cap', hatCol: undefined }, shirt, skin);
+      if (c === undefined) throw new Error('faceray: a cap was handed no colour');
+      judge(undefined, c, shirt, skin, 'the dress code');
       if (calls === 0) break;
     }
-    for (const c of outcomes) {
-      const m = Math.min(dE(c, shirt), dE(c, skin));
-      if (!worst || m < worst.m) worst = { m, c, shirt, skin };
-      if (m <= DE_BAR) hatFails.push({ c, shirt, skin, ds: dE(c, shirt), dk: dE(c, skin) });
+    hk.pick = (a) => a[0];
+    // 2. every colour a role authors, on every shirt, on every skin — a
+    //    superset of the pairs the cast builds, which are named when they fail
+    for (const hin of AUTH) {
+      const c = colourHead({ hair: 'bald', hat: 'cap', hatCol: hin }, shirt, skin);
+      const roles = byPair.get(`${hin}|${shirt}`);
+      judge(hin, c, shirt, skin, roles ? [...roles].join('/') : null);
+      if (roles && c !== hin) {
+        const key = `${[...roles].join('/')} ${hex(hin)} on shirt ${hex(shirt)}`;
+        if (!moved.has(key)) moved.set(key, { skins: 0, to: new Set() });
+        moved.get(key).skins++; moved.get(key).to.add(hex(c));
+      }
     }
   }
 }
@@ -386,22 +506,44 @@ if (ONLY.includes('E')) {
     console.log(`PASS — (E) every Hair x Hat shows at least ${EYE_BAR * 100}% of each eye at ${PITCHES.join('/')} deg `
       + `(${nCombos} built, ${nConv} under a brim convention)`);
   }
-  if (ONLY_HAT || ONLY_HAIR) console.log('  (a filtered run: (E) covered only the hats and hairs asked for)');
 }
+if (ONLY.includes('M')) {
+  if (mouthFails.length) {
+    exit = 1;
+    console.log(`FAIL — (M) ${mouthFails.length} of ${nCombos - nConv} Hair x Hat combinations outside the conventions `
+      + `show less than the ${Math.round(MOUTH_FLOOR * 100)}% of the mouth this build is held to: `
+      + mouthFails.slice(0, 16).map((f) => `${f.hair}/${f.hat} ${pc3(f.mouth).replace(/ /g, '')}`).join(', ')
+      + (mouthFails.length > 16 ? `, and ${mouthFails.length - 16} more` : ''));
+  } else {
+    console.log(`PASS — (M) every Hair x Hat outside the conventions shows at least ${Math.round(MOUTH_FLOOR * 100)}% of the mouth `
+      + `at ${PITCHES.join('/')} deg (lowest ${mouthLow ? `${mouthLow.hair}/${mouthLow.hat} ${pc3(mouthLow.mouth).replace(/ /g, '')}` : '-'})`);
+  }
+}
+if (ONLY_HAT || ONLY_HAIR) console.log('  (a filtered run: (E) and (M) covered only the hats and hairs asked for)');
 if (ONLY.includes('H')) {
+  const what = `${nOut} outcomes: ${SKIN.length} skins x ${nShirts} shirts x (the dress code's pick + ${nAuth} colours the cast authors), `
+    + `the cast read from castFor over ${nSamples} calls, ${nRoles} roles`;
+  if (moved.size) {
+    console.log(`\n  pairs a role builds that the hat-colour rule re-shades (role, authored colour, shirt -> colours worn):`);
+    for (const [k, v] of [...moved].slice(0, 40)) console.log(`    ${k} -> ${[...v.to].join(' ')} (${v.skins} of ${SKIN.length} skins)`);
+    if (moved.size > 40) console.log(`    and ${moved.size - 40} more`);
+  }
   if (hatFails.length) {
     exit = 1;
     // the skin and the shirt collisions are different defects (a skull read,
-    // and a head that melts into its own body), so they are counted apart
-    const bySkin = hatFails.filter((f) => f.dk <= DE_BAR).sort((a, b) => a.dk - b.dk);
-    const byShirt = hatFails.filter((f) => f.ds <= DE_BAR).sort((a, b) => a.ds - b.ds);
-    const say = (f) => `${hex(f.c)} on skin ${hex(f.skin)} / shirt ${hex(f.shirt)} (dE ${f.dk.toFixed(1)} skin, ${f.ds.toFixed(1)} shirt)`;
-    console.log(`FAIL — (H) ${hatFails.length} skin x shirt x hat-colour outcomes are within dE ${DE_BAR} of the shirt or the skin `
-      + `(${pairs} skin x shirt pairs): ${bySkin.length} against the SKIN${bySkin.length ? `, worst ${say(bySkin[0])}` : ''}; `
-      + `${byShirt.length} against the SHIRT${byShirt.length ? `, worst ${say(byShirt[0])}` : ''}`);
+    // and a head that melts into its own body), so they are counted apart;
+    // a collision a role really builds is named, and listed first
+    const real = hatFails.filter((f) => f.how);
+    const bySkin = hatFails.filter((f) => f.dk <= DE_BAR).sort((a, b) => (!!b.how - !!a.how) || a.dk - b.dk);
+    const byShirt = hatFails.filter((f) => f.ds <= DE_BAR).sort((a, b) => (!!b.how - !!a.how) || a.ds - b.ds);
+    const say = (f) => `${f.how ? `${f.how}: ` : ''}${hex(f.c)} on skin ${hex(f.skin)} / shirt ${hex(f.shirt)} (dE ${f.dk.toFixed(1)} skin, ${f.ds.toFixed(1)} shirt)`;
+    console.log(`FAIL — (H) ${hatFails.length} of ${what} are within dE ${DE_BAR} of the shirt or the skin, `
+      + `${real.length} of them on a pair a role really builds: `
+      + `${bySkin.length} against the SKIN${bySkin.length ? `, first ${say(bySkin[0])}` : ''}; `
+      + `${byShirt.length} against the SHIRT${byShirt.length ? `, first ${say(byShirt[0])}` : ''}`);
   } else {
-    console.log(`PASS — (H) every hat colour the dress code can pick clears dE ${DE_BAR} from both shirt and skin `
-      + `(${pairs} skin x shirt pairs; closest ${worst.m.toFixed(1)}: ${hex(worst.c)} on skin ${hex(worst.skin)} / shirt ${hex(worst.shirt)})`);
+    console.log(`PASS — (H) every hat colour a head is handed clears dE ${DE_BAR} from both its shirt and its skin (${what}; `
+      + `closest ${worst.m.toFixed(1)}: ${hex(worst.c)} on skin ${hex(worst.skin)} / shirt ${hex(worst.shirt)})`);
   }
 }
 process.exit(exit);

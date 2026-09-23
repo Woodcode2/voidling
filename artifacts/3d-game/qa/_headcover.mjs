@@ -35,7 +35,12 @@
 // on any eye that is entirely inside a shell or the skull, and on any hair
 // style that leaves the up-facing scalp bare.
 import { readFileSync } from 'node:fs';
-import * as THREE from 'three';
+// An aborted run (a call site that no longer parses, a missing module) ends in
+// one FAIL line, not a stack trace and silence: this is a push-gate step.
+const abort = (e) => { console.log(`FAIL — _headcover aborted before a verdict: ${e && e.message ? e.message : e}`); process.exit(1); };
+process.on('uncaughtException', abort);
+process.on('unhandledRejection', abort);
+const THREE = await import('three');
 const SRC = readFileSync('src/proto3d/life.ts', 'utf8');
 const need = (m, label) => {
   if (!m) throw new Error(`_headcover: could not find ${label} in life.ts — the call site moved, `

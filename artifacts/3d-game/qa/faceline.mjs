@@ -18,9 +18,17 @@
 //
 // ── THE THREE ANGLES, AND WHAT IS APPROXIMATE ABOUT THEM ────────────────────
 // The render loop owns the camera, so the camera cannot be moved from a probe
-// (personsheet.mjs's TRAP). 46 is the spawn camera itself. 55 and 65 are made
-// by tipping each SUBJECT back about its feet, top away from the camera, by
-// the difference — the head then meets the camera's rays at the steeper angle.
+// (personsheet.mjs's TRAP). The camera stays where the game puts it (about 46
+// degrees at spawn), and each SUBJECT is tipped FORWARD about its feet, top
+// toward the camera, until the camera sits at the asked elevation in the
+// head's own frame — every row, 46 included, because the camera's elevation
+// seen from a head 2.9 up is not the one seen from the ground. Forward, not
+// back: leaning a head back turns its face up toward the camera, which LOWERS
+// the angle the camera looks down at it. The first draft of this file tipped
+// back, and these same lines run in node against three.js (a head 2.9 up, a
+// camera 60 away at 46 degrees) walked 46/55/65 to 37.8/10.0/-20.1 degrees —
+// the probe would have failed every head on its own tilt; tipped forward they
+// land on 46.0/55.0/65.0.
 // The angle every verdict below reports is MEASURED, not assumed: the camera's
 // position taken into each head's own frame, elevation and azimuth, so a tip
 // that misses shows up as a number. What the tip cannot do is move the sun:
@@ -28,7 +36,7 @@
 // direction than it would under a steeper camera. Read those rows for where
 // the eyes are, not for how the face is lit.
 //
-// ── THE VERDICT: SAME MEASURE AS faceray, ON THE REAL MESH ──────────────────
+// ── THE VERDICT: faceray's QUESTION, ON THE REAL MESH, SAMPLED ITS OWN WAY ──
 // Sample points on each eye's surface (the eye read out of life.ts, not
 // copied into this file), facing the camera. A point is DRAWN if a ray from the
 // camera to it lands on it on a bald reference head in the same pose (skull,
@@ -40,12 +48,32 @@
 // Bar: 50% at every angle for every hat that qa/faceray.mjs does not exempt by
 // name — the exemptions are read out of faceray.mjs, so the two probes cannot
 // disagree about which hats are a convention.
+// NOT THE SAME NUMBER AS faceray's. faceray lays a grid of parallel rays over
+// the eye's screen footprint; this samples points on the eye's analytic
+// surface, weighted by sin(theta) x facing, and it reads LOWER at 65 degrees.
+// These same sampling lines, run in node against three.js on the heads
+// faceray builds (head only, no body; camera 60 away), 2026-09-23: lowest
+// outside the conventions beanie 98/84/56 on every hair (faceray: 100/93/69),
+// hood 94/83/60 (99/91/73), cap and postal 100/100/71 (100/100/85), bare short
+// hair 100/100/90 (100/100/98). So a head can pass faceray by 19 points and
+// this by 6; read the beanie row first if this ever fails.
 //
 // Clocks: every wait is on __matchState().t (the game's clock); the software
 // renderer runs it ~14x slower than the wall (GOVERNOR rule 4).
-import { chromium } from 'playwright';
 import { mkdirSync, readFileSync } from 'node:fs';
-import { enterMatch } from './_enter.mjs';
+// AN ABORTED RUN IS A FAIL, NOT SILENCE: a timeout, a dead preview server, a
+// call site that no longer parses — each ends in one FAIL line and exit 1, with
+// the browser closed, rather than a stack trace the gate has to interpret.
+let b = null;
+const abort = async (e) => {
+  console.log(`FAIL — faceline aborted before a verdict: ${e && e.message ? e.message.split('\n')[0] : e}`);
+  try { await Promise.race([b?.close(), new Promise((r) => setTimeout(r, 5000))]); } catch {}
+  process.exit(1);
+};
+process.on('uncaughtException', abort);
+process.on('unhandledRejection', abort);
+const { chromium } = await import('playwright');
+const { enterMatch } = await import('./_enter.mjs');
 
 const pos = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const PORT = pos[0] || '4177';
@@ -71,7 +99,7 @@ if (Object.values(EYE).some(Number.isNaN)) throw new Error(`faceline: the eye di
 const CONV = Object.keys(Object.fromEntries([...need(readFileSync('qa/faceray.mjs', 'utf8')
   .match(/const CONVENTION = \{([\s\S]*?)\n\};/), 'faceray.mjs CONVENTION')[1].matchAll(/^\s*(\w+):/gm)].map((m) => [m[1], 1])));
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 3 });
 p.setDefaultTimeout(400000);
@@ -130,11 +158,12 @@ for (const pitch of PITCHES) {
         const yaw = Math.atan2(C.x - at.x, C.z - at.z);
         g.rotation.set(0, yaw, 0, 'YXZ');
         scene.add(g); g.updateMatrixWorld(true);
-        // tip the subject back by whatever this head still needs to meet the
-        // camera at `pitch`; two passes, because tipping moves the head too
+        // tip the subject FORWARD (+x, top toward the camera) by whatever this
+        // head still needs to meet the camera at `pitch`; two passes, because
+        // tipping moves the head too (see THE THREE ANGLES for the sign)
         for (let k = 0; k < 2; k++) {
           const a = angleOf(g.getObjectByName('head'));
-          g.rotation.x -= THREE.MathUtils.degToRad(pitch - a.el);
+          g.rotation.x += THREE.MathUtils.degToRad(pitch - a.el);
           g.updateMatrixWorld(true);
         }
         people.push({ hair, g });

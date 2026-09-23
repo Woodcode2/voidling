@@ -784,47 +784,76 @@ interface PersonOpts {
 // it was the hat itself (bald, 0 to 8%). The cap alone is the default hat of
 // 21 dress codes.
 //
-// The fix is the hair's (see hairParts): tip the hat back about the head
-// centre, so its front rim rises above the brows and its back drops to the
-// nape, which is where a hat pushed back on a head sits anyway. It is ONE
-// rigid rotation of a hat's parts together — each centre turned about the
-// origin, each part given the same ninth argument — so no hat changes shape,
-// size, colour or triangle count, only its seat. Worst eye across all nine
-// hairs, 46/55/65 degrees, qa/faceray.mjs, from 0/0/0 on each:
+// The fix is the hair's (see hairParts): tip the hat back so its front rim
+// rises above the brows and its back drops to the nape, which is where a hat
+// pushed back on a head sits anyway. Not every hat got the same treatment,
+// and the table says which is which. Worst eye across all nine hairs,
+// 46/55/65 degrees, qa/faceray.mjs, from 0/0/0 on each:
 //
-//   cap, postal  100/100/85   the governor's numbers: crown -0.5 at y 0.16,
-//                             z -0.04, peak from the skeptic's visor sweep
+// RIGID TIPS — every part's centre turned about the head origin and every
+// part given the same ninth argument, so the tip changes no shape, size or
+// triangle count, only the seat:
 //   beanie       100/ 93/69   -0.55, the hair's own tilt (-0.5 held 43% at 65)
 //   bandana      100/100/98   -0.55; the knot swings down to the nape
-//   hood          99/ 91/73   dome only, -0.55 and 0.04 further back (-0.55 in
-//                             place held 26% at 65); the collar stays on the neck
-//   flower       100/100/92   the garland on the hairline, -0.55 and 0.04 back
-//                             (in place: 48% at 65); the flowers ride on it
 //   visor        100/100/97   -0.6 (-0.55 read 59% at 65, too thin a margin)
 //   bucket       100/100/98   -0.5 (-0.4 read 23% at 65)
 //   tricorn      100/100/98   -0.4 (-0.3 read 65% at 65)
-//   helmet        99/ 94/85   shell and rim -0.55 and 0.08 back, the cap's peak;
-//                             tipped in place even -0.6 read 0% at 65, with the
-//                             rim band, tipped up in front of the brows, doing
-//                             most of the covering
-//   shako         91/ 88/81   the peak ONLY, tipped to -0.9 and brought in to
-//                             z 0.42; tipping the whole hat -0.55 cleared 98%
-//                             but lays the drum and plume back 31 degrees, and
-//                             a marching band's shako leaning back reads as
+//
+// TIPPED IN PART, OR ABOUT THEIR OWN CENTRE:
+//   hood          99/ 91/73   the dome alone turned -0.55 about the origin and
+//                             then moved 0.04 further back (-0.55 without the
+//                             move held 26% at 65); the collar did not move
+//   flower       100/100/92   the garland tipped -0.55 about its OWN centre and
+//                             moved 0.04 back (untipped position: 48% at 65);
+//                             the three flowers turned about the garland's centre
+//                             with it
+//
+// RE-AUTHORED — new sizes and seats, not a rotation of the old hat:
+//   cap, postal  100/100/85   crown -0.5 at y 0.16, z -0.04 (was y 0.14,
+//                             z -0.02, level), the governor's numbers; peak
+//                             0.54 x 0.08 x 0.30 at y 0.36, z 0.44, -0.7 (was
+//                             0.42 deep at y 0.16, z 0.56, level), the skeptic's
+//                             visor sweep
+//   helmet        99/ 94/85   shell and rim each tipped -0.55 about their own
+//                             centre, RAISED 0.04 and 0.03 (shell y 0.02 -> 0.06,
+//                             rim -0.06 -> -0.03) and moved 0.08 back (z 0 ->
+//                             -0.08); without the raise the same tip read
+//                             86/79/70. Tipped with no move at all, even -0.6
+//                             read 0% at 65: the rim band, tipped up in front of
+//                             the brows, did most of the covering. Its own peak,
+//                             0.60 x 0.08 x 0.36 at y 0.40, z 0.42, -0.7 (was
+//                             0.44 deep at y 0.10, z 0.60, level). The white face
+//                             bar is GONE: it stayed at y -0.20, z 0.50 while the
+//                             rim above it rose to about y 0.21, so it hung alone
+//                             across the lip and the chin: with it the mouth
+//                             read 88/90/96 under short hair, without it
+//                             100/100/100 — and 12 triangles fewer
+//   shako         91/ 88/81   the peak ONLY: 0.56 x 0.08 x 0.30 at y 0.26,
+//                             z 0.42, tipped -0.9 (was 0.40 deep at y 0.16,
+//                             z 0.56, level); the drum, band and plume did not
+//                             move. Tipping the whole hat -0.55 cleared 98% but
+//                             lays the drum and plume back 31 degrees, and a
+//                             marching band's shako leaning back reads as
 //                             falling off
+//   snorkel      100/100/98   the mask pushed UP onto the forehead, the way one
+//                             is worn out of the water: centre y 0.06, z 0.44,
+//                             level -> y 0.40, z 0.33, tipped -0.75, so its pane
+//                             faces up toward the camera; the tube follows it up
+//                             0.10 and back 0.08. Over the eyes, the mask read
+//                             0/0/0 on every hair and hid the mouth down to
+//                             96/62/22; on the forehead the mouth reads 100
 //
 // (Single-hat alternatives are from the same probe run over a copy of this
-// file, FACERAY_SRC, across five of the nine hairs.)
+// file, FACERAY_SRC: the helmet's and the snorkel's across all nine hairs,
+// the rest across five of the nine.)
 //
-// FOUR HATS KEEP THEIR EYES COVERED, BY DECISION, and qa/faceray.mjs exempts
-// them by name: the sun hat, the straw hat and the captain's cap, because a
-// brim or a low dark peak shading the eyes is how those hats are drawn and
-// the brim is what reads from the top of the camera's travel (the governor's
-// convention); and the snorkel, because a dive mask over the eyes IS the eyes
-// — the same call makePerson already makes for sunglasses, which draw no eyes
-// at all. The tricorn and the bucket are brims too, and are NOT exempt: the
-// tricorn is on 62% of the costumed pirates, and the bucket on the kids, and
-// a small tilt clears both.
+// THREE HATS KEEP THEIR EYES COVERED, BY THE GOVERNOR'S CONVENTION, and
+// qa/faceray.mjs exempts them by name: the sun hat, the straw hat and the
+// captain's cap, because a brim or a low dark peak shading the eyes is how
+// those hats are drawn and the brim is what reads from the top of the
+// camera's travel. The tricorn and the bucket are brims too, and are NOT
+// exempt: the tricorn is on 62% of the costumed pirates, and the bucket on
+// the kids, and a small tilt clears both.
 function hatParts(out: Geo[], kind: Hat, col: number): void {
   if (kind === 'tricorn') {
     out.push(pc(B.tri, INK, 0, 0.221, -0.093, 2.0, 0.09, 2.0, -0.4));   // TRIANGLE brim, not a cone
@@ -844,8 +873,8 @@ function hatParts(out: Geo[], kind: Hat, col: number): void {
     out.push(pc(B.cyl, col, 0, 0.132, -0.090, 1.18, 0.13, 1.18, -0.6));
     out.push(pc(B.box, col, 0, 0.490, 0.416, 0.62, 0.07, 0.50, -0.6));
   } else if (kind === 'snorkel') {
-    out.push(pc(B.box, 0x63d6f0, 0, 0.06, 0.44, 0.62, 0.26, 0.20));
-    out.push(pc(B.tube, 0xffd23f, 0.44, 0.30, 0.14, 0.09, 0.70, 0.09, 0, 0, -0.2));
+    out.push(pc(B.box, 0x63d6f0, 0, 0.40, 0.33, 0.62, 0.26, 0.20, -0.75));   // mask, up on the forehead
+    out.push(pc(B.tube, 0xffd23f, 0.44, 0.40, 0.06, 0.09, 0.70, 0.09, 0, 0, -0.2));
   } else if (kind === 'toque') {
     out.push(pc(B.cyl, WHITE, 0, 0.36, 0, 0.90, 0.54, 0.90));
     out.push(pc(B.sphS, WHITE, 0, 0.64, 0, 0.72));
@@ -880,7 +909,6 @@ function hatParts(out: Geo[], kind: Hat, col: number): void {
     out.push(pc(B.hemi, col, 0, 0.06, -0.08, 1.24, 1.06, 1.24, -0.55));
     out.push(pc(B.cyl, col, 0, -0.03, -0.08, 1.26, 0.20, 1.26, -0.55));
     out.push(pc(B.box, col, 0, 0.40, 0.42, 0.60, 0.08, 0.36, -0.7));   // peak
-    out.push(pc(B.box, WHITE, 0, -0.20, 0.50, 0.52, 0.06, 0.30));      // face bar
   } else if (kind === 'shako') {   // marching band: tall drum, peak, and a PLUME
     out.push(pc(B.cyl, col, 0, 0.52, 0, 0.96, 0.86, 0.96));
     out.push(pc(B.cyl, GOLD, 0, 0.20, 0, 1.00, 0.10, 1.00));
@@ -1301,23 +1329,47 @@ const CHILD: Build = { hipY: 0.86, shY: 1.62, headY: 2.20, girth: 1.17, armL: 0.
 // it, which reads as a bald dome. And a hat the colour of the shirt melts the
 // head into the body from above, which is the other half of the rule.
 //
-// So the pick is made only among the colours more than dE 15 from BOTH the
-// shirt and the skin. qa/faceray.mjs bar (H) runs the head block over every
-// skin in SKIN against every shirt in OUTFIT (528 pairs) and makes pick()
-// return each candidate in turn: before, 132 outcomes were within 15 of the
-// skin and 128 within 15 of the shirt; after, none, the closest being 17.2.
-// Against the skin the filter only ever removes the cream, and only on the
-// two palest skins (white is 25.4 from the palest). Over that whole domain at
-// least one colour always survives — if the fallback below had run for any
-// pair, its colour would be within 15 of something and bar (H) would fail —
-// so it exists for a shirt passed in from outside the dress codes: the
-// least-bad colour, not a crash.
+// THE RULE, ON EVERY PATH: whatever colour a hat is handed must be more than
+// dE 15 from BOTH the shirt and the skin. There are two paths in:
+//   1. no colour of its own (the dress-code hat): hatColFor picks among the
+//      HAT_COLS that clear both. Against the skin that filter only ever drops
+//      the cream, and only on the two palest skins (12.8 and 7.1; every other
+//      HAT_COLS entry is at least 25.4 from every skin).
+//   2. a colour the ROLE authors (castFor's `hatCol:` — a uniform, a campaign
+//      colour, a role's own palette). The first version of this rule covered
+//      only path 1, and path 2 is where most of the collisions were: the
+//      protester's cream cap over a cream shirt (dE 0), the cream sun hats of
+//      the rich, the gossips and the tourists on the palest skin (7.1), the
+//      pilot's cream cap (13.3), and every uniform whose cap is its shirt —
+//      the campaigners, boosters, ballplayers, band, bellhop, lifeguard, guide,
+//      ticket seller and driver.
+// Both paths end in hatClear. A colour that clears is kept exactly. One that
+// does not becomes its NEAREST SHADE that clears: mixed toward black and toward
+// white in twentieths, the first step at which either clears, and of the two
+// the one further from both. So an authored colour keeps its hue — a crimson
+// campaign cap on a crimson shirt comes out a lighter crimson (#e06963), the
+// bellhop's burgundy a lighter burgundy — where swapping in a HAT_COLS entry
+// could have put a crimson campaigner in the blue one. It always ends: at the
+// twentieth step the two shades are black and white, which are 42.9 and 25.4
+// from the nearest skin and 100 apart, so no shirt is within 15 of both.
+//
+// qa/faceray.mjs bar (H) runs makePerson's head statements on every skin x
+// every shirt a dress code or a role can hand makePerson x (the dress code's
+// every pick + every colour castFor authors, read by running castFor for every
+// Role) and reads the colour handed to hatParts. On 4174709, the path-1-only
+// version: 1771 of 31478 outcomes within dE 15, 297 of them on a pair a role
+// really builds. Now: none; the closest is 15.0, because the nearest shade
+// that clears is chosen.
 //
 // CIE76 on the sRGB hex, the same arithmetic as qa/formsep.mjs — the gamut
 // here is a dozen swatches, and that is the formula every other colour rule
-// in this repo is written against. At most ten dE76 calls a person, at build.
-// Still ONE pick() draw, the same as the palette pick it replaces, and the
-// crowd draws from Math.random, not the seeded stream.
+// in this repo is written against. hatClear makes two dE76 calls for a hat
+// colour that clears and at most 82 for one it re-shades, and hatColFor ten
+// more on the dress-code path, once per person at build. hatColFor makes
+// exactly ONE pick() draw on every call (the first version made none when no
+// colour survived), the same one draw as the palette pick it replaces;
+// hatClear makes none. And the crowd draws from Math.random, not the seeded
+// stream.
 const HAT_COLS = [0xf6e3b8, 0xff6f91, 0xffffff, 0xe8604d, 0x4da3ff];
 const _lin = (v: number) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
 const _lf = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
@@ -1334,10 +1386,28 @@ function dE76(a: number, b: number): number {
 }
 function hatColFor(shirt: number, skin: number): number {
   const ok = HAT_COLS.filter((c) => dE76(c, shirt) > 15 && dE76(c, skin) > 15);
-  if (ok.length) return pick(ok);
-  let best = HAT_COLS[0], bestD = -1;
-  for (const c of HAT_COLS) { const d = Math.min(dE76(c, shirt), dE76(c, skin)); if (d > bestD) { bestD = d; best = c; } }
-  return best;
+  return pick(ok.length ? ok : HAT_COLS);   // ONE draw either way; hatClear settles the rest
+}
+/** `c` mixed toward `to` (black or white) by t, channel by channel in sRGB. */
+function shadeHex(c: number, to: number, t: number): number {
+  let out = 0;
+  for (const sh of [16, 8, 0]) {
+    const a = (c >> sh) & 255, b = (to >> sh) & 255;
+    out |= Math.round(a + (b - a) * t) << sh;
+  }
+  return out;
+}
+/** The hat colour itself when it clears dE 15 from both the shirt and the
+ *  skin; otherwise the nearest shade of it that does (see above). */
+function hatClear(c: number, shirt: number, skin: number): number {
+  const margin = (h: number) => Math.min(dE76(h, shirt), dE76(h, skin));
+  if (margin(c) > 15) return c;
+  for (let i = 1; i <= 20; i++) {
+    const dark = shadeHex(c, 0x000000, i / 20), light = shadeHex(c, 0xffffff, i / 20);
+    const md = margin(dark), ml = margin(light);
+    if (md > 15 || ml > 15) return md >= ml ? dark : light;
+  }
+  return c;   // not reached: at i = 20 the shades are black and white (see above)
 }
 const HAIRS: Hair[] = ['short', 'short', 'buzz', 'bob', 'bob', 'long', 'long', 'bun', 'pony', 'pony', 'curly', 'curly', 'braids', 'bald'];
 const PATTERNS: Pattern[] = ['plain', 'plain', 'plain', 'stripe', 'floral', 'twotone', 'sash'];
@@ -1520,18 +1590,27 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
   // play camera spends all its time looking at, so it gets the vertex budget.
   const hp: Geo[] = [];
   hp.push(pc(B.sph, skin, 0, 0, 0.01, 1.06, 1.12, 0.99));
-  // THE HAT IS DECIDED BEFORE THE HAIR, because curly hair under a hat is
-  // drawn as the shared short crown. The five curl lumps sit on top of the
-  // head (y 0.28-0.39, radius 0.19) exactly where every crowned hat sits, so
-  // under one they either poke through it as five bumps or are buried inside
-  // it as 840 triangles nobody sees (5 x the 168 of a 12x8 B.dot, counted off
-  // the geometry). Same Math.random draws in the same order as before — hk was
-  // the only draw here and hairParts takes none — and it is not the seeded
-  // stream either way.
+  // THE HAT IS DECIDED BEFORE THE HAIR, because curly hair under ANY hat is
+  // drawn as the shared short crown (the spec's words, Job 4: "draw curly hair
+  // as short under any hat"). The five curl lumps sit on top of the head
+  // (y 0.28-0.39, radius 0.19). Under a CROWNED hat — cap, postal, beanie,
+  // bandana, hood, helmet, bucket, tricorn, captain, sun, straw — that is
+  // exactly where the crown sits, so they either poke through it as bumps or
+  // are buried inside it: 840 triangles (5 x the 168 of a 12x8 B.dot, counted
+  // off the geometry) for nothing or for worse. Under the toque and the bellhop
+  // (closed drums of radius 0.45 and 0.46, against lumps whose outer edge is
+  // 0.51-0.57 from the head's axis) they poke out through the drum. Under the
+  // OPEN hats — the visor, the flower garland and the snorkel mask — nothing
+  // covers them, so there the swap is a visible change, not a saving: a
+  // curly-haired lifeguard, spa guest in a robe or snorkeller reads as
+  // short-haired. That is what the spec asks for, and it is recorded here so
+  // nobody reads the saving as the reason. Same Math.random draws in the same
+  // order as before — hk was the only draw here and hairParts takes none — and
+  // it is not the seeded stream either way.
   const hk: Hat | null = (o && o.hat !== undefined) ? o.hat
     : (fit.hat && Math.random() < (fit.hatOdds ?? 0.4) ? fit.hat : null);
   hairParts(hp, hk && hair === 'curly' ? 'short' : hair, hairCol);
-  if (hk) hatParts(hp, hk, o?.hatCol ?? hatColFor(shirt, skin));
+  if (hk) hatParts(hp, hk, hatClear(o?.hatCol ?? hatColFor(shirt, skin), shirt, skin));
   // ── THE FACE ── the comment at the head of this block has promised "skull,
   // hair, hat, face" since the crowd was written, and there has never been a
   // single eye in this game's entire population. Every townsperson is a bare
