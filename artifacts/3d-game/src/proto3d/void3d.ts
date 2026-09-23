@@ -14,6 +14,15 @@ export interface VoidState {
   x: number; z: number;
   vx: number; vz: number;   // world velocity (units/s)
   lookX: number; lookY: number; // aim -1..1 for pupil tracking
+  /** The speed FULL STICK settles to at this size, in world units/second —
+   *  steerCap() of the camera's settled distance. The motion read (roll-bob,
+   *  travel squash, directional stretch), the lean and the direction-flip
+   *  anticipation are all fractions of it, because world speed rides the
+   *  camera: full stick is 14.37 u/s at spawn and 72.94 at r 8, and any one
+   *  constant divisor is right at one size only (qa/motionlaw.mjs). Optional:
+   *  a rig that does not pass it — every preview, sheet and store shot, all
+   *  of which hold vx = vz = 0 — keeps the old reference of 40. */
+  vRef?: number;
 }
 
 export type Mood = 'cruise' | 'hungry' | 'frenzy' | 'scared' | 'hurt' | 'smug' | 'sleepy' | 'victory';
@@ -59,8 +68,16 @@ export interface Void3D {
   /** What the face is DOING this frame, for probes that must measure the
    *  expression rather than describe it. `smile` is the open kawaii grin's
    *  own visibility — the one feature a child reads first — and `maw` is the
-   *  gape's current scale. See qa/faceparity.mjs. */
-  faceState(): { mood: Mood; maw: number; smile: boolean; biting: boolean; hold: number };
+   *  gape's current scale. See qa/faceparity.mjs.
+   *  `move` is moveAmt, the 0..1 motion read the bob and the stretch hang
+   *  off (qa/heromotion.mjs); `lid` and `shut` are the eye's two knobs as the
+   *  mood engine has them this frame (qa/moodrule.mjs); `uniformK` is the
+   *  pure size term the evolution pop and the bite's wind-up both write
+   *  (qa/mouthwind.mjs). All four are READ from the frame that used them,
+   *  never recomputed, so a probe cannot be told a number the render did not
+   *  draw. */
+  faceState(): { mood: Mood; maw: number; smile: boolean; biting: boolean; hold: number;
+    move: number; lid: number; shut: number; uniformK: number };
   /** QA/capture: hold the jaw shut so the face shows its MOOD and nothing else.
    *  The gape is driven by eating, not by mood, so a hero parked anywhere with
    *  food in reach is mid-bite in almost every frame and cannot be
@@ -1407,7 +1424,18 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     hungry:  { pupil: 1.28, smile: 1.1, maw: 0.12, brow: 0.85, browAng: 0.12, browY: 0.45, blush: 0.6 },
     frenzy:  { pupil: 1.35, smile: 1.42, wide: 1.05, blush: 0.85, brow: 0.85, browAng: 0.18, browY: 0.47, maw: 0.12, bounce: 1 },
     scared:  { wide: 1.16, pupil: 0.55, smile: 0.85, mouthY: -0.65, brow: 1, browAng: -0.5, browY: 0.43, sweat: 1, blush: 0.3 },
-    hurt:    { lid: 0.3, mouthY: -0.8, smile: 0.8, brow: 1, browAng: -0.6, browY: 0.38, sweat: 1, blush: 0.35 },
+    // ── HURT SCREWS ITS EYES SHUT ─────────────────────────────────────────
+    // This was lid 0.3 with the eye still OPEN: the white squashed to under a
+    // third of its height with the pupil still drawn in it. That is exactly the
+    // face the sleepy note below retracts — "half-lidded and staring", which
+    // reads as dazed — and it was the face a child got every time something
+    // bit her. A cartoon in pain squeezes its eyes closed. `shut: 1` hides the
+    // white and the pupil and leaves the dark backing disc, and lid 0.2 flattens
+    // that disc to a line a little heavier than sleep's 0.13, so the two closed
+    // faces are told apart by the eye as well as by the frown, the angry brows,
+    // the sweat and the shake that hurt already carries. qa/moodrule.mjs: no
+    // mood may draw an open eye under lid 0.6, or a shut one over 0.25.
+    hurt:    { lid: 0.2, shut: 1, mouthY: -0.8, smile: 0.8, brow: 1, browAng: -0.6, browY: 0.38, sweat: 1, blush: 0.35 },
     // ── SMUG IS THE FACE FOR EATING A SIBLING, SO IT HAD BETTER BE A WIN ──
     // It used to be lid 0.55 — eyelids just over half shut — with a small
     // smirk. On a drawing board that is "pleased with myself". At 47px on a
@@ -1725,6 +1753,14 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // anticipation, no settle). The envelope in the render (see `mo`) uses this
   // to part the jaw for ~45ms, spring open, overshoot ~10% and settle.
   let mouthAge = 1;
+  // the grade of the bite that last started from a CLOSED mouth — chomp()'s
+  // own `g`, written on the same branch that restarts mouthAge, so the body's
+  // wind-up (see uniformK in update) is sized by the meal that earned it and
+  // never replays mid-chew
+  let windG = 0;
+  // what update() last multiplied the body by, kept only so faceState() can
+  // report the frame's own number instead of a probe re-deriving it
+  let uniformKNow = 1;
   let stretchT = 0;                // rocket stretch pulse
   let inhaleT = 0;                 // collapse inhale->burst envelope
   let evolveT = 0;                 // evolution celebration pop
@@ -1765,7 +1801,10 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     // see: `biting` only says the mouth is open, and the bug worth catching is
     // the mouth shutting EARLY — while the meal is still on its way down. A
     // boolean sampled at 1-2fps cannot tell those apart. qa/_eatmotion.mjs.
-    faceState() { return { mood, maw: mp.maw, smile: mouth.visible, biting: mouthT > 0, hold: mouthT }; },
+    faceState() {
+      return { mood, maw: mp.maw, smile: mouth.visible, biting: mouthT > 0, hold: mouthT,
+        move: moveAmt, lid: mp.lid, shut: mp.shut, uniformK: uniformKNow };
+    },
     pinMouth(shut) { mouthPinShut = shut; if (shut) { mouthT = 0; mouthMax = 0; mouthAge = 0; } },
     pinGape(v) {
       if (v <= 0) { mouthT = 0; mouthMax = 0; return; }
@@ -2016,8 +2055,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // floor: a small bite buys more time open, and nothing else.
       const cur = mouthT > 0 ? mouthMax * Math.min(1, mouthT * 8) : 0;
       // the wind-up only plays from a CLOSED mouth — a hoover spree must not
-      // re-anticipate mid-chew, that would read as stutter
-      if (cur < 0.05) mouthAge = 0;
+      // re-anticipate mid-chew, that would read as stutter. The body's wind-up
+      // takes its size from this same branch, so it obeys the same rule.
+      if (cur < 0.05) { mouthAge = 0; windG = g; }
       // ── AND THE JAW MUST NOT SHUT WITH A HOUSE HALFWAY DOWN IT ──────────
       // `want` is 220-480ms. The drain loop takes 1 / (2.9 - 1.3 * mass)
       // seconds to carry a prop in — 364ms for a snack, 625ms for a meal the
@@ -2079,10 +2119,37 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       }
 
       const speed = Math.hypot(s.vx, s.vz);
-      moveAmt += (Math.min(1, speed / 40) - moveAmt) * Math.min(1, dt * 6);
+      // ── HE WAS ONLY A THIRD ALIVE FOR THE FIRST MINUTE OF EVERY MATCH ────
+      // This read `speed / 40`. Forty is a speed, and this game has no single
+      // speed: steerCap() rides the camera distance, so full stick is 14.37 u/s
+      // at spawn and 72.94 at r 8. Against 40, a child holding the stick flat
+      // out at spawn size got a motion read of 0.359 — roll-bob, travel squash
+      // and the shader's directional stretch all at a third of "moving" — and
+      // 0.304 at the tail of the descent, where the first drag of every match
+      // is made. It only reached 1 from about r 4 up, i.e. the law was right
+      // for the late game and wrong for the minute a child judges the game on.
+      // (qa/motionlaw.mjs, evaluated out of the source on the build before.)
+      //
+      // vRef is what full stick settles to at THIS size, handed in by the frame
+      // loop from the camera's settled distance, so the three reads below are
+      // fractions of the player's own top speed and mean the same thing at
+      // every size:
+      //   · motion saturates at 85% of top speed — the headroom the steering
+      //     blend and the camera's ease need, so full stick reads as full;
+      //   · the flip anticipation arms above a quarter of top speed on both
+      //     sides of the reversal. 10 was a quarter of 40, which put it at 70%
+      //     of top speed at spawn and 14% at r 8 — one gesture, armed at shares
+      //     of the stick five times apart depending on how big he was;
+      //   · the lean (below) reaches its 0.11 cap AT full stick, where /520
+      //     gave 1.6 degrees at spawn and only hit the cap from about r 6.
+      // A rig that passes no vRef keeps 40, which is a quarter-for-quarter match
+      // on the flip; every such rig in this codebase holds vx = vz = 0, so none
+      // of them can see the difference in the other two.
+      const vRef = s.vRef ?? 40;
+      moveAmt += (Math.min(1, speed / (0.85 * vRef)) - moveAmt) * Math.min(1, dt * 6);
       // ANTICIPATION: a hard direction flip squashes for a beat before launch
       const pm = Math.hypot(pvx, pvz);
-      if (speed > 10 && pm > 10 && (s.vx * pvx + s.vz * pvz) / (speed * pm) < -0.25) flipT = 0.14;
+      if (speed > 0.25 * vRef && pm > 0.25 * vRef && (s.vx * pvx + s.vz * pvz) / (speed * pm) < -0.25) flipT = 0.14;
       pvx = s.vx; pvz = s.vz;
       if (flipT > 0) flipT -= dt;
 
@@ -2148,12 +2215,51 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
           : -0.07 * Math.exp(-(u0 - 0.085) * 10)
             + 0.44 * Math.exp(-(u0 - 0.085) * 4.0) * Math.sin((u0 - 0.085) * 9.6)) * fade;
       }
+      // ── THE BITE'S WIND-UP HAPPENED WHERE NOBODY COULD SEE IT ────────────
+      // The jaw's anticipation (the `openEnv` ramp in the mouth block below)
+      // is 45 ms of the gape parting to at most 0.119 of a full opening — and
+      // the gape is not drawn at all under MOUTH_HIDES_AT, 0.25. So for the
+      // whole wind-up the maw was hidden and the grin stayed up: the first
+      // frame anything changed was the frame the jaw sprang, 59.2 ms in on a
+      // full bite. The anticipation existed in the numbers and nowhere on the
+      // screen, on the one action the whole game is made of.
+      //
+      // So the BODY winds up instead: for the first 60 ms of a bite from a
+      // closed mouth he gathers in by up to 4% of his size on a full bite
+      // (0.48% on a snack, at chomp's own 0.12 grade floor). 4% is 2.5x his
+      // idle breath (1.6%), so it reads as an action rather than as the
+      // breathing he is already doing. It rides uniformK, the pure size term
+      // the evolution pop uses, so the hat and the face ride it rigidly and
+      // nothing is sheared. mouthAge only restarts from a closed mouth, so a
+      // hoover spree gathers once, not on every mouthful.
+      //
+      // ONE CLOCK, ADVANCED ONCE, BEFORE EITHER READER. The advance used to sit
+      // in the mouth block below, after this line, so the gather read LAST
+      // frame's age while the jaw read this frame's: the first frame after a
+      // bite never dipped, and at 30 Hz and at the 0.05 dt clamp the only
+      // dipped frame was the frame the jaw was first drawn on — the gather
+      // landed on the gape instead of before it. Advanced here, both read the
+      // same age. Stepped through this update() in node (qa/mouthwind.mjs), a
+      // full bite from a closed mouth now reads 0.9694, 0.9606, 0.98 and then
+      // 1 on the jaw's first drawn frame at 60 Hz; 0.9606 then 1 at 30 Hz;
+      // 0.98 then 1 at 20 Hz.
+      //
+      // …and only while a bite is live. mouthAge stands still whenever mouthT
+      // is 0, so a QA pin that zeroed mouthT inside these 60 ms (__pinGape(0),
+      // which qa/moodsheet, gapesheet and moodrule call on a live match) froze
+      // the gather until the next bite from a closed mouth: pinned two 60 Hz
+      // frames into a full bite, uniformK read 0.9606 at 1, 2, 3, 4 and 5 s.
+      if (mouthT > 0) { mouthT -= dt; mouthAge += dt; }
+      if (mouthT > 0 && mouthAge < 0.06) uniformK -= 0.04 * windG * Math.sin(Math.PI * Math.min(1, mouthAge / 0.06));
+      uniformKNow = uniformK;
       const lat = uniformK - breathe;
       squash *= uniformK;
       bob.scale.set(dispR * lat, dispR * squash, dispR * lat);
       hatSquash = squash;   // the hat rides the head's height, rigidly
-      bob.rotation.z = THREE.MathUtils.clamp(-s.vx / 520, -0.11, 0.11);
-      bob.rotation.x = THREE.MathUtils.clamp(s.vz / 520, -0.11, 0.11);
+      // the lean is a share of top speed too (see vRef above): 0.11 rad at full
+      // stick along an axis, at every size, where /520 was a fixed speed
+      bob.rotation.z = THREE.MathUtils.clamp(-s.vx / vRef * 0.11, -0.11, 0.11);
+      bob.rotation.x = THREE.MathUtils.clamp(s.vz / vRef * 0.11, -0.11, 0.11);
       // feed the travel direction to the vertex shader in the body's own space
       if (speed > 0.5) stretchDir.set(s.vx / speed, 0, s.vz / speed);
       bodyMat.uniforms.uStretchDir.value.copy(stretchDir);
@@ -2287,7 +2393,8 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // the anticipation every polished eat animation has), a spring open
       // with ~10% overshoot at ~220ms, settled by ~400ms; the existing
       // mouthT*8 term stays as the CLOSING ease so the jaw never snaps shut.
-      if (mouthT > 0) { mouthT -= dt; mouthAge += dt; }
+      // (mouthT and mouthAge were advanced for this frame above the body's
+      // wind-up, so the jaw and the gather read one age.)
       let openEnv = 1;
       if (mouthAge < 0.045) openEnv = (mouthAge / 0.045) * 0.12;
       else {

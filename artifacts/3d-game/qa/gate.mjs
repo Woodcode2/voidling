@@ -152,6 +152,41 @@ const SUITE = [
     cmd: ['node', 'qa/evolvepop.mjs'], verdict: pf,
     why: 'evolving reads as getting BIGGER — the pop dominates the wind-up and lands with the sound' },
 
+  // THE VOID IS ALIVE AT SPAWN (studio round 4, Job 8). Three node probes, same
+  // reasoning as evolvepop: motionlaw and moodrule are pure functions of
+  // numbers the source already writes down, and mouthwind also steps the real
+  // rig (void3d.ts bundled by vite's own esbuild, no renderer) frame by frame,
+  // so no slow frame can sample around any of them. Before the job: full stick
+  // read as 0.359 of moving at spawn size and 0.304 at the tail of the descent,
+  // with a 1.6° lean and the flip armed at 0.70 of top speed; hurt squinted
+  // with its eyes open at lid 0.30; the bite's wind-up drew nothing (the jaw
+  // peaks at 0.119 against a draw threshold of 0.25). On the Job 8 commit the
+  // body's gather ran a frame behind the jaw — at 30 Hz and at the 0.05 clamp
+  // its only dipped frame was the jaw's first — and __pinGape(0) inside it
+  // froze him 3.9% small; mouthwind's stepped half fails that commit.
+  { id: 'motionlaw', tier: 'feel', profiles: ['push', 'live', 'art'], timeout: 30,
+    cmd: ['node', 'qa/motionlaw.mjs'], verdict: pf,
+    why: 'full stick reads as moving at every size, the descent included, and leans and arms the flip on a share of his own top speed' },
+  { id: 'moodrule', tier: 'feel', profiles: ['push', 'live', 'art'], timeout: 30,
+    cmd: ['node', 'qa/moodrule.mjs'], verdict: pf,
+    why: 'no mood squints with its eyes open: an open eye stays at lid 0.6 or above, a shut one is a line' },
+  { id: 'mouthwind', tier: 'feel', profiles: ['push', 'live', 'art'], timeout: 60,
+    cmd: ['node', 'qa/mouthwind.mjs'], verdict: pf,
+    why: 'a bite winds up where a child can see it — the body gathers past his own breath BEFORE the jaw, and is whole on the jaw\'s first frame at 60, 30 and 20 Hz' },
+  // …and their LIVE halves, which read the same numbers off faceState() in a
+  // real match. None has been run yet (they were written while the machine was
+  // running the browser gate), so they sit in live + quality, not push, until a
+  // green reading promotes them.
+  { id: 'heromotion', tier: 'feel', profiles: ['live', 'quality'], timeout: 1200,
+    cmd: ['node', 'qa/heromotion.mjs', PORT, 'maple'], verdict: pf,
+    why: 'full stick held in a real match reads as moving on the rig (faceState().move >= 0.85) at spawn size and at r 8' },
+  { id: 'moodrule:maple', tier: 'feel', profiles: ['live', 'quality'], timeout: 1200,
+    cmd: ['node', 'qa/moodrule.mjs', PORT, 'maple'], verdict: pf,
+    why: 'every pinned mood lands on the rig at its table lid and shut, and none squints with its eyes open' },
+  { id: 'mouthwind:maple', tier: 'feel', profiles: ['live', 'quality'], timeout: 1200,
+    cmd: ['node', 'qa/mouthwind.mjs', PORT, 'maple'], verdict: pf,
+    why: 'a real bite in a real match gathers the body on a frame before the jaw is first drawn' },
+
   // THE OPENING BELONGS TO THE PLAYER. Eighteen bars measured against HOLE.IO's own
   // recording: the clock must not move before the first touch, the descent runs
   // ~1.2 s on an ease-in-out with the controls live throughout, the first point
@@ -694,7 +729,7 @@ const SUITE = [
 
   { id: 'juice', tier: 'feel', profiles: ['live', 'art'], timeout: 420,
     cmd: ['node', 'qa/juice.mjs', PORT], verdict: pf,
-    why: 'a bite is answered on at least three channels, not one' },
+    why: 'a bite is answered on at least three channels, not one — and the face answers an evolution within three frames' },
 
   { id: 'aftermatch', tier: 'feel', profiles: ['live'], timeout: 420,
     cmd: ['node', 'qa/aftermatch.mjs', PORT], verdict: pf,
