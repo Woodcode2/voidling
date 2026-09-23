@@ -70,16 +70,18 @@ compacted conversation loses nothing.
 | Q1n | note | rivalnotice's "0.0/min" in gate.mjs predates two threshold moves (1.2x -> 0.85x -> 0.75x, each set from a measured size distribution). Re-measure before treating Q1 as open. The code raises the real PLAY question itself: the rivals that "notice" you sit at 0.75-0.85x your size, so they cannot actually eat you — "making it literally true means raising the family's cap, which is a measured balance number, and that is his call". | rivals.ts:1430-1475 | |
 | S4 | P1 | **Analytics has been silently dropped since the COPPA fix.** The deployed `ingest-events` (v1, unversioned until now) REQUIRES `user_id`; the client correctly stopped sending one. Every batch -> 400 `missing fields`. | read of the deployed function via the Supabase connector, 2026-09-23 | fix written: `supabase/functions/ingest-events/index.ts`. Deploy is production infra -> OWNER QUEUE |
 | S2 | LEAD | **All 8 App Store screenshots show a menu the game no longer has** | readiness audit (store) | reshoot at the required sizes |
-| S3 | LEAD | **`?iapmock=1` hands out every paid item free on the public web URL** | readiness audit (money) | |
-| D1 | LEAD | **RELEASE-GATE.md is stale** — 5 push steps documented vs 55 run; "five worlds" vs six; no `quality` profile | readiness audit (web) | |
 
 ### Research and review — in flight
 
 - Top-games research: genre ancestors, kids' retention, feel, audio, graphics — and
   an inventory of what this game actually has, read from source, so every
   recommendation is a concrete gap rather than generic advice.
-- Studio lookbook reshoot (`qa/lookbook.mjs`) — the first pack in which the six play
-  frames contain the hero. Teams may not review a surface they have not seen.
+- Studio round (`studio` workflow) on the 2026-09-23 lookbook — PASS, all 11 shots,
+  and the first pack in which all six play frames carry the hero (each measured in
+  by shippedlook's coverage bar). Nine teams, a skeptic per finding, art direction,
+  the governor.
+- Re-measuring the owner's complaints: `gate.mjs --profile=quality
+  --only=edgespeed,rivalnotice,food` (Q1-Q3).
 
 ### Owner queue — only he can do these
 
@@ -101,6 +103,9 @@ compacted conversation loses nothing.
 
 | id | what | commit |
 |---|---|---|
+| S3 | `?iapmock=1` handed every paid item out free on the public URL. Measured open (public host: "BUY · $2.99"), measured shut ("$2.99 · ON THE APP STORE"; 127.0.0.1 still "BUY" for QA), gated in push as `iapmockhost` | 922e090, 1b3aa57 |
+| D1 | RELEASE-GATE.md stops copying the gate (5 steps listed vs 55 run; five worlds vs six; no quality profile) and points at `--list` | 6c0200f |
+| — | Lookbook: PASS, every surface; all six play frames with the hero measured in | f15c564, 076179f, 1b3aa57 |
 | — | Ferris wheel promoted from dead-GLB fallback to the real prop; 15 draw calls -> 1 | 211a0e8 |
 | — | PLAY AGAIN stranded the hero 26u in the sky — proven by A/B, two builds one line apart (groupY 0.81 vs 26.81) | e7d0d63, 1939b53 |
 | — | Every person has a mouth; both eyes actually drawn; static townsfolk under the facet bar | db37367, ff3c658 |
