@@ -1353,6 +1353,14 @@ const CHILD: Build = { hipY: 0.86, shY: 1.62, headY: 2.20, girth: 1.17, armL: 0.
 // could have put a crimson campaigner in the blue one. It always ends: at the
 // twentieth step the two shades are black and white, which are 42.9 and 25.4
 // from the nearest skin and 100 apart, so no shirt is within 15 of both.
+// OUTSIDE THE RULE, BY DESIGN: six hats draw a FIXED colour and never look at
+// the one they are handed — the tricorn (INK), the captain's and the toque's
+// WHITE, the snorkel mask, the flower garland and the postal cap. None of them
+// is within 15 of a skin, so none reads as a bald head (the B4 symptom). Some
+// sit close to the shirt their role wears, measured: the chef's and van crew's
+// toque on chef whites dE 0, the diver's mask on its #2fd8e8 shirt 10.6, the
+// mail carrier's cap on #4a6ea8 12.8, the dock captain's WHITE on cream 13.8.
+// Those are uniforms read as uniforms; the spec's rule is for PICKED colours.
 //
 // qa/faceray.mjs bar (H) runs makePerson's head statements on every skin x
 // every shirt a dress code or a role can hand makePerson x (the dress code's

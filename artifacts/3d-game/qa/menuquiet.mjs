@@ -147,10 +147,16 @@ try {
       null, { timeout: 400000 }).catch(() => { });
     // wait until the crowd is actually talking over the end card, so the carry-in
     // is a real one rather than a lucky quiet moment
+    // ARMED MEANS ALIVE, NOT SEEN. The end card hides every .vb by rule
+    // (index.html, body:has(#end.show), studio round 4 Job 7), so onScreen()
+    // cannot see a bubble under the card at all — and the carry-in this bar
+    // exists for is exactly that: a bubble alive but hidden under the card
+    // that becomes visible on the menu the moment the card closes. So the arm
+    // asks for a live crowd bubble (.vb.show, not a rival), displayed or not.
     let armed = false;
     for (let i = 0; i < 14 && !armed; i++) {
-      const s = await onScreen(p);
-      armed = s.bubbles.some((x) => !x.rival);
+      armed = await p.evaluate(() => [...document.querySelectorAll('.vb.show')]
+        .some((el) => !el.classList.contains('rival') && (el.textContent || '').trim().length > 0));
       if (!armed) await p.waitForTimeout(2000);
     }
     console.log(`  C: a crowd bubble was up over the end card: ${armed}`);

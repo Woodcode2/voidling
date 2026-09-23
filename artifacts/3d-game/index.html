@@ -3133,8 +3133,13 @@
          again so the card does not depend on an observer to be clean.
          #coins IS NOT HERE, deliberately: it is the wallet the card's payout
          goes into (endMatch's addCoins() rewrites it as the card comes up),
-         and #end's top padding exists to leave it room. qa/endghost.mjs. */
-      body:has(#end.show) :is(#timer,#news,#banner,#count,#btnQuit,#wayfind,#form,#noms,.vb,.vf){display:none}
+         and #end's top padding exists to leave it room. qa/endghost.mjs.
+         #goal and #growth are named here too, not left to body.ovl alone: the
+         hudshots read on five worlds (2026-09-23, before this rule) found the
+         goal chip — z-index 12, above the card — reading "EAT 40,001 / 40,000"
+         over Lantern's and Powder's results, and the worst ghost should not
+         hang on an observer's timing. */
+      body:has(#end.show) :is(#timer,#news,#banner,#count,#btnQuit,#goal,#growth,#wayfind,#form,#noms,.vb,.vf){display:none}
       /* 12 painted the wallet chip over four scrolling screens — it sat on the
          Honey voidling's face at the bottom of the shop and clipped the TOP
          VOIDS title with no scrolling at all. It only ever needed to clear the
