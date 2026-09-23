@@ -247,7 +247,7 @@ if (want(2)) {
     // measured with qa/_ladderanims.mjs, pipFlagBob's animationstart landed
     // 0.03 s, 3.9 s and 0.02 s after the insert on three loads of the same
     // build, and its animationend 3.9-4.0 s after the insert on all three. So
-    // the four shots sometimes landed inside a bob behaving exactly as
+    // the four shots COULD land inside a bob behaving exactly as
     // designed. GOVERNOR.md rule 4: wait on the thing itself. Every FINITE
     // animation in the menu panel is awaited to its end; an INFINITE one is
     // the failure this bar exists for, named on the spot.
@@ -281,8 +281,18 @@ if (want(2)) {
       for (let i = 1; i < shots.length; i++) {
         const a = shots[i - 1].data, c = shots[i].data;
         let diff = 0;
+        // A CHANGE IS MORE THAN ONE STEP OF RASTER NOISE. This compared for
+        // exact equality, and it failed this bar in two push gates and then
+        // three runs in a row on 6 px. qa/_ladderstill.mjs located them: all
+        // six on one locked pipDot, each moving by exactly 1/255 and back
+        // again (A -> B -> A) — the software rasteriser re-shading a soft
+        // gradient after the live shots forced frames. No animation this bar
+        // exists for (the flag's bob, the ring's pulse, a shake) moves a pixel
+        // by fewer than several steps; 2 per channel is the floor below which
+        // nothing a child could see has changed.
+        const NOISE = 2;
         for (let k = 0; k < Math.min(a.length, c.length); k += 4) {
-          if (a[k] !== c[k] || a[k + 1] !== c[k + 1] || a[k + 2] !== c[k + 2]) diff++;
+          if (Math.abs(a[k] - c[k]) > NOISE || Math.abs(a[k + 1] - c[k + 1]) > NOISE || Math.abs(a[k + 2] - c[k + 2]) > NOISE) diff++;
         }
         if (diff > worst) { worst = diff; pair = `${i - 1}->${i}`; }
       }
