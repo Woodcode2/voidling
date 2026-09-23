@@ -4531,6 +4531,7 @@ _dbg.__matchState = () => ({
 // the store shooter can still identify what it photographed when it needs to.
 // (reads the query string directly rather than through _qd, which is declared
 // 550 lines below this and would be a temporal dead zone from here)
+let buildStamp: HTMLElement | null = null;
 if (import.meta.env.DEV || new URLSearchParams(location.search).has('stamp')) {
   const bs = document.createElement('div');
   // a missing `define` would take out every statement after this line — the
@@ -4539,28 +4540,62 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('stamp')) {
   bs.textContent = `v ${typeof __BUILD__ === 'undefined' ? 'dev' : __BUILD__}`;
   bs.style.cssText = 'position:fixed;right:8px;bottom:calc(4px + env(safe-area-inset-bottom, 0px));z-index:11;font-size:9px;font-weight:700;letter-spacing:1px;color:rgba(203,178,255,0.5);pointer-events:none;';
   document.body.appendChild(bs);
-  // …and NOT on the shop or the worlds screen. body.menu is still set inside
-  // those overlays, so a build stamp shipped on two player-facing screens.
-  // 'topvoids' was missing, so the dev build stamp painted over the TOP VOIDS
-// board — on a screen whose whole job is to look like a real leaderboard. The
-// comment two lines up already said "and NOT on the shop or the worlds screen":
-// a fix that missed a case. 'pause' and 'policy' are new and belong here too.
-const OVERLAYS = ['worlds', 'shop', 'daily', 'settings', 'trophies', 'skinPrev',
-  'topvoids', 'pause', 'policy', 'gate'];
-  const vis = () => {
+  buildStamp = bs;
+}
+// ── BODY.OVL — THE HUD'S "A SHEET IS UP" SWITCH, ON EVERY BUILD ──────────────
+// index.html has six `body.ovl … { display: none }` rules — the goal chip, the
+// growth bar, the NOMS pill, the form callout, the wayfinder, the quest board —
+// each written so HUD furniture cannot sit on top of a sheet. The only thing
+// that ever set body.ovl was this observer, and it lived INSIDE the build-stamp
+// block above: `if (import.meta.env.DEV || ?stamp)`. So every one of those six
+// rules worked on a developer's machine and did nothing in any build a child
+// has ever run — the goal chip at z-index 12 read "EAT 18,020 / 18,000" over
+// the results card until the HUD's 0.2 s tick hid it, and
+// qa/out/hudshots/maple-endcard.png caught it there. Studio
+// round 4, Job 7, moved it out; qa/ovlwire.mjs reads this block and fails if it
+// goes back in, and qa/endghost.mjs checks the flag live — bar (d) on the
+// results card, bar (e) on a production build with the shop open.
+//
+// THE LIST, AND TWO NAMES THAT COULD NOT SHIP. 'trophies' and 'topvoids' were
+// added when each was a full-screen overlay of its own (the stamp once painted
+// over the TOP VOIDS board because 'topvoids' was missing). They are PANES of
+// #profile now, and openProfile() only sets a pane's .show when the profile
+// OPENS — BACK clears #profile.show and leaves the pane's alone. With either
+// name here, a child who looked at her trophies and pressed BACK would have
+// body.ovl held on for the rest of the session, and all six of those HUD
+// elements gone from every match after it. Harmless while this was DEV-only;
+// the first thing it would have done in production. The sheet is 'profile',
+// so the list names the sheet (qa/ovlwire.mjs bar (d) fails on a nested name).
+//
+// 'end' IS THE RESULTS CARD, and it was never here — the growth bar's own note
+// in the frame loop says so ("#end is not in OVERLAYS, so the bar was sitting
+// on top of the score screen"). It is a full-screen sheet like the others; the
+// card's own `body:has(#end.show)` rule in index.html covers what body.ovl
+// does not.
+//
+// 'pause' and 'policy' belong here as they always did.
+const OVERLAYS = ['worlds', 'shop', 'daily', 'settings', 'profile', 'skinPrev',
+  'pause', 'policy', 'gate', 'end'];
+{
+  const sync = () => {
     const overlaid = OVERLAYS.some((id) => document.getElementById(id)?.classList.contains('show'));
-    bs.style.display = document.body.classList.contains('menu') && !overlaid ? 'block' : 'none';
+    // …and NOT on the shop or the worlds screen. body.menu is still set inside
+    // those overlays, so a build stamp shipped on two player-facing screens.
+    if (buildStamp) buildStamp.style.display = document.body.classList.contains('menu') && !overlaid ? 'block' : 'none';
     // …and the same signal drives the quest board, which is menu furniture now:
     // it must not sit on top of the shop, the world picker or the settings sheet
     document.body.classList.toggle('ovl', overlaid);
   };
-  const mo = new MutationObserver(vis);
+  // Body class writes land here too (menu, intro, calm…): each costs one walk
+  // of a ten-id list, and toggle() with an unchanged flag writes nothing, so
+  // this observer never feeds itself.
+  const mo = new MutationObserver(sync);
   mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });
   for (const id of OVERLAYS) {
     const n = document.getElementById(id);
     if (n) mo.observe(n, { attributes: true, attributeFilter: ['class'] });
   }
-  vis();
+  sync();
 }
 const bubbles = createBubbles(camera);
 await bootStage('Letting everyone in…', 42);
@@ -8053,6 +8088,17 @@ function paintCardLadder(card: Element, world: string): void {
   host.innerHTML = pipRow(states, { size: 18 });
 }
 
+/** ── A DRAWN MARK WHERE A FALLBACK GLYPH USED TO BE ────────────────────────
+ *  → ▾ ▴ ▶ and ⌂ are outside every unicode-range the four @fontsource/fredoka
+ *  imports at the top of this file declare, so each came out of the platform's
+ *  fallback face inside our own buttons (qa/glyphs.mjs reads the ranges and
+ *  scans every string this module graph can put on screen). The replacements
+ *  are <symbol>s in index.html's icon sheet; `.gl` there sizes one to the em
+ *  and inks it in currentColor, so it sits in a label like the letter it
+ *  replaced. `id` is the symbol's name without the `ic-` prefix. */
+const glyph = (id: 'arrow' | 'play' | 'pause' | 'chev'): string =>
+  `<svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-${id}"/></svg>`;
+
 /** ── THE LADDER, ON THE ONE SCREEN THAT SAYS WHAT JUST HAPPENED ───────────
  *  Paints the end card's progression furniture and returns true when it took
  *  the screen. Returns false on a match nobody chose a dot for — every harness
@@ -8085,6 +8131,7 @@ function paintLevelEnd(result: GoalResult): boolean {
   endHd.classList.remove('pipHd');
   endEl.classList.remove('lvl', 'rivals');
   el('endStats').classList.remove('open');
+  el('endMore').classList.remove('open');   // its chevron follows the stats, closed
   if (!goal) return false;
   ensurePipDefs();
   // FOUR QUESTIONS, and the card answers only those (see index.html's note on
@@ -8155,7 +8202,7 @@ function paintLevelEnd(result: GoalResult): boolean {
   // ladder moved, TRY AGAIN when it did not. LOOKED AT, not reasoned about —
   // qa/_endshot.mjs put them side by side and the redundancy was obvious.
   const again = document.getElementById('btnAgain');
-  if (again) again.textContent = result === 'win' ? 'CONTINUE →' : 'TRY AGAIN';
+  if (again) again.innerHTML = result === 'win' ? `CONTINUE ${glyph('arrow')}` : 'TRY AGAIN';
   return true;
 }
 
@@ -8435,7 +8482,7 @@ function endMatch(result: GoalResult = null) {
     if (opened) {
       track('world_unlocked', { world: opened, after: pickedWorld, total: unlockedCount() });
       nx.innerHTML = `<div class="unlockCard">🔓 <b>NEW WORLD!</b><span>${WORLD_LABEL[opened]} is open</span>`
-        + `<button id="endGoWorld" class="goShop">TAKE ME THERE →</button></div>`;
+        + `<button id="endGoWorld" class="goShop">TAKE ME THERE ${glyph('arrow')}</button></div>`;
       const gw = document.getElementById('endGoWorld');
       if (gw) gw.addEventListener('click', () => {
         track('world_pick', { pick: opened, from: pickedWorld, rebuild: true, via: 'unlock' });
@@ -8493,7 +8540,7 @@ function endMatch(result: GoalResult = null) {
       // and put the door in the room.
       nx.innerHTML = g.have >= g.need
         ? `✦ you can afford the <b>${g.label}</b> skin!<div class="nb"><div style="width:100%"></div></div>`
-          + `<button id="endShop" class="goShop">OPEN SHOP →</button>`
+          + `<button id="endShop" class="goShop">OPEN SHOP ${glyph('arrow')}</button>`
         : `${g.need - g.have}✦ to the <b>${g.label}</b> skin<div class="nb"><div style="width:${Math.round(k * 100)}%"></div></div>`;
       const gs = document.getElementById('endShop');
       if (gs) gs.addEventListener('click', () => {
@@ -11137,8 +11184,12 @@ function resetMatch() {
 document.getElementById('endMore')?.addEventListener('click', () => {
   const st = el('endStats');
   const open = st.classList.toggle('open');
-  const b = document.getElementById('endMore');
-  if (b) b.textContent = open ? 'MY NUMBERS ▴' : 'MY NUMBERS ▾';
+  // A CLASS, NOT A LABEL. This rewrote the text to 'MY NUMBERS ▴' / '▾' — two
+  // glyphs the font does not have — and nothing ever wrote it back, so after a
+  // child opened her numbers once, every later card (paintLevelEnd closes the
+  // stats) offered ▴ over a closed panel. The chevron is drawn in the markup
+  // and turned over by CSS; the reset lives beside the stats' own reset.
+  document.getElementById('endMore')?.classList.toggle('open', open);
   track('end_more', { open, level: goal ? goal.n : 0 });
 });
 el('btnAgain').addEventListener('click', () => {
@@ -11227,7 +11278,9 @@ el('btnHome').addEventListener('click', () => {
     // menu and endMatch put the results card over it, and a queued cheer
     // played there (verify pass, logic-3)
     outroT = 0; audio.cancelCheer();
-    qBtn.textContent = '⌂'; qBtn.classList.remove('arm');
+    // the mark it rests on is ic-pause from the sheet, not ⌂: the button pauses,
+    // and ⌂ is a glyph the font does not carry (index.html, #btnQuit)
+    qBtn.innerHTML = glyph('pause'); qBtn.classList.remove('arm');
     saveStats();   // partial progress (things eaten) still counts toward trophies
     countMatch();
     track('match_quit', {
@@ -12651,8 +12704,13 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { beginMatch(); }
     if (!host) return;
     let cv = host.querySelector('canvas') as HTMLCanvasElement | null;
     if (!cv) { cv = document.createElement('canvas'); host.appendChild(cv); }
-    // sized once, from the element, at the screen's own density
-    if (!PREV_S) PREV_S = Math.round((host.getBoundingClientRect().width || 190) * DPR);
+    // sized once, from the element, at the screen's own density — its LAYOUT
+    // width (offsetWidth), not its rect: #skinPrev's card arrives on modalIn,
+    // and a rect read inside it would include that scale. (openPreview calls
+    // this before #skinPrev gains .show, so on that path the element is
+    // display:none here and both reads give 0 and the 190 fallback; read from
+    // the source, not measured. This line does not change that.)
+    if (!PREV_S) PREV_S = Math.round((host.offsetWidth || 190) * DPR);
     cv.width = PREV_S; cv.height = PREV_S;
     const ctx = cv.getContext('2d');
     const { sc, cam, rig } = voidStudio();
@@ -12807,8 +12865,17 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { beginMatch(); }
     // measured off a real card so the hats tab gets the same native-resolution
     // treatment as the voids tab, rather than a constant that goes stale the
     // next time the grid changes columns
+    // THE LAYOUT BOX, NOT THE RECT. With the hats tab remembered, both shop
+    // doors reach this through __shopTab in the rAF after #shop gains .show,
+    // and #shop arrives on modalIn, whose first
+    // keyframe is scale(0.94). A rect includes every ancestor's transform, so
+    // a rect read on that frame reads the card at 0.94 of its width, and the
+    // buffer sized from it is kept until the skin changes (thumbsFor). That is
+    // read from the source, not measured in a browser. offsetWidth is the
+    // untransformed layout width, to a whole CSS px; qa/sheetbox.mjs bars a
+    // rect read inside a sheet that arrives on a transform.
     const cw = (document.querySelector('#hatGrid .hatCard canvas') as HTMLElement | null)
-      ?.getBoundingClientRect().width || 110;
+      ?.offsetWidth || 110;
     const S = Math.min(512, Math.round(cw * DPR));
     const { sc, cam, rig } = voidStudio();
     rig.setSkin(sk);
@@ -14937,7 +15004,10 @@ function animate() {
   // whole job is to look continuous.
   // It is also only ever a MATCH element: body.ovl covers the sheets, but the
   // results card is #end and #end is not in OVERLAYS, so the bar was sitting
-  // on top of the score screen at full opacity.
+  // on top of the score screen at full opacity. (#end IS in OVERLAYS since
+  // studio round 4, and body.ovl now runs on every build, not only in DEV —
+  // this toggle stays, because it is also what keeps the bar down before the
+  // match has started, where no sheet is up.)
   const gOn = started && !ended && !paused;
   growthEl.classList.toggle('off', !gOn);
   if (gOn) paintGrowth(R);
