@@ -39,7 +39,7 @@ export interface Audio3D {
   win(): void;                     // end-of-match warm sting — 1st place only
   lose(): void;                    // "aww — next time": soft, major, no dread
   hit(): void;                     // took a shot
-  alert(): void;                   // defense wave banner
+  alert(): void;                   // danger, and only danger: a charge, the first-run danger teach
   bigEat(): void;                  // crunching a building
   /** the HEADLINE bite — a CHOMP, or a rival devoured. Keeps the tuned note and
    *  lays a crunch and a gulp over it, all above 250 Hz (see the method).
@@ -3256,7 +3256,14 @@ export function createAudio(): Audio3D {
    *  a performance, and about as dry as a sound gets. */
   function clack(dest: AudioNode, t: number, vol: number) {
     nEnv(fxFor(dest, 'clack'), t, 0.028, vol, 0.0008);
-    dTone(dest, t, 0.03, 'square', vol * 0.3, 1900, 1200, 0, 0.001);
+    // the block's pitch, 30 ms falling 1900 -> 1200 Hz under the high-passed
+    // crack. It was a square: the one square voice in Lantern's alert(), and
+    // under a recording the clappers are that alert's FIRST sound
+    // (lnLastSting), so it is a triangle like the rest of the danger cues
+    // (qa/eightbit.mjs). Every other clack changes with it, at the same level:
+    // the fallback score's bar-line clappers, the ambience's claps and cup on
+    // a tray, and the gate sting.
+    dTone(dest, t, 0.03, 'triangle', vol * 0.3, 1900, 1200, 0, 0.001);
   }
   /** A stall's griddle. Not music — but a market's real bed is FRYING, and
    *  this is the only world where the food makes a noise. */
@@ -3633,9 +3640,21 @@ export function createAudio(): Audio3D {
     shaku(master, lnDeg(12), t + 1.4, 1.8, 0.08);
     taiko(master, t + 1.4, 0.24, true);
   }
-  /** THE LAST MINUTE: the drum, alone, speeding up. No melody left. */
+  /** THE LAST MINUTE: the drum, alone, speeding up. No melody left. It is
+   *  alert() on Lantern — a charge and the first-run danger teach. */
   function lnLastSting(t: number) {
     if (!master) return;
+    // ── UNDER A RECORDING, THE WARNING CAME TWO SECONDS LATE ────────────────
+    // taiko() returns while a recording plays (recordingLive(), the owner's
+    // "not synced" rule), so all twelve strokes below vanish and what was left
+    // was the gong at t + 2.0 and the clappers at t + 2.1. qa/lnalert.mjs read
+    // the first voice at 2.000 s after the call. A charge winds up for 0.85 s
+    // (rivals.ts, rv.ctim), so the warning landed after the lunge it warned
+    // about, and every match world ships a recording. So under one: the
+    // clappers on the call and the gong 80 ms behind them, no drum — the
+    // probe's first voice reads 0.000 s, and the fallback's drum tower is
+    // untouched.
+    if (recordingLive()) { clack(master, t, 0.07); kane(master, t + 0.08, 0.12, true); return; }
     for (let i = 0; i < 12; i++) taiko(master!, t + i * (0.30 - i * 0.017), 0.10 + i * 0.011, true);
     kane(master, t + 2.0, 0.12, true);
     clack(master, t + 2.1, 0.07);
@@ -4520,13 +4539,38 @@ export function createAudio(): Audio3D {
       tone(523.25, 523.25, 0.55, 'triangle', 0.11, 0.2);
     },
     hit() {
-      tone(140, 60, 0.16, 'square', 0.16);
-      noise(0.12, 0.18, 700, 200);
+      // ── A BITE ON HER GOES UP, NOT DOWN ──────────────────────────────────
+      // This was tone(140, 60, 0.16, 'square', 0.16) plus a noise burst
+      // low-passed 700 -> 200 Hz: a square wave falling to 60 Hz, which is the
+      // "drum hit in all but name" bigEat() was convicted of (its note below),
+      // in the one wave this file's header rules out ("no harsh 8-bit edges").
+      // It plays on every rival bite, on "can't afford" and a failed store
+      // purchase in the shop and the hats, and on the parental gate's wrong
+      // answer. Now a boing: a triangle rising
+      // 330 -> 520 Hz and a sine an octave above it at 0.4 of its level, and
+      // nothing under 330 Hz — the mirror of bonk(), the wall's soft fall from
+      // 520 to 330. qa/eightbit.mjs counted 15 square oscillators across hit()
+      // and alert() on the six worlds before this change (the governor's
+      // estimate was 14; the fifteenth was Lantern's clappers, see clack())
+      // and 0 after, and fails on any voice here that falls or sits under 200 Hz.
+      tone(330, 520, 0.12, 'triangle', 0.16);
+      tone(660, 1040, 0.12, 'sine', 0.064);
     },
     alert() {
+      // ── THE ALARM MEANS DANGER AND ONLY DANGER (studio round 4, Job 10) ──
+      // It answered six things: every sibling joining (3-5 a match, harmless
+      // GRUMPS included), the charge, losing the lead, the first-run "that one
+      // is BIGGER than you" teach, and a tapped padlock on a level dot or a
+      // world card. A pre-reader learns an alarm that rings for everything
+      // means "something happened", so by the time NIBBLES winds up it no
+      // longer means "move". Joins play ready() now, a lost lead is a card with
+      // no sting, and a padlock is a soft pop(); what is left here is the
+      // charge and the danger teach (qa/dangerchannel.mjs holds that).
       if (isPirate()) {
-        // a friendly two-tone boat horn, a major third apart. Announcing a
-        // guest at the resort, not a warning — the squares stay on Maple.
+        // a friendly two-tone boat horn, a major third apart. It was written to
+        // announce a guest at the resort; since Job 10 no join rings it, and on
+        // this world it is the charge's warning and the danger teach's, and
+        // nothing else.
         const c = ensure(); if (!c || !master) return;
         const t = c.currentTime;
         for (const [f, off] of [[261.63, 0], [329.63, 0.17]] as [number, number][]) {
@@ -4538,13 +4582,20 @@ export function createAudio(): Audio3D {
       if (isLantern()) {
         // The drum tower, alone, speeding up. On this world an alert is not a
         // siren — nobody here has one. It is the one instrument that is still
-        // playing after the market has stopped talking.
+        // playing after the market has stopped talking. Under a recording the
+        // drum is gated and the clappers and the gong stand in for it, on the
+        // call rather than two seconds after it (lnLastSting).
         const c = ensure(); if (!c || !master) return;
         lnLastSting(c.currentTime);
         return;
       }
-      tone(660, 660, 0.13, 'square', 0.12);
-      tone(880, 880, 0.13, 'square', 0.12, 0.16);
+      // Two bare square beeps, 660 then 880 Hz, were the other half of the 8-bit
+      // count in hit()'s note. Same two notes, on Pirate's recipe above: a
+      // triangle, with a sine at 2f at 0.54 of its level (0.07 against 0.13).
+      tone(660, 660, 0.13, 'triangle', 0.12);
+      tone(1320, 1320, 0.13, 'sine', 0.065);
+      tone(880, 880, 0.13, 'triangle', 0.12, 0.16);
+      tone(1760, 1760, 0.13, 'sine', 0.065, 0.16);
     },
     nomCrown(n) {
       const c = ensure(); if (!c || !master) return;
