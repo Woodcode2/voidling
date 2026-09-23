@@ -18,13 +18,15 @@
 // the colour tables, the sph/cyl helpers and the mr/mpick/mchance wrappers
 // they call, lifts the transform half of part() out of island.ts the same way,
 // strips the types and RUNS them. Whatever those functions build is what gets
-// measured. Anything it cannot find ABORTS (exit 2) — silently skipping a call
-// site that moved is the same bug wearing a hat.
+// measured. Anything it cannot find ABORTS: it prints a FAIL line and exits 2
+// — silently skipping a call site that moved is the same bug wearing a hat.
 //
-// ── SIX CHECKS ──────────────────────────────────────────────────────────────
+// ── SEVEN CHECKS AND A RATCHET ──────────────────────────────────────────────
 // Every length is in T, the per-person height unit personParts itself scales
 // by (read off the running function, not recomputed), so the jitter between
-// a short and a tall townsperson cannot move a verdict.
+// a short and a tall townsperson cannot move a verdict. A number quoted below
+// for an older eye is this file's output run on that build's mainstreet.ts:
+// a28ca61 for the ball eye, 8c61268 for the first lens.
 //
 //  1. DRAWS. makeTownsfolk and personParts take their shirt, facing, hat, skin
 //     and trousers from Maple's ONE seeded stream. Every authored placement
@@ -37,30 +39,48 @@
 //     qa/personsheet.mjs turned every subject by rotation.y alone and shot the
 //     back of the bowler's head. The facing has to ride on the mesh as
 //     userData.faceRy, equal to the draw that turned it.
-//  3. INK INSIDE THE OUTLINE. No face mark may reach further from the head's
-//     centre than the head's own drawn silhouette: the widest ring of the
-//     tessellated 16x11 skull, 0.36 T x sin(5 pi/11) = 0.356 T. A dark mark
-//     that stands past that line reads as a lump on the outline — the
-//     owner's "eyes that pop out". Measured in 3D from the head centre, not
-//     along the facing: the studio's 0.365 T is the eye's reach seen exactly
-//     side-on, and it is not the worst view. From the view where the eye's own
-//     direction is square to the camera — at the play camera's 46-65 degrees,
-//     a person turned 55-65 degrees away, which it sees all the time — the
-//     ball eye stands out further, and 3D reach is the number that covers
-//     every view at once.
+//  3. INK INSIDE THE OUTLINE. No eye may reach further from the head's centre
+//     than the widest ring of the tessellated 16x11 skull, 0.36 T x
+//     sin(5 pi/11) = 0.356 T — the silhouette the spec names. A dark mark that
+//     stands past that ring reads as a lump on the outline — the owner's "eyes
+//     that pop out". Measured in 3D from the head centre, not along the
+//     facing: the studio's 0.365 T is the eye's reach seen exactly side-on,
+//     and the ball eye's 3D reach was 0.391 T.
+//     THE RING DOES NOT BOUND EVERY VIEW. The widest ring is the outline only
+//     where a ring is on the silhouette. Where the patch of skull under a mark
+//     is on the silhouette, the drawn outline there is that patch — for an eye,
+//     its facet's plane at 0.3495 T — and a mark that is proud of the skull
+//     (check 4) stands past it. That is by design, and it is measured rather
+//     than argued: every azimuth round the person, 1 degree apart, at each play
+//     elevation, the mark's vertices against the hull of the skull's own. The
+//     lens eye stands at most 0.0056 T past, and within a tenth of that with
+//     the person turned anywhere from 66 to 114 degrees from the camera; the
+//     ball eye it replaced stood 0.039 T past, from 57 to 151 degrees. Printed
+//     every run, not gated beyond the ring.
 //  4. INK PROUD OF THE DRAWN SKULL. Along its own outward direction, each
-//     mark's highest drawn point has to clear the drawn skull under its centre
+//     eye's highest drawn point has to clear the drawn skull under its centre
 //     by 0.005 T. The drawn skull is not the nominal 0.36 T sphere: between
 //     rings it sags, by `sag` below, and a mark that clears the nominal sphere
 //     but not the facet under it is a mark the skull eats — the "one clean
 //     oval and one ragged smudge" mainstreet.ts records.
-//  5. INK DRAWS. From the play camera at 46, 55 and 65 degrees, looking at the
-//     face, at least half of the rays that meet a mark must meet the mark
-//     before the skull. This is Job 4's bar for the walking crowd ("at least
-//     50% of eye samples must land on INK"), applied to the static crowd so
-//     the two populations are graded alike. It is here because checks 3 and 4
-//     are read at ONE point on a mark: a mark can pass both at its centre and
-//     still be cut in half by a skull ridge a hair to one side.
+//  5. INK DRAWS, AND THERE IS ENOUGH OF IT. From the play camera at 46, 55 and
+//     65 degrees, looking the person in the face:
+//     (a) at least half of the rays that meet an eye must meet it before the
+//         skull. This is Job 4's bar for the walking crowd ("at least 50% of
+//         eye samples must land on INK"), applied to the static crowd so the
+//         two populations are graded alike. It is here because checks 3 and 4
+//         are read at ONE point on a mark: a mark can pass both at its centre
+//         and still be cut in half by a skull ridge a hair to one side.
+//     (b) each eye must show at least 0.0031 T^2 of ink: one ray per 0.002 T
+//         cell across the face, counting the cells whose first hit is the eye.
+//         (a) is a SHARE, and a share cannot see an eye shrink. The lens that
+//         first replaced the ball eye (8c61268) passed (a) at 81% and showed
+//         0.00421 / 0.00349 / 0.00258 T^2 from 46 / 55 / 65 degrees, against
+//         the ball's 0.00873 / 0.00782 / 0.00673 — 52-62% less ink, and no
+//         check could see it. 0.0031 T^2 at the steepest camera is the floor
+//         that commit's review proposed; the lens now shows
+//         0.00522 / 0.00436 / 0.00323, which is still 40-52% less than the
+//         ball. The ball cannot come back — it is what failed check 3.
 //
 //     WHAT 3-5 CAUGHT BEFORE ANYTHING SHIPPED. The studio's written fix was
 //     to flatten the ball eye where it stood (0.75 across, flat along the
@@ -79,22 +99,47 @@
 //     cap, 14x10 yoke), so a pair that clears it cannot scallop. Nominal
 //     surfaces, not drawn ones: the ruff is two NOMINAL surfaces agreeing to
 //     within the facets' error, which is exactly what a drawn gap cannot see.
+//  7. THE EYES CLEAR THE MOUTH. Each eye sits right above a corner of the
+//     mouth, and the mouth stands further out than the eyes, so from above it
+//     rises toward them in the image: a taller eye closes the gap from both
+//     sides. On the same face grid as 5(b), the nearest eye cell to the
+//     nearest mouth cell, centre to centre, must be at least 0.005 T (the
+//     studio's clearance number, reused; 0.002 T is one cell and means they
+//     touch). The ball eye measured 0.0020 T from 65 degrees — touching; the
+//     first lens 0.0102 T; this one 0.0060 T. A lens tall enough to show
+//     0.00335 T^2 (0.90 up, centred on the equator) measures 0.0020 T: that
+//     is where 5(b) and 7 meet.
 //
-// Checks 3-5 sweep the facing through one full period of the skull's 16
-// columns (22.5 degrees) in 24 steps, because the eyes turn with the person
-// and — before this job — the skull did not, so where the eyes landed on the
-// skull's facets was different for every townsperson.
+// Checks 3-5 and 7 sweep the facing through one full period of the skull's
+// 16 columns (22.5 degrees) in 24 steps, because the eyes turn with the
+// person and — before this job — the skull did not, so where the eyes landed
+// on the skull's facets was different for every townsperson. The outline
+// sweep in 3 and the face grid in 5(b) and 7 cost about a second a facing, so
+// they run on every 6th: four facings, a quarter-period apart.
 //
-// ── THE MOUTH IS MEASURED AND NOT GATED ─────────────────────────────────────
-// Checks 3-5 read every INK part on the head and print all of them, but only
-// the EYES carry a verdict. The mouth is 0.30 T wide; the skull's columns are
-// about 0.135 T apart at that height, so the mouth spans two column ridges,
-// and a mark cannot clear a ridge (which reaches the full 0.36 T at its
-// vertices) without also passing the 0.356 T outline. Keeping the mouth
-// inside the outline means cutting it to one facet, under 0.135 T — a change
-// to the look of every face in the town that nobody has asked for. That is an
-// art call, and it is printed below as one, with its numbers, rather than
-// waved through.
+// WHAT NONE OF THIS SEES: THE HAT. The face is measured against the skull
+// alone. Run once with the hat's crown and brim (and the hair cap) counted as
+// occluders on the same face grid, each eye showed 0.00262 T^2 from 46
+// degrees, 0.00002 from 55 and none from 65: the 0.47-0.49 T brim covers a
+// hatted person's eyes from above. That is the bowler brim the studio deferred
+// to the line-up (STUDIO-ROUND-4, "WHAT I AM NOT DOING", MOTION), not
+// something this probe grades. Bareheaded, the hair cap took nothing from
+// either eye.
+//
+// ── THE MOUTH: FROZEN, NOT FORGIVEN ─────────────────────────────────────────
+// The mouth is an ink part too, and it reaches 0.38322 T against the 0.356 T
+// ring: 0.0269 T past, measured 0.0328 T past the drawn outline in the worst
+// play view. The mouth is 0.30 T wide; the skull's columns are about 0.135 T
+// apart at that height, so the mouth spans two column ridges, and a mark
+// cannot clear a ridge (which reaches the full 0.36 T at its vertices)
+// without also passing the ring. Keeping it inside means cutting it to one
+// facet, under 0.135 T — a change to the look of every face in the town that
+// nobody has asked for, which is an art call, and it is open.
+// Until it is made, the mouth may not get WORSE: its reach is held at the
+// 0.38322 T measured at 8c61268 (bar 0.3833 T) and its drawn share at 32.8%
+// (bar 32.8%), the way qa/roundlod.mjs holds its debt. The spec's gate — no
+// ink part through the silhouette — is met by the eyes and frozen for the
+// mouth. If the mouth ever improves, this file says which numbers to lower.
 import * as THREE from 'three';
 import { readFileSync } from 'node:fs';
 
@@ -102,14 +147,29 @@ const MS_PATH = 'src/proto3d/mainstreet.ts';
 const IS_PATH = 'src/proto3d/island.ts';
 const MS = readFileSync(MS_PATH, 'utf8');
 const IS = readFileSync(IS_PATH, 'utf8');
-const abort = (why) => { console.log(`ABORTED — ${why}`); process.exit(2); };
+// AN ABORT IS A FAIL, AND IT HAS TO SAY SO IN THE WORDS THE GATE READS. By the
+// time the face is measured, checks 1-2 have already printed four PASS lines,
+// and a pf reader takes PASS lines with no FAIL line as consent. The first
+// version printed "ABORTED — ..." and exited 2: recolour one eye and the mouth
+// and the run ended on four PASS lines and no FAIL line. So every way out that
+// is not the end of the file prints a FAIL line first, including a throw this
+// file did not foresee.
+const abort = (why) => { console.log(`FAIL — ABORTED — ${why}`); process.exit(2); };
+process.on('uncaughtException', (e) => abort(`the probe threw: ${e?.stack || e}`));
+process.on('unhandledRejection', (e) => abort(`the probe threw: ${e?.stack || e}`));
 
 const PROUD_MIN = 0.005;        // T — check 4, the studio's number
-const DRAW_MIN = 0.5;           // share — check 5, Job 4's number
+const DRAW_MIN = 0.5;           // share — check 5(a), Job 4's number
 const PAIR_MIN = 0.03;          // T — check 6, the studio's number
 const ELEVATIONS = [46, 55, 65];
 const LANDINGS = 24;
 const GRID = 32;
+const FINE_EVERY = 6;           // the outline sweep and the face grid run on every 6th facing
+const CELL_T = 0.002;           // T — the face grid's cell
+const EYE_AREA_MIN = 0.0031;    // T^2 — check 5(b), the review's floor (see the header)
+const GAP_MIN = 0.005;          // T — check 7, in the image (see the header)
+const MOUTH_REACH_MAX = 0.3833; // T — the mouth ratchet, measured 0.38322 at 8c61268
+const MOUTH_DRAW_MIN = 0.328;   // share — the mouth ratchet, measured 32.8% at 8c61268
 
 // ── SOURCE SURGERY ──────────────────────────────────────────────────────────
 // A scanner that knows where comments and strings are, because these functions
@@ -279,8 +339,60 @@ function build(ry, hat) {
   if (skin === undefined) abort('personParts drew no skin tone from SKIN.');
   return { T, skin, parts: __probe.parts.slice() };
 }
+const UP = V(0, 1, 0);
+// The play camera at elevation `el` degrees, `az` radians round from the way the
+// person faces (0 = looking them in the face), and the image plane it sees.
+function view(fwd, el, az) {
+  const e = el * Math.PI / 180;
+  const toCam = fwd.clone().applyAxisAngle(UP, az).multiplyScalar(Math.cos(e)).add(V(0, Math.sin(e), 0)).normalize();
+  const dir = toCam.clone().negate();
+  const u = new THREE.Vector3().crossVectors(dir, UP).normalize();
+  const w = new THREE.Vector3().crossVectors(u, dir).normalize();
+  return { toCam, dir, u, w };
+}
+// A bounding sphere per mesh, so a ray that cannot touch a mark skips its
+// triangles. The face grid below casts tens of thousands of rays.
+function ball(pos) {
+  const m = new THREE.Box3().setFromBufferAttribute(pos).getCenter(V(0, 0, 0));
+  let r = 0; const v = V(0, 0, 0);
+  for (let i = 0; i < pos.count; i++) r = Math.max(r, v.fromBufferAttribute(pos, i).distanceTo(m));
+  return { m, r2: r * r * 1.0001 };
+}
+const passesBy = (b, o, d) => {
+  const ox = o.x - b.m.x, oy = o.y - b.m.y, oz = o.z - b.m.z, t = ox * d.x + oy * d.y + oz * d.z;
+  return ox * ox + oy * oy + oz * oz - t * t > b.r2;
+};
+// Convex hull in the image plane (Andrew's monotone chain, counter-clockwise).
+// The skull is a convex polyhedron, so the hull of its projected vertices IS
+// its drawn outline from that camera.
+function hull(pts) {
+  pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], hi = [];
+  for (const q of pts) { while (lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (let i = pts.length - 1; i >= 0; i--) { const q = pts[i]; while (hi.length > 1 && cr(hi[hi.length - 2], hi[hi.length - 1], q) <= 0) hi.pop(); hi.push(q); }
+  lo.pop(); hi.pop();
+  return lo.concat(hi);
+}
+/** How far q lies outside the convex CCW polygon h; 0 when inside. */
+function beyond(h, q) {
+  let out = false;
+  for (let i = 0; i < h.length && !out; i++) {
+    const a = h[i], b = h[(i + 1) % h.length];
+    if ((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0]) < 0) out = true;
+  }
+  if (!out) return 0;
+  let best = Infinity;
+  for (let i = 0; i < h.length; i++) {
+    const a = h[i], b = h[(i + 1) % h.length], ex = b[0] - a[0], ey = b[1] - a[1];
+    const t = Math.max(0, Math.min(1, ((q[0] - a[0]) * ex + (q[1] - a[1]) * ey) / (ex * ex + ey * ey)));
+    best = Math.min(best, Math.hypot(q[0] - a[0] - t * ex, q[1] - a[1] - t * ey));
+  }
+  return best;
+}
 const stats = new Map();        // part class -> worst-case numbers over every landing
-const bump = (k, f) => { if (!stats.has(k)) stats.set(k, { reach: -Infinity, sil: Infinity, proud: Infinity, sag: -Infinity, draw: Infinity, n: 0 }); f(stats.get(k)); };
+const bump = (k, f) => { if (!stats.has(k)) stats.set(k, { reach: -Infinity, sil: Infinity, proud: Infinity, sag: -Infinity, draw: Infinity, past: -Infinity, byAz: new Float64Array(181), n: 0 }); f(stats.get(k)); };
+const faceRows = ELEVATIONS.map((el) => ({ el, area: Infinity, gap: Infinity }));
 const STEP = (Math.PI * 2 / 16) / LANDINGS;
 for (let k = 0; k < LANDINGS; k++) {
   const ry = 0.1 + k * STEP;
@@ -296,11 +408,69 @@ for (let k = 0; k < LANDINGS; k++) {
   const fwd = V(Math.sin(ry), 0, Math.cos(ry)), rgt = V(Math.cos(ry), 0, -Math.sin(ry));
   const ink = parts.filter((q) => q.col === tables.INK && V(q.x, q.y, q.z).distanceTo(c) < 1.5 * R);
   if (ink.length < 2) abort(`only ${ink.length} INK part(s) on the head — the face moved or lost its colour.`);
-  for (const q of ink) {
+  const marks = ink.map((q) => {
     const p = V(q.x, q.y, q.z), off = p.clone().sub(c);
-    const cls = Math.abs(off.dot(rgt)) > 0.15 * R ? 'eye' : 'mouth';
+    return { q, p, off, cls: Math.abs(off.dot(rgt)) > 0.15 * R ? 'eye' : 'mouth', pos: q.geo.getAttribute('position'), b: ball(q.geo.getAttribute('position')) };
+  });
+  // ── PAST THE OUTLINE, IN EVERY PLAY VIEW ─────────────────────────────────
+  // Reach (check 3) is read against the widest ring, the spec's number. It
+  // does not bound every view: where a mark's own patch of skull is on the
+  // silhouette, the drawn outline there is that patch, not the widest ring,
+  // and a mark proud of the skull stands past it by about its proudness. This
+  // measures it: every azimuth round the person, 1 degree apart, at each play
+  // elevation, the mark's vertices against the hull of the skull's.
+  if (k % FINE_EVERY === 0) for (const el of ELEVATIONS) for (let deg = 0; deg < 360; deg++) {
+    const az = deg * Math.PI / 180, { u, w } = view(fwd, el, az);
+    const sk = [];
+    for (let i = 0; i < sp.count; i++) { const x = sp.getX(i) - c.x, y = sp.getY(i) - c.y, z = sp.getZ(i) - c.z; sk.push([x * u.x + y * u.y + z * u.z, x * w.x + y * w.y + z * w.z]); }
+    const h = hull(sk);
+    for (const mk of marks) {
+      let past = 0;
+      for (let i = 0; i < mk.pos.count; i++) {
+        const x = mk.pos.getX(i) - c.x, y = mk.pos.getY(i) - c.y, z = mk.pos.getZ(i) - c.z;
+        past = Math.max(past, beyond(h, [x * u.x + y * u.y + z * u.z, x * w.x + y * w.y + z * w.z]));
+      }
+      // folded to 0-180: how far the person is turned from the camera, either way
+      bump(mk.cls, (st) => { const a = deg > 180 ? 360 - deg : deg; st.past = Math.max(st.past, past / T); st.byAz[a] = Math.max(st.byAz[a], past / T); });
+    }
+  }
+  // ── THE FACE AS THE CAMERA SEES IT ───────────────────────────────────────
+  // One ray per 0.002 T cell across the whole face, looking the person in the
+  // face from each play elevation. A cell belongs to the mark it meets first,
+  // if it meets that mark no later than the skull. Two numbers come out:
+  //   INK AREA — each eye's cells, in T^2: how much eye a child can see.
+  //   EYE-MOUTH GAP — the nearest pair of eye and mouth cells, in T in the
+  //   image: how much skin separates the eyes from the mouth's corners.
+  const CELL = CELL_T * T;
+  if (k % FINE_EVERY === 0) for (const row of faceRows) {
+    const { toCam, dir, u, w } = view(fwd, row.el, 0);
+    let u0 = Infinity, u1 = -Infinity, w0 = Infinity, w1 = -Infinity;
+    for (const mk of marks) for (let i = 0; i < mk.pos.count; i++) {
+      const x = mk.pos.getX(i) - c.x, y = mk.pos.getY(i) - c.y, z = mk.pos.getZ(i) - c.z;
+      const a = x * u.x + y * u.y + z * u.z, b = x * w.x + y * w.y + z * w.z;
+      u0 = Math.min(u0, a); u1 = Math.max(u1, a); w0 = Math.min(w0, b); w1 = Math.max(w1, b);
+    }
+    const cells = marks.map(() => []);
+    for (let a = u0 - CELL; a <= u1 + CELL; a += CELL) for (let b = w0 - CELL; b <= w1 + CELL; b += CELL) {
+      const o = c.clone().addScaledVector(u, a).addScaledVector(w, b).addScaledVector(toCam, 4 * R);
+      let best = Infinity, who = -1;
+      for (let j = 0; j < marks.length; j++) {
+        if (passesBy(marks[j].b, o, dir)) continue;
+        const t = firstHit(marks[j].pos, o, dir);
+        if (t < best) { best = t; who = j; }
+      }
+      if (who >= 0 && best <= firstHit(sp, o, dir)) cells[who].push([a, b]);
+    }
+    const eyeCells = [], mouthCells = [];
+    marks.forEach((mk, j) => {
+      if (mk.cls === 'eye') { row.area = Math.min(row.area, cells[j].length * CELL * CELL / (T * T)); eyeCells.push(...cells[j]); }
+      else mouthCells.push(...cells[j]);
+    });
+    for (const [ea, eb] of eyeCells) for (const [ma, mb] of mouthCells) row.gap = Math.min(row.gap, Math.hypot(ea - ma, eb - mb) / T);
+  }
+  for (const mk of marks) {
+    const { q, p, off, cls, pos } = mk;
     const d = off.clone().normalize();
-    const pos = q.geo.getAttribute('position');
     let reach = 0, apex = -Infinity, ext = 0;
     const v = V(0, 0, 0);
     for (let i = 0; i < pos.count; i++) {
@@ -312,11 +482,7 @@ for (let k = 0; k < LANDINGS; k++) {
     if (!Number.isFinite(s)) abort('a ray from the head centre found no skull — the skull is not closed.');
     let worstDraw = Infinity;
     for (const el of ELEVATIONS) {
-      const e = el * Math.PI / 180;
-      const toCam = fwd.clone().multiplyScalar(Math.cos(e)).add(V(0, Math.sin(e), 0)).normalize();
-      const dir = toCam.clone().negate();
-      const u = new THREE.Vector3().crossVectors(dir, V(0, 1, 0)).normalize();
-      const w = new THREE.Vector3().crossVectors(u, dir).normalize();
+      const { toCam, dir, u, w } = view(fwd, el, 0);
       let met = 0, first = 0;
       for (let a = 0; a < GRID; a++) for (let b = 0; b < GRID; b++) {
         const o = p.clone().addScaledVector(u, ((a + 0.5) / GRID - 0.5) * 2.2 * ext)
@@ -337,27 +503,48 @@ for (let k = 0; k < LANDINGS; k++) {
     });
   }
 }
-console.log(`\n  3-5. the face against the drawn skull — ${LANDINGS} facings across one 22.5-degree skull period, camera at ${ELEVATIONS.join('/')} degrees`);
-console.log('    mark    reach   outline   proud    sag    draws');
-for (const [cls, st] of stats) console.log(`    ${cls.padEnd(6)} ${st.reach.toFixed(4)}T  ${st.sil.toFixed(4)}T  ${st.proud.toFixed(4)}T  ${st.sag.toFixed(4)}T  ${(100 * st.draw).toFixed(1).padStart(5)}%   (worst of ${st.n})`);
+console.log(`\n  3-5, 7. the face against the drawn skull — ${LANDINGS} facings across one 22.5-degree skull period, camera at ${ELEVATIONS.join('/')} degrees`);
+console.log('    mark    reach   outline   proud    sag    draws   past the drawn outline, worst play view');
+for (const [cls, st] of stats) {
+  const band = [...st.byAz.keys()].filter((a) => st.byAz[a] >= 0.9 * st.past);
+  console.log(`    ${cls.padEnd(6)} ${st.reach.toFixed(4)}T  ${st.sil.toFixed(4)}T  ${st.proud.toFixed(4)}T  ${st.sag.toFixed(4)}T  ${(100 * st.draw).toFixed(1).padStart(5)}%   ${st.past.toFixed(4)}T (within 10% of that with the person turned ${band[0]}-${band[band.length - 1]} deg from the camera)   (worst of ${st.n})`);
+}
+console.log('    looking her in the face:  elevation   ink area per eye   eye-mouth gap');
+for (const r of faceRows) console.log(`                              ${String(r.el).padStart(4)} deg     ${r.area.toFixed(5)} T^2       ${r.gap.toFixed(4)} T`);
 const eye = stats.get('eye');
 if (!eye) abort('no INK part classified as an eye.');
 verdict(eye.reach <= eye.sil,
-  `no eye reaches past the skull's drawn outline (${eye.reach.toFixed(4)} T against ${eye.sil.toFixed(4)} T)`,
-  `an eye reaches ${eye.reach.toFixed(4)} T from the head centre, past the skull's drawn outline at ${eye.sil.toFixed(4)} T — it stands out of the silhouette by ${(eye.reach - eye.sil).toFixed(4)} T.`);
+  `no eye reaches past the skull's widest drawn ring (${eye.reach.toFixed(4)} T against ${eye.sil.toFixed(4)} T)`,
+  `an eye reaches ${eye.reach.toFixed(4)} T from the head centre, past the skull's widest drawn ring at ${eye.sil.toFixed(4)} T — it stands out of the silhouette by ${(eye.reach - eye.sil).toFixed(4)} T.`);
 verdict(eye.proud >= PROUD_MIN,
   `every eye clears the drawn skull under it by ${eye.proud.toFixed(4)} T (bar ${PROUD_MIN} T; the skull sags up to ${eye.sag.toFixed(4)} T there)`,
   `an eye clears the drawn skull under its centre by only ${eye.proud.toFixed(4)} T against a ${PROUD_MIN} T bar — the facet it lands on eats it.`);
 verdict(eye.draw >= DRAW_MIN,
   `from every camera elevation at least ${(100 * eye.draw).toFixed(1)}% of each eye draws in front of the skull (bar ${100 * DRAW_MIN}%)`,
   `on the worst facing only ${(100 * eye.draw).toFixed(1)}% of an eye draws in front of the skull (bar ${100 * DRAW_MIN}%) — the rest of it is under the skull.`);
+const area = Math.min(...faceRows.map((r) => r.area));
+verdict(area >= EYE_AREA_MIN,
+  `looking her in the face, each eye shows at least ${area.toFixed(5)} T^2 of ink from every play elevation (floor ${EYE_AREA_MIN} T^2)`,
+  `looking her in the face, an eye shows only ${area.toFixed(5)} T^2 of ink (floor ${EYE_AREA_MIN} T^2, per elevation: ${faceRows.map((r) => `${r.el} deg ${r.area.toFixed(5)}`).join(', ')}) — the eye is too small to read.`);
+const gap = Math.min(...faceRows.map((r) => r.gap));
+verdict(gap >= GAP_MIN,
+  `the eyes stand clear of the mouth's corners in the image by at least ${gap.toFixed(4)} T from every play elevation (floor ${GAP_MIN} T)`,
+  `from ${faceRows.find((r) => r.gap === gap).el} degrees an eye comes within ${gap.toFixed(4)} T of the mouth in the image (floor ${GAP_MIN} T; ${CELL_T} T means they touch) — the eye and the mouth's corner run together.`);
+
+// ── THE MOUTH: FROZEN, NOT FORGIVEN ─────────────────────────────────────────
+// It stands past the outline and that is an open art call (header). Until it is
+// made, the mouth may not get worse: no further out, no less of it drawn.
 const mouth = stats.get('mouth');
-if (mouth) {
-  const over = mouth.reach - mouth.sil;
-  console.log(over > 0
-    ? `  NOT GATED — the mouth reaches ${mouth.reach.toFixed(4)} T, ${over.toFixed(4)} T past the outline. An art call (see this file's header), not Job 6's.`
-    : `  NOT GATED — the mouth sits inside the outline (${mouth.reach.toFixed(4)} T).`);
-}
+if (!mouth) abort('no INK part classified as a mouth.');
+console.log(`\n  the mouth, ratcheted: reach ${mouth.reach.toFixed(5)} T (${(mouth.reach - mouth.sil).toFixed(4)} T past the widest ring), draws ${(100 * mouth.draw).toFixed(1)}%`);
+verdict(mouth.reach <= MOUTH_REACH_MAX,
+  `the mouth reaches no further than the recorded ${MOUTH_REACH_MAX} T (${mouth.reach.toFixed(5)} T). Still past the widest ring — an open art call, frozen here.`,
+  `the mouth reaches ${mouth.reach.toFixed(5)} T, past the recorded ${MOUTH_REACH_MAX} T: the lump on the outline grew.`);
+verdict(mouth.draw >= MOUTH_DRAW_MIN,
+  `at least ${(100 * mouth.draw).toFixed(1)}% of the mouth draws in front of the skull from every play elevation (recorded ${(100 * MOUTH_DRAW_MIN).toFixed(1)}%)`,
+  `only ${(100 * mouth.draw).toFixed(1)}% of the mouth draws in front of the skull on the worst facing, below the recorded ${(100 * MOUTH_DRAW_MIN).toFixed(1)}% — the skull is eating it.`);
+if (mouth.reach < MOUTH_REACH_MAX - 0.0005 || mouth.draw > MOUTH_DRAW_MIN + 0.02)
+  console.log(`  the mouth IMPROVED: lower MOUTH_REACH_MAX to ${Math.ceil(mouth.reach * 1e4) / 1e4} and raise MOUTH_DRAW_MIN to ${Math.floor(mouth.draw * 1e3) / 1e3} in this file, so the ground cannot be given back.`);
 
 // ══ 6. SAME-COLOUR SPHERE / CAP PAIRS ═══════════════════════════════════════
 console.log('\n  6. same-colour sphere / cylinder-cap pairs, nominal surfaces');

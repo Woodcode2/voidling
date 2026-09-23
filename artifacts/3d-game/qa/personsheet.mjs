@@ -32,21 +32,36 @@
 // INK, read out of that file, not copied — in the head band, and the upper of
 // the two INK clusters there is the eyes (the lower is the mouth). The head
 // centre is the mesh's own vertical axis at the eyes' height, because
-// personParts builds every static at x = z = 0. That is a check on the face,
-// not on faceRy: it reads the vertices the camera sees, so a wrong faceRy, a
-// missing one or a face built facing the wrong way all fail it the same way.
+// makeTownsfolk and makeProtester build their person at x = z = 0. Not every
+// personParts call does: the diner's arguing pair is built at (7.6, 5.6) and
+// (9.2, 5.2) inside the diner's Group, which this check already skips as not
+// one vertex-coloured mesh. So a subject is judged only if its eye centroid
+// lies within 0.6 geometry units of its own vertical axis. personParts'
+// eyes, run in node through this same clustering, sit 0.3205 T off it —
+// 0.425-0.479 units across the height jitter, whichever way the person faces.
+// One built anywhere else is reported and not asserted, because its head
+// centre is not on that axis. That is a check on the face, not on faceRy: it
+// reads the vertices the camera sees, so a wrong faceRy, a missing one or a
+// face built facing the wrong way all fail it the same way.
 //
 //   PASS — every found face in the front frame looks at the camera
 //   FAIL — a subject shows the camera the back of its head
+//
+// Any way out before the verdict prints a FAIL line: a pf reader takes a run
+// that printed nothing but its setup as silence, and one that threw after a
+// PASS as consent.
 import { chromium } from 'playwright';
 import { mkdirSync, readFileSync } from 'node:fs';
+
+process.on('uncaughtException', (e) => { console.log(`FAIL — ABORTED — the probe threw: ${String(e?.stack || e).split('\n')[0]}`); process.exit(2); });
+process.on('unhandledRejection', (e) => { console.log(`FAIL — ABORTED — the probe threw: ${String(e?.stack || e).split('\n')[0]}`); process.exit(2); });
 
 const PORT = process.argv[2] || '4177';
 const WORLD = process.argv[3] || 'maple';
 const OUT = 'qa/out/person';
 mkdirSync(OUT, { recursive: true });
 const INK_M = readFileSync('src/proto3d/mainstreet.ts', 'utf8').match(/\nconst INK = (0x[0-9a-fA-F]{6});/);
-if (!INK_M) { console.log('ABORTED — const INK is not in src/proto3d/mainstreet.ts; the face colour moved.'); process.exit(2); }
+if (!INK_M) { console.log('FAIL — ABORTED — const INK is not in src/proto3d/mainstreet.ts; the face colour moved.'); process.exit(2); }
 const INK = Number(INK_M[1]);
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -215,9 +230,12 @@ for (const [tag, turn] of [['front', 0], ['threequarter', Math.PI * 0.25], ['sid
         for (let j = 0; j < at.length; j++) if (Math.abs(hs[j] - b) < Math.abs(hs[j] - a)) {
           eye.x += pos.getX(at[j]); eye.y += pos.getY(at[j]); eye.z += pos.getZ(at[j]); n++;
         }
+        if (!n) { rows.push({ i, why: 'the INK in the head band is one height cluster — no eyes over a mouth' }); continue; }
         eye.multiplyScalar(1 / n);
-        const head = new THREE.Vector3(0, eye.y, 0);
         const offAxis = Math.hypot(eye.x, eye.z);
+        // built off the origin (header): its head centre is not on this axis
+        if (offAxis > 0.6) { rows.push({ i, why: `eyes ${offAxis.toFixed(2)} off the mesh's own vertical axis — built away from x = z = 0, so the head centre is not known` }); continue; }
+        const head = new THREE.Vector3(0, eye.y, 0);
         m.localToWorld(eye); m.localToWorld(head);
         const de = eye.distanceTo(cam.position), dh = head.distanceTo(cam.position);
         rows.push({ i, faceRy: m.userData.faceRy ?? null, offAxis: +offAxis.toFixed(3), nearer: +(dh - de).toFixed(3), ok: de < dh });

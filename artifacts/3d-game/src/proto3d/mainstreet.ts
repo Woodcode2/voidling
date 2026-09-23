@@ -409,7 +409,7 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
   // arithmetic is checked against the eyes rather than eyeballed — at the eyes'
   // forward offset the cap's lower edge sits at 2.307 T and the eyes at 2.25 T,
   // so they clear it by about a twentieth of a head. (The eyes have since moved
-  // onto the skull's facets at 2.23 T, and each eye's centre is 0.394 T from
+  // onto the skull's facets at 2.2275 T, and each eye's centre is 0.394 T from
   // the cap's axis — outside the cap's 0.355 T radius altogether.)
   {
     // ── AND IT MUST NOT OVERHANG THE SKULL ────────────────────────────────
@@ -476,13 +476,14 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
       // every facet on both sides.
       // ── AND THAT PUSHED THE MARK OUT OF THE HEAD ────────────────────────
       // Proud of every facet meant a dark ball reaching 0.391 T from the head
-      // centre (qa/townface.mjs, drawn geometry). The skull's own outline is
-      // 0.356 T: eleven rows put no ring on the equator, so its widest ring is
-      // 0.36 x sin(5 pi/11). From the view where the eye's own direction is
-      // square to the camera — a person turned about sixty degrees away, which
-      // the play camera sees all the time — that is a 0.035 T lump on the
-      // silhouette, and art direction found it on the first two people in the
-      // first frame.
+      // centre (qa/townface.mjs, drawn geometry). The skull's widest ring is
+      // 0.356 T: eleven rows put no ring on the equator, so it is
+      // 0.36 x sin(5 pi/11). Against the skull's drawn outline, from every side
+      // at the play camera's 46-65 degrees, the ball stood up to 0.039 T past
+      // it, and within a tenth of that with the person turned anywhere from 57
+      // to 151 degrees from the camera — side-on or further, which the play
+      // camera sees all the time. Art direction found that lump on the first two
+      // people in the first frame.
       //
       // Clearing the drawn skull AND staying inside 0.356 T leaves a window of
       // 0.007 T, because the drawn skull is 0.3495 T out at a facet's middle.
@@ -497,20 +498,37 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
       //
       // So each eye is a LENS SEATED ON ITS FACET. The same 9x7 ball, no more
       // triangles, its pole laid along the facet's normal so the apex is a
-      // drawn vertex: 0.75 across (the studio's number), 0.70 up and 0.12
-      // along the normal — 0.0525 x 0.049 x 0.0084 T. The facet's plane is
+      // drawn vertex: 0.75 across (the studio's number), 0.85 up and 0.12
+      // along the normal — 0.0525 x 0.0595 x 0.0084 T. The facet's plane is
       // 0.36 cos(pi/16) cos(pi/22) = 0.3495 T out; the lens's centre sits at
-      // 0.3469 T, just under it, so the plane cuts the lens below its widest
-      // ring and the rim meets the skin square-on rather than at a grazing
-      // angle. It sits 0.01 T above the equator, which keeps the mouth's
-      // corners clear of it. Measured on the drawn geometry: the apex clears
-      // the facet by 0.0058 T, no point is further than 0.3558 T from the head
-      // centre, 0.0005 T inside the outline, and from 46, 55 and 65 degrees at
-      // least 81% of each eye draws in front of the skull, identically on
-      // every townsperson. qa/townface.mjs checks 3-5.
+      // 0.3469 T, 0.0026 T inside it, so the apex lands at 0.3553 T: 0.0058 T
+      // proud of the facet and inside the 0.356 T ring. Within the facet the
+      // plane passes between the lens's second and third drawn rings, just
+      // outside the widest one, so by the arithmetic of those rings the drawn
+      // rim crosses the skin at 16-18 degrees (the nominal ellipsoid's at
+      // 23-26): a shallow angle, not square-on. A square-on rim would need the
+      // centre ON the plane, and that puts the apex at 0.3579 T, past the ring.
+      //
+      // IT SHOWS LESS INK THAN THE BALL DID, AND THAT IS THE PRICE. Looking
+      // the person in the face, each eye shows 0.00522 / 0.00436 / 0.00323 T^2
+      // of ink from 46 / 55 / 65 degrees, against the ball's 0.00873 / 0.00782
+      // / 0.00673: 40-52% less. The first lens here, 0.70 up and 0.01 T above
+      // the equator, showed 0.00421 / 0.00349 / 0.00258: 52-62% less, and no
+      // number held it. The lens cannot grow much more than it has. Upward,
+      // its top rim leaves the ring: 0.85 up at 0.01 T above the equator
+      // reaches 0.3566 T. Downward, it meets the mouth: the mouth stands
+      // further out than the eyes, so from above it rises toward them in the
+      // image, and 0.90 up centred on the equator (0.00335 T^2 from 65
+      // degrees) puts an eye against a mouth corner, which is where the ball
+      // was. 0.85 up and 0.0075 T above the equator keeps about 0.006 T
+      // between them in the image from 65 degrees and 0.014 T from 46. On the
+      // drawn geometry, the same on every townsperson: no point further than
+      // 0.3562 T from the head centre, and from 46, 55 and 65 degrees at least
+      // 86% of each eye draws in front of the skull. qa/townface.mjs checks
+      // 3-5 and 7, with a floor of 0.0031 T^2 under the ink.
       const yaw = ry + side * Math.PI / 8;           // the facet 22.5 degrees off the facing
       const ex = x + Math.sin(yaw) * 0.3469 * T, ez = z + Math.cos(yaw) * 0.3469 * T;
-      out.push(part(sph(0.07 * T, 9, 7), INK, ex, 2.23 * T, ez, Math.PI / 2, yaw, 0, 0.75, 0.12, 0.70));
+      out.push(part(sph(0.07 * T, 9, 7), INK, ex, 2.2275 * T, ez, Math.PI / 2, yaw, 0, 0.75, 0.12, 0.85));
     }
     // ── AND A MOUTH ───────────────────────────────────────────────────────
     // Two eyes and nothing else is a MANNEQUIN. It is the single thing art
@@ -532,14 +550,16 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
     // inside the skull at +/-0.151 T of lateral extent, giving a drawn width of
     // 0.30 T on a 0.72 T head.
     //
-    // IT STILL STANDS OUT OF THE OUTLINE, and that is recorded, not fixed.
+    // IT STILL STANDS OUT OF THE OUTLINE, and that is frozen, not fixed.
     // qa/townface.mjs measures its drawn reach at 0.383 T against the skull's
-    // 0.356 T outline — the same lump the eyes had. The eyes' cure does not
-    // carry over: a lens has to sit inside ONE facet to clear the skull without
-    // leaving the outline, a facet is about 0.135 T wide at this height, and
-    // this mouth is 0.30 T. Cutting it to one facet changes every face in the
-    // town, which is an art call and not part of the job that fixed the eyes.
-    // The probe prints the mouth's numbers on every run and gates only the eyes.
+    // 0.356 T widest ring — the same kind of lump the eyes had, 0.027 T past
+    // it. The eyes' cure does not carry over: a lens has to sit inside ONE
+    // facet to clear the skull without leaving the ring, a facet is about
+    // 0.135 T wide at this height, and this mouth is 0.30 T. Cutting it to one
+    // facet changes every face in the town, which is an art call and not part
+    // of the job that fixed the eyes. Until it is made, the probe holds the
+    // mouth where it is: FAIL if it reaches past 0.3833 T or draws less than
+    // 32.8% in front of the skull.
     //
     // DETERMINISM: no mpick, no mrnd. Still exactly the two seeded draws at the
     // top of this function, in the same order.

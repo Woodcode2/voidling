@@ -606,6 +606,16 @@ const SUITE = [
     cmd: ['node', 'qa/peoplefacet.mjs'], verdict: pf,
     why: 'the walking people are curves and not prisms — every part wide enough for a facet to read carries at least the 14 sides island.ts states, measured as the straight edge in screen pixels at the closest the camera ever settles (the owner, twice: "the people in game as like Lego")' },
 
+  // Studio round 4, Job 6: the static townsfolk's face and collar, built in
+  // node from mainstreet.ts itself. Judged by exit code rather than pf: it
+  // prints PASS lines for checks 1-2 before it builds a face, so a run killed
+  // part-way (a signal, no handler reached) would leave PASS lines and no FAIL
+  // line; its exit code is 0 only when it reaches its own last line clean.
+  // Ran in 6.4-6.6s on a four-core box under a browser gate's load.
+  { id: 'townface', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 120,
+    cmd: ['node', 'qa/townface.mjs'], verdict: exitCode,
+    why: 'the static townsfolk (the two protesters beside the spawn, every judge, farmhand and drive-in customer): eyes inside the skull\'s widest ring and proud of the drawn skull, each eye showing at least 0.0031 T^2 of ink and clear of the mouth from 46-65 degrees, the mouth frozen where it stands until its art call is made, no same-colour collar ruff, and the seeded draws shirt -> facing -> [hat] -> skin -> trousers frozen in order and count' },
+
   { id: 'safety', tier: 'words', profiles: ['push', 'live'], timeout: 60,
     cmd: ['node', 'scripts/safety-scan.mjs'], verdict: exitCode,
     why: 'no retired vocabulary in any string a child can read — the 4+ rating depends on it' },
