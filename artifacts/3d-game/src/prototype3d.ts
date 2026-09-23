@@ -436,7 +436,32 @@ if (_wantGoal !== null) playingGoal = _wantGoal;
 // setWorld() has just established on the line above, so this is the earliest
 // point it CAN run. Everything downstream that closes over `audio` is a
 // callback invoked later, so nothing moves into a temporal-dead-zone.
-const audio = createAudio();
+// ── QA: EVERY CALL INTO THE AUDIO ENGINE, IN ORDER, ON THE GAME'S CLOCK ────
+// Research governor G4. "What plays when the match ends" had no instrument:
+// musicLog() records the engine's state transitions, not which sound a call
+// site asked for, so a probe could not tell the buzzer's evolve() from a
+// whistle. Each public method is wrapped once, here, to note its name and
+// tClock before it runs. Per-frame reads and the zone setter are skipped, or
+// they would bury everything else. tClock is declared further down this file,
+// so until that line has run a call is stamped -1 rather than touching it.
+// Nothing about what is played changes; this only writes down that it was.
+const audioCalls: { t: number; id: string }[] = [];
+let audioClockReady = false;
+const AUDIO_UNLOGGED = new Set(['musicState', 'musicLog', 'isMuted', 'setZone', 'ensureMusic']);
+const audio = (() => {
+  const a = createAudio();
+  const rec = a as unknown as Record<string, unknown>;
+  for (const k of Object.keys(rec)) {
+    const f = rec[k];
+    if (typeof f !== 'function' || AUDIO_UNLOGGED.has(k)) continue;
+    rec[k] = (...args: unknown[]) => {
+      audioCalls.push({ t: audioClockReady ? tClock : -1, id: k });
+      if (audioCalls.length > 400) audioCalls.shift();
+      return (f as (...x: unknown[]) => unknown).apply(a, args);
+    };
+  }
+  return a;
+})();
 // …and start the downloads. Decoding needs no running clock — only playing
 // does — so the menu theme and this world's track are fetched and decoded
 // while the island is still being raised, and are in memory before anything
@@ -3451,6 +3476,7 @@ const _dbg = new Proxy(_dbgStore, {
   // where the four-phase story currently stands (newsroom_arc.ts)
   __music: () => ReturnType<typeof audio.musicState>;
   __audioLog: () => string[];
+  __audioCalls: () => { t: number; id: string }[];
   __newsArc: () => {
     log: { t: number; phase: number; tier: number; react: boolean; brand: string; text: string }[];
     arc: { phase: number; cards: number; high: number };
@@ -3545,6 +3571,8 @@ _dbg.__music = () => audio.musicState();
 /** QA: the audio engine's own ordered log — what it actually played, in order.
  *  qa/nomstream.mjs counts the chain's crowns and cash-ins in it. */
 _dbg.__audioLog = () => audio.musicLog();
+/** QA: every public audio call as {t: tClock, id}, oldest first (see its wrapper). */
+_dbg.__audioCalls = () => audioCalls.slice();
 // QA: put a hat on the live void. Needed to measure OCCLUSION from the play
 // camera — the thing qa/hatsheet.mjs cannot see, because it renders a hat alone
 // in a bare scene from near-horizontal angles while the game looks DOWN at a
@@ -5423,6 +5451,7 @@ const JOY_EDGE = 22;
 // px of base travel per rescue tick — ~4 frames from crippled to full reach
 const JOY_STEP = 16;
 let lastInput = -9999, tClock = 0;
+audioClockReady = true;   // the audio call log may read tClock from here on
 let hatSayCd = 12;   // legendary hats speak, but not for the first few seconds
 function joySet(cx: number, cy: number) {
   joy.px = cx; joy.py = cy;
