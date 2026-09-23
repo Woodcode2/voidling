@@ -84,6 +84,14 @@
       /* <b> computes 'bolder', which from a 600 parent lands on 900 — a face
          Fredoka does not have. Pin it to the real display weight. */
       b, strong { font-weight: 700; }
+      /* ── A BUTTON DOES NOT INHERIT THE PAGE'S FACE, UNLESS TOLD ────────────
+         The user agent gives every <button> `font: -webkit-small-control`,
+         which resets the family to the system UI face. Twenty-five rules in
+         this sheet each remembered `font-family: inherit` on their own button;
+         at least two never did — the scrapbook's world tabs and MY NUMBERS on
+         the results card — and drew their labels in the platform's face inside
+         a Fredoka game. One rule, so the next button cannot forget. */
+      button { font-family: inherit; }
 
       /* ── THE CHROME SYSTEM — why every raised surface now shares four lines ─
          The owner's read was "not crisp, not very defined", and the audit
@@ -135,9 +143,30 @@
         --pipStep: 80ms;
       }
       /* one rim treatment, spent everywhere a surface is raised */
+      /* ── AND FOR A LONG TIME IT WAS SPENT NOWHERE ───────────────────────────
+         The chrome-system note above describes a class that was applied to
+         zero elements: the four chips on screen for every second of every match —
+         #goal, #coins, #growth, #btnQuit — each carried its own hand-rolled
+         translucent fill and its own radius (22, 11, 15 and 11px), two had a
+         border of their own and two had none, and three of them a live
+         backdrop blur over the WebGL canvas. Studio round 4 (Job 7) puts all
+         four on this class. The ID
+         rules below now carry only geometry and type; fill, rim, edge and
+         shadow come from here, and ID specificity means an ID rule that
+         declares any of those four will silently win — so they must not. */
       .clay { background: var(--panel);
         border: 2px solid var(--edge); border-top-color: var(--rim);
         box-shadow: inset 0 2px 0 var(--rim), var(--shadow-card); }
+      /* ── A DRAWN MARK, SET LIKE A LETTER ─────────────────────────────────────
+         → ▾ ▶ ⌂ are outside every unicode-range the four @fontsource/fredoka
+         imports declare (qa/glyphs.mjs reads the ranges: U+2191 and U+2193
+         are in the latin subset and U+2192 is not), so each one used to come
+         out of the platform's fallback face. They are <symbol>s in the icon
+         sheet now, and this box makes a <use> of one behave like the glyph it
+         replaced: one em square, sitting on the text's own baseline, in the
+         text's own colour. */
+      .gl { display: inline-block; width: 1em; height: 1em; flex: none;
+        vertical-align: -0.14em; fill: currentColor; overflow: visible; }
       /* THE GREY CIRCLE THAT ATE THE SCREEN. Push and hold — which is the ONLY
          control this game has — and the browser painted its own press feedback
          over the element under the thumb. That element is the WebGL canvas, and
@@ -320,11 +349,15 @@
            440x956, 430x932 and 375x667 — directly above the toolbar. */
         bottom: max(26px, calc(18px + env(safe-area-inset-bottom, 0px)));
         width: min(92vw, 460px); box-sizing: border-box;
-        padding: 8px 12px 9px; border-radius: 15px;
-        background: linear-gradient(180deg, rgba(30,16,58,0.91), rgba(16,8,30,0.93));
-        border: 1.5px solid rgba(201,166,255,0.28);
-        box-shadow: 0 6px 22px rgba(0,0,0,0.42);
-        backdrop-filter: blur(8px);
+        /* .clay (markup) owns fill, rim, edge and shadow. Its edge is 2px where
+           this card's was 1.5, so each padding gives back the half pixel and
+           neither the card's outer box nor the track inside it moves — the
+           track's rect is where every flying score number lands
+           (prototype3d.ts refreshGRect caches it once a match). Radius 15 was off the
+           12/18/26 scale; the card takes --r-md. The blur(8px) is gone: over a
+           solid fill it was compositing the WebGL canvas into an intermediate
+           texture every frame to change nothing a child could see. */
+        padding: 7.5px 11.5px 8.5px; border-radius: var(--r-md);
         transition: transform 0.18s cubic-bezier(0.2,1.6,0.4,1); }
       #growth .gRow { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
       #growth .gNow { color: #fff; font-size: 15px; font-weight: 700; letter-spacing: 1.6px;
@@ -576,7 +609,29 @@
          can never eat a touch in the exact seconds a player is scrambling. */
       #count { position: fixed; top: 33%; left: 0; right: 0; z-index: 8; pointer-events: none;
         display: flex; justify-content: center; }
+      /* ── THE LAST HERO NUMERAL WITHOUT A CONTOUR ────────────────────────────
+         #timer, #evolve, #form, #noms and the score floaters all carry the
+         house outline; this one carried an offset drop and a warm glow, and a
+         glow LIGHTENS the ground around a gold glyph — studio round 3 measured
+         the gold below 3:1 on 22-34% of its own footprint in all five worlds
+         and the hot 3-2-1 below it on 74-81%. 8px, because the stroke has to
+         scale with a glyph up to 150px tall the way #timer's 3px scales with
+         a 40px one; paint-order puts the fill over the inner half, so what
+         shows is a 4px contour outside the letterform on any ground.
+
+         WHERE IT SITS IS STILL top: 33%, AND THAT IS OWED, NOT DECIDED. The
+         studio's placement is "the free band below the void, measured on the
+         HUD frame" — not under the clock (#news owns that band) and not over
+         his head (#form owns that). That band is between the hero's projected
+         face box and the growth card's top edge, and neither number can be
+         read from source: the hero's screen box comes out of the camera law
+         at clock 7, and the card's height out of Fredoka's line metrics. A
+         percentage typed here without that frame would be a guess with a
+         comment on it. qa/countdown.mjs reads both edges at ?len=15, clock 7,
+         prints the band and the centred `top`, and fails today on overlap —
+         the number to write here is the one it prints. */
       #count span { font-size: min(30vw, 150px); font-weight: 700; color: #ffd23f;
+        -webkit-text-stroke: 8px rgba(12,6,26,0.92); paint-order: stroke fill;
         text-shadow: 0 5px 0 rgba(60,20,10,0.5), 0 0 38px rgba(255,180,60,0.55);
         opacity: 0; transform: scale(0.6); }
       #count span.hot { color: #ff6a5e; text-shadow: 0 5px 0 rgba(60,10,10,0.55), 0 0 42px rgba(255,90,74,0.6); }
@@ -591,8 +646,10 @@
         max-width: min(92vw, 420px); padding: 11px 16px 11px 13px; border-radius: 18px;
         background: linear-gradient(180deg, rgba(38,20,64,0.94), rgba(20,10,38,0.94));
         border: 1.5px solid rgba(184,117,255,0.42);
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 24px rgba(184,117,255,0.22);
-        backdrop-filter: blur(9px); }
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 24px rgba(184,117,255,0.22); }
+      /* (no backdrop-filter: at 0.94 the card lets 6% of the world through,
+         and a blur(9px) of that 6% was the fourth full-screen blur pass on a
+         match frame — studio round 4, Job 7, took all four out together) */
       #banner .bIco { font-size: 26px; line-height: 1; flex: none; }
       #banner .bTx { color: #fff; font-size: clamp(16px, 4.6vw, 21px); font-weight: 700;
         letter-spacing: 0.4px; line-height: 1.15; text-align: left; }
@@ -675,8 +732,10 @@
         transform: translate(-50%, -50%); pointer-events: none; display: none; }
       /* coins + quests */
       /* The panel-opacity measurement below was taken on the leaderboard,
-         which was deleted 2026-08-29. It is kept here because #coins and
-         #btnQuit use the same rgba(16,8,30,0.88) it produced. */
+         which was deleted 2026-08-29. #coins and #btnQuit wore the same
+         rgba(16,8,30,0.88) it produced until studio round 4 put both on .clay's
+         solid --panel; it is kept because it is the reason solid was the right
+         direction to keep going in. */
       /* ── PANEL OPACITY, and why these three numbers moved ──────────────
          Measured across MAPLE FALLS, GAME DAY and LANTERN NIGHT: the game's
          three most-glanced chips were all light text on a HALF-TRANSPARENT
@@ -689,9 +748,20 @@
          backwards from where anyone would look for the problem.
          At 0.88 the panel is 0.12 whatever is behind it, and the chip has
          the same contrast on a night market as on a beach. The blur is what
-         keeps it from reading as a solid box. */
+         keeps it from reading as a solid box.
+         RETRACTED, studio round 4 (Job 7): reading as a solid box IS the bar.
+         hole.io's plates are opaque, and the clay school's read as moulded
+         objects because they are opaque with a lit rim — the rim does the
+         separating this blur was faking, and the blur cost a full-screen
+         backdrop pass per chip per frame to modulate 12% of a pixel. The chip
+         is .clay now: --panel at full opacity, so nothing behind it reaches
+         the chip at all and its contrast is the same on every world. */
+      /* padding 4/9 rather than 6/11: .clay adds a 2px edge, and giving it
+         back out of the padding keeps the chip at the "about 29px tall" that
+         #end's reserved top strip was sized for. 11px radius was off the
+         scale; --r-sm is 12. */
       #coins { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); z-index: 5; pointer-events: none;
-        background: rgba(16,8,30,0.88); border-radius: 11px; padding: 6px 11px; backdrop-filter: blur(7px);
+        border-radius: var(--r-sm); padding: 4px 9px;
         color: #ffe08a; font-size: 14px; font-weight: 700; }
       /* daily quests: three icon CHIPS (pre-reader friendly), not sentences */
       /* The three daily-quest chips sat in the top-left of every single frame
@@ -720,9 +790,14 @@
         /* under the clock, wherever the clock ends — not at a number picked
            off one phone. 6px of air at every width (see --timer-bottom). */
         top: calc(var(--timer-bottom) + 6px); z-index: 12;
-        display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px;
-        border-radius: 22px; background: rgba(28, 15, 61, 0.82);
-        box-shadow: 0 2px 10px rgba(0,0,0,0.35); pointer-events: none;
+        /* .clay (markup) owns the fill and rim. border-box, and 12px of side
+           padding rather than 14, because the class brings a 2px edge: the
+           chip stays 44px tall and exactly as wide as it was, so the gap
+           qa/chipfit.mjs grades under the clock at four widths does not move.
+           22px was a pill on a 44px chip and off the scale; 999 is on it. */
+        box-sizing: border-box;
+        display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px;
+        border-radius: 999px; pointer-events: none;
         /* ── A PILL WITH A FIXED HEIGHT MUST NOT BE ALLOWED TO WRAP ───────
            `height: 44px` with no width limit and no nowrap is a trap: a value
            too long to fit does not shrink and does not ellipse, it wraps — and
@@ -734,7 +809,11 @@
            ever does outgrow the screen, max-width holds it on screen and the
            probe fails loudly, which is the failure mode worth having. */
         white-space: nowrap; max-width: calc(100vw - 24px); }
-      #goal .gLabel { font-size: 12px; letter-spacing: 1.2px; color: #cfc4ee; }
+      /* 600, not the 400 it inherited from <body>: the label is the one line on
+         a HUD chip that was set in the BODY weight, beside a 700 value, over a
+         moving world. The type ladder's own words for 600 are "card titles,
+         emphasis", which is what a chip's label is. */
+      #goal .gLabel { font-size: 12px; font-weight: 600; letter-spacing: 1.2px; color: #cfc4ee; }
       #goal .gVal { font-size: 17px; color: #fff6df; font-weight: 700; }
       body.menu #goal, body.ovl #goal { display: none; }
       /* …and `display: flex` above beats the user agent's own [hidden] rule, so
@@ -1141,10 +1220,19 @@
          through it. */
       #end.lvl #endQuests { display: none !important; }
       #end.lvl #endStats.open { display: flex; }
+      /* 44px, because it is a button: 7px of padding round an 11px label is
+         nowhere near the target every other button on this card was taken to,
+         on the screen a child is most likely to be tapping in a hurry
+         (qa/uisystem.mjs reads the rendered height). The chevron is the sheet's
+         ic-chev — whose own note already said "the end card's MY NUMBERS" and
+         was never used here — and it turns over when the numbers are open. */
       #endMore { display: none; margin: 10px auto 0; padding: 7px 16px; border-radius: 999px;
+        min-height: 44px; box-sizing: border-box;
         border: 1.5px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.05);
         color: #b9a6e4; font-size: 11px; font-weight: 700; letter-spacing: 1.6px; }
       #end.lvl #endMore { display: block; }
+      #endMore .gl { margin-left: 3px; transition: transform 0.16s ease; }
+      #endMore.open .gl { transform: rotate(180deg); }
       /* THE HEADLINE, WHEN IT IS A PIP. #end .hd is a 26-44px type block with
          its own line-height and stroke; a 96px pip inside it inherits none of
          that usefully and all of it harmfully. So on a level the headline stops
@@ -1406,7 +1494,12 @@
          system emoji on the path in from the front door. */
       .bkHd #btnDaily svg { display: block; width: 22px; height: 22px; margin: 0 auto; }
       .bkTabs { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; padding-bottom: 10px; }
-      .bkTabs button { border: 0; border-radius: 999px; padding: 8px 13px; font-size: 12.5px;
+      /* min-height 44: 8px of padding round a 12.5px label was a pill a child
+         had to aim for, in the one row of the scrapbook that changes what the
+         whole screen shows (studio round 3 found it; round 4, Job 7 fixed it).
+         The family now comes from the global `button` rule — this one never
+         had it. */
+      .bkTabs button { min-height: 44px; border: 0; border-radius: 999px; padding: 8px 13px; font-size: 12.5px;
         font-weight: 600; letter-spacing: 0.6px; background: rgba(255,255,255,0.09); color: #cbb8e8; }
       .bkTabs button.on { background: #cb99ff; color: #1a0f2e; }
       /* grid-auto-rows: min-content IS LOAD-BEARING. Without it the six rows
@@ -1454,7 +1547,19 @@
       #end { position: fixed; inset: 0; z-index: 9; display: none; flex-direction: column;
         align-items: center; justify-content: flex-start; background: rgba(13,8,33,0.82); backdrop-filter: blur(8px);
         color: #fff; text-align: center; }
-      #end.show { display: flex; }
+      /* ── THE CARD ARRIVES; IT DOES NOT APPEAR ────────────────────────────────
+         `display: flex` and nothing else, so the results card replaced the
+         world between two frames — a hard cut, on the screen every match ends
+         on, in a game whose sheets pop in on modalIn. 0.28s of opacity: no
+         slide and no scale on a full-screen scrim, because its children
+         already arrive on their own (the standings rows on erIn, the stat
+         tiles on esIn at staggered delays), and a moving parent would drag
+         every one of them with it.
+         Opacity only, so the scrim's backdrop blur fades with it rather than
+         snapping on under a transparent card. Silenced in both calm lists at
+         the foot of the sheet — the card then arrives as it always did. */
+      #end.show { display: flex; animation: endIn 0.28s ease-out; }
+      @keyframes endIn { from { opacity: 0; } to { opacity: 1; } }
       /* THE TOP PADDING CLEARS THE COIN CHIP, and that is not arbitrary.
          #coins is fixed at top 12px and about 29px tall, and it was raised to
          z-index 11 to clear the menu — the comment where that happens says it
@@ -1589,6 +1694,10 @@
         letter-spacing: 1px; color: #0d0821; background: linear-gradient(180deg, #ffe07a, #ffc21f);
         border: none; border-radius: var(--r-sm); padding: 9px 22px; cursor: pointer;
         box-shadow: inset 0 2px 0 rgba(255,255,255,0.55), 0 4px 0 #c98d00, 0 7px 14px rgba(0,0,0,0.3); }
+      /* the drawn arrow is a flex item here, and the end of a flex item drops
+         the trailing space its label ends on — so the gap that space used to
+         make is a margin */
+      .goShop .gl { margin-left: 0.35em; }
       #end .er { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700;
         animation: erIn 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) backwards;
         padding: 5px 13px; border-radius: var(--r-sm); margin: 3px 0;
@@ -2123,14 +2232,24 @@
          see what they are waiting for */
       /* the selected world gets the gold frame it always had, on the poster */
       #worlds .wCard.sel { box-shadow: 0 0 0 3px #ffd23f, 0 10px 30px rgba(0,0,0,0.5); }
-      /* in-game home button */
+      /* in-game pause button (born as the home button; it kept the id) */
       #btnQuit { position: fixed; top: calc(56px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); z-index: 6; width: 44px; height: 44px;
         /* the lowest-contrast element in the game on every world measured —
            1.46:1 on Maple — because a light purple glyph on a 0.6 panel over
            bright ground is two mid greys. The panel goes opaque and the glyph
            goes up; it is a QUIT button and it has to be findable in a hurry. */
-        border-radius: 11px; border: 1.5px solid rgba(201,166,255,0.55); background: rgba(16,8,30,0.88);
-        color: #e6dbff; font-size: 20px; cursor: pointer; font-family: inherit; backdrop-filter: blur(7px); }
+        /* …and now .clay's opaque --panel, its rim and its edge (markup), not
+           a 0.88 panel under a blur(7px) of the live canvas. A <button> is
+           border-box, so the class's 2px edge stays inside the 44x44 target.
+           THE MARK IS A PAUSE, NOT A HOUSE. The first tap opens the pause
+           sheet (prototype3d.ts: "FIRST TAP PAUSES"), and ⌂ promised HOME — to
+           a child, and in a glyph the font does not carry, so it came out of
+           the platform's fallback face as well as saying the wrong thing.
+           ic-pause, from the sheet; the id stays, because every probe that
+           pauses a match clicks #btnQuit. */
+        border-radius: var(--r-sm);
+        color: #e6dbff; font-size: 20px; cursor: pointer; font-family: inherit; }
+      #btnQuit .gl { display: block; margin: 0 auto; }
       body.menu #btnQuit { display: none; }
       #btnQuit.arm { width: auto; padding: 0 12px; font-size: 12px; font-weight: 700; letter-spacing: 1px;
         color: #ff8a9a; border-color: rgba(255,90,110,0.65); }
@@ -2250,6 +2369,21 @@
       .wCard.shake { animation: wshake 0.4s; }
       @keyframes wshake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
       @keyframes modalIn { from { opacity: 0; transform: translateY(14px) scale(0.94); } to { opacity: 1; transform: none; } }
+      /* ── FOUR MORE PANELS ARRIVE THE SAME WAY ─────────────────────────────────
+         modalIn was spent on four cards (#daily, #skinPrev, #settings, #gate)
+         and nowhere else, so the calendar floated in and the SHOP — which has a
+         door on the menu and another on the results card — appeared between
+         two frames like a page load. Same curve, same 0.24s,
+         on the pause card and on the three sheets reached from the front door.
+         The `to` keyframe is each element's own resting state (opacity 1, no
+         transform), so silencing it in the calm lists leaves the panel exactly
+         where it always was — the check qa/calmlist.mjs asks for first.
+         A TRANSFORMED ANCESTOR IS A CONTAINING BLOCK for fixed descendants, for
+         the 0.24s it runs. .metaScr and #shop already are one — they carry a
+         backdrop-filter, which does the same (see the note on #soloTog) — so
+         nothing inside them changes what it is positioned against. */
+      #pause.show .setCard, #shop.show, #worlds.show, #profile.show {
+        animation: modalIn 0.24s cubic-bezier(0.2, 1.4, 0.4, 1); }
       /* touch feel: every control presses down */
       .backBtn:active, #btnBack:active, #btnHome:active, #btnQuit:active, .wCard:active, .skCard:active { transform: scale(0.96); }
       #dailyClaim:active, #spAct:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8163a; }
@@ -2594,8 +2728,17 @@
          grid, exactly as the absolute one did. So it is docked the way a bar
          should be: a plain flex child after the grid, with the grid taking the
          scroll instead of the screen. Nothing can overlap anything. */
+      /* min-height 44 — it is a mode switch, and 10px of padding round a 13px
+         label did not reach the target the rest of the picker is held to.
+         CENTRE, not baseline, once there is a floor: with `baseline` the extra
+         height all lands under the text and the label rides the top edge of
+         its own pill. The 11px subtitle then centres on the 13px label rather
+         than sharing its baseline — in one face that moves it by (ascent −
+         descent) × 1px, under a pixel for any face whose ascent is under an
+         em. */
       #soloTog { flex: 0 0 auto; margin: 10px 0 2px; cursor: pointer;
-        display: flex; flex-direction: row; align-items: baseline; gap: 9px;
+        min-height: 44px; box-sizing: border-box;
+        display: flex; flex-direction: row; align-items: center; gap: 9px;
         background: rgba(28,12,52,0.92); border: 2px solid rgba(255,255,255,0.16); border-radius: 16px;
         color: #cbb2ff; font-family: inherit; font-size: 13px; font-weight: 700; letter-spacing: 1.4px;
         padding: 10px 20px; }
@@ -2966,6 +3109,23 @@
       /* …and it has no business sitting over a results card or a shop sheet */
       body.ovl #growth { display: none; }
       #growth.off { display: none; }
+      /* ── THE RESULTS CARD IS NOT A WINDOW ONTO THE MATCH ───────────────────
+         #end is a 0.82 scrim, and everything the match left on screen showed
+         through it: the clock, the pause button, a bulletin or a banner
+         still in flight, a countdown numeral, a crowd bubble, a score floater —
+         and the goal chip, which sits at z-index 12, ABOVE the card, reading
+         "EAT 18,020 / 18,000" over the result it produced until the HUD's
+         0.2s tick got round to hiding it (qa/out/hudshots/maple-endcard.png
+         was shot inside that window, and it is in the repo). With the card now
+         fading in over 0.28s, every one of them would be at full strength for
+         the first frames of the result. body.ovl covers the chip, the bar, the
+         NOMS pill, the form callout and the wayfinder now that 'end' is in the
+         overlay list; this covers the rest by name, and names three of those
+         again so the card does not depend on an observer to be clean.
+         #coins IS NOT HERE, deliberately: it is the wallet the card's payout
+         goes into (endMatch's addCoins() rewrites it as the card comes up),
+         and #end's top padding exists to leave it room. qa/endghost.mjs. */
+      body:has(#end.show) :is(#timer,#news,#banner,#count,#btnQuit,#wayfind,#form,#noms,.vb,.vf){display:none}
       /* 12 painted the wallet chip over four scrolling screens — it sat on the
          Honey voidling's face at the bottom of the shop and clipped the TOP
          VOIDS title with no scrolling at all. It only ever needed to clear the
@@ -3072,6 +3232,13 @@
          sake and carry no state a child needs. */
       body.calm .handG, body.calm .hTrail, body.calm .hTouch,
       body.calm .pip.shake, body.calm #mlPips .pip.shake { animation: none !important; }
+      /* THE FIVE THAT STUDIO ROUND 4 (Job 7) ADDED, named the day they were
+         written: modalIn on the pause card and the three front-door sheets,
+         and the results card's fade. Every one's last keyframe is its own
+         resting state, so with the animation gone each panel is simply there
+         — which is how all five arrived before they animated at all. */
+      body.calm #pause.show .setCard, body.calm #shop.show, body.calm #worlds.show,
+      body.calm #profile.show, body.calm #end.show { animation: none !important; }
       /* ── TWO CARDS THAT MUST NOT SIMPLY BE SILENCED ──────────────────────
          #evolve.show and #news.show are not decorations on a visible element:
          their animations ARE their visibility. Both elements sit at opacity 0
@@ -3114,7 +3281,8 @@
         #skinPrev .spCard, #daily .dCard, .skCard .rib,
         .skCard.bought, .burst > i, #shopWallet.bump, .skCard.isnew::before,
         #skinPrev.win .spWin,
-        .handG, .hTrail, .hTouch, .pip.shake, #mlPips .pip.shake {
+        .handG, .hTrail, .hTouch, .pip.shake, #mlPips .pip.shake,
+        #pause.show .setCard, #shop.show, #worlds.show, #profile.show, #end.show {
           animation: none !important;
         }
         /* the sparkles are pure animation: with none, they would sit in a pile
@@ -3284,9 +3452,29 @@
         <path fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"
               stroke-linejoin="round" d="M5.6 9.2 12 15.6l6.4-6.4"/>
       </symbol>
+      <!-- THE THREE TEXT MARKS THE FONT NEVER HAD. → ▶ and ⌂ sat inside our
+           own buttons in the platform's fallback face (qa/glyphs.mjs). All
+           three are currentColor, so each takes its button's ink the way the
+           letter it replaced did, and the arrow shares the chevron's 2.8 stroke
+           so the two read as one hand. -->
+      <!-- ARROW — CONTINUE, OPEN SHOP, TAKE ME THERE -->
+      <symbol id="ic-arrow" viewBox="0 0 24 24">
+        <path fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"
+              stroke-linejoin="round" d="M4.2 12h15M13.4 6.2 19.2 12l-5.8 5.8"/>
+      </symbol>
+      <!-- PLAY — a soft triangle, set by its centroid rather than its
+           bounding box, which is what makes a play mark look centred -->
+      <symbol id="ic-play" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M7.8 5.1c0-1.2 1.3-1.9 2.3-1.3l10.3 6.9c.9.6.9 2 0 2.6L10.1 20.2c-1 .6-2.3-.1-2.3-1.3z"/>
+      </symbol>
+      <!-- PAUSE — the in-match button pauses, so it says pause -->
+      <symbol id="ic-pause" viewBox="0 0 24 24">
+        <rect fill="currentColor" x="5.6" y="4.4" width="4.6" height="15.2" rx="1.7"/>
+        <rect fill="currentColor" x="13.8" y="4.4" width="4.6" height="15.2" rx="1.7"/>
+      </symbol>
     </defs></svg>
     <div id="timer">3:00</div>
-    <div id="coins">✦ 0</div>
+    <div id="coins" class="clay">✦ 0</div>
     <div id="quests"></div>
     <!-- THE LEVEL'S GOAL, LIVE. Sits where #quests will leave (the daily board
          is retired on day 6 of the menu stream) and carries one line: what this
@@ -3294,9 +3482,9 @@
          chose a level — a harness match with no level runs goal-free, which is
          what keeps ~110 existing match probes from silently becoming level
          runs. Built by the module; nothing here is ever re-templated. -->
-    <div id="goal" hidden><span class="gLabel"></span><b class="gVal"></b></div>
+    <div id="goal" class="clay" hidden><span class="gLabel"></span><b class="gVal"></b></div>
     <!-- built once by the module; NOTHING here is ever re-templated -->
-    <div id="growth">
+    <div id="growth" class="clay">
       <div class="gRow"><span class="gNow">VOIDLING</span><span class="gM">6m</span>
         <span class="gNext">NEXT <b>MUNCHER</b></span></div>
       <div class="gTrack"><div class="gFill"></div></div>
@@ -3342,7 +3530,7 @@
         </g>
       </svg>
     </div>
-    <button id="btnQuit" title="home">⌂</button>
+    <button id="btnQuit" class="clay" title="pause" aria-label="pause"><svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-pause"/></svg></button>
     <div id="titlecard">
       <!-- all three are filled from WORLD_COPY before the card is ever shown;
            hardcoding them here is how "LEVEL 1 / MAPLE ISLE / eat the island"
@@ -3546,7 +3734,7 @@
         <button class="setRow" id="pauseSound"><span>🔊 SOUND</span><b>ON</b></button>
         <button class="setRow" id="pauseHaptics"><span>📳 RUMBLE<i class="setSub" id="pauseHapticsSub">phone vibration</i></span><b>ON</b></button>
         <button class="setRow" id="pauseMotion"><span>🎢 BIG MOTION<i class="setSub">screen shake &amp; flashes</i></span><b>ON</b></button>
-        <button id="pauseResume">▶ KEEP PLAYING</button>
+        <button id="pauseResume"><svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-play"/></svg> KEEP PLAYING</button>
         <button id="pauseQuit" class="gateCancel">LEAVE THE MATCH</button>
       </div>
     </div>
@@ -3581,27 +3769,27 @@
         <div class="wCard sel" data-world="maple">
           <div class="wArt"></div><div class="wNum">WORLD 1</div>
           <div class="wBody"><b>MAPLE FALLS</b><span>SLEEPY LITTLE TOWN</span>
-            <div class="wBest"></div><div class="wPips"></div><div class="wGo">▶ PLAY</div></div>
+            <div class="wBest"></div><div class="wPips"></div><div class="wGo"><svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-play"/></svg> PLAY</div></div>
         </div>
         <div class="wCard" data-world="pirate">
           <div class="wArt"></div><div class="wNum">WORLD 2</div>
           <div class="wBody"><b>PIRATE BAY</b><span>SUN, SAND, SNACKS</span>
-            <div class="wBest"></div><div class="wPips"></div><div class="wGo">▶ PLAY</div></div>
+            <div class="wBest"></div><div class="wPips"></div><div class="wGo"><svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-play"/></svg> PLAY</div></div>
         </div>
         <div class="wCard" data-world="gameday">
           <div class="wArt"></div><div class="wNum">WORLD 3</div>
           <div class="wBody"><b>GAME DAY</b><span>THE WHOLE TOWN IS HERE</span>
-            <div class="wBest"></div><div class="wPips"></div><div class="wGo">▶ PLAY</div></div>
+            <div class="wBest"></div><div class="wPips"></div><div class="wGo"><svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-play"/></svg> PLAY</div></div>
         </div>
         <div class="wCard" data-world="lantern">
           <div class="wArt"></div><div class="wNum">WORLD 4</div>
           <div class="wBody"><b>LANTERN NIGHT</b><span>YOU ARE THEIR GUEST</span>
-            <div class="wBest"></div><div class="wPips"></div><div class="wGo">▶ PLAY</div></div>
+            <div class="wBest"></div><div class="wPips"></div><div class="wGo"><svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-play"/></svg> PLAY</div></div>
         </div>
         <div class="wCard" data-world="powder">
           <div class="wArt"></div><div class="wNum">WORLD 5</div>
           <div class="wBody"><b>POWDER PASS</b><span>SCHOOL'S SHUT. SLIDE.</span>
-            <div class="wBest"></div><div class="wPips"></div><div class="wGo">▶ PLAY</div></div>
+            <div class="wBest"></div><div class="wPips"></div><div class="wGo"><svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-play"/></svg> PLAY</div></div>
         </div>
         <!-- WORLD 6 exists in WorldId, WORLDS, WORLD_NAMES, WORLD_COPY,
              WORLD_LIGHT, the newsroom, the crowd and the prop kit — and had no
@@ -3612,7 +3800,7 @@
         <div class="wCard" data-world="skylark">
           <div class="wArt"></div><div class="wNum">WORLD 6</div>
           <div class="wBody"><b>SKYLARK FIELD</b><span>BEFORE THEY ALL GO UP</span>
-            <div class="wBest"></div><div class="wPips"></div><div class="wGo">▶ PLAY</div></div>
+            <div class="wBest"></div><div class="wPips"></div><div class="wGo"><svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-play"/></svg> PLAY</div></div>
         </div>
       </div>
       <!-- AFTER the grid, so it docks below it instead of floating on top of
@@ -3766,7 +3954,7 @@
            the reward and the next dot, interrupting the one line of thought the
            card exists to carry: did I do it, where am I, what did I get, what
            is next. The least important thing takes the lowest slot. -->
-      <button id="endMore">MY NUMBERS ▾</button>
+      <button id="endMore">MY NUMBERS<svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-chev"/></svg></button>
       <div id="endStats"></div>
       <div id="endQuests"></div>
       <!-- THE WAY BACK IN NEVER SCROLLS AWAY. These were direct children of a

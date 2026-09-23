@@ -43,7 +43,19 @@ const PORT = process.argv[2] || '4177';
  *  deliberately exempting ✓ and ★ — three characters of exactly the same kind,
  *  two forgiven and one condemned, on nothing but which range I happened to
  *  type. ✨ (U+2728) sits beside ✦ in the same block and IS colour emoji. Only
- *  the Unicode property tells them apart. */
+ *  the Unicode property tells them apart.
+ *
+ *  RETRACTED IN PART, studio round 4 (Job 7): "render in our own face" is
+ *  false for every one of ✦ ✓ ★ →. The four @fontsource/fredoka imports are
+ *  unicode-range subsets, and none of those code points is in any of them —
+ *  the latin subset even carries U+2191 and U+2193 and skips the U+2192
+ *  between them — so each is drawn by the platform's fallback face, in its
+ *  weight, inside our own labels. qa/glyphs.mjs reads the ranges out of the
+ *  real CSS and bars → ▾ ▴ ▶ ⌂ (drawn from the icon sheet since); ✦ ✓ ★ ✕
+ *  are listed there as not yet barred. What stands is the distinction this
+ *  file is built on — colour emoji are the platform's ART, a fallback text
+ *  glyph is the platform's TYPE — and so does this bar, which is about the
+ *  first. The claim that every text glyph is ours does not. */
 const PICTO = /\p{Emoji_Presentation}|\uFE0F/u;
 
 /** Screens a child reaches, each with the element that PROVES it opened — the

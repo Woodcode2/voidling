@@ -525,6 +525,17 @@ const SUITE = [
     cmd: ['node', 'qa/worldreg.mjs'], verdict: pf,
     why: 'every per-world table knows every world the game renders — a missing row is never a crash, it is a silent `?? maple` and a world quietly running on another world\'s numbers' },
 
+  // Studio round 4, Job 7. Both static, both observed failing on ea6b384 and
+  // passing on the commit that registered them; the browser halves of the same
+  // job (endghost, modalin, countdown, and uisystem's match walk) are not
+  // registered until a run on this machine has read them.
+  { id: 'glyphs', tier: 'build', profiles: ['push', 'live', 'art'], timeout: 30,
+    cmd: ['node', 'qa/glyphs.mjs'], verdict: pf,
+    why: 'no → ▾ ▴ ▶ ⌂ in text a child sees — each is outside every unicode-range the Fredoka imports declare, read from the @fontsource CSS, so it would come out of the platform\'s fallback face; every drawn <use> resolves to a symbol' },
+  { id: 'ovlwire', tier: 'build', profiles: ['push', 'live', 'art'], timeout: 30,
+    cmd: ['node', 'qa/ovlwire.mjs'], verdict: pf,
+    why: 'the body.ovl observer runs on every build, not only inside the DEV build-stamp guard; its list names #end and only top-level sheets (a pane keeps .show after its sheet closes and would pin the HUD down)' },
+
   { id: 'skyland', tier: 'quality', profiles: ['push', 'live'], timeout: 90,
     cmd: ['node', 'qa/skyland.mjs'], verdict: pf,
     why: 'SKYLARK FIELD has ground to stand on — placeable >= 56% (shipped 41%), the child spawns in arrivals (shipped: the rough), and the whale is inside the fixed camera\'s frame when controls go live (shipped: 66 degrees out of it)' },
@@ -671,9 +682,13 @@ const SUITE = [
     cmd: ['node', 'qa/aftermatch.mjs', PORT], verdict: pf,
     why: 'the menu theme comes home after TIME!, by both ways out' },
 
-  { id: 'uisystem', tier: 'ui', profiles: ['push', 'live', 'art'], timeout: 300,
+  // 900, not 300: since studio round 4 (Job 7) it boots a second page into a
+  // level match and runs it to the results card, on top of the four screens.
+  // Unmeasured on this machine when raised — the first gate run sets the real
+  // number, and this should come down to it with margin.
+  { id: 'uisystem', tier: 'ui', profiles: ['push', 'live', 'art'], timeout: 900,
     cmd: ['node', 'qa/uisystem.mjs', PORT], verdict: pf,
-    why: 'every computed font weight is a face that exists and every size is readable' },
+    why: 'every computed font weight is a face that exists and every size is readable; the four match chips are one .clay system; no backdrop blur over a match; 44px buttons in our face' },
 
   ...WORLDS.map(w => ({ id: `postpipe:${w}`, tier: 'art', profiles: ['live', 'art'], timeout: 420,
     cmd: ['node', 'qa/postpipe.mjs', w, PORT, '--gate'], verdict: exitCode,
