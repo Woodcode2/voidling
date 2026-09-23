@@ -109,7 +109,7 @@ frame is qa/out/hudshots/maple-noms.png.
 
 | id | blocker / job | team | state |
 |---|---|---|---|
-| B5 / Job 1 | Every frame anti-aliased (G10 reopened) | LIGHT | fix applied; aamsaa (a') before/after running |
+| B5 / Job 1 | Every frame anti-aliased (G10 reopened) | LIGHT | **DONE** 2a17344 — qa/aamsaa.mjs (a'), scene-target samples on six consecutive renders: before **4, 0, 4, 0, 4, 0** (BAD), after **4, 4, 4, 4, 4, 4** (ok). Edge blend 29.5% → 29.7% on the frame each happened to catch; native AA on the same frame 32.6-33.4%. |
 | B6 / I-2, I-8 | No current frame of the in-match HUD or the G4 end | UI | qa/hudshots.mjs written, running |
 | — | End card stacks finale + evolve + win in one millisecond | AUDIO | fixed: finale(cheer) plays the motif and ONE cheer 0.76 s later; endparty (g) |
 | Job 0 / I-1 | The pack photographs what a child sees: `__settleCam()`, hide-HUD stylesheet, width check (frames are ~37% too close) | QA | queued, day 1 |
@@ -141,7 +141,7 @@ Five research lenses (genre, retention, feel, audio, graphics) against a source 
 | G7 | P1 | 'Now I can eat that!' is heard and seen | PLAY + AUDIO | days | queued |
 | G8 | P1 | Time, not the camera, sells the marquee moments | CHOREOGRAPHY | a day | queued |
 | G9 | P1 | Follow-through: he savours it, and the BURP OF CHAMPIONS finally exists | HERO | a day | queued |
-| G10 | P1 | Anti-aliasing back on the two best rungs | LIGHT | hours | **REOPENED by studio round 4, fix in hand (Job 1)** — bb1430b gave the composer a 4-sample scene target, but RenderPass draws into `readBuffer`, the composer starts with readBuffer = the 0-sample clone, and OutputPass swaps every frame: the scene alternated 4, 0, 4, 0 — a 30 Hz shimmer the probe passed, because bar (a) read renderTarget1.samples once. The 29.6% edge reading was a frame that happened to be multisampled. Fix: OutputPass `needsSwap = false`, readBuffer pinned to the multisampled target. Probe bar (a') records readBuffer.samples on six consecutive renders. Native AA reference on the same frame 32.9%; bar (b) 35% still unmet by MSAA alone (G10b). |
+| G10 | P1 | Anti-aliasing back on the two best rungs | LIGHT | hours | **DONE (Job 1, 2a17344; reopened by studio round 4 and closed the same day)** — bb1430b gave the composer a 4-sample scene target, but RenderPass draws into `readBuffer`, the composer starts with readBuffer = the 0-sample clone, and OutputPass swaps every frame: the scene alternated 4, 0, 4, 0 — a 30 Hz shimmer the probe passed, because bar (a) read renderTarget1.samples once. The 29.6% edge reading was a frame that happened to be multisampled. Fix: OutputPass `needsSwap = false`, readBuffer pinned to the multisampled target. Probe bar (a') records readBuffer.samples on six consecutive renders. Native AA reference on the same frame 32.9%; bar (b) 35% still unmet by MSAA alone (G10b). |
 | G10b | P2 | A post-process AA pass (SMAA) on the bloom rungs, if a real phone can pay for it | LIGHT | hours + a device | queued — cost unmeasurable here (no GPU); needs the TestFlight run |
 | G11 | P1 | The WORLD ENDER minute survives a phone: the crowd stops casting shadows | STATIC + MOTION | days | queued |
 | G12 | OWNER | Win the dot, keep the show: bank the goal and play on to the bell | PLAY | a day | OWNER DECISION — reverses his 2026-09-06 decision 1 (a won dot ends the match on the spot). |

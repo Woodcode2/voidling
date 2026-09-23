@@ -9,13 +9,18 @@
 //
 //   1. maple-noms.png     mid-chain (12+ NOMS, the gold tier) with a number
 //                         in flight to the bar
-//   2. maple-party.png    0.35 s after a dot is won from third place — the
+//   2. maple-party.png    0.45 s after a dot is won from third place — the
 //                         confetti out of the void, before the card
 //   3. maple-endcard.png  the card that follows
 //
-// Everything is timed on the game's own clocks. The frames land in
-// qa/out/hudshots/, and the probe prints what each frame should show so the
-// reader knows what to look for.
+// Everything is timed on the game's own clocks — except the DOM confetti,
+// whose CSS animations run on the WALL clock: under the software renderer a
+// 0.35 s game-time wait is ~9 s of wall, so the first run photographed 140
+// finished (invisible) scraps. Each confetti animation is therefore frozen at
+// the point a phone would show at that moment before the shutter. A short
+// drag first retires the drag lesson's hand, which otherwise covers the void.
+// The frames land in qa/out/hudshots/, and the probe prints what each frame
+// should show so the reader knows what to look for.
 import { chromium } from 'playwright';
 import { mkdirSync } from 'fs';
 
@@ -40,6 +45,18 @@ await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 4, null, { timeout: 600000 });
+await p.evaluate(() => {   // one real drag: the lesson's hand leaves, as it does for a child who has moved
+  const cv = document.querySelector('canvas'), x = innerWidth / 2, y = innerHeight / 2;
+  cv.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: x, clientY: y, bubbles: true }));
+  for (let i = 1; i <= 6; i++) dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: x + i * 14, clientY: y, bubbles: true }));
+  dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientX: x + 84, clientY: y, bubbles: true }));
+});
+const freeze = (sel, ms) => p.evaluate(([s, m]) => {
+  let n = 0;
+  for (const a of document.getAnimations()) if (a.effect?.target?.matches?.(s)) { a.currentTime = m; a.pause(); n++; }
+  return n;
+}, [sel, ms]);
+const thaw = (sel) => p.evaluate((s) => { for (const a of document.getAnimations()) if (a.effect?.target?.matches?.(s)) a.play(); }, sel);
 
 // 1 — a chain of twelve and a number in the air
 const t0 = await p.evaluate(() => window.__matchState().t);
@@ -63,20 +80,24 @@ await p.evaluate((e) => window.__setRivalScores([e * 6, e * 5]), eat);
 const t1 = await p.evaluate(() => window.__matchState().tClock);
 await p.waitForFunction((t) => window.__matchState().tClock > t + 0.5, t1, { timeout: 600000, polling: 200 });
 await p.evaluate((e) => window.__setScore(e + 1), eat);
-await p.waitForFunction(() => window.__goalState?.()?.met, null, { timeout: 600000, polling: 50 });
-const tm = await p.evaluate(() => window.__matchState().tClock);
-await p.waitForFunction((t) => window.__matchState().tClock >= t + 0.35, tm, { timeout: 600000, polling: 50 });
+await p.waitForFunction(() => document.querySelectorAll('.wConf').length > 0, null, { timeout: 600000, polling: 20 });
+const froze2 = await freeze('.wConf', 450);   // ~0.45 s into the burst, as a phone would show it
 const s2 = await p.evaluate(() => ({ conf: document.querySelectorAll('.wConf').length, mood: window.__matchState().mood }));
 await p.screenshot({ path: `${OUT}/maple-party.png` });
+await thaw('.wConf');
+console.log(`     (${froze2} confetti animations frozen at 450 ms for the shutter)`);
 console.log(`  2  ${OUT}/maple-party.png — ${s2.conf} confetti scraps, mood '${s2.mood}'`);
 console.log('     look for: paper confetti bursting up out of the void over the town; no card yet');
 
 // 3 — the card
-await p.waitForFunction(() => document.getElementById('end')?.classList.contains('show'), null, { timeout: 900000, polling: 250 });
-const tc = await p.evaluate(() => window.__matchState().tClock);
-await p.waitForFunction((t) => window.__matchState().tClock > t + 0.4, tc, { timeout: 600000, polling: 200 });
+await p.waitForFunction(() => document.getElementById('end')?.classList.contains('show'), null, { timeout: 900000, polling: 30 });
+// the card's own entrance and the confetti run on the wall clock and the
+// confetti is removed 3.2 s (wall) after it lands: freeze both at ~0.9 s
+const froze3 = await freeze('#end, #end *', 900);
 const s3 = await p.evaluate(() => ({ hd: document.getElementById('endHd')?.textContent, conf: document.querySelectorAll('#end .endConf').length }));
 await p.screenshot({ path: `${OUT}/maple-endcard.png` });
+await thaw('#end, #end *');
+console.log(`     (${froze3} card animations frozen at 900 ms for the shutter)`);
 console.log(`  3  ${OUT}/maple-endcard.png — "${s3.hd}", ${s3.conf} card confetti`);
 console.log('     look for: the win headline and the confetti falling over the card; no match HUD left showing through');
 

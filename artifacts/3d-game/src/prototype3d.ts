@@ -8627,7 +8627,7 @@ function nomCash(): void {
 let nomsOn = false, nomsHtml = '', nomsTier = '', nomsSide = '', nomsLX = -1, nomsLY = -1;
 function paintNoms(): void {
   const fb = bubbles.formBox();
-  if (combo < 5 || !started || ended || paused || !fb.on) {
+  if (combo < 5 || !started || ended || paused || outroT > 0 || !fb.on) {   // the whistle ends the chain's show too
     if (nomsOn) { nomsOn = false; nomsEl.classList.remove('on'); }
     return;
   }
@@ -14580,7 +14580,11 @@ function animate() {
       // until the 1.8s `ev` animation has finished with a beat to spare.
       retireBanner(); holdBanner(2.6);
     }
-    audio.evolve();
+    // …but not over the whistle. The eat loop runs on through the two-second
+    // outro, so a form-up can land in it — measured at the buzzer by
+    // qa/endparty.mjs (e): "whistle … evolve" inside 0.6 s. The end owns that
+    // moment; the form still changes, silently (research governor G4).
+    if (outroT <= 0) audio.evolve();
     // the LENS marks the evolution too: a punch plus a 7% distance pop that
     // the follow lerp eases home over the next second — the world exhales.
     // The final-form moment used to be ~8x weaker than a rival bite; this
@@ -14631,7 +14635,9 @@ function animate() {
   if (comboT <= 0 && combo > 0) {
     // …and when the chain ends it is PAID, not lost: a chain of five or more
     // cashes in beside the void. No "combo broken" sound, by design.
-    if (combo >= 5 && started && !ended) nomCash();
+    // not inside the outro: the whistle and the party own it, and the points
+    // are already scored — a cash-in there is one more sound on the end
+    if (combo >= 5 && started && !ended && outroT <= 0) nomCash();
     combo = 0; chainPts = 0;
   }
   // …and the banked bite points leave as one number when the burst stops. Runs
