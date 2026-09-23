@@ -7569,7 +7569,7 @@ function offerDrop() {
     // rising pops at the quarter marks — the same anticipation audio the
     // countdown ritual uses, aimed upward instead of down
     const step = Math.floor(dropCharge * 4);
-    if (charging && step > lastStep) { lastStep = step; audio.pop(4 + step); buzz(12); }
+    if (charging && step > lastStep) { lastStep = step; audio.tick(step, 4); buzz(12); }
     if (!charging) lastStep = Math.floor(dropCharge * 4) - 1;
     if (dropCharge >= 1) { openDrop(n); return; }
     dropRaf = requestAnimationFrame(pump);
@@ -7662,7 +7662,7 @@ function celebrateEnd(coins: number, xpGain: number, lead: string, won = false, 
     const k = Math.min(1, (performance.now() - t0) / 900);
     b.textContent = `+${Math.round(coins * (k * (2 - k)))}✦`;   // ease-out count-up
     const chunk = Math.floor(k * 8);
-    if (coins > 0 && chunk > lastChunk) { lastChunk = chunk; audio.pop(3 + chunk); }
+    if (coins > 0 && chunk > lastChunk) { lastChunk = chunk; audio.tick(chunk, 8); }
     if (k < 1) requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
@@ -13213,7 +13213,10 @@ function animate() {
         // buzzer. A flat 6 is the same tick nine times: a metronome, not a
         // siren. (The goal sprite's single pulse that replaces the banner
         // arrives with the icon sheet — §4.2; the chip carries the words today.)
-        audio.pop(bell ? 11 - cs : 6);
+        // its own voice now (G4): pop() is the EAT sound, and ticking on it
+        // swallowed any bite inside 75 ms of a tick. Still flat unless a bell
+        // is ringing — no clock that pressures.
+        audio.tick(bell ? 10 - cs : 2, 10);
         fx.ring(voidState.x, voidState.z, bell && cs <= 3 ? 0xff6a5e : 0xffd23f,
           voidling.radius * (1.5 + (10 - cs) * 0.07), 0.55);
       }
@@ -13633,7 +13636,7 @@ function animate() {
         if (driving && !wasAtWall && wallCueCd <= 0
           && Math.hypot(velX, velZ) > ownSpeed * 0.35) {
           wallCueCd = 0.6; wallCueN++;
-          voidling.bump(); audio.pop(0, 2.2, voidling.radius); buzz(10);
+          voidling.bump(); audio.bonk(); buzz(10);   // a wall is not a meal (G4)
         }
         wasAtWall = true;
         // THE HEADING SWEEP. Two previous attempts projected the velocity onto

@@ -62,6 +62,15 @@ export interface Audio3D {
    *  instrument, on every card. A win lays the win sting over it; nothing
    *  plays the old falling "aww" any more. */
   finale(won: boolean): void;
+  /** THE TICK, for the countdown, the coin count-up and the drop charge — step
+   *  `i` of `n`, rising on a pentatonic that only goes up. Its own voice and its
+   *  own state: these all ticked on pop(), the EAT sound, whose 75 ms gate then
+   *  swallowed a real bite landing just after, and whose melody turns back down
+   *  at its top (research governor G4). */
+  tick(i: number, n: number): void;
+  /** the wall. A soft bonk — it used to be a pop(), an eat, on a thing she
+   *  could not eat. */
+  bonk(): void;
   startMusic(): void;              // the match loop — tempo + layers ride the stage
   setMusicStage(n: number): void;
   stopMusic(): void;
@@ -4573,6 +4582,22 @@ export function createAudio(): Audio3D {
           for (const [k, v, d] of [[1, 1, 2.6], [1.2, 0.4, 1.8], [1.5, 0.3, 1.4], [2, 0.22, 1.0]] as number[][])
             dTone(m, t + off, d, 'sine', 0.1 * v, 523.25 * k, 0, 0, 0.004);
       }
+    },
+    tick(i, n) {
+      const c = ensure(); if (!c || !master) return;
+      // straight up a two-octave pentatonic from G5, never back down; a longer
+      // run than the scale is spread across it so the last step is the top
+      const UP = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
+      const k = n > UP.length ? Math.round((i / Math.max(1, n - 1)) * (UP.length - 1)) : Math.min(UP.length - 1, i);
+      const f = 783.99 * Math.pow(2, UP[Math.max(0, k)] / 12);
+      marimba(master, f, c.currentTime + 0.005, 0.22, 0.13);   // at least as loud as the pop tick it replaced (-39.1 dBFS)
+    },
+    bonk() {
+      const c = ensure(); if (!c || !master) return;
+      const t = c.currentTime;
+      dTone(master, t, 0.11, 'sine', 0.09, 520, 330, 0, 0.003);
+      dTone(master, t, 0.06, 'triangle', 0.035, 1040, 700, 0, 0.002);
+      grain(900, 1.4, 0.03, 0.04);
     },
     finale(won) {
       const c = ensure(); if (!c || !master) return;

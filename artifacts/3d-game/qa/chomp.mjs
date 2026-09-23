@@ -271,6 +271,75 @@ bar(!missing.length && !hot.length,
   `(k) every end sound peaks at or under -3 dBFS (${Math.max(...ends.map(([, r]) => r.peak)).toFixed(1)})`,
   missing.length ? '(k) nothing to check for a peak — the end sounds do not exist' : `(k) over the -3 dBFS ceiling: ${hot.join(', ')}`);
 
+// ══ PART 5 — THE TICKS GET THEIR OWN VOICE ═════════════════════════════════
+// Research governor G4. The countdown, the coin count-up and the drop charge
+// all ticked on pop() — the EAT sound — and pop() drops anything inside 75 ms
+// of the last one. So a countdown tick swallowed a real bite that landed right
+// after it, and the count-up's "rising" ticks walked the eat melody's ladder,
+// which turns back down at its top (PENTA = 0 2 4 7 9 12 9 7). Measured on the
+// build as shipped: what the count-up call site plays (tick(i, 8) where it
+// exists, else the pop(3 + i) it used), and a real bite 30 ms after a tick.
+// Math.random is seeded per render so two renders differ only by what was asked.
+const tk = await p.evaluate(async () => {
+  const mod = await import('/src/proto3d/audio3d.ts');
+  const seed = () => { let x = 12345; Math.random = () => ((x = (x * 1103515245 + 12345) % 2147483648) / 2147483648); };
+  const realRandom = Math.random;
+  const render = async (fn, secs = 1.2) => {
+    seed();
+    const ctx = new OfflineAudioContext(1, Math.floor(44100 * secs), 44100);
+    const RealAC = window.AudioContext;
+    window.AudioContext = function () { return ctx; };
+    let a;
+    try { a = mod.createAudio(); a.setMuted?.(false); fn(a, ctx); }
+    finally { window.AudioContext = RealAC; }
+    const d = (await ctx.startRendering()).getChannelData(0);
+    return Array.from(d);
+  };
+  const at = (ctx, t) => Object.defineProperty(ctx, 'currentTime', { value: t, configurable: true });
+  const tickFn = (a, i, n) => (a.tick ? a.tick(i, n) : a.pop(3 + i));
+  // (l) a tick at 0, a bite at 30 ms
+  const only = await render((a, ctx) => { at(ctx, 0); tickFn(a, 0, 10); });
+  const both = await render((a, ctx) => { at(ctx, 0); tickFn(a, 0, 10); at(ctx, 0.03); a.pop(0, 1.3, 2.5); });
+  const biteOnly = await render((a, ctx) => { at(ctx, 0.03); a.pop(0, 1.3, 2.5); });
+  // over the sound's OWN 200 ms, not the whole render: a 0.15 s tick averaged
+  // across 1.2 s reads ~9 dB quieter than it is, and the first run of this
+  // bar put a plain bite, alone, under -40 that way
+  const rms = (d, t0 = 0) => { const a = Math.floor(t0 * 44100), n = Math.floor(0.2 * 44100);
+    let q = 0; for (let i = a; i < a + n; i++) q += (d[i] || 0) ** 2;
+    return 20 * Math.log10(Math.sqrt(q / n) || 1e-9); };
+  const diff = both.map((v, i) => v - only[i]);
+  // (m) eight count-up ticks, 112 ms apart, as the count-up calls them
+  const GAP = 0.1125;
+  const run = await render((a, ctx) => { for (let i = 0; i < 8; i++) { at(ctx, i * GAP); tickFn(a, i, 8); } }, 1.4);
+  Math.random = realRandom;
+  const pitch = (d, t0) => {
+    const s0 = Math.floor((t0 + 0.004) * 44100), N = 1764;   // 40 ms from 4 ms after onset
+    let best = 0, bestF = 0;
+    for (let f = 200; f <= 3000; f += 5) {
+      let re = 0, im = 0;
+      for (let k = 0; k < N; k++) {
+        const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * k) / (N - 1));
+        const v = (d[s0 + k] || 0) * w, ph = (2 * Math.PI * f * k) / 44100;
+        re += v * Math.cos(ph); im -= v * Math.sin(ph);
+      }
+      const m = re * re + im * im;
+      if (m > best) { best = m; bestF = f; }
+    }
+    return bestF;
+  };
+  const pitches = []; for (let i = 0; i < 8; i++) pitches.push(pitch(run, i * GAP));
+  return { hasTick: true, tickDb: rms(only), biteDb: rms(diff, 0.03), biteAlone: rms(biteOnly, 0.03), pitches };
+});
+console.log('\n  THE TICKS — a countdown tick and a bite 30 ms later; eight count-up ticks');
+console.log(`    tick alone ${tk.tickDb.toFixed(1)} dBFS, the bite that followed it ${tk.biteDb.toFixed(1)} dBFS (the same bite alone: ${tk.biteAlone.toFixed(1)})`);
+console.log(`    count-up pitches: ${tk.pitches.join(' → ')} Hz`);
+bar(tk.tickDb > -40 && tk.biteDb > -40,
+  `(l) the tick and the bite 30 ms after it both sound (${tk.tickDb.toFixed(1)}, ${tk.biteDb.toFixed(1)} dBFS; bar -40)`,
+  `(l) ${tk.biteDb <= -40 ? 'the bite 30 ms after a countdown tick is swallowed' : 'the tick is inaudible'} (${tk.tickDb.toFixed(1)}, ${tk.biteDb.toFixed(1)} dBFS; bar -40)`);
+const rising = tk.pitches.every((f, i) => i === 0 || f > tk.pitches[i - 1]);
+bar(rising, `(m) the eight count-up ticks rise, every one: ${tk.pitches.join(' → ')} Hz`,
+  `(m) the count-up does not rise all the way: ${tk.pitches.join(' → ')} Hz`);
+
 await b.close();
 console.log(`\n${bad ? 'FAIL' : 'PASS'} — ${bad} bad`);
 process.exit(bad ? 1 : 0);
