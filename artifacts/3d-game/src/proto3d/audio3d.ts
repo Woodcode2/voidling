@@ -59,9 +59,12 @@ export interface Audio3D {
    *  Bells and whistles only; no drum (owner, 2026-08-29). All above 250 Hz. */
   whistle(): void;
   /** THE END CARD'S TUNE: one five-note VOIDLING motif, on the world's own
-   *  instrument, on every card. A win lays the win sting over it; nothing
-   *  plays the old falling "aww" any more. */
-  finale(won: boolean): void;
+   *  instrument, on every card, then at most ONE cheer after it — the win
+   *  sting or the level-up fanfare, whichever the card earned. The card used
+   *  to fire the motif, the rank level-up and the new-world cheer in the same
+   *  millisecond (studio governor, 2026-09-23). Nothing plays the old falling
+   *  "aww" any more. */
+  finale(cheer: 'win' | 'evolve' | null): void;
   /** THE TICK, for the countdown, the coin count-up and the drop charge — step
    *  `i` of `n`, rising on a pentatonic that only goes up. Its own voice and its
    *  own state: these all ticked on pop(), the EAT sound, whose 75 ms gate then
@@ -4599,9 +4602,9 @@ export function createAudio(): Audio3D {
       dTone(master, t, 0.06, 'triangle', 0.035, 1040, 700, 0, 0.002);
       grain(900, 1.4, 0.03, 0.04);
     },
-    finale(won) {
+    finale(cheer) {
       const c = ensure(); if (!c || !master) return;
-      logEv(`finale ${won ? 'win' : 'end'}`);
+      logEv(`finale ${cheer ?? 'end'}`);
       const m = master, t = c.currentTime + 0.05;
       duckMusic(8, 3.0);
       // VOIDLING: C5 E5 G5 A5 C6 — five notes, up, on the pentatonic the bites
@@ -4614,7 +4617,9 @@ export function createAudio(): Audio3D {
         else if (isPowder() || worldId() === 'maple') glock(m, f, tt, dur + 0.4, 0.11);
         else { tone(f, f, dur, 'triangle', 0.12, tt - c.currentTime); tone(f * 2, f * 2, dur * 0.6, 'sine', 0.035, tt - c.currentTime); }
       });
-      if (won) setTimeout(() => this.win(), 720);
+      // the one cheer lands after the motif's last note, never on top of it
+      if (cheer === 'win') setTimeout(() => this.win(), 760);
+      else if (cheer === 'evolve') setTimeout(() => this.evolve(), 760);
     },
     nomCash(n) {
       const c = ensure(); if (!c || !master) return;

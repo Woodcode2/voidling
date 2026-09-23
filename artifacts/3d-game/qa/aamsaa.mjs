@@ -54,6 +54,22 @@ const info = await p.evaluate(() => {
   return { rung: q.level, pr: q.pr, bloom: !!c, samples: c?.renderTarget1?.samples ?? -1,
     maxSamples: window.__renderer?.capabilities?.maxSamples ?? -1 };
 });
+// ── (a') WHAT THE SCENE IS DRAWN INTO, ON EVERY FRAME ──────────────────────
+// Bar (a) read renderTarget1.samples once, and passed a composer whose
+// RenderPass drew into the 0-sample target on every other frame: the targets
+// swap after each render (OutputPass needsSwap), and RenderPass draws into
+// whichever one is readBuffer at the time. Found by the studio governor from
+// three's source, 2026-09-23. This wraps composer.render and records
+// readBuffer.samples as each of six consecutive frames begins — the target
+// the scene is about to be drawn into.
+const seen = await p.evaluate(() => new Promise((res) => {
+  const c = window.__composer?.();
+  if (!c) { res(null); return; }
+  const out = [], real = c.render.bind(c);
+  c.render = (dt) => { out.push(c.readBuffer?.samples ?? -1); return real(dt); };
+  const wait = () => { if (out.length >= 6) { c.render = real; res(out.slice(0, 6)); } else requestAnimationFrame(wait); };
+  requestAnimationFrame(wait);
+}));
 await p.screenshot({ path: OUT });
 // ── THE REFERENCE: the same frame drawn DIRECT, through the canvas's own AA ──
 // Bar (b) was the governor's number, set before any run. The first reading
@@ -98,9 +114,10 @@ console.log(`  ·    composer scene target samples: ${info.samples}   (device ma
 console.log(`  ·    strong-edge pixels: ${edges}   blended between their plateaus: ${partial}   = ${(cover * 100).toFixed(1)}%`);
 if (refD && refC) console.log(`  ·    same frame read back: direct to the AA canvas ${(refD.cover * 100).toFixed(1)}%, `
   + `through the composer ${(refC.cover * 100).toFixed(1)}% — the hardware's own AA is the ceiling MSAA can reach`);
+console.log(`  ·    scene target samples on six consecutive frames: ${seen ? seen.join(', ') : 'no composer'}`);
 if (info.rung !== 0 || !info.bloom) no(`could not reach rung 0 with bloom on (rung ${info.rung}, bloom ${info.bloom}) — cannot answer`);
-else if (info.samples <= 0) no(`(a) the best rung renders through a composer target with ${info.samples} samples — no anti-aliasing where the game looks best`);
-else ok(`(a) the best rung's composer target is multisampled: ${info.samples} samples`);
+else if (!seen || seen.some((n) => n < 2)) no(`(a') the scene is drawn into a target without multisampling on ${seen ? seen.filter((n) => n < 2).length : '?'} of 6 frames — the edges shimmer between smooth and stepped`);
+else ok(`(a') every one of six consecutive frames draws the scene into a multisampled target (${seen.join(', ')})`);
 if (edges < 2000) no(`(b) only ${edges} strong-edge pixels on the frame — too few to judge, cannot answer`);
 else if (cover < 0.35) no(`(b) ${(cover * 100).toFixed(1)}% of edge pixels are blended — the edges are a staircase (bar 35%)`);
 else ok(`(b) ${(cover * 100).toFixed(1)}% of edge pixels are blended between their plateaus (bar 35%)`);

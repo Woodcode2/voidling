@@ -175,14 +175,27 @@ function ensureComposer(): EffectComposer {
   // ones a good phone runs and a store screenshot is taken on, were the only
   // ones with staircased edges. Research governor G10; qa/aamsaa.mjs.
   //
-  // The scene target is built here with samples, and handed in. Only
-  // renderTarget1 needs them: RenderPass draws the scene into it, bloom
-  // composites onto it without a swap, and OutputPass takes it to the screen —
-  // nothing on this chain ever renders into renderTarget2, which the composer
-  // clones from the first. So the clone goes back to 0 samples before its first
-  // use (three allocates GPU storage lazily), which keeps the multisample cost
-  // to the one target that earns it. Size is corrected by the per-frame
-  // setSize() below exactly as before; this only has to be the right KIND.
+  // The scene target is built here with samples, and handed in.
+  //
+  // ── AND IT HAS TO BE THE ONE THE SCENE IS DRAWN INTO, EVERY FRAME ───────
+  // The first version of this fix (bb1430b) said "nothing on this chain ever
+  // renders into renderTarget2". That was false, and the studio governor
+  // caught it from three's source: RenderPass draws into composer.READBUFFER,
+  // the composer starts with readBuffer = renderTarget2, and OutputPass keeps
+  // Pass's default needsSwap = true — so the two targets swapped after every
+  // frame and the scene alternated between the 4-sample target and the
+  // 0-sample clone. Smooth edges one frame, a staircase the next: a 30 Hz
+  // shimmer on the phone, 15 Hz on the menu, which draws every other frame.
+  // qa/aamsaa.mjs read renderTarget1.samples once and passed it.
+  //
+  // So: OutputPass does not swap (it is the last pass and draws to the
+  // screen, so there is nothing for a swap to hand on), and readBuffer is
+  // pointed at the multisampled target once. Bloom composites onto readBuffer
+  // without a swap. renderTarget2 is never drawn to and keeps 0 samples, so
+  // the multisample cost stays on the one target that earns it. setSize()
+  // resizes both and does not reset them; only reset() would, and nothing
+  // here calls it. qa/aamsaa.mjs bar (a') records readBuffer.samples on six
+  // consecutive renders.
   {
     const pr = renderer.getPixelRatio();
     const w = Math.max(1, Math.floor(window.innerWidth * pr));
@@ -191,6 +204,8 @@ function ensureComposer(): EffectComposer {
     composer = new EffectComposer(renderer,
       new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples }));
     composer.renderTarget2.samples = 0;
+    composer.readBuffer = composer.renderTarget1;
+    composer.writeBuffer = composer.renderTarget2;
   }
   composer.addPass(new RenderPass(scene, camera));
   bloomPass = new UnrealBloomPass(
@@ -241,7 +256,9 @@ function ensureComposer(): EffectComposer {
   // OutputPass honours CustomToneMapping (it compiles the same patched
   // tonemapping_pars_fragment chunk, so the ACES + toe + split + chroma grade
   // rides along) — verified against OutputPass.js in the installed dep.
-  composer.addPass(new OutputPass());
+  const out = new OutputPass();
+  out.needsSwap = false;   // the last pass: a swap would hand the next frame the 0-sample target
+  composer.addPass(out);
   return composer;
 }
 let shadowFrame = 0;
@@ -445,7 +462,9 @@ if (_wantGoal !== null) playingGoal = _wantGoal;
 // they would bury everything else. tClock is declared further down this file,
 // so until that line has run a call is stamped -1 rather than touching it.
 // Nothing about what is played changes; this only writes down that it was.
-const audioCalls: { t: number; id: string }[] = [];
+// `w` is wall seconds: sounds PLAY on the wall clock, so a probe asking what a
+// child hears together reads `w`; one asking what the game did when reads `t`
+const audioCalls: { t: number; w: number; id: string }[] = [];
 let audioClockReady = false;
 const AUDIO_UNLOGGED = new Set(['musicState', 'musicLog', 'isMuted', 'setZone', 'ensureMusic']);
 const audio = (() => {
@@ -455,7 +474,7 @@ const audio = (() => {
     const f = rec[k];
     if (typeof f !== 'function' || AUDIO_UNLOGGED.has(k)) continue;
     rec[k] = (...args: unknown[]) => {
-      audioCalls.push({ t: audioClockReady ? tClock : -1, id: k });
+      audioCalls.push({ t: audioClockReady ? tClock : -1, w: performance.now() / 1000, id: k });
       if (audioCalls.length > 400) audioCalls.shift();
       return (f as (...x: unknown[]) => unknown).apply(a, args);
     };
@@ -2254,8 +2273,10 @@ function fadeOccluders(dt: number): void {
 // Each rung carries its own phone value now. The old code applied
 // Math.min(q.pr, 1.3) on touch devices, which flattened the whole ladder to a
 // single blurry rung and made three of the four entries unreachable.
-// ── BLOOM IS OFF ON EVERY RUNG, AND THAT IS A COLOUR DECISION ─────────────
-// The composer path does not render the same colours as the direct path — it
+// ── HISTORY: BLOOM WAS ONCE OFF ON EVERY RUNG, AS A COLOUR DECISION ──────
+// It is back on for rungs 0 and 1 (see the table and ensureComposer); this
+// block is kept for why it was ever off. The composer path did not render the
+// same colours as the direct path — it
 // costs the hero about 0.20 saturation and adds 0.12 value, measured on all
 // four worlds with the glow's own strength forced to zero (see ensureComposer).
 // Because this flag is what selects between the two paths, the adapter walking
@@ -3476,7 +3497,7 @@ const _dbg = new Proxy(_dbgStore, {
   // where the four-phase story currently stands (newsroom_arc.ts)
   __music: () => ReturnType<typeof audio.musicState>;
   __audioLog: () => string[];
-  __audioCalls: () => { t: number; id: string }[];
+  __audioCalls: () => { t: number; w: number; id: string }[];
   __newsArc: () => {
     log: { t: number; phase: number; tier: number; react: boolean; brand: string; text: string }[];
     arc: { phase: number; cards: number; high: number };
@@ -3571,7 +3592,7 @@ _dbg.__music = () => audio.musicState();
 /** QA: the audio engine's own ordered log — what it actually played, in order.
  *  qa/nomstream.mjs counts the chain's crowns and cash-ins in it. */
 _dbg.__audioLog = () => audio.musicLog();
-/** QA: every public audio call as {t: tClock, id}, oldest first (see its wrapper). */
+/** QA: every public audio call as {t: tClock, w: wall s, id}, oldest first (see its wrapper). */
 _dbg.__audioCalls = () => audioCalls.slice();
 // QA: put a hat on the live void. Needed to measure OCCLUSION from the play
 // camera — the thing qa/hatsheet.mjs cannot see, because it renders a hat alone
@@ -8150,7 +8171,7 @@ function endMatch(result: GoalResult = null) {
     // chime, never a loss sting (§4.3, "audio.ready(), never audio.lose()").
     // …and every card now plays the VOIDLING motif, with the win sting laid
     // over it only for a win (research governor G4).
-    audio.finale(goal ? result === 'win' : newBest);
+    audio.finale((goal ? result === 'win' : newBest) ? 'win' : null);
     if (newBest) localStorage.setItem('voidBestPct', String(devouredPct));
     const lvl2Before = rankInfo(xp).lvl;
     const gain2 = 8 + (newBest ? 8 : 0);
@@ -8209,10 +8230,13 @@ function endMatch(result: GoalResult = null) {
   // gets the cheer; one who came 1st on a dot asking for something else does
   // not get told she lost.
   // …AND NOTHING PLAYS lose() ANY MORE (research governor G4). Every card
-  // gets the VOIDLING motif on the world's own instrument; the cheer rides on
-  // top of it for a won dot, or for first place when there is no dot. A child
-  // who came third has still just played a match, and the ear says so.
-  audio.finale(goal ? result === 'win' : myRank === 1);
+  // gets the VOIDLING motif on the world's own instrument, played once at the
+  // bottom of this function, and then ONE cheer: for a won dot, first place
+  // with no dot, a new world, or a rank level-up — the biggest of them, never
+  // two at once (studio governor, 2026-09-23: this card used to fire the
+  // motif, evolve() and win() in the same millisecond). A child who came third
+  // has still just played a match, and the ear says so.
+  let cheer: 'win' | 'evolve' | null = (goal ? result === 'win' : myRank === 1) ? 'win' : null;
   // everyone leaves with something; winning is 5x last place, not infinity-x
   const today = new Date().toDateString();
   // The score term was min(60, score/50) — SATURATED at 3,000 points, which a
@@ -8320,7 +8344,7 @@ function endMatch(result: GoalResult = null) {
       `<div class="es rk${leveledTo ? ' up' : ''}"><i>${leveledTo ? 'LEVEL UP!' : rk.nm}</i>` +
       `<b>${rk.ic} LVL ${rk.lvl}</b>` +
       `<div class="xpb"><div style="width:${Math.round(rk.prog * 100)}%"></div></div></div>`;
-    if (leveledTo) { audio.evolve(); buzz(70); }
+    if (leveledTo) { if (!cheer) cheer = 'evolve'; buzz(70); }   // a win outranks a level-up; one cheer
     // ── TODAY'S QUESTS, on the screen where "what next" is the live question.
     // The board pays a +25 completion bonus and was, until now, invisible.
     {
@@ -8375,8 +8399,8 @@ function endMatch(result: GoalResult = null) {
         location.href = location.pathname;
       });
       // the same falling sparks a payout and a championship use — a new world
-      // is at least as big a moment as either
-      audio.win(); buzz(70);
+      // is at least as big a moment as either, and it takes the one cheer
+      cheer = 'win'; buzz(70);
       for (let i = 0; i < 16; i++) {
         const sp = document.createElement('span');
         sp.className = 'endConf';
@@ -8445,6 +8469,7 @@ function endMatch(result: GoalResult = null) {
   endList.innerHTML = rows.map((r, i) =>
     `<div class="er ${r.me ? 'me' : ''}" style="animation-delay:${0.15 + i * 0.12}s"><span>${r.me && i === 0 ? '👑' : i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
   endEl.classList.add('show');
+  audio.finale(cheer);
   countMatch();
   track('match_end', {
     sec: elapsed(), score: Math.round(playerScore), eaten: matchEaten,
@@ -8596,7 +8621,7 @@ function nomCash(): void {
  *  Beside the void, never on his face: placed off the edge of the disc from
  *  the SAME face box the bubbles dodge (bubbles.formBox(), refreshed by
  *  bubbles.update() just before this runs), on whichever side has room, and
- *  under the face when the disc fills the screen. Violet from five, gold from
+ *  under the face when the disc fills the screen. Teal from five, gold from
  *  ten, rainbow from twenty. No ring, no fuse, nothing that drains. Every DOM
  *  write is change-gated, like the wayfinder's. */
 let nomsOn = false, nomsHtml = '', nomsTier = '', nomsSide = '', nomsLX = -1, nomsLY = -1;

@@ -83,6 +83,49 @@ built on it:
 | S4 | P1 | **Analytics has been silently dropped since the COPPA fix.** The deployed `ingest-events` (v1, unversioned until now) REQUIRES `user_id`; the client correctly stopped sending one. Every batch -> 400 `missing fields`. | read of the deployed function via the Supabase connector, 2026-09-23 | fix written: `supabase/functions/ingest-events/index.ts`. Deploy is production infra -> OWNER QUEUE |
 | S2 | LEAD | **All 8 App Store screenshots show a menu the game no longer has** | readiness audit (store) | reshoot at the required sizes |
 
+### Studio round 4 (2026-09-23) — NO-SHIP: the blockers and the order of work
+
+The full record is docs/STUDIO-ROUND-4.md. Bar: **Donut County** (one
+tessellation style per frame; faces as flat marks readable from the camera;
+the reward lands on the drop). hole.io is the floor; Crossy Road the bar for
+"many worlds, one game". Art direction: the six worlds do not yet read as one
+game — glow does not mean light, "quiet ground, loud props" holds in two worlds
+of six, and the hero is darker on the menus than in play.
+
+**Held before main fast-forwards** (governor's precondition):
+- G4 and G6 each have a frame a person has read — qa/hudshots.mjs (new).
+- The NOMS pill has a named decision — see below.
+- The end card plays at most one celebration within 0.5 s — qa/endparty.mjs (g).
+- Job 1 (every frame anti-aliased).
+
+**Decision on the NOMS pill (G6), recorded 2026-09-23.** It stays, as a
+TRANSIENT and not a chip: it exists only while a chain of five or more is live,
+beside the void, never on the HUD rails, and it is gone the instant the chain
+cashes in. The owner's 2026-08-29 clutter complaint was about permanent chips;
+this is not one. Its first tier was #8a5cff, a hair off the hero's own 0x9a5cff
+and right beside him, against the style's rule that nothing wears his violet —
+moved to teal #14a89a. **Owner: veto on sight if it reads as clutter** — the
+frame is qa/out/hudshots/maple-noms.png.
+
+| id | blocker / job | team | state |
+|---|---|---|---|
+| B5 / Job 1 | Every frame anti-aliased (G10 reopened) | LIGHT | fix applied; aamsaa (a') before/after running |
+| B6 / I-2, I-8 | No current frame of the in-match HUD or the G4 end | UI | qa/hudshots.mjs written, running |
+| — | End card stacks finale + evolve + win in one millisecond | AUDIO | fixed: finale(cheer) plays the motif and ONE cheer 0.76 s later; endparty (g) |
+| Job 0 / I-1 | The pack photographs what a child sees: `__settleCam()`, hide-HUD stylesheet, width check (frames are ~37% too close) | QA | queued, day 1 |
+| B2 / Job 2 | Maple crowns carry 603 faceted "dapple" spheres — one mass each | STATIC | queued, day 1 |
+| B1 / Job 3 | Leaf drifts painted onto the square's walks (two coffee stains in the opening frame); Pirate sand chroma rider | GROUND | queued, day 1 |
+| B7 / Job 5 | Paint glows (Maple planters halo in the first frame) | LIGHT | queued, day 1 |
+| B3, B4 / Job 4 | Walking people's eyes buried by hair shells and caps | MOTION | queued, day 2 |
+| Job 6 | The first two people she sees: chest ruff, eyes proud of the skull | MOTION | queued, day 2 |
+| Job 7 | One HUD, and screens without ghosts (timer/news behind the card, countdown stroke, chips, glyphs) | UI | queued, day 2 |
+| Job 8 | The void alive at spawn (motion normalised to the settled cap, hurt face, wind-up) | HERO | queued |
+| B7 / Job 9 | Lantern Night's lanterns light up; umbrella and moss rock | LIGHT + STATIC | after 0-8 |
+| Job 10 | The alarm means danger and only danger; no square waves | AUDIO + PLAY | after 0-8 |
+| Job 11 | The bite pays off on the swallow (sound lands 170-290 ms before the sink) | CHOREOGRAPHY | after G4/G6 verified |
+
+Research items G5, G7-G29 wait until these blockers close (governor).
+
 ### The research governor's build order (2026-09-23)
 
 Five research lenses (genre, retention, feel, audio, graphics) against a source inventory; 14 agents; the governor's verdict, verbatim: *"No. It is not AAA yet, and today it would not reliably bring a 6-11 year old back."*
@@ -98,7 +141,7 @@ Five research lenses (genre, retention, feel, audio, graphics) against a source 
 | G7 | P1 | 'Now I can eat that!' is heard and seen | PLAY + AUDIO | days | queued |
 | G8 | P1 | Time, not the camera, sells the marquee moments | CHOREOGRAPHY | a day | queued |
 | G9 | P1 | Follow-through: he savours it, and the BURP OF CHAMPIONS finally exists | HERO | a day | queued |
-| G10 | P1 | Anti-aliasing back on the two best rungs | LIGHT | hours | **DEFECT FIXED, BAR (b) NOT MET** bb1430b — composer samples 0 → 4; blended edge pixels 4.2% → 29.6% (rung 0, Maple, same harness, before on dist-base). Bar (b) was 35%, set before any run. The same frame drawn DIRECT to the antialias:true canvas reads **32.9%**: the hardware's own 4x MSAA misses 35% too, so no MSAA change can reach it. Composer is at 90% of native. Reaching 35% needs a post-AA pass — see G10b. aamsaa stays out of the gate until its bar is one a fix can meet. |
+| G10 | P1 | Anti-aliasing back on the two best rungs | LIGHT | hours | **REOPENED by studio round 4, fix in hand (Job 1)** — bb1430b gave the composer a 4-sample scene target, but RenderPass draws into `readBuffer`, the composer starts with readBuffer = the 0-sample clone, and OutputPass swaps every frame: the scene alternated 4, 0, 4, 0 — a 30 Hz shimmer the probe passed, because bar (a) read renderTarget1.samples once. The 29.6% edge reading was a frame that happened to be multisampled. Fix: OutputPass `needsSwap = false`, readBuffer pinned to the multisampled target. Probe bar (a') records readBuffer.samples on six consecutive renders. Native AA reference on the same frame 32.9%; bar (b) 35% still unmet by MSAA alone (G10b). |
 | G10b | P2 | A post-process AA pass (SMAA) on the bloom rungs, if a real phone can pay for it | LIGHT | hours + a device | queued — cost unmeasurable here (no GPU); needs the TestFlight run |
 | G11 | P1 | The WORLD ENDER minute survives a phone: the crowd stops casting shadows | STATIC + MOTION | days | queued |
 | G12 | OWNER | Win the dot, keep the show: bank the goal and play on to the bell | PLAY | a day | OWNER DECISION — reverses his 2026-09-06 decision 1 (a won dot ends the match on the spot). |
@@ -127,10 +170,8 @@ Full change + probe text for every item: the research workflow journal; each is 
 - Top-games research: genre ancestors, kids' retention, feel, audio, graphics — and
   an inventory of what this game actually has, read from source, so every
   recommendation is a concrete gap rather than generic advice.
-- Studio round (`studio` workflow) on the 2026-09-23 lookbook — PASS, all 11 shots,
-  and the first pack in which all six play frames carry the hero (each measured in
-  by shippedlook's coverage bar). Nine teams, a skeptic per finding, art direction,
-  the governor.
+- Studio round 4 on the 2026-09-23 lookbook — DONE: NO-SHIP, seven blockers, twelve
+  jobs (above; docs/STUDIO-ROUND-4.md).
 - Re-measuring the owner's complaints: `gate.mjs --profile=quality
   --only=edgespeed,rivalnotice,food` (Q1-Q3).
 

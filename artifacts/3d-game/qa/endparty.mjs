@@ -29,6 +29,11 @@
 //   (d) goal won at rank 3: at least 24 end-card confetti (.endConf)
 //   (e) buzzer: a 'whistle' within 0.6 s of the clock reaching zero, no 'evolve'
 //   (f) buzzer at rank 3, no level: no 'lose' once the card is up
+//   (g) on both cards: no two celebration sounds (finale, win, evolve) start
+//       within 0.5 s of each other — the card used to fire the motif, the
+//       rank level-up and the new-world cheer in one millisecond (studio
+//       governor, 2026-09-23). Read on the WALL clock, which is the one sounds
+//       play on; a build without wall stamps falls back to tClock.
 import { chromium } from 'playwright';
 
 const PORT = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : '4177';
@@ -86,6 +91,13 @@ async function open(q) {
 const endsAt = (fr, pick) => { const i = fr.findIndex(pick); return i < 0 ? null : fr[i].tc; };
 const near = (fr, tc) => fr.reduce((a, x) => (Math.abs(x.tc - tc) < Math.abs(a.tc - tc) ? x : a), fr[0]);
 const window_ = (calls, t0, t1) => calls.filter((c) => c.t >= t0 && c.t <= t1).map((c) => c.id);
+const CHEERS = new Set(['finale', 'win', 'evolve']);
+const stacked = (calls, fromT) => {
+  const cs = calls.filter((c) => c.t >= fromT - 0.2 && CHEERS.has(c.id)).map((c) => ({ id: c.id, w: c.w ?? c.t }));
+  const bad = [];
+  for (let i = 1; i < cs.length; i++) if (cs[i].w - cs[i - 1].w < 0.5) bad.push(`${cs[i - 1].id}+${cs[i].id} ${((cs[i].w - cs[i - 1].w) * 1000).toFixed(0)} ms apart`);
+  return { cs, bad };
+};
 
 let bad = 0, bars = 0;
 const bar = (ok, id, msg) => { bars++; console.log(`  ${ok ? 'ok  ' : 'BAD '} (${id}) ${msg}`); if (!ok) bad++; };
@@ -122,6 +134,9 @@ if (ONLY.includes('a')) {
   bar(c.wConf >= 100 && !c.card, 'c', `goal won: ${c.wConf} in-world confetti node(s) 0.5 s in, card ${c.card ? 'already up' : 'not up yet'} (want >= 100, before the card)`);
   const ec = Math.max(0, ...fr.filter((x) => x.card).map((x) => x.endConf));
   bar(ec >= 24, 'd', `goal won at rank ${near(fr, cardT).rank}: ${ec} end-card confetti (want >= 24)`);
+  const sa = stacked(calls, cardT - 1.5);
+  bar(!sa.bad.length, 'g', sa.bad.length ? `goal won: celebration sounds stacked on the card — ${sa.bad.join('; ')}`
+    : `goal won: ${sa.cs.map((c) => c.id).join(' then ') || 'no celebration'}, never two within 0.5 s`);
 }
 
 if (ONLY.includes('b')) {
@@ -146,6 +161,9 @@ if (ONLY.includes('b')) {
   bar(!after.includes('lose'), 'f', after.includes('lose')
     ? 'third place with no level: the card plays lose(), the one sad sound the game owns'
     : 'third place with no level: no lose() on the card');
+  const sb = stacked(calls, cardT - 1.5);
+  bar(!sb.bad.length, 'g', sb.bad.length ? `buzzer: celebration sounds stacked on the card — ${sb.bad.join('; ')}`
+    : `buzzer: ${sb.cs.map((c) => c.id).join(' then ') || 'no celebration'}, never two within 0.5 s`);
 }
 
 await b.close();
