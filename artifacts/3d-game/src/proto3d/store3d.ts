@@ -73,9 +73,25 @@ const isNative = (): boolean =>
   !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
     .Capacitor?.isNativePlatform?.();
 
-/** Testing escape hatch: only ?iapmock=1 lets the web build grant a skin. */
+/** Testing escape hatch: only ?iapmock=1 lets the web build grant a skin —
+ *  and only on THIS machine.
+ *
+ *  The header of this file says why the web build must not grant anything:
+ *  "voidling is playable on the open web, so the mock would have given away
+ *  every paid skin to anyone who found the page." The hatch then reopened that
+ *  exact door for anyone who typed nine characters after the live URL. Found by
+ *  the 2026-09-22 readiness audit; qa/iapmockhost.mjs loads the real page from a
+ *  public-looking hostname and reads the paid cards to prove it is shut.
+ *
+ *  Scoped by HOSTNAME, not by import.meta.env.DEV, because the QA probes that
+ *  legitimately need it (qa/_shopshot.mjs and friends) run against `vite
+ *  preview` — a production build — at 127.0.0.1. DEV would blind them; a
+ *  hostname check keeps them working and cannot be satisfied from the internet.
+ *  A Capacitor build is never here at all: isNative() takes the StoreKit path. */
+const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/;
 const mockAllowed = (): boolean =>
-  new URLSearchParams(location.search).get('iapmock') === '1';
+  LOCAL_HOST.test(location.hostname)
+  && new URLSearchParams(location.search).get('iapmock') === '1';
 
 let store: StoreApi | null = null;
 let ready = false;
