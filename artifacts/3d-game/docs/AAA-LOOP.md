@@ -143,6 +143,14 @@ minor regressions, each closed here against a probe that failed first.
 | X8 / G4 | Every match ends as a party — on every world | qa/endparty.mjs had run on Maple only (8/8 PASS after G4) | on the verify-pass build: **Pirate, Gameday, Lantern, Powder, Skylark 8/8 PASS each** — a whistle and no evolve at both doors, 'victory', 140 confetti before the card, 40 on it, no lose(), never two celebrations within 0.5 s. **G4 holds on all six worlds.** |
 | X7 | Smaller residuals | duckMusic's deeper floor survived the release ramp; OPEN SHOP and LEAVE did not cancel a queued cheer; the bite bank paid under the pause sheet; the ferris wheel's cross tie ran through both rims | fixed in bd38108 (by reading; the cheer and pause paths are inside X3's drive) |
 
+**Merged to main at 05c5842 (2026-09-23), push gate 58/58.** The full run
+passed 45 steps; 13 (splash through menuquiet, one contiguous window) died on
+"browser has been closed" or before printing a verdict while four day-2 fix
+agents were busy on the box. The cause was not pinned down (no OOM record);
+nothing in them is a game check failing. Re-run alone on the same dist with
+nothing else on the machine: 13/13 PASS. Lesson kept: the gate runs with the
+box to itself, and no agent work of any kind overlaps it.
+
 **halocensus v2, and why v1 was retired.** v1 measured the RESULT — pixels
 bloom lifted by 3+ L* more than 16 px from a light — and condemned Lantern's
 lanterns (a lit table's haze reaches ~200 px, all 405 "hot" cells) while
