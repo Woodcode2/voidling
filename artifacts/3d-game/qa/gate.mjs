@@ -593,6 +593,14 @@ const SUITE = [
   { id: 'iosname', tier: 'money', profiles: ['push', 'live'], timeout: 30,
     cmd: ['node', 'qa/iosname.mjs'], verdict: pf,
     why: 'the iOS home-screen label matches capacitor.config.ts — cap sync never fixes this one' },
+  // A DOOR THAT WAS SHUT, THEN REOPENED BY A TESTING HATCH. store3d.ts's header
+  // says the web build must never grant a paid item; `?iapmock=1` granted every
+  // one to anyone who typed it after the live URL. Measured on the build that
+  // shipped before 922e090: a public hostname's legendary card read "BUY · $2.99".
+  // In push because it is money and it is cheap to reopen by accident.
+  { id: 'iapmockhost', tier: 'money', profiles: ['push', 'live'], timeout: 1500,
+    cmd: ['node', 'qa/iapmockhost.mjs', PORT], verdict: pf,
+    why: '?iapmock=1 cannot hand a paid item over on a public hostname — a tapped legendary card says ON THE APP STORE there, and still says BUY at 127.0.0.1 so the QA probes that test purchases keep working' },
 
   { id: 'questable', tier: 'money', profiles: ['live'], timeout: 1600,
     cmd: ['node', 'qa/questable.mjs', PORT, ...WORLDS], verdict: pf,

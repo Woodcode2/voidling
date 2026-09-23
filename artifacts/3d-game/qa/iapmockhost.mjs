@@ -36,7 +36,21 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader',
     `--host-resolver-rules=MAP ${FOREIGN} 127.0.0.1`] });
 
-/** Open the shop at `host` with ?iapmock=1 and return the paid cards' button text. */
+/** Open the shop at `host` with ?iapmock=1, TAP a legendary card the way a
+ *  child does, and return what the preview's action button says.
+ *
+ *  THE FIRST VERSION OF THIS READ THE GRID AND FOUND NOTHING. It looked for
+ *  "BUY" / "ON THE APP STORE" among the shop's buttons and came back 0 and 0 on
+ *  both hosts — because the grid never says either. A paid card on the grid
+ *  shows only its dollar price (`.pr`); the line that decides whether money
+ *  changes hands is #spAct, the button on the PREVIEW, which only exists after
+ *  a tap. The probe failed loudly on "no paid card was found at all" rather
+ *  than passing on silence, which is the whole reason that branch is there.
+ *  Two readings now, both player-facing:
+ *    heading — `.shopTier.gold span`: "A WHOLE NEW CHARACTER" when a purchase
+ *              path exists, "COMING SOON ON iPHONE" when it does not
+ *    action  — #spAct after tapping `.skCard.legend`: "BUY · $x" hands it over,
+ *              "$x · ON THE APP STORE" does not */
 async function paidCards(host) {
   const p = await b.newPage({ viewport: { width: 430, height: 932 } });
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
@@ -51,34 +65,35 @@ async function paidCards(host) {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
   await p.evaluate(() => document.getElementById('btnShop')?.click());
   await p.waitForSelector('#shop.show', { timeout: 60000 }).catch(() => { });
-  const r = await p.evaluate(() => {
-    const txt = [...document.querySelectorAll('#shop button, #shop .shopBuy, #shop [data-price]')]
-      .map((e) => (e.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean);
-    return {
-      hostname: location.hostname,
-      open: !!document.querySelector('#shop.show'),
-      buy: txt.filter((t) => /^BUY\s*·/i.test(t)).length,
-      store: txt.filter((t) => /ON THE APP STORE/i.test(t)).length,
-      sample: txt.filter((t) => /BUY|APP STORE/i.test(t)).slice(0, 3),
-    };
-  });
+  await p.waitForSelector('#shopGrid .skCard.legend', { timeout: 60000 }).catch(() => { });
+  const heading = await p.evaluate(() =>
+    (document.querySelector('#shopGrid .shopTier.gold span')?.textContent || '').trim());
+  const legends = await p.evaluate(() => document.querySelectorAll('#shopGrid .skCard.legend').length);
+  await p.evaluate(() => document.querySelector('#shopGrid .skCard.legend')?.click());
+  await p.waitForFunction(() => (document.getElementById('spAct')?.textContent || '').trim().length > 1,
+    null, { timeout: 30000 }).catch(() => { });
+  const r = await p.evaluate(() => ({
+    hostname: location.hostname,
+    open: !!document.querySelector('#shop.show'),
+    action: (document.getElementById('spAct')?.textContent || '').replace(/\s+/g, ' ').trim(),
+  }));
   await p.close();
-  return r;
+  return { ...r, heading, legends };
 }
 
 console.log(`\n  IAP MOCK BY HOST — can ?iapmock=1 give paid items away on a deployed URL?\n`);
 const live = await paidCards(FOREIGN);
-console.log(`  ·    ${live.hostname}: shop open=${live.open}  BUY=${live.buy}  APP STORE=${live.store}  e.g. ${JSON.stringify(live.sample)}`);
-if (!live.open) no(`the shop did not open on ${FOREIGN} — cannot answer, and silence is a FAIL`);
-else if (live.buy > 0) no(`on ${FOREIGN} the paid cards read "BUY" — the mock is live on a public hostname and hands every paid item over for free`);
-else if (live.store === 0) no(`on ${FOREIGN} no paid card was found at all — the probe cannot see the thing it measures`);
-else ok(`on ${FOREIGN}, ?iapmock=1 is refused: ${live.store} paid card(s) read "ON THE APP STORE", none read "BUY"`);
+console.log(`  ·    ${live.hostname}: shop open=${live.open}  legendary cards=${live.legends}  heading="${live.heading}"  action="${live.action}"`);
+if (!live.open || !live.legends || !live.action) no(`on ${FOREIGN} the shop, a legendary card or its action button could not be read — cannot answer, and silence is a FAIL`);
+else if (/^BUY\b/i.test(live.action)) no(`on ${FOREIGN} a legendary card's button reads "${live.action}" — the mock is live on a public hostname and hands every paid item over for free`);
+else if (!/ON THE APP STORE/i.test(live.action)) no(`on ${FOREIGN} the button reads "${live.action}" — neither a purchase nor a pointer to the App Store; the probe does not recognise the state`);
+else ok(`on ${FOREIGN}, ?iapmock=1 is refused: a tapped legendary card says "${live.action}", and the tier reads "${live.heading}"`);
 
 const local = await paidCards('127.0.0.1');
-console.log(`  ·    ${local.hostname}: shop open=${local.open}  BUY=${local.buy}  APP STORE=${local.store}`);
-if (!local.open) no('the shop did not open on 127.0.0.1 — cannot answer, and silence is a FAIL');
-else if (local.buy === 0) no('on 127.0.0.1 ?iapmock=1 no longer works — the fix blinded the QA probes that test purchases');
-else ok(`on 127.0.0.1, ?iapmock=1 still works for QA: ${local.buy} paid card(s) read "BUY"`);
+console.log(`  ·    ${local.hostname}: shop open=${local.open}  legendary cards=${local.legends}  heading="${local.heading}"  action="${local.action}"`);
+if (!local.open || !local.legends || !local.action) no('on 127.0.0.1 the shop, a legendary card or its action button could not be read — cannot answer, and silence is a FAIL');
+else if (!/^BUY\b/i.test(local.action)) no(`on 127.0.0.1 ?iapmock=1 no longer works ("${local.action}") — the fix blinded the QA probes that test purchases`);
+else ok(`on 127.0.0.1, ?iapmock=1 still works for QA: "${local.action}"`);
 
 await b.close();
 console.log(`\n${bad ? 'FAIL' : 'PASS'} — ${bad ? `${bad} of ${bars}` : bars} bar(s)`);
