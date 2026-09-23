@@ -45,6 +45,14 @@ export interface Audio3D {
    *  lays a crunch and a gulp over it, all above 250 Hz (see the method). */
   chomp(mealR?: number, voidR?: number, kind?: 'prop' | 'rival'): void;
   ready(): void;                   // a power just charged
+  /** THE CHAIN'S CROWN — every tenth link of an unbroken eating chain. A
+   *  rising major triad on the pop's own pentatonic ladder, a step higher per
+   *  crown, with a sparkle on top. Everything sits above 500 Hz. */
+  nomCrown(n: number): void;
+  /** THE CHAIN CASHES IN — a lapsed chain of five or more. A rising major
+   *  third: the chain ended, and the sound says it was worth it. There is no
+   *  "combo broken" sound, on purpose. */
+  nomCash(n: number): void;
   startMusic(): void;              // the match loop — tempo + layers ride the stage
   setMusicStage(n: number): void;
   stopMusic(): void;
@@ -4494,6 +4502,41 @@ export function createAudio(): Audio3D {
       }
       tone(660, 660, 0.13, 'square', 0.12);
       tone(880, 880, 0.13, 'square', 0.12, 0.16);
+    },
+    nomCrown(n) {
+      const c = ensure(); if (!c || !master) return;
+      logEv(`crown ${n}`);
+      // C5 at ten, D5 at twenty, E5 at thirty — the same ladder pop() walks,
+      // so the crown sounds like the bites that earned it, only finished
+      const step = PENTA[Math.min(PENTA.length - 1, Math.max(0, Math.floor(n / 10) - 1))];
+      const root = 523.25 * Math.pow(2, step / 12);
+      const t = c.currentTime;
+      [0, 4, 7].forEach((semi, k) => {
+        const f = root * Math.pow(2, semi / 12);
+        if (isPirate()) marimba(master!, f, t + k * 0.075, 0.45, 0.12);
+        else {
+          tone(f, f, 0.2, 'sine', 0.11, k * 0.075);
+          tone(f * 2, f * 2, 0.12, 'triangle', 0.03, k * 0.075);
+        }
+      });
+      // the sparkle: three short pings an octave and more above the triad
+      [3.0, 4.0, 5.04].forEach((m, k) => tone(root * m, root * m, 0.07, 'sine', 0.028, 0.2 + k * 0.045));
+      duckMusic(3, 0.4);
+    },
+    nomCash(n) {
+      const c = ensure(); if (!c || !master) return;
+      logEv(`cashin ${n}`);
+      const t = c.currentTime;
+      // G5 then B5, a major third up: the chime a till makes when it closes
+      for (const [k, f] of [783.99, 987.77].entries()) {
+        if (isPirate()) marimba(master, f, t + k * 0.11, 0.6, 0.13);
+        else {
+          tone(f, f, 0.32, 'sine', 0.12, k * 0.11);
+          tone(f * 2, f * 2, 0.16, 'triangle', 0.035, k * 0.11);
+        }
+      }
+      tone(987.77 * 3, 987.77 * 3, 0.1, 'sine', 0.025, 0.24);
+      duckMusic(3, 0.6);
     },
     ready() {
       if (isPirate()) {

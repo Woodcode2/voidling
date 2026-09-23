@@ -51,10 +51,10 @@ node qa/gate.mjs --list --profile=push   # every step, and the one line on what 
 
 | profile | when | size (read 2026-09-23 — re-read it, do not trust this) |
 |---|---|---|
-| `push` | before every push, and **nothing reaches `main` without it green** | 55 steps |
+| `push` | before every push, and **nothing reaches `main` without it green** | 57 steps |
 | `art` | after any visual change | 35 |
-| `quality` | the owner's own complaints, each with a band at BOTH ends — too little and nothing changed, too much and it is "a shit show for a six-year-old" | 12 |
-| `live` | **before anything reaches production** | 101 |
+| `quality` | the owner's own complaints, each with a band at BOTH ends — too little and nothing changed, too much and it is "a shit show for a six-year-old" | 13 |
+| `live` | **before anything reaches production** | 103 |
 
 **`quality` is where the owner's complaints live, and it is on probation.** Its
 instruments run as their own profile until each has a green reading, then they

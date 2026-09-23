@@ -221,8 +221,13 @@ const SAMPLER = () => {
           x: parseFloat(jr.style.left) || 0, y: parseFloat(jr.style.top) || 0,
           d: jr.getBoundingClientRect().width, W: window.innerWidth });
       }
+      // …AND THE EAT'S NUMBER IS NOW A FLIGHT. Research governor G6 retired the
+      // '+N' that rose off every prop: the coalesced number flying into the bar
+      // is the one stream. A flight runs no animation and never wears `go` — it
+      // wears `fly` until it lands and is reset to bare `vf` — so it is live on
+      // either class. Before G6 the rising floater always came first anyway.
       for (const el of document.querySelectorAll('.vf')) {
-        const live = el.classList.contains('go') && !!(el.textContent || '').trim();
+        const live = (el.classList.contains('go') || el.classList.contains('fly')) && !!(el.textContent || '').trim();
         const was = live0.get(el) || false;
         if (live && !was) w.__op.floaters.push({ t: performance.now() - w.__op.t0, text: el.textContent || '' });
         live0.set(el, live);

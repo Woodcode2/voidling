@@ -111,19 +111,36 @@ for (const wid of WORLDS) {
     // ordering artifact is averaged into the window it belongs to. The peak
     // window's own dt and distance are kept so a surprising number can be
     // interrogated instead of believed.
+    // ── AND ON THE CLOCK THE VOID MOVES BY ──────────────────────────────
+    // This windowed on __matchState().t, the MATCH clock, and the match clock
+    // runs on dtw — the world's time, which hitStop() slows to 6% for 55-105 ms
+    // on every big bite. The void is steered on dt and deliberately never
+    // freezes (see "THE WORLD MAY STOP. THE THUMB MAY NOT." in prototype3d.ts).
+    // So every window holding a hit-stop divided real movement by a clock that
+    // had nearly stopped, and read fast. Pirate's shore is lined with food, so
+    // its windows were full of them: 1.51x on 2026-09-23 against a clamp that
+    // holds 1.35x per frame. tClock advances by dt, the same dt the integrator
+    // and the shore clamp use, so it is the clock this speed is a speed OF.
+    // The match-clock reading is still taken, beside it, so the gap is on the
+    // page rather than asserted.
     const WIN = 0.25;
-    let peak = 0, peakR = 0, n = 0, atEdge = 0, capAt = 0, peakDt = 0, peakDist = 0;
-    let px = vs0.x, pz = vs0.z, last = window.__matchState().t;
-    let accD = 0, accT = 0, accNear = false, accCap = 0;
+    let peak = 0, peakR = 0, n = 0, atEdge = 0, capAt = 0, peakDt = 0, peakDist = 0, peakStops = 0;
+    let mPeakR = 0;
+    let px = vs0.x, pz = vs0.z, last = window.__matchState().tClock, lastM = window.__matchState().t;
+    let accD = 0, accT = 0, accM = 0, accNear = false, accCap = 0, accStops = 0;
     await new Promise((res) => {
       const tick = () => {
         const vs = window.__voidState();
-        const now = window.__matchState().t;
+        const ms = window.__matchState();
+        const now = ms.tClock;
+        if (typeof now !== 'number') throw new Error('__matchState().tClock is missing — cannot time the void on its own clock');
         const dt = now - last;
         if (dt < 1e-4) { requestAnimationFrame(tick); return; }   // same frame, no data
         last = now;
+        const dm = ms.t - lastM; lastM = ms.t;
+        if (dm < dt * 0.5) accStops++;   // the world's clock crawled this frame: a hit-stop
         accD += Math.hypot(vs.x - px, vs.z - pz);
-        accT += dt;
+        accT += dt; accM += dm;
         px = vs.x; pz = vs.z;
         // ── AND READ THE REAL camDist, DO NOT RECONSTRUCT IT ─────────────
         // This first derived the cap from the radius, on the reasoning that
@@ -149,23 +166,29 @@ for (const wid of WORLDS) {
           || !window.__solidAt(vs.x, vs.z + R, vs.r) || !window.__solidAt(vs.x, vs.z - R, vs.r)) accNear = true;
         if (accT >= WIN) {
           const sp = accD / accT;
-          if (accNear) { atEdge++; if (sp / accCap > peakR) {
-            peakR = sp / accCap; peak = sp; capAt = accCap; peakDt = accT; peakDist = accD; } }
-          accD = 0; accT = 0; accNear = false;
+          if (accNear) {
+            atEdge++;
+            if (sp / accCap > peakR) {
+              peakR = sp / accCap; peak = sp; capAt = accCap; peakDt = accT; peakDist = accD; peakStops = accStops; }
+            if (accM > 1e-4 && (accD / accM) / accCap > mPeakR) mPeakR = (accD / accM) / accCap;
+          }
+          accD = 0; accT = 0; accM = 0; accNear = false; accStops = 0;
         }
         if (n < FR) requestAnimationFrame(tick); else res();
       };
       requestAnimationFrame(tick);
     });
     clearInterval(iv);
-    return { ok: true, peak, peakR, capAt, n, atEdge, peakDt, peakDist };
+    return { ok: true, peak, peakR, capAt, n, atEdge, peakDt, peakDist, peakStops, mPeakR };
   }, FRAMES);
 
   if (!r.ok) { console.log(`  ${wid.padEnd(9)} SKIPPED — ${r.why}`); rows.push({ wid, skipped: true }); }
   else {
     console.log(`  ${wid.padEnd(9)} ${r.atEdge} windows at the shore over ${r.n} frames   `
       + `peak ${r.peak.toFixed(1)} u/s against a steering cap of ${r.capAt.toFixed(1)} = ${r.peakR.toFixed(2)}x`
-      + `   (that window: ${r.peakDist.toFixed(1)}u in ${r.peakDt.toFixed(3)}s of match)`);
+      + `   (that window: ${r.peakDist.toFixed(1)}u in ${r.peakDt.toFixed(3)}s of sim, ${r.peakStops} hit-stop frame(s))`);
+    console.log(`  ${''.padEnd(9)} the same windows timed on the MATCH clock peak at ${r.mPeakR.toFixed(2)}x — `
+      + `the hit-stop slows that clock and never the void, so that figure is not a speed`);
     rows.push({ wid, ...r });
   }
   await p.close();

@@ -21,14 +21,17 @@ export interface Bubbles {
    *  are IDENTIFIED conversation, the crowd's are anonymous texture, and the
    *  two are visually different classes at a glance. */
   say(pos: THREE.Vector3, text: string, kind: BubbleKind, opts?: { name?: string; color?: string }): void;
-  float(pos: THREE.Vector3, text: string, big?: boolean): void;   // rising score/juice text
+  /** `gold` is the chain's own colour — the NOMS crowns and the cash-in. It is
+   *  not the pink of a bite or the green of a set piece, so the one thing a
+   *  child can build on purpose reads as its own class of number. */
+  float(pos: THREE.Vector3, text: string, big?: boolean, gold?: boolean): void;   // rising score/juice text
   /** THE NUMBER GOES INTO THE BAR. The owner, on hole.io: "when you eat like
    *  points are going into the bar". Same pooled node as float(), but instead
    *  of rising and fading in world space it flies to a SCREEN point and fires
    *  onArrive when it lands. `target` is read every frame rather than captured,
    *  because the bar's head moves as the bar fills. */
   flyTo(pos: THREE.Vector3, text: string, target: () => { x: number; y: number } | null,
-    onArrive: () => void, big?: boolean): void;
+    onArrive: () => void, opts?: { scale?: number; color?: string }): void;
   /** `hero` is the void's world position and radius. Pass it and no bubble
    *  will be drawn across his face. See the note at HERO_PAD. */
   /** THE FORM-NAME CALLOUT. Pops the new form name above his head for 0.8s.
@@ -231,6 +234,7 @@ const style = document.createElement('style');
     }
     body.calm .vf.go { opacity: 1 !important; transform: translate(-50%, -70%) !important; }
     .vf.big { font-size: 26px; color: #7ef2a0; letter-spacing: 1px; }
+    .vf.gold { color: #ffd23f; }
     /* A FLYING NUMBER CARRIES ITS OWN OPACITY, and that is not optional:
        '.vf' is authored opacity 0 and only '.vf.go's vfRise reveals it, so a
        flying slot — which deliberately runs no animation, because its motion is
@@ -481,7 +485,7 @@ const style = document.createElement('style');
       slot.lx = -1; slot.ly = -1;   // position is stale; next update() repaints
       slot.el.classList.add('show');
     },
-    float(pos, text, big = false) {
+    float(pos, text, big = false, gold = false) {
       text = sentence(text);
       const f = floats[fHead]; fHead = (fHead + 1) % floats.length;
       // A RECYCLED SLOT MUST NOT STAY IN FLIGHT. float() and flyTo() share one
@@ -496,11 +500,12 @@ const style = document.createElement('style');
       }
       f.active = true; f.pos.copy(pos); f.until = clock + 0.9;
       f.el.textContent = text;
-      f.el.className = `vf${big ? ' big' : ''}`;
+      f.el.style.fontSize = ''; f.el.style.color = '';   // a flight's size and tint die with it
+      f.el.className = `vf${big ? ' big' : ''}${gold ? ' gold' : ''}`;
       void (f.el as HTMLElement).offsetWidth;
       f.el.classList.add('go');
     },
-    flyTo(pos, text, target, onArrive, big = false) {
+    flyTo(pos, text, target, onArrive, opts) {
       fStats.launched++;
       text = sentence(text);
       const f = floats[fHead]; fHead = (fHead + 1) % floats.length;
@@ -512,7 +517,13 @@ const style = document.createElement('style');
       }
       f.active = true; f.pos.copy(pos);
       f.el.textContent = text;
-      f.el.className = `vf fly${big ? ' big' : ''}`;
+      f.el.className = 'vf fly';
+      // ── THE NUMBER IS AS BIG AS THE MEAL ─────────────────────────────────
+      // It was 20px for a traffic cone and 20px for a town hall. The caller
+      // sizes it from the bank it carries and tints it inside a beat window;
+      // both are inline, so the pooled node has to shed them on every raise.
+      f.el.style.fontSize = opts?.scale ? `${(20 * opts.scale).toFixed(1)}px` : '';
+      f.el.style.color = opts?.color ?? '';
       // `until` is a SAFETY NET, not the schedule: if the target goes away or a
       // frame is dropped the slot still retires rather than sticking on screen.
       f.until = clock + 0.6;
@@ -542,6 +553,7 @@ const style = document.createElement('style');
         f.el.classList.remove('show');
         f.el.className = 'vf';
         f.el.textContent = '';
+        f.el.style.fontSize = ''; f.el.style.color = '';
         f.lx = -1; f.ly = -1;
         f.fly = null;   // a pending payout dies with the match, not into the next one
       }

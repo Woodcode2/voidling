@@ -224,6 +224,30 @@
       #wayfind.on { opacity: 1; visibility: visible;
         transition: opacity 0.22s linear, visibility 0s linear 0s; }
       body.ovl #wayfind, body.menu #wayfind { display: none; }
+      /* ── THE NOMS PILL ──────────────────────────────────────────────────────
+         The eating chain, counted in words a child reads: '12 NOMS'. Placed
+         beside the void from JS every frame (paintNoms), so like #wayfind it
+         carries no @keyframes — only a class-driven fade — and cannot be caught
+         by the reduced-motion catch-all. Violet from five links, gold from ten,
+         rainbow from twenty. A beat window adds a static ×2 tag. Nothing on it
+         drains or counts down (research governor G6). */
+      #noms { position: fixed; left: 0; top: 0; z-index: 5; pointer-events: none;
+        transform: translate(0, -50%); padding: 4px 12px 5px; border-radius: 999px;
+        font-family: 'Fredoka', system-ui, sans-serif; font-weight: 800; font-size: 15px;
+        letter-spacing: 0.6px; line-height: 1.25; white-space: nowrap; color: #fff;
+        -webkit-text-stroke: 2.5px rgba(26,10,22,0.9); paint-order: stroke fill;
+        background: #8a5cff;
+        box-shadow: 0 0 0 2.5px rgba(26,10,22,0.9), 0 3px 8px rgba(0,0,0,0.35);
+        opacity: 0; visibility: hidden;
+        transition: opacity 0.16s linear, visibility 0s linear 0.16s; }
+      #noms.on { opacity: 1; visibility: visible;
+        transition: opacity 0.16s linear, visibility 0s linear 0s; }
+      #noms.lft { transform: translate(-100%, -50%); }
+      #noms.mid { transform: translate(-50%, -50%); }
+      #noms[data-tier="2"] { background: #f5a300; }
+      #noms[data-tier="3"] { background: linear-gradient(90deg, #ff4f7b, #ff9f1c, #ffd23f, #3fcf7a, #3fb4ff, #9b6bff); }
+      #noms b { margin-left: 7px; font-weight: 900; color: #ffe46b; }
+      body.ovl #noms, body.menu #noms { display: none; }
       /* ── THE FORM-NAME CALLOUT ───────────────────────────────────────────────
          The owner, on hole.io: "What if we had a graphics that looked beat like
          hole and it says level up next to the void?" — and then, shown that his
@@ -3258,6 +3282,7 @@
     </div>
     <div id="evolve"><div class="big"></div><div class="sm">EVOLVED</div></div>
     <div id="wayfind"></div>
+    <div id="noms"></div>
     <div id="form"></div>
     <div id="guide"></div>
     <!-- the ghost hand: a looping press-and-drag demo over the live game.

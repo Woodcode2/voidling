@@ -145,6 +145,71 @@ bar(Math.max(ev.prop.peak, ev.rival.peak) <= -3,
   `(e) peaks stay at or under -3 dBFS (${Math.max(ev.prop.peak, ev.rival.peak).toFixed(1)})`,
   `(e) a headline bite peaks at ${Math.max(ev.prop.peak, ev.rival.peak).toFixed(1)} dBFS, over the -3 dBFS ceiling`);
 
+// ══ PART 3 — THE CHAIN: A CROWN EVERY TENTH NOM, AND THE CASH-IN ═══════════
+// Research governor G6. The eating chain was silent — it paid a multiplier a
+// child could not see and lapsed without a sound. It now has two sounds of its
+// own, and they have to survive a phone speaker as well as the bites do: same
+// band, same veto on anything below 250 Hz, same ceiling.
+//
+// THE THUD IS READ THROUGH A STEEP FILTER HERE. Parts 1-2 use one pole, which
+// falls only 6 dB an octave, and that is fine for comparing a bite with a bite
+// at similar levels. It is not fine for a sound twelve dB louder whose lowest
+// note is C5: its first run read -46.7 dBFS "below 250 Hz" against the plain
+// bite's -49.3 and failed (g) — on a synth whose lowest partial is 523 Hz. That
+// was the crown's C5 leaking through one pole, not a thud. Four cascaded poles
+// (24 dB an octave) put 523 Hz about 29 dB down and leave what is really below
+// 250 Hz — the bite's own 52-150 Hz body — where it is.
+const ch = await p.evaluate(async () => {
+  const mod = await import('/src/proto3d/audio3d.ts');
+  const band = (d, lo, hi) => {
+    const dt = 1 / 44100;
+    const aH = lo ? (1 / (2 * Math.PI * lo)) / ((1 / (2 * Math.PI * lo)) + dt) : 0;
+    const aL = hi ? dt / ((1 / (2 * Math.PI * hi)) + dt) : 1;
+    let hp = 0, xp = 0, l1 = 0, l2 = 0, l3 = 0, l4 = 0, sum = 0;
+    for (let i = 0; i < d.length; i++) {
+      const h = lo ? aH * (hp + d[i] - xp) : d[i]; xp = d[i]; hp = h;
+      let y = h;
+      if (hi) { l1 += aL * (y - l1); l2 += aL * (l1 - l2); l3 += aL * (l2 - l3); l4 += aL * (l3 - l4); y = l4; }
+      sum += y * y;
+    }
+    return 20 * Math.log10(Math.sqrt(sum / d.length) || 1e-9);
+  };
+  const render = async (fn) => {
+    const ctx = new OfflineAudioContext(1, 44100, 44100);
+    const RealAC = window.AudioContext;
+    window.AudioContext = function () { return ctx; };
+    let a, has = true;
+    try { a = mod.createAudio(); a.setMuted?.(false); has = fn(a) !== false; }
+    finally { window.AudioContext = RealAC; }
+    const d = (await ctx.startRendering()).getChannelData(0);
+    let peak = 0; for (let i = 0; i < d.length; i++) peak = Math.max(peak, Math.abs(d[i]));
+    return { has, hp: band(d, 450, 0), low: band(d, 0, 250), peak: 20 * Math.log10(peak || 1e-9) };
+  };
+  return {
+    pop: await render((a) => a.pop(0, 1.3, 2.5)),
+    crown10: await render((a) => (a.nomCrown ? a.nomCrown(10) : false)),
+    crown30: await render((a) => (a.nomCrown ? a.nomCrown(30) : false)),
+    cash: await render((a) => (a.nomCash ? a.nomCash(14) : false)),
+  };
+});
+console.log('\n  THE CHAIN — the crown every tenth nom, and the cash-in when it ends');
+console.log('                     >450 Hz   <250 Hz    peak');
+for (const [k, r] of Object.entries(ch))
+  console.log(`    ${k.padEnd(8)}  ${r.has ? r.hp.toFixed(1).padStart(10) : '    absent'}  ${r.low.toFixed(1).padStart(8)}  ${r.peak.toFixed(1).padStart(6)}  dBFS`);
+const chain = [ch.crown10, ch.crown30, ch.cash];
+bar(chain.every((r) => r.has && r.hp >= ch.pop.hp),
+  `(f) the crowns and the cash-in are no quieter than a plain bite where a phone can hear them (${chain.map((r) => r.hp.toFixed(1)).join(', ')} vs ${ch.pop.hp.toFixed(1)} dBFS)`,
+  chain.some((r) => !r.has) ? '(f) the chain has no sound of its own — nomCrown()/nomCash() do not exist'
+    : `(f) a chain sound is quieter than a plain bite above 450 Hz (${chain.map((r) => r.hp.toFixed(1)).join(', ')} vs ${ch.pop.hp.toFixed(1)} dBFS)`);
+bar(chain.every((r) => r.has && r.low <= ch.pop.low + 1),
+  `(g) no thud: below 250 Hz the chain sounds sit at ${chain.map((r) => r.low.toFixed(1)).join(', ')} against the bite's ${ch.pop.low.toFixed(1)} dBFS`,
+  chain.some((r) => !r.has) ? '(g) nothing to check for a thud — the chain sounds do not exist'
+    : `(g) a chain sound carries a thud below 250 Hz (${chain.map((r) => r.low.toFixed(1)).join(', ')} vs ${ch.pop.low.toFixed(1)} dBFS) — the owner vetoed exactly this`);
+bar(chain.every((r) => r.has && r.peak <= -3),
+  `(h) the chain sounds peak at or under -3 dBFS (${Math.max(...chain.map((r) => r.peak)).toFixed(1)})`,
+  chain.some((r) => !r.has) ? '(h) nothing to check for a peak — the chain sounds do not exist'
+    : `(h) a chain sound peaks at ${Math.max(...chain.map((r) => r.peak)).toFixed(1)} dBFS, over the -3 dBFS ceiling`);
+
 await b.close();
 console.log(`\n${bad ? 'FAIL' : 'PASS'} — ${bad} bad`);
 process.exit(bad ? 1 : 0);

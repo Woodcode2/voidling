@@ -3450,6 +3450,7 @@ const _dbg = new Proxy(_dbgStore, {
   // QA: the newsroom arc — every card that reached the screen this match, and
   // where the four-phase story currently stands (newsroom_arc.ts)
   __music: () => ReturnType<typeof audio.musicState>;
+  __audioLog: () => string[];
   __newsArc: () => {
     log: { t: number; phase: number; tier: number; react: boolean; brand: string; text: string }[];
     arc: { phase: number; cards: number; high: number };
@@ -3541,6 +3542,9 @@ _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the l
 // never starts is exactly that, so total silence read as RECORDING. This is the
 // state that decides whether a sound reaches a child.
 _dbg.__music = () => audio.musicState();
+/** QA: the audio engine's own ordered log — what it actually played, in order.
+ *  qa/nomstream.mjs counts the chain's crowns and cash-ins in it. */
+_dbg.__audioLog = () => audio.musicLog();
 // QA: put a hat on the live void. Needed to measure OCCLUSION from the play
 // camera — the thing qa/hatsheet.mjs cannot see, because it renders a hat alone
 // in a bare scene from near-horizontal angles while the game looks DOWN at a
@@ -4380,6 +4384,7 @@ _dbg.__matchState = () => ({
   graze: rivals.grazeCount(),
   band: rivals.bandStat(),   // QA: is the lane multiplier pinned at its clamp?
   fever: feverMult,          // QA: is a beat window live right now?
+  combo,                     // QA: the chain qa/nomstream.mjs grades the pill and the cash-in against
   t: started ? matchElapsed() : 0, clock: matchClock, score: playerScore, r: voidling.radius, eaten: matchEaten, ev: rivalEv,
   // QA, round 7 stream A: the arm/start split is invisible from outside without
   // these, and a goal card that never appeared cost a full diagnostic run to
@@ -5602,6 +5607,7 @@ const gFillEl = growthEl.querySelector('.gFill') as HTMLElement;
 const hungerLbl = el('hungerlbl');
 const evolveEl = el('evolve'), endEl = el('end'), endHd = el('endHd'), endSub = el('endSub'), endList = el('endList');
 const wayEl = el('wayfind');
+const nomsEl = el('noms');
 const bannerEl = el('banner'), hungerEl = el('hunger'), hungerFill = hungerEl.querySelector('.fill') as HTMLElement;
 let prevHunger = 0;
 
@@ -8424,6 +8430,9 @@ function endMatch(result: GoalResult = null) {
  *  The growth bar's step rides the same schedule, so the number and the bar
  *  move together rather than at two different rhythms. */
 let eatFloatPts = 0, eatFloatT = 0;
+/** the biggest bite in the bank, and whether a landmark went in — the flight's
+ *  size reads both. See the flush in the frame loop. */
+let eatFloatK = 0, eatFloatLm = false;
 const eatFloatAt = new THREE.Vector3();
 const EAT_FLOAT_WINDOW = 0.45;
 /** ── AND THE BAR HAS TO SAY IT GOT IT ──────────────────────────────────────
@@ -8480,6 +8489,68 @@ const KEEL_UP = new THREE.Vector3(0, 1, 0);
 const _kq = new THREE.Quaternion(), _kq2 = new THREE.Quaternion();
 // devour one edible: spiral it in, grow, score (2D combo model), charge hunger
 let combo = 0, comboT = 0, chompCd = 0;
+/** ── THE CHAIN SHE CAN SEE ─────────────────────────────────────────────────
+ *  Research governor G6. `combo` has always counted an unbroken eating chain
+ *  and paid a multiplier on it, and a child could see none of it: the chain
+ *  showed up as a decimal ('COMBO ×1.5') on every fifth bite and lapsed in
+ *  silence. It is now a pill beside the void from five links, a crown at every
+ *  tenth, and a cash-in when it ends — '14 NOMS! +420', the chain's own total.
+ *  chainPts is that total. It is a RECAP of points already scored, never a
+ *  bonus on top: the race economy is tuned on playerScore and stays untouched.
+ *  Nothing drains, counts down or scolds; a chain that ends is paid, not lost. */
+let chainPts = 0;
+const nomAt = new THREE.Vector3();
+function nomCash(): void {
+  nomAt.set(voidState.x, voidling.radius + 3.2, voidState.z);
+  bubbles.float(nomAt, `${combo} NOMS! +${chainPts.toLocaleString()}`, true, true);
+  audio.nomCash(combo); buzz(20);
+  // the bar takes its brighter punch: this is the chain's payout moment
+  gBiteK = Math.max(gBiteK, EAT_TICK_BIG);
+  gbarPay();
+}
+/** ── THE NOMS PILL ─────────────────────────────────────────────────────────
+ *  Beside the void, never on his face: placed off the edge of the disc from
+ *  the SAME face box the bubbles dodge (bubbles.formBox(), refreshed by
+ *  bubbles.update() just before this runs), on whichever side has room, and
+ *  under the face when the disc fills the screen. Violet from five, gold from
+ *  ten, rainbow from twenty. No ring, no fuse, nothing that drains. Every DOM
+ *  write is change-gated, like the wayfinder's. */
+let nomsOn = false, nomsHtml = '', nomsTier = '', nomsSide = '', nomsLX = -1, nomsLY = -1;
+function paintNoms(): void {
+  const fb = bubbles.formBox();
+  if (combo < 5 || !started || ended || paused || !fb.on) {
+    if (nomsOn) { nomsOn = false; nomsEl.classList.remove('on'); }
+    return;
+  }
+  const tag = feverMult > 1 ? `<b>×${Math.round(feverMult)}</b>` : '';
+  const html = `${combo} NOMS${tag}`;
+  if (html !== nomsHtml) { nomsHtml = html; nomsEl.innerHTML = html; }
+  const tier = combo >= 20 ? '3' : combo >= 10 ? '2' : '1';
+  if (tier !== nomsTier) { nomsTier = tier; nomsEl.dataset.tier = tier; }
+  // width is estimated from the string, not measured: a read after the write
+  // above would force a layout every time the count ticks
+  const estW = 26 + 9.6 * (`${combo} NOMS`.length) + (tag ? 30 : 0), estH = 30;
+  const W = window.innerWidth, H = window.innerHeight, gap = 8;
+  let x = fb.cx + fb.rx * 0.9 + gap, y = fb.cy - fb.ry * 0.15, side = '';
+  if (x + estW > W - 8) {
+    x = fb.cx - fb.rx * 0.9 - gap; side = 'lft';
+    if (x - estW < 8) { x = fb.cx; y = fb.bottom + gap + estH / 2; side = 'mid'; }
+  }
+  y = Math.min(H - 190, Math.max(220, y));
+  // …and if the clamp pushed it back over his face, it waits for room
+  const l = side === 'lft' ? x - estW : side === 'mid' ? x - estW / 2 : x;
+  if (l < fb.right && l + estW > fb.left && y - estH / 2 < fb.bottom && y + estH / 2 > fb.top) {
+    if (nomsOn) { nomsOn = false; nomsEl.classList.remove('on'); }
+    return;
+  }
+  if (side !== nomsSide) { nomsSide = side; nomsEl.className = side; if (nomsOn) nomsEl.classList.add('on'); }
+  if (Math.abs(x - nomsLX) > 0.5 || Math.abs(y - nomsLY) > 0.5) {
+    nomsLX = x; nomsLY = y;
+    nomsEl.style.left = `${x.toFixed(1)}px`;
+    nomsEl.style.top = `${y.toFixed(1)}px`;
+  }
+  if (!nomsOn) { nomsOn = true; nomsEl.classList.add('on'); }
+}
 /** tClock at the last bite of ANY kind. The score floor is about to be gated
  *  on it; until then it is written and never read, so this commit changes no
  *  frame of the game. tClock is wall time since page load, which is why
@@ -8625,6 +8696,9 @@ function capture(e: Edible, giveHunger = true) {
   // window add up and leave as a single bigger number, which is also the more
   // satisfying read: the burst becomes one punch instead of a stutter of ones.
   eatFloatPts += pts;
+  chainPts += pts;
+  eatFloatK = Math.max(eatFloatK, bite);
+  if (e.mesh.userData.landmark) eatFloatLm = true;
   eatFloatAt.set(e.mesh.position.x, voidling.radius + 2.2, e.mesh.position.z);
   if (eatFloatT <= 0) eatFloatT = EAT_FLOAT_WINDOW;   // LEADING: arm on the first bite, never re-arm
   // …and the growth bar takes the same bite. `bite` is already the meal's size
@@ -8749,8 +8823,13 @@ function capture(e: Edible, giveHunger = true) {
   // juice: score floater on the morsel, flair on big bites and hot combos
   floatPos.set(e.mesh.position.x, voidling.radius + 2, e.mesh.position.z);
   const coinVal = e.mesh.userData.coin as number | undefined;
+  // ── ONE NUMBER STREAM ───────────────────────────────────────────────────
+  // A '+N' used to rise off every prop as well, on top of the coalesced flight
+  // into the bar — two streams of the same points, and in a burst a stutter of
+  // near-identical numbers nobody could read. The flight is the stream now
+  // (research governor G6; qa/nomstream.mjs). A coin is a different currency,
+  // so it keeps its own number.
   if (coinVal) { addCoins(coinVal); bubbles.float(floatPos, `+${coinVal}✦`, true); }
-  else bubbles.float(floatPos, `+${pts}`);
   // CHOMP! is an EVENT, not wallpaper. The growth law parks the player just
   // above their staple food size, so the bar is "bigger than YOU" + a long
   // cooldown — a couple of CHOMPs a match, each one earned.
@@ -8758,7 +8837,14 @@ function capture(e: Edible, giveHunger = true) {
     chompCd = tClock + 7;
     bubbles.float(floatPos, 'CHOMP!', true); audio.chomp(e.radius, voidling.radius, 'prop'); buzz(30);
   } else { audio.pop(combo, e.radius, voidling.radius); buzz(e.radius > 2 ? 15 : 8); }
-  if (combo > 0 && combo % 5 === 0) bubbles.float(floatPos, `COMBO ×${comboMult.toFixed(1)}`, true);
+  // The decimal 'COMBO ×1.5' that stood here is gone: a six-year-old does not
+  // read a decimal. The chain is counted in NOMS instead, on the pill, and
+  // every tenth link is a crown she can hear.
+  if (combo % 10 === 0) {
+    nomAt.set(voidState.x, voidling.radius + 3.6, voidState.z);
+    bubbles.float(nomAt, `${combo} NOMS!`, true, true);
+    audio.nomCrown(combo); buzz(25);
+  }
   // ── THE HAT HAS OPINIONS ────────────────────────────────────────────────
   // Legendary hats only, and RARELY. A hat that comments on every bite is a
   // hat a child mutes inside one match; one that pipes up every half-minute
@@ -10810,6 +10896,7 @@ function resetMatch() {
                 camOffset.y * camDist,
                 voidState.z + camOffset.z * camDist);
   playerScore = 0; hunger = 0; combo = 0; prevRank = 0; chompCd = 0; newsCd = COPY.signOn;
+  comboT = 0; chainPts = 0; eatFloatK = 0; eatFloatLm = false;   // a chain never carries into the next match
   // the whole rank-announce machine restarts with the match, or a rematch
   // opens with a stale crown to lose and a stale announcedRank to suppress
   crownLive = false; everBehind = false; shownRank = 0; announcedRank = 0; rankHold = 0;
@@ -13823,6 +13910,7 @@ function animate() {
   // on screen with no rule protecting him. qa/bubbleclear.mjs measures it.
   bubbles.update(dt, { pos: voidling.group.position, r: voidling.radius });
   paintWayfinder();
+  paintNoms();
   const cy = voidling.group.position.y;
 
   for (const e of edibles) {
@@ -14423,7 +14511,13 @@ function animate() {
   if (started) audio.setZone(island.biomeAt(voidState.x, voidState.z));
 
   // combo decays when you stop eating
-  comboT -= dt; if (comboT <= 0) combo = 0;
+  comboT -= dt;
+  if (comboT <= 0 && combo > 0) {
+    // …and when the chain ends it is PAID, not lost: a chain of five or more
+    // cashes in beside the void. No "combo broken" sound, by design.
+    if (combo >= 5 && started && !ended) nomCash();
+    combo = 0; chainPts = 0;
+  }
   // …and the banked bite points leave as one number when the burst stops. Runs
   // on REAL dt rather than game time so a hit-stop cannot hold the payout back:
   // the number is feedback about what just happened, not part of the ceremony.
@@ -14441,8 +14535,15 @@ function animate() {
       // here, so the payout cannot happen before the number that explains it.
       // bubbles.flyTo guarantees it fires in every motion state — under
       // reduced motion the duration is zero and it lands on the next frame.
-      bubbles.flyTo(eatFloatAt, `+${eatFloatPts.toLocaleString()}`, gBarTarget, gbarPay);
-      eatFloatPts = 0;
+      // …and it is as big as what went in. 1 + 0.22·log10(points), 1 to 1.8,
+      // and a quarter more when the bank holds a meal over half his size or a
+      // landmark. Inside a beat window it wears the beat's colour, so the
+      // doubled value is seen on the number that carries it.
+      const k = Math.min(2, Math.min(1.8, Math.max(1, 1 + 0.22 * Math.log10(eatFloatPts)))
+        * (eatFloatK >= EAT_TICK_BIG || eatFloatLm ? 1.25 : 1));
+      bubbles.flyTo(eatFloatAt, `+${eatFloatPts.toLocaleString()}`, gBarTarget, gbarPay,
+        { scale: k, color: feverMult > 1 ? `#${feverCol.toString(16).padStart(6, '0')}` : undefined });
+      eatFloatPts = 0; eatFloatK = 0; eatFloatLm = false;
     }
   }
   // …and the bar's own acknowledgement, on the same real-time clock — it is

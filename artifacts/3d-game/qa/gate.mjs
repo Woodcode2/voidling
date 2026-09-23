@@ -602,6 +602,14 @@ const SUITE = [
     cmd: ['node', 'qa/iapmockhost.mjs', PORT], verdict: pf,
     why: '?iapmock=1 cannot hand a paid item over on a public hostname — a tapped legendary card says ON THE APP STORE there, and still says BUY at 127.0.0.1 so the QA probes that test purchases keep working' },
 
+  // G1 (research governor, P0): the first match a child ever plays is Maple
+  // dot 1 from its first armed frame, no match turns the clock red or says EAT
+  // FASTER, and dot 4 in solo still brings the family. Measured failing on the
+  // pre-fix build (goal 0; timer rgb(255,138,138) + "EAT FASTER!!"; joined 0/3).
+  { id: 'firstrun', tier: 'play', profiles: ['push', 'live', 'quality'], timeout: 2400,
+    cmd: ['node', 'qa/firstrun.mjs', PORT], verdict: pf,
+    why: 'a cold install opens on Maple dot 1, no match nags with a red clock, and solo cannot turn the dot-4 race into a free win' },
+
   { id: 'questable', tier: 'money', profiles: ['live'], timeout: 1600,
     cmd: ['node', 'qa/questable.mjs', PORT, ...WORLDS], verdict: pf,
     why: 'over a year of draws, no world can show a daily chip a child cannot clear' },
