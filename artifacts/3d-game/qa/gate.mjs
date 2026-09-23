@@ -616,6 +616,25 @@ const SUITE = [
     cmd: ['node', 'qa/townface.mjs'], verdict: exitCode,
     why: 'the static townsfolk (the two protesters beside the spawn, every judge, farmhand and drive-in customer): eyes inside the skull\'s widest ring and proud of the drawn skull, each eye showing at least 0.0031 T^2 of ink and clear of the mouth from 46-65 degrees, the mouth frozen where it stands until its art call is made, no same-colour collar ruff, and the seeded draws shirt -> facing -> [hat] -> skin -> trousers frozen in order and count' },
 
+  { id: 'faceray', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 180,
+    cmd: ['node', 'qa/faceray.mjs'], verdict: pf,
+    why: 'a walking person has a face: every Hair x Hat, built by life.ts\'s own head code and raycast from the play camera at 46/55/65 degrees, shows at least half of each eye (studio round 4, B3/B4: the hair and the caps buried both eyes on 10 of 14 hair draws) and no less of the mouth than this build (a frozen ratchet: the helmet\'s face bar and the snorkel mask had hidden it unseen), and no hat colour — the dress code\'s pick or one a role authors — is within dE 15 of the skin or the shirt under it (a cream cap on a pale face read as a bald head)' },
+
+  { id: 'headcover', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 60,
+    cmd: ['node', 'qa/_headcover.mjs'], verdict: pf,
+    why: 'no hair or hat shell swallows an eye whole, the eye stands proud of its own skull, and tipping the shells off the face has not bared the scalp the camera looks down on' },
+
+  // THE LINE-UP A PERSON READS (studio round 4, I-3; the third gate of Job 4).
+  // faceray's eye question asked of the shipped mesh in the built game, from
+  // the live camera (sampled its own way, so its numbers run lower than
+  // faceray's — see its header), with a frame per hat. Registered 2026-09-23 without
+  // ever having run — the machine's browser was busy with a release gate — so
+  // it sits in live and quality only, and moves to push once a run has been
+  // read. Its tip was checked in node (qa/faceline.mjs, THE THREE ANGLES).
+  { id: 'faceline', tier: 'art', profiles: ['live', 'quality'], timeout: 2400,
+    cmd: ['node', 'qa/faceline.mjs', PORT, 'maple'], verdict: pf,
+    why: 'every Hair x Hat the game builds, stood facing the live camera at 46/55/65 degrees in the built page, shows at least half of each eye outside the three brim conventions — and leaves qa/out/faceline/*.png for a person to read, which is the half of Job 4 no number closes' },
+
   { id: 'safety', tier: 'words', profiles: ['push', 'live'], timeout: 60,
     cmd: ['node', 'scripts/safety-scan.mjs'], verdict: exitCode,
     why: 'no retired vocabulary in any string a child can read — the 4+ rating depends on it' },
