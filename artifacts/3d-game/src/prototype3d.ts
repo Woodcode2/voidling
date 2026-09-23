@@ -3493,7 +3493,8 @@ const _dbg = new Proxy(_dbgStore, {
   __warpVoid: (x: number, z: number) => void;
   __inDeepWater3: (x: number, z: number, m: number) => boolean;
   __setMood: (m: string | null) => void;
-  __faceState: () => { mood: string; maw: number; smile: boolean; biting: boolean };
+  __faceState: () => { mood: string; maw: number; smile: boolean; biting: boolean;
+    hold: number; move: number; lid: number; shut: number; uniformK: number };
   __stages: () => { cur: number; best: number; ceremonies: number };
   __voidSetMenuR: (r: number) => void;
   __dioMark: () => number;
@@ -13521,6 +13522,13 @@ function animate() {
   // pulled a sleepy face and played the sleepy voice line while barrelling
   // across the island at full speed.
   if (driving) lastInput = tClock;
+  // THE CAMERA DISTANCE THIS SIZE SETTLES AT — the same law targetDist uses in
+  // the camera block, taken here because the camera block runs after the
+  // input and the rig. Hoisted out of the input branch (where it lived inline,
+  // for the descent) so the steering and the hero's motion reference (vRef,
+  // just before voidling.update) read ONE expression rather than two copies
+  // that can drift the way steerCap's three call sites once did.
+  const steerLawD = Math.min(340, Math.max(26, PLAY_DIST * Math.pow(voidling.radius / 0.9, 0.82)));
   if (dashT > 0) {
     // ROCKET BITE dash — barrel forward, eating in the path
     dashT -= dt;
@@ -13561,7 +13569,7 @@ function animate() {
       // targetDist is computed later in the frame, so derive the settled camera
       // distance from the radius directly rather than reading the diving one
       const cd = introT > 0
-        ? Math.min(camDist, Math.min(340, Math.max(26, PLAY_DIST * Math.pow(voidling.radius / 0.9, 0.82))))
+        ? Math.min(camDist, steerLawD)
         : camDist;
       const speed = steerCap(cd) * jm;
       tvx = (rightTmp.x * inX - fwdTmp.x * inY) * speed;
@@ -13978,8 +13986,32 @@ function animate() {
     menuLook = Math.max(0, menuLook - dtw);
     gYUse = -0.72;
   }
+  // ── THE RIG'S MOTION REFERENCE: WHAT FULL STICK SETTLES TO ─────────────
+  // The rig reads its motion, lean and flip anticipation as fractions of this
+  // (void3d.ts, at `vRef`), so it has to be the player's own top speed at this
+  // size — and specifically the speed the steering SETTLES to, not the one it
+  // happens to be reading this frame. So camAim, the distance the camera is
+  // going to, not camDist, the distance it is passing through: during the
+  // descent camDist falls from DESCENT_START (132) and steerCap of it would
+  // tell the rig that a spawn-size void's top speed was 72.96 u/s while the
+  // steering was holding him to 14.37 — full stick read as 0.23 of moving, at
+  // the exact moment the first drag of every match is made.
+  //
+  // camAim is last frame's (the camera block runs below). During the descent
+  // it IS the dive — targetDist is set to camDist there — so it takes the
+  // same min() against the size law that the input block's `cd` takes, which
+  // makes vRef exactly the cap the steering is applying. It is 0 until the
+  // play camera has run once (and stays 0 in ?top, whose camera branch never
+  // writes it), and a rig handed a vRef of 0 would divide by it; the size law
+  // stands in. The menu's stage camera does not write it either, so on the
+  // menu it holds whatever the last match left — harmless, because the menu
+  // parks him (vx = vz = 0) and every read it feeds is a share of his speed.
+  // Look-up and the outro push-in both move camAim, and so both move the
+  // steering, so they move this too.
+  const heroAim = camAim > 0 ? camAim : steerLawD;
+  const heroVRef = steerCap(introT > 0 ? Math.min(heroAim, steerLawD) : heroAim);
   voidling.update(dtw, { t: tClock, x: voidState.x, z: voidState.z, vx, vz,
-    lookX: THREE.MathUtils.clamp(gX, -1, 1), lookY: gYUse });
+    lookX: THREE.MathUtils.clamp(gX, -1, 1), lookY: gYUse, vRef: heroVRef });
   // ── HOW FAR THE CROWD MATTERS ──────────────────────────────────────────
   // Everything past this runs on a stagger rather than every frame (see the
   // dispatch in life.ts). It is derived from the CAMERA, not from a constant,
@@ -14625,6 +14657,17 @@ function animate() {
     // `n > stage`, which is a DRESSING change — and VISUAL_STAGE collapses
     // seven forms onto five, so the finale evolution never triggered it.
     voidling.celebrate();
+    // …AND THE FACE. The body popped, the ribbon flared, the card, the paper,
+    // the flash and the buzz all answered — and the mood engine went on
+    // showing whatever it showed before, cruise or hungry, because nothing
+    // here ever told it. The biggest thing that happens to him got no
+    // expression at all. Smug is the face this game already spends on its
+    // other big win (eating a sibling, at 2.4 s; see onRivalEaten), and it was
+    // rebuilt to read as triumph at 47 px. 1.8 s is the length of the `ev`
+    // card animation it lands beside. max(), so it never cuts a longer smug
+    // short. It sits below hurt, the outro's victory and scared in the mood
+    // block's order, so it cannot mask any of those. qa/juice.mjs (b).
+    smugUntil = Math.max(smugUntil, tClock + 1.8);
     // the bar takes the beat too — the pips retire one at a time and the whole
     // strip swells, so an evolution is visible at the bottom of the screen and
     // not only in the middle of it

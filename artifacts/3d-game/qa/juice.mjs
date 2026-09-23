@@ -15,6 +15,20 @@
 //   haptics   buzz() fired
 // Contract: at least THREE of four answer. Fails on the pre-fix build, where
 // the lens never moved in the entire codebase (fov was written exactly once).
+//
+// (b) THE FACE TAKES THE EVOLUTION TOO — studio round 4, Job 8 (HERO). An
+// evolution is the biggest thing that happens to the void, and the one channel
+// that never answered it was his own face: celebrate() pops the body and
+// flares the ribbon, the card and the paper and the flash all fire, and the
+// mood engine went on showing whatever it showed before — cruise, or hungry
+// in a town. Part (b) forces the next form through the REAL ceremony block
+// (__forceEvolve, which drives the stage check itself rather than a copy of
+// it) from a fresh match and requires the rig to report `smug` or `victory`
+// within 3 animation frames. Three, not one: the ceremony runs AFTER the mood
+// block in the frame loop, so the earliest a mood can follow it is the next
+// frame, and the probe's own rAF callback may land either side of the game's.
+// Counted in frames rather than seconds because the claim is "on the beat",
+// and under swiftshader a second of wall clock is a single frame.
 import { chromium } from 'playwright';
 import { enterMatch } from './_enter.mjs';
 
@@ -37,6 +51,35 @@ await p.evaluate(() => document.querySelectorAll('.show')
 await enterMatch(p, 'maple');
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 900000 });
 
+// ── (b) first, on the fresh match, before (a) moves the radius ─────────────
+const face = await p.evaluate(() => new Promise((res) => {
+  const before = window.__faceState().mood;
+  const ev0 = window.__stages().ceremonies;
+  window.__forceEvolve();
+  const seen = [];
+  const tick = () => {
+    const m = window.__faceState().mood;
+    seen.push(m);
+    if (m === 'smug' || m === 'victory' || seen.length >= 3) {
+      res({ before, seen, fired: window.__stages().ceremonies > ev0 });
+    } else requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}));
+const faceOk = face.fired && ['smug', 'victory'].includes(face.seen[face.seen.length - 1]);
+console.log(`  (b) forced evolution: ceremony ${face.fired ? 'fired' : 'DID NOT FIRE'}; mood ${face.before} -> `
+  + `${face.seen.join(' -> ')} over ${face.seen.length} frame(s)`);
+const faceVerdict = !face.fired
+  ? 'FAIL — (b) __forceEvolve did not run a ceremony from a fresh match, so the face was never asked'
+  : faceOk ? `PASS — (b) the face answers the evolution: ${face.seen[face.seen.length - 1]} on frame ${face.seen.length}`
+    : `FAIL — (b) three frames after the evolution the face still reads ${face.seen[face.seen.length - 1]} `
+      + '(contract: smug or victory within 3 frames)';
+// The ceremony punches the lens too (camPunch). Let that spring home before (a)
+// reads its own lens channel, or (a) would be crediting the bite with the
+// evolution's punch.
+await p.waitForFunction(() => { const j = window.__juiceState(); return j.fovKick <= 0.02 && j.stop <= 0; },
+  null, { timeout: 900000 });
+
 // a size where houses are a big-but-legal bite, near a built-up district
 await p.evaluate(() => { window.__setVoidR(4); });
 await p.waitForTimeout(800);
@@ -47,7 +90,12 @@ const out = await p.evaluate(() => {
   const after = window.__juiceState();
   return { before, ate, after };
 });
-if (!out.ate) { console.log('  no big edible in range — inconclusive, not a failure'); await b.close(); process.exit(0); }
+if (!out.ate) {
+  console.log('  (a) no big edible in range — inconclusive, not a failure');
+  await b.close();
+  console.log('\n  ' + faceVerdict + '\n');
+  process.exit(faceOk ? 0 : 1);
+}
 
 const ch = {
   lens: out.after.fovKick > 0.5 || out.after.fov > 32.2,
@@ -59,5 +107,8 @@ const n = Object.values(ch).filter(Boolean).length;
 console.log(`  forced bite r=${out.ate.r.toFixed(2)} on R=${out.ate.R.toFixed(2)}`);
 console.log(`  channels: lens=${ch.lens} (fov ${out.after.fov.toFixed(1)})  hitstop=${ch.hitstop} (${out.after.stop.toFixed(3)}s)  sparks=${ch.sparks} (+${out.after.puffs - out.before.puffs})  haptics=${ch.haptics}`);
 await b.close();
-console.log('\n  ' + (n >= 3 ? `PASS — ${n}/4 channels answered the bite` : `FAIL — only ${n}/4 channels answered (contract: ≥3)`) + '\n');
-process.exit(n >= 3 ? 0 : 1);
+// One verdict line per part, so the gate's reader (a PASS and no FAIL) needs
+// both; a FAIL in either is the step's FAIL.
+console.log('\n  ' + (n >= 3 ? `PASS — (a) ${n}/4 channels answered the bite` : `FAIL — (a) only ${n}/4 channels answered (contract: ≥3)`));
+console.log('  ' + faceVerdict + '\n');
+process.exit(n >= 3 && faceOk ? 0 : 1);

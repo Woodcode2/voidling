@@ -152,6 +152,24 @@ const SUITE = [
     cmd: ['node', 'qa/evolvepop.mjs'], verdict: pf,
     why: 'evolving reads as getting BIGGER — the pop dominates the wind-up and lands with the sound' },
 
+  // THE VOID IS ALIVE AT SPAWN (studio round 4, Job 8). Three maths probes on
+  // the live expressions, same reasoning as evolvepop: each is a pure function
+  // of numbers the source already writes down, so evaluating it costs nothing
+  // and no slow frame can sample around it. Before the job: full stick read as
+  // 0.359 of moving at spawn size and 0.304 at the tail of the descent; hurt
+  // squinted with its eyes open at lid 0.30; the bite's wind-up drew nothing
+  // (the jaw peaks at 0.119 against a draw threshold of 0.25). The live halves
+  // (qa/heromotion.mjs, and moodrule/mouthwind given a port) read the rig.
+  { id: 'motionlaw', tier: 'feel', profiles: ['push', 'live', 'art'], timeout: 30,
+    cmd: ['node', 'qa/motionlaw.mjs'], verdict: pf,
+    why: 'full stick reads as moving at every size, the descent included — the motion law divides by his own top speed' },
+  { id: 'moodrule', tier: 'feel', profiles: ['push', 'live', 'art'], timeout: 30,
+    cmd: ['node', 'qa/moodrule.mjs'], verdict: pf,
+    why: 'no mood squints with its eyes open: an open eye stays at lid 0.6 or above, a shut one is a line' },
+  { id: 'mouthwind', tier: 'feel', profiles: ['push', 'live', 'art'], timeout: 30,
+    cmd: ['node', 'qa/mouthwind.mjs'], verdict: pf,
+    why: 'a bite winds up where a child can see it — the body gathers past his own breath, and is whole as the jaw appears' },
+
   // THE OPENING BELONGS TO THE PLAYER. Eighteen bars measured against HOLE.IO's own
   // recording: the clock must not move before the first touch, the descent runs
   // ~1.2 s on an ease-in-out with the controls live throughout, the first point
