@@ -553,7 +553,8 @@ const SUITE = [
   // frame linear, as RenderPass hands it to bloom, and counts pixels over the
   // bloom cut that are not a light. Maple failed on its white planters (75
   // cells at L 1.18 against a 1.05 cut), Pirate on lacquered blossoms (2 cells,
-  // specular sparks at 2.6). Art + live until a second green promotes it.
+  // specular sparks at 2.6); 0 and 0 after the per-world cut and the petal
+  // sheen. Art + live until a second green promotes it.
   { id: 'halocensus', tier: 'art', profiles: ['live', 'art'], timeout: 1500,
     cmd: ['node', 'qa/halocensus.mjs', PORT, 'maple'], verdict: pf,
     why: 'nothing but a light crosses the bloom threshold in Maple\'s opening frame — no white paint wearing a lamp\'s halo' },
