@@ -6065,10 +6065,17 @@ function makeFerrisWheel(): THREE.Group {
   // ── SPOKES ──────────────────────────────────────────────────────────────
   // One diameter per pair of opposite gondolas, on BOTH rims, so the wheel is
   // braced in its own plane twice over. N/2 diameters x 2 rims = 8 members.
+  // ── THE STATIONS SIT HALF A STEP ROUND ─────────────────────────────────
+  // With a station at exactly 270 degrees the bottom car hung 1.975 below a
+  // rim that is itself only 1.5 off the ground: 45% of it under the lawn
+  // (pre-merge review, content-2 / render-1). Offset by half a step, the lowest
+  // two cars ride at 247.5 and 292.5 degrees and clear the ground by 0.02.
+  // Spokes, braces and cars all use the same stations.
+  const station = (i: number) => ((i + 0.5) / N) * Math.PI * 2;
   for (let i = 0; i < N / 2; i++) {
-    const a = (i / (N / 2)) * Math.PI;
+    const a = station(i);
     for (const dz of [-HALF, HALF])
-      p.push(part(new THREE.CylinderGeometry(0.11, 0.11, R * 2, 8), STEEL, 0, HY, dz, 0, 0, a));
+      p.push(part(new THREE.CylinderGeometry(0.11, 0.11, R * 2, 8), STEEL, 0, HY, dz, 0, 0, a - Math.PI / 2));
   }
 
   // ── CROSS-BRACING ───────────────────────────────────────────────────────
@@ -6076,7 +6083,7 @@ function makeFerrisWheel(): THREE.Group {
   // the part that makes the wheel read as an object with depth rather than as
   // two hoops that happen to overlap.
   for (let i = 0; i < N; i++) {
-    const a = (i / N) * Math.PI * 2;
+    const a = station(i);
     p.push(part(new THREE.CylinderGeometry(0.09, 0.09, HALF * 2, 6), TRIM,
       Math.cos(a) * R, HY + Math.sin(a) * R, 0, Math.PI / 2));
   }
@@ -6087,7 +6094,7 @@ function makeFerrisWheel(): THREE.Group {
   // cones so the silhouette is not eight identical bricks.
   const GOND = [0x5ec8d8, 0xffd23f, 0x7ed57a, 0xf06fb0, 0xb98cff, 0xff9a3a, 0x4fd1a5, 0xff7a6b];
   for (let i = 0; i < N; i++) {
-    const a = (i / N) * Math.PI * 2;
+    const a = station(i);
     const cx = Math.cos(a) * R, cy = HY + Math.sin(a) * R;
     p.push(part(new THREE.CylinderGeometry(0.07, 0.07, 0.9, 6), TRIM, cx, cy - 0.45, 0));   // hanger
     p.push(part(new THREE.BoxGeometry(1.5, 1.05, 1.35), GOND[i % GOND.length], cx, cy - 1.45, 0));
@@ -6096,12 +6103,19 @@ function makeFerrisWheel(): THREE.Group {
 
   // ── THE FRAME ───────────────────────────────────────────────────────────
   // Two A-frames, one either side of the wheel, tied together at the foot.
+  // THE LEGS LEAN IN. part() rotates counter-clockwise, so the old
+  // `sx > 0 ? -0.33 : 0.33` tipped each leg's top AWAY from the axle: two Vs
+  // with feet 3.0 apart and tops 8.6 apart, ending in air 4.3 from a free-
+  // standing axle (pre-merge review, content-1 / render-2; the committed
+  // landmark render shows it). Now each pair meets under the axle: centres at
+  // x ±1.45, feet ±2.84, tops ±0.06 at y 8.0, and the tie beam spans the legs
+  // where they cross y 1.5 (±2.3).
   for (const dz of [-HALF - 0.7, HALF + 0.7]) {
-    for (const sx of [-2.9, 2.9]) {
+    for (const sx of [-1.45, 1.45]) {
       p.push(part(new THREE.CylinderGeometry(0.24, 0.38, 8.6, 8), TRIM,
-        sx, HY / 2 - 0.05, dz, 0, 0, sx > 0 ? -0.33 : 0.33));
+        sx, HY / 2 - 0.05, dz, 0, 0, sx > 0 ? 0.33 : -0.33));
     }
-    p.push(part(new THREE.BoxGeometry(5.6, 0.26, 0.26), TRIM, 0, 1.5, dz));       // tie beam
+    p.push(part(new THREE.BoxGeometry(4.6, 0.26, 0.26), TRIM, 0, 1.5, dz));       // tie beam
   }
   p.push(part(new THREE.BoxGeometry(0.3, 0.3, HALF * 2 + 1.4), TRIM, 0, 1.5, 0)); // cross tie
 

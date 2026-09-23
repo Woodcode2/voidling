@@ -202,7 +202,10 @@ function ensureComposer(): EffectComposer {
     const h = Math.max(1, Math.floor(window.innerHeight * pr));
     const samples = Math.min(4, renderer.capabilities.maxSamples || 0);
     composer = new EffectComposer(renderer,
-      new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples }));
+      // resolveDepthBuffer false: nothing after RenderPass reads depth, and the
+      // default blitted colour AND depth at the end of both renders into this
+      // target every composed frame (pre-merge review, render-4)
+      new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples, resolveDepthBuffer: false }));
     composer.renderTarget2.samples = 0;
     composer.readBuffer = composer.renderTarget1;
     composer.writeBuffer = composer.renderTarget2;
@@ -5033,7 +5036,10 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   camPunch(6); fx.kick(rx - voidState.x, rz - voidState.z, 9);
   floatPos.set(rx, rr + 5, rz);
   bubbles.float(floatPos, `${FAMILY_TITLE[name] ?? ''} ${name} DEVOURED! +${pts}`, true);
-  audio.chomp(rr, voidling.radius, 'rival');
+  // inside the outro the rival goes down with a plain bite: the whistle owns
+  // the end, and the chomp's fanfare and duck would talk over it (review audio-4)
+  if (outroT <= 0) audio.chomp(rr, voidling.radius, 'rival', combo);
+  else audio.pop(combo, rr, voidling.radius);
   buzz(80);
 };
 // ── the void's EMOTIONS: game state resolves to a mood every frame ──────────
@@ -8943,12 +8949,12 @@ function capture(e: Edible, giveHunger = true) {
   // cooldown — a couple of CHOMPs a match, each one earned.
   if (e.radius > voidling.radius && tClock > chompCd) {
     chompCd = tClock + 7;
-    bubbles.float(floatPos, 'CHOMP!', true); audio.chomp(e.radius, voidling.radius, 'prop'); buzz(30);
+    bubbles.float(floatPos, 'CHOMP!', true); audio.chomp(e.radius, voidling.radius, 'prop', combo); buzz(30);
   } else { audio.pop(combo, e.radius, voidling.radius); buzz(e.radius > 2 ? 15 : 8); }
   // The decimal 'COMBO ×1.5' that stood here is gone: a six-year-old does not
   // read a decimal. The chain is counted in NOMS instead, on the pill, and
   // every tenth link is a crown she can hear.
-  if (combo % 10 === 0) {
+  if (combo % 10 === 0 && outroT <= 0) {   // not over the whistle and the party (review logic-2)
     nomAt.set(voidState.x, voidling.radius + 3.6, voidState.z);
     bubbles.float(nomAt, `${combo} NOMS!`, true, true);
     audio.nomCrown(combo); buzz(25);
@@ -9088,6 +9094,11 @@ pwBtns[1].addEventListener('click', fireCollapse);
 // before the player could move (docs/crews/round-7/recon/self/opening-before.log).
 let armed = false;
 let started = false, startT = 0, soloMode = false, titleUntil = 0;
+/** What the child ASKED for (BY MYSELF on or off). soloMode is what this match
+ *  actually is — dot 4's race overrides a solo request (soloFor). PLAY AGAIN
+ *  must carry the request, not the override, or one dot-4 match silently turns
+ *  every later match into a race (pre-merge review, logic-4). */
+let soloWanted = false;
 // the ghost hand's own beat: the lesson lands AFTER the card has gone, not in
 // the same frame the controls go live (the MK8D order — card, settle, teach)
 let handHold = 0;
@@ -9312,6 +9323,7 @@ function beginMatch(solo = false) {
   // finished loading (and finally have real footprints) also get validated
   _revalQueue = [tClock + 8, tClock + 22];
   bakeContactShadows();   // and again on each re-sweep, for late GLB arrivals
+  soloWanted = solo;
   soloMode = soloFor(solo);
   matchLen = soloMode ? 120 : MATCH_LEN;
   matchClock = matchLen;
@@ -9730,7 +9742,7 @@ function withWorldReady(cb: () => void) {
   });
 }
 function startFresh(solo: boolean) {
-  if (ended || started) { soloMode = solo; resetMatch(); }
+  if (ended || started) { soloWanted = solo; soloMode = soloFor(solo); resetMatch(); }
   else beginMatch(solo);
 }
 // PLAY opens the level picker. The old flow ran the other way — pick a level,
@@ -10899,6 +10911,7 @@ function clearBeatLoot() {
 let drumRef: THREE.Object3D | null = null, drumBaseScale = 1, drumCueT = 0, drumThump = 0;
 function resetMatch() {
   joyRelease();   // PLAY AGAIN can be tapped and HELD — see joyRelease
+  audio.cancelCheer();   // a card left inside 0.76 s keeps its cheer to itself (review logic-3)
   resetNews(); resetMapleNews(); resetGamedayNews(); resetLanternNews(); resetPowderNews(); signedOn = false;   // memory + the sign-on are per-match
   // …and the story starts at morning again, with nothing said and nothing
   // pending. resetArc() is what makes "the arc never reverses" survive a PLAY
@@ -10968,7 +10981,7 @@ function resetMatch() {
   // join times are scaled to the clock they'll run on. beginMatch() sets
   // matchLen further down, so pass the length it is ABOUT to choose — reading
   // the live one here would scale the new match's joins to the old match's clock.
-  rivals.reset(soloFor(soloMode) ? 120 : MATCH_LEN);
+  rivals.reset(soloFor(soloWanted) ? 120 : MATCH_LEN);
   curStage = 0; bestStage = 0; evolveCeremonies = 0;
   voidling.setStage(0); voidling.setRadius(START_R);
   // FIXED START, deliberately. A replay review argued for randomising this —
@@ -11060,7 +11073,7 @@ function resetMatch() {
   applyLightRig(); outroT = 0;
   el('end').classList.remove('show');
   timerEl.style.color = '';
-  beginMatch(soloMode);
+  beginMatch(soloWanted);
 }
 document.getElementById('endMore')?.addEventListener('click', () => {
   const st = el('endStats');
@@ -11081,6 +11094,7 @@ el('btnAgain').addEventListener('click', () => {
 });
 
 el('btnHome').addEventListener('click', () => {
+  audio.cancelCheer();   // the cheer belongs to the card, not the menu (review logic-3)
   track('home_tap', { played: stats.matches });
   el('end').classList.remove('show');
   document.body.classList.add('menu');
@@ -13228,7 +13242,7 @@ function animate() {
       // docs/OVERNIGHT.md), and a late multiplier would quietly stale that
       // calibration for the sake of a spectacle the ritual delivers anyway.
       const cs = Math.ceil(matchClock);
-      if (cs <= 10 && cs >= 1 && cs !== countTick && !ended) {
+      if (cs <= 10 && cs >= 1 && cs !== countTick && !ended && outroT <= 0) {   // a won dot's outro is the end (review audio-4)
         countTick = cs;
         const cEl = el('count').firstElementChild as HTMLElement;
         cEl.textContent = String(cs);
@@ -14631,13 +14645,18 @@ function animate() {
   if (started) audio.setZone(island.biomeAt(voidState.x, voidState.z));
 
   // combo decays when you stop eating
-  comboT -= dt;
+  // …and a PAUSE freezes the chain rather than timing it out behind the sheet.
+  // animate() keeps running while paused, so this used to lapse 1.6 s into
+  // any mid-chain pause and cash in under the pause sheet — the chime, the
+  // buzz and the bar punch for a payoff she could not see (pre-merge review,
+  // logic-1 / ux-4). Held, the chain carries on when she resumes.
+  if (!paused) comboT -= dt;
   if (comboT <= 0 && combo > 0) {
     // …and when the chain ends it is PAID, not lost: a chain of five or more
     // cashes in beside the void. No "combo broken" sound, by design.
     // not inside the outro: the whistle and the party own it, and the points
     // are already scored — a cash-in there is one more sound on the end
-    if (combo >= 5 && started && !ended && outroT <= 0) nomCash();
+    if (combo >= 5 && started && !ended && !paused && outroT <= 0) nomCash();
     combo = 0; chainPts = 0;
   }
   // …and the banked bite points leave as one number when the burst stops. Runs

@@ -43,7 +43,7 @@ export interface Audio3D {
   bigEat(): void;                  // crunching a building
   /** the HEADLINE bite — a CHOMP, or a rival devoured. Keeps the tuned note and
    *  lays a crunch and a gulp over it, all above 250 Hz (see the method). */
-  chomp(mealR?: number, voidR?: number, kind?: 'prop' | 'rival'): void;
+  chomp(mealR?: number, voidR?: number, kind?: 'prop' | 'rival', combo?: number): void;
   ready(): void;                   // a power just charged
   /** THE CHAIN'S CROWN — every tenth link of an unbroken eating chain. A
    *  rising major triad on the pop's own pentatonic ladder, a step higher per
@@ -65,6 +65,9 @@ export interface Audio3D {
    *  millisecond (studio governor, 2026-09-23). Nothing plays the old falling
    *  "aww" any more. */
   finale(cheer: 'win' | 'evolve' | null): void;
+  /** Drop a finale's queued cheer — the card was left before it landed
+   *  (PLAY AGAIN, HOME). Called by the game on match reset and on HOME. */
+  cancelCheer(): void;
   /** THE TICK, for the countdown, the coin count-up and the drop charge — step
    *  `i` of `n`, rising on a pentatonic that only goes up. Its own voice and its
    *  own state: these all ticked on pop(), the EAT sound, whose 75 ms gate then
@@ -403,7 +406,9 @@ export function createAudio(): Audio3D {
     g.gain.exponentialRampToValueAtTime(vol, t + 0.003);
     g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
     src.connect(f); f.connect(g); g.connect(master);
-    src.start(t, Math.random() * 1.9, dur + 0.03);
+    // the offset leaves room for the whole grain in the 2 s buffer — 1.9 with
+    // a long grain ran off the end and clipped the Skylark whoosh (review audio-2)
+    src.start(t, Math.random() * Math.max(0, 2 - dur - 0.05), dur + 0.03);
   }
 
   // ── recorded sample kit: the produced audio in /assets/audio. Buffers decode
@@ -748,11 +753,19 @@ export function createAudio(): Audio3D {
   // stacking ramps into a staircase.
   // (duckMusic, not duck — Maple Falls has a pond, the pond has ducks, and
   // duck() is already the sound one of them makes. This codebase.)
-  let duckUntil = 0;
+  let duckUntil = 0, duckFloor = 1;
+  let cheerT = 0;   // finale()'s queued cheer, so the game can cancel it
   function duckMusic(db = 6, hold = 0.3) {
     const c = ctx; if (!c || !musicBus) return;
     const g = musicBus.gain, t = c.currentTime;
-    const floor = Math.pow(10, -db / 20);
+    // A SHALLOWER DUCK MUST NOT LIFT A DEEPER ONE STILL BEING HELD. This used
+    // the newest call's floor for the whole extended hold, so a 3 dB crown
+    // 0.4 s into the evolve fanfare's 6 dB duck ramped the score back UP under
+    // the fanfare (pre-merge review, audio-5). While a hold is live the floor
+    // is the deeper of the two; once it has recovered, it starts fresh.
+    if (t >= duckUntil + 0.4) duckFloor = 1;
+    const floor = Math.min(duckFloor, Math.pow(10, -db / 20));
+    duckFloor = floor;
     duckUntil = Math.max(duckUntil, t + 0.12 + hold);
     g.cancelScheduledValues(t);
     g.setValueAtTime(g.value, t);
@@ -4404,7 +4417,7 @@ export function createAudio(): Audio3D {
     //   3. a GULP — a sine that swallows 900 -> 300 Hz, 0.18 s in
     //   4. a rival adds a rising GLOCK arpeggio and the score steps aside
     // The bay's squeezebox joke rides every fifth one, as it did on bigEat.
-    chomp(mealR = 3.2, voidR = 3.0, kind: 'prop' | 'rival' = 'prop') {
+    chomp(mealR = 3.2, voidR = 3.0, kind: 'prop' | 'rival' = 'prop', combo = 0) {
       const c = ensure(); if (!c || !master) return;
       const now = c.currentTime;
       if (isPirate() && ++bigEatCount % 5 === 2) yoHo(now + 0.1);
@@ -4412,7 +4425,10 @@ export function createAudio(): Audio3D {
       // never be the one skipped, so it is let through — without resetting the
       // melody (a gap under 1.1 s keeps walking the ladder).
       lastPop = Math.min(lastPop, now - 0.08);
-      this.pop(0, mealR, voidR);
+      // the chain's pitch lift carries into the headline bite: pop(0, …) dropped
+      // it, so the biggest bite of a chain could land an octave under the bites
+      // either side of it (review audio-6)
+      this.pop(combo, mealR, voidR);
       const big = kind === 'rival';
       [1500, 2200, 3000, 4000].forEach((fc, i) =>
         grain(fc * (big ? 0.9 : 1), 1.2, 0.022, (big ? 0.16 : 0.13) - i * 0.005, 0.012 + i * 0.03));
@@ -4529,7 +4545,10 @@ export function createAudio(): Audio3D {
       logEv(`crown ${n}`);
       // C5 at ten, D5 at twenty, E5 at thirty — the same ladder pop() walks,
       // so the crown sounds like the bites that earned it, only finished
-      const step = PENTA[Math.min(PENTA.length - 1, Math.max(0, Math.floor(n / 10) - 1))];
+      // up a ladder that only rises and holds at the top: PENTA turns back down
+      // (… 12 9 7), which made crowns from 70 on fall and repeat (review audio-3)
+      const UP = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
+      const step = UP[Math.min(UP.length - 1, Math.max(0, Math.floor(n / 10) - 1))];
       const root = 523.25 * Math.pow(2, step / 12);
       const t = c.currentTime;
       [0, 4, 7].forEach((semi, k) => {
@@ -4618,8 +4637,14 @@ export function createAudio(): Audio3D {
         else { tone(f, f, dur, 'triangle', 0.12, tt - c.currentTime); tone(f * 2, f * 2, dur * 0.6, 'sine', 0.035, tt - c.currentTime); }
       });
       // the one cheer lands after the motif's last note, never on top of it
-      if (cheer === 'win') setTimeout(() => this.win(), 760);
-      else if (cheer === 'evolve') setTimeout(() => this.evolve(), 760);
+      // the timer is KEPT: leaving the card inside 0.76 s used to let the cheer
+      // land on the next match's opening or on the menu (review logic-3)
+      if (cheerT) clearTimeout(cheerT);
+      cheerT = cheer === 'win' ? window.setTimeout(() => { cheerT = 0; this.win(); }, 760)
+        : cheer === 'evolve' ? window.setTimeout(() => { cheerT = 0; this.evolve(); }, 760) : 0;
+    },
+    cancelCheer() {
+      if (cheerT) { clearTimeout(cheerT); cheerT = 0; }
     },
     nomCash(n) {
       const c = ensure(); if (!c || !master) return;

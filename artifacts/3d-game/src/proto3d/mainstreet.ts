@@ -507,8 +507,15 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
   // scalp around its own lower edge. Overhanging the SKULL is what a hat is
   // for — the note on the hair cap is about hair, which is not.
   // Two parts instead of one, in the mesh this function already merges.
+  // …AND THE CROWN SITS WHERE THE HAIR SITS. It was centred on the head axis
+  // while the hair cap is 0.05 T behind it, so just above the brim the hair's
+  // back reached 0.402 T against the crown's 0.363 T and a band of hair showed
+  // out of the back of every hat (pre-merge review, content-3). Centred on the
+  // hair cap, the crown's back reaches 0.415 T and its front 0.315 T, still
+  // over the skull's 0.312 T at the brim.
   if (hat !== undefined) {
-    out.push(part(sph(0.365 * T, 16, 9), hat, x, 2.40 * T, z, 0, ry, 0, 1, 0.74, 1));
+    const [hcx, hcz] = at(0, -0.05 * T);
+    out.push(part(sph(0.365 * T, 16, 9), hat, hcx, 2.40 * T, hcz, 0, ry, 0, 1, 0.74, 1));
     out.push(part(cyl(0.47 * T, 0.49 * T, 0.05 * T, 16), hat, x, 2.40 * T, z, 0, ry, 0));
   }
 }

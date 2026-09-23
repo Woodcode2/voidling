@@ -515,6 +515,28 @@ const style = document.createElement('style');
         fStats.displaced++;
         if (cb) cb();
       }
+      // ── UNDER REDUCED MOTION THE NUMBER STAYS WHERE IT WAS EARNED ─────────
+      // A flight under reduced motion had dur 0: it landed on the next update,
+      // which put the slot back to bare 'vf' (opacity 0) in the same call, so
+      // the number existed for at most one frame at a stale position. With the
+      // per-bite '+N' retired (G6) that left a reduced-motion child with NO
+      // points number on an ordinary bite — the exact failure the '.vf.go' calm
+      // rules above were written to end (pre-merge review, ux-1). So it is
+      // raised as a still floater at the bite, held 0.9 s by those same rules,
+      // and the bar is paid now: the number and the payout still arrive together.
+      if (reduceMotion()) {
+        f.fly = null;
+        f.active = true; f.pos.copy(pos); f.until = clock + 0.9;
+        f.el.textContent = text;
+        f.el.style.fontSize = opts?.scale ? `${(20 * opts.scale).toFixed(1)}px` : '';
+        f.el.style.color = opts?.color ?? '';
+        f.el.className = 'vf';
+        void (f.el as HTMLElement).offsetWidth;
+        f.el.classList.add('go');
+        fStats.landed++;
+        onArrive();
+        return;
+      }
       f.active = true; f.pos.copy(pos);
       f.el.textContent = text;
       f.el.className = 'vf fly';
