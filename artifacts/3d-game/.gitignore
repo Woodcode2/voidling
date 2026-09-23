@@ -23,6 +23,8 @@ qa/out/shippedlook/maple_leaves.png
 # Evidence for a decision belongs in a commit message or a ledger entry; the
 # pixels themselves are reproducible, so they do not belong in history.
 qa/out/person/
+# 54 frames, ~61 MB, rebuilt by `node qa/faceline.mjs 4177 maple` (the I-3 line-up)
+qa/out/faceline/
 # qa/out/shippedlook/*_look.png was ignored here — the studio's entire
 # canonical evidence pack lived untracked, died with every container restart,
 # and silently reverted to an August 23 snapshot while the committed .src

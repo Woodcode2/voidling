@@ -608,8 +608,16 @@
         display: flex; justify-content: center; opacity: 0; }
       /* ── the final-ten countdown: one huge number, popped once a second.
          Gold until three, hot from three down. Fixed and pointer-blind, so it
-         can never eat a touch in the exact seconds a player is scrambling. */
-      #count { position: fixed; top: 33%; left: 0; right: 0; z-index: 8; pointer-events: none;
+         can never eat a touch in the exact seconds a player is scrambling.
+         IN THE FREE BAND BELOW HIM, not on him. At top 33% the numeral sat on
+         the void's face: 56.5% / 57.1% / 51.6% of his face box covered at
+         430x932 / 390x844 / 360x780 (qa/countdown.mjs, studio round 4 Job 7).
+         The band from his chin to the growth card centres the numeral at
+         62.4% / 61.8% / 61.7% — a 0.6-point spread, so one percentage holds
+         at every size; the pixel alternative (bottom 195/180/169) did not.
+         It cannot go under the timer (#news lives there) or over his head
+         (#form does). */
+      #count { position: fixed; top: 62%; left: 0; right: 0; z-index: 8; pointer-events: none;
         display: flex; justify-content: center; }
       /* ── THE LAST HERO NUMERAL WITHOUT A CONTOUR ────────────────────────────
          #timer, #evolve, #form, #noms and the score floaters all carry the
@@ -625,20 +633,8 @@
          because it is what softened the edge the stroke is there to draw.
          The 5px offset drop stays; it is a hard shadow, not a glow.
 
-         WHERE IT SITS IS STILL top: 33%, AND THAT IS OWED, NOT DECIDED. The
-         studio's placement is "the free band below the void, measured on the
-         HUD frame" — not under the clock (#news owns that band) and not over
-         his head (#form owns that). That band is between the hero's projected
-         face box and the growth card's top edge, and neither number can be
-         read from source: the hero's screen box comes out of the camera law
-         at clock 7, and the card's height out of Fredoka's line metrics. A
-         percentage typed here without that frame would be a guess with a
-         comment on it. qa/countdown.mjs reads both edges at ?len=15, clock 7,
-         prints the band and the centred `top`, and is expected to fail on
-         overlap until then (it has not been run yet) — the number to write
-         here is the one it prints. It is registered in qa/gate.mjs's live and
-         quality profiles as `countdown`, so until this is placed those two
-         profiles say so. */
+         Where it sits is on #count above: top 62%, placed from the
+         countdown probe's own reading of the band. */
       #count span { font-size: min(30vw, 150px); font-weight: 700; color: #ffd23f;
         -webkit-text-stroke: 8px rgba(12,6,26,0.92); paint-order: stroke fill;
         text-shadow: 0 5px 0 rgba(60,20,10,0.5);

@@ -116,15 +116,31 @@ try {
     await p.goto(`http://127.0.0.1:${PORT}/?w=lantern&manual=1`, { waitUntil: 'domcontentloaded', timeout: 300000 });
     await p.waitForFunction(() => !!window.__menuState && window.__menuState().menuMode, null, { timeout: 420000 });
     await p.evaluate(() => document.body.classList.remove('diorama'));
-    let talked = 0;
-    for (let i = 0; i < 16; i++) {
+    // ON THE GAME'S CLOCK, NOT THE WALL'S (GOVERNOR rule 4). This sampled 16
+    // times 2.5 s of WALL time apart. Alone on the box that is ~40 s of wall
+    // and enough game time for the crowd to speak; with other browsers on the
+    // box the same 40 s was a second or two of tClock and the town had no
+    // time to say anything — measured 2026-09-23: 0 of 16 on main AND on the
+    // branch in the same loaded run, where the same main build had passed
+    // alone in the gate. So the watch runs until 40 s of tClock have passed
+    // (the ambient cadence is a ~2.4 s mean gap, lines live 3.4 s), sampling
+    // every 1.5 s of tClock, and fails only on a watch that saw that much
+    // game time and no line.
+    const clock = () => p.evaluate(() => window.__matchState?.().tClock ?? 0);
+    const WATCH = 40, STEP = 1.5;
+    let talked = 0, samples = 0;
+    const t0 = await clock();
+    for (let t = await clock(); t - t0 < WATCH && samples < 200; t = await clock()) {
       // hold it off every sample: enterMenu can be called again and would put it back
       await p.evaluate(() => document.body.classList.remove('diorama'));
       const s = await onScreen(p);
+      samples++;
       if (s.bubbles.some((x) => !x.rival)) talked++;
-      await p.waitForTimeout(2500);
+      await p.waitForFunction((x) => (window.__matchState?.().tClock ?? 0) >= x, t + STEP, { timeout: 600000, polling: 200 }).catch(() => { });
     }
-    console.log(`  B: with body.diorama removed, the crowd spoke in ${talked} of 16 samples`);
+    const span = (await clock()) - t0;
+    console.log(`  B: with body.diorama removed, the crowd spoke in ${talked} of ${samples} samples over ${span.toFixed(1)} s of game time`);
+    if (span < WATCH * 0.9) console.log(`     (note: the watch saw only ${span.toFixed(1)} s of game time)`);
     ok(talked > 0, 'B: the suppression is keyed on body.diorama and nothing else — take the class off and the town talks again',
       talked ? '' : 'the crowd stayed silent with the class removed, so something OTHER than the class is suppressing it');
     await p.close();

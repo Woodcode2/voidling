@@ -130,7 +130,7 @@ const SUITE = [
   // ink contrast, so it can see a text halo; a backdrop-only bar could only ever
   // be satisfied by darkening posters that are APPROVED.
   { id: 'pickerfit', tier: 'ui', profiles: ['push', 'live', 'art'], timeout: 300,
-    cmd: ['node', 'qa/pickerfit.mjs', PORT], verdict: pf,
+    cmd: ['node', 'qa/pickerfit.mjs', PORT, '--atrest'], verdict: pf,
     why: 'a six-year-old can read every world name and tagline on the picker, whatever poster is behind it' },
 
   // The one event the whole difficulty curve is built around. A hunter's bite
@@ -220,7 +220,7 @@ const SUITE = [
   // the picker in the state a real new player is in — two unlocked, three
   // locked — because every other probe here seeds all five and cannot see it.
   { id: 'lockedcards', tier: 'ui', profiles: ['push', 'live', 'art'], timeout: 300,
-    cmd: ['node', 'qa/lockedcards.mjs', PORT], verdict: pf,
+    cmd: ['node', 'qa/lockedcards.mjs', PORT, '--atrest'], verdict: pf,
     why: 'a child can still tell the locked worlds apart — the art keeps selling the next one' },
 
   // ── THE QUALITY TIER ─────────────────────────────────────────────────────
@@ -643,7 +643,7 @@ const SUITE = [
     why: 'nothing a child has to read disappears when the phone asks for less motion — every card whose animation IS its visibility keeps its full run under prefers-reduced-motion (before: all four at 0ms), measured by walking the card\'s own timeline rather than watching wall-clock frames' },
 
   { id: 'pictograph', tier: 'ui', profiles: ['push', 'live'], timeout: 600,
-    cmd: ['node', 'qa/pictograph.mjs', '4177'], verdict: pf,
+    cmd: ['node', 'qa/pictograph.mjs', PORT, '--atrest'], verdict: pf,
     why: 'no emoji on a screen a child looks at — MENU-BRIEF 1.4 ends by naming this bar ("fails on any emoji or dingbat") and it was never built. An emoji is the PLATFORM’s art, in Apple’s colour and line weight, beside a HUD we drew ourselves, and it changes under the player when the OS updates. Walks the DOM rather than the source, because 46,075 of the first grep’s 58,495 hits were the ─ in comment headers. Unicode’s own Emoji_Presentation property draws the line, so ✦, ✓ and ★ stay legal as typography we set. Ten offenders on shop/picker/profile are frozen BY NAME and printed every run' },
 
   { id: 'calmlist', tier: 'ui', profiles: ['push', 'live'], timeout: 600,
@@ -812,15 +812,12 @@ const SUITE = [
   // and one 120 ms wait per sheet it reads.
   // Once a run is green, promotion is adding '--atrest' to the push step's
   // cmd and deleting the step here.
-  { id: 'pictograph-atrest', tier: 'ui', profiles: ['live', 'quality'], timeout: 600,
-    cmd: ['node', 'qa/pictograph.mjs', PORT, '--atrest'], verdict: pf,
-    why: 'no emoji on a screen a child looks at, read with each sheet at rest — a walk that skips #worlds, #shop and #profile as invisible because their arrival had not begun cannot pass by finding nothing' },
-  { id: 'pickerfit-atrest', tier: 'ui', profiles: ['live', 'quality'], timeout: 300,
-    cmd: ['node', 'qa/pickerfit.mjs', PORT, '--atrest'], verdict: pf,
-    why: 'a six-year-old can read every world name and tagline on the picker, measured on a picker that is at opacity 1 when it is photographed' },
-  { id: 'lockedcards-atrest', tier: 'ui', profiles: ['live', 'quality'], timeout: 300,
-    cmd: ['node', 'qa/lockedcards.mjs', PORT, '--atrest'], verdict: pf,
-    why: 'a child can still tell the locked worlds apart, measured on a picker that is at opacity 1 when it is photographed' },
+  // (pictograph, pickerfit and lockedcards were promoted to their --atrest
+  // form in push on 2026-09-23 after a green run of each: pickerfit 4.55:1,
+  // lockedcards 12.9 dE, pictograph 12 known after the at-rest walk found two
+  // settings-sheet emoji the unflagged walk had never painted — on main too.
+  // The unflagged pictograph walked 0 text nodes on the merged build: Job 7's
+  // modalIn put #worlds, #shop and #profile at opacity 0 when it read them.)
 
   ...WORLDS.map(w => ({ id: `postpipe:${w}`, tier: 'art', profiles: ['live', 'art'], timeout: 420,
     cmd: ['node', 'qa/postpipe.mjs', w, PORT, '--gate'], verdict: exitCode,

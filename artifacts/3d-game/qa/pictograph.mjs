@@ -116,6 +116,11 @@ const KNOWN = new Set([
   'profile button',         // "🎈 SKYLARK FIELD 0/12"
   'profile .on',            // "🍁 MAPLE FALLS 0/12"
   'profile i',              // "💜"
+  // Found 2026-09-23 by the --atrest walk, and present on main as well
+  // (05c5842, same run): the unflagged walk read the settings sheet before
+  // its text had painted, so these two were never in its count. Debt, not new.
+  'settings span',          // "🔊 SOUND"
+  'settings .setNote',      // "made for kids who like snacks 🍩"
 ]);
 
 // THE FRONT DOOR IS ALREADY CLEAN — none of the ten is on #menu. They are on
