@@ -79,10 +79,10 @@ await p.evaluate(() => {
         const text = (this.textContent || '').trim();
         if (!text) return;
         const s = ms();
-        const rec = { t: s.t ?? 0, fever: s.fever ?? 1, fly: /\bfly\b/.test(v), cls: v, text, fs: 0, col: '' };
+        const rec = { t: s.t ?? 0, fever: s.fever ?? 1, fly: /\bfly\b/.test(v), cls: v, text, fs: 0, col: '', go: false };
         L.f.push(rec);
         queueMicrotask(() => { const cs = getComputedStyle(this);
-          rec.fs = parseFloat(cs.fontSize) || 0; rec.col = cs.color; });
+          rec.fs = parseFloat(cs.fontSize) || 0; rec.col = cs.color; rec.go = this.classList.contains('go'); });
       },
     });
   });
@@ -159,11 +159,16 @@ await b.close();
 const f = L.f, fr = L.fr;
 const inChain = (r) => r.t >= t0 - 0.05 && r.t <= chainOver;
 const PLUS = /^\+[\d,]+$/;
-const perBite = f.filter((r) => inChain(r) && !r.fly && PLUS.test(r.text));
-const decimal = f.filter((r) => /COMBO\s*[×x]\s*\d+\.\d/i.test(r.text));
+// A RISING floater is one that wears `go`: float() writes the class and adds
+// `go` in the same call. A LANDED flight has its class reset to bare 'vf' with
+// its text still on it, and that write passes through the same setter — the
+// first run of this probe counted every landing as a per-bite number (10 for
+// 10 flights). `go` is read in the microtask, after the raise has finished.
+const perBite = f.filter((r) => inChain(r) && !r.fly && r.go && PLUS.test(r.text));
+const decimal = f.filter((r) => r.go && /COMBO\s*[×x]\s*\d+\.\d/i.test(r.text));
 const flights = f.filter((r) => inChain(r) && r.fly && PLUS.test(r.text) && r.fs > 0);
-const crowns = f.filter((r) => inChain(r) && /^(\d+) NOMS!$/i.test(r.text));
-const cashins = f.filter((r) => inChain(r) && /^(\d+) NOMS! \+[\d,]+$/i.test(r.text));
+const crowns = f.filter((r) => inChain(r) && r.go && /^(\d+) NOMS!$/i.test(r.text));
+const cashins = f.filter((r) => inChain(r) && r.go && /^(\d+) NOMS! \+[\d,]+$/i.test(r.text));
 
 // the chain, from the game's own count when it reports one
 const chainFrames = fr.filter((x) => x.t >= t0 - 0.05 && x.t <= chainOver);

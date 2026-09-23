@@ -210,6 +210,67 @@ bar(chain.every((r) => r.has && r.peak <= -3),
   chain.some((r) => !r.has) ? '(h) nothing to check for a peak — the chain sounds do not exist'
     : `(h) a chain sound peaks at ${Math.max(...chain.map((r) => r.peak)).toFixed(1)} dBFS, over the -3 dBFS ceiling`);
 
+// ══ PART 4 — THE END, IN EACH WORLD'S OWN VOICE ═════════════════════════════
+// Research governor G4: the buzzer and a won dot both played evolve(), the
+// form-up fanfare. The end now has whistle() — a referee, a ship's bell, the
+// temple bell, sleigh bells, a burner and a chime, the town-hall bell — and the
+// end card has finale(), one motif on each world's instrument. Same three
+// tests as the chain: heard on a phone, no thud, under the ceiling.
+const WORLDS6 = ['maple', 'pirate', 'gameday', 'lantern', 'powder', 'skylark'];
+const endv = await p.evaluate(async (worlds) => {
+  const mod = await import('/src/proto3d/audio3d.ts');
+  const isl = await import('/src/proto3d/island.ts');
+  const band = (d, lo, hi) => {
+    const dt = 1 / 44100;
+    const aH = lo ? (1 / (2 * Math.PI * lo)) / ((1 / (2 * Math.PI * lo)) + dt) : 0;
+    const aL = hi ? dt / ((1 / (2 * Math.PI * hi)) + dt) : 1;
+    let hp = 0, xp = 0, l1 = 0, l2 = 0, l3 = 0, l4 = 0, sum = 0;
+    for (let i = 0; i < d.length; i++) {
+      const h = lo ? aH * (hp + d[i] - xp) : d[i]; xp = d[i]; hp = h;
+      let y = h;
+      if (hi) { l1 += aL * (y - l1); l2 += aL * (l1 - l2); l3 += aL * (l2 - l3); l4 += aL * (l3 - l4); y = l4; }
+      sum += y * y;
+    }
+    return 20 * Math.log10(Math.sqrt(sum / d.length) || 1e-9);
+  };
+  const render = async (w, fn) => {
+    isl.setWorld(w);
+    const ctx = new OfflineAudioContext(1, 44100 * 2, 44100);
+    const RealAC = window.AudioContext;
+    window.AudioContext = function () { return ctx; };
+    let a, has = true;
+    try { a = mod.createAudio(); a.setMuted?.(false); has = fn(a) !== false; }
+    finally { window.AudioContext = RealAC; }
+    const d = (await ctx.startRendering()).getChannelData(0);
+    let peak = 0; for (let i = 0; i < d.length; i++) peak = Math.max(peak, Math.abs(d[i]));
+    return { has, hp: band(d, 450, 0), low: band(d, 0, 250), peak: 20 * Math.log10(peak || 1e-9) };
+  };
+  const out = { pop: await render('maple', (a) => a.pop(0, 1.3, 2.5)) };
+  for (const w of worlds) {
+    out[`${w}:whistle`] = await render(w, (a) => (a.whistle ? a.whistle() : false));
+    out[`${w}:finale`] = await render(w, (a) => (a.finale ? a.finale(false) : false));
+  }
+  return out;
+}, WORLDS6);
+console.log('\n  THE END — each world\'s whistle and its end-card motif (2 s renders)');
+console.log('                         >450 Hz   <250 Hz    peak');
+for (const [k, r] of Object.entries(endv))
+  console.log(`    ${k.padEnd(16)}  ${r.has ? r.hp.toFixed(1).padStart(8) : '  absent'}  ${r.low.toFixed(1).padStart(8)}  ${r.peak.toFixed(1).padStart(6)}  dBFS`);
+const ends = Object.entries(endv).filter(([k]) => k !== 'pop');
+const missing = ends.filter(([, r]) => !r.has).map(([k]) => k);
+const quiet = ends.filter(([, r]) => r.has && r.hp < endv.pop.hp).map(([k]) => k);
+const thud = ends.filter(([, r]) => r.has && r.low > endv.pop.low + 1).map(([k]) => k);
+const hot = ends.filter(([, r]) => r.has && r.peak > -3).map(([k]) => k);
+bar(!missing.length && !quiet.length,
+  `(i) every world's whistle and motif is at least as loud as a plain bite where a phone can hear it`,
+  missing.length ? `(i) no end sound of its own in: ${missing.join(', ')}` : `(i) quieter than a plain bite above 450 Hz: ${quiet.join(', ')}`);
+bar(!missing.length && !thud.length,
+  `(j) no thud: nothing below 250 Hz beyond a plain bite's ${endv.pop.low.toFixed(1)} dBFS`,
+  missing.length ? '(j) nothing to check for a thud — the end sounds do not exist' : `(j) a thud below 250 Hz in: ${thud.join(', ')}`);
+bar(!missing.length && !hot.length,
+  `(k) every end sound peaks at or under -3 dBFS (${Math.max(...ends.map(([, r]) => r.peak)).toFixed(1)})`,
+  missing.length ? '(k) nothing to check for a peak — the end sounds do not exist' : `(k) over the -3 dBFS ceiling: ${hot.join(', ')}`);
+
 await b.close();
 console.log(`\n${bad ? 'FAIL' : 'PASS'} — ${bad} bad`);
 process.exit(bad ? 1 : 0);

@@ -53,6 +53,15 @@ export interface Audio3D {
    *  third: the chain ended, and the sound says it was worth it. There is no
    *  "combo broken" sound, on purpose. */
   nomCash(n: number): void;
+  /** THE END OF THE MATCH, in the world's own voice (research governor G4).
+   *  The buzzer and a won goal both played evolve() — the "you grew" fanfare a
+   *  child hears forty times a match — so the end had no sound of its own.
+   *  Bells and whistles only; no drum (owner, 2026-08-29). All above 250 Hz. */
+  whistle(): void;
+  /** THE END CARD'S TUNE: one five-note VOIDLING motif, on the world's own
+   *  instrument, on every card. A win lays the win sting over it; nothing
+   *  plays the old falling "aww" any more. */
+  finale(won: boolean): void;
   startMusic(): void;              // the match loop — tempo + layers ride the stage
   setMusicStage(n: number): void;
   stopMusic(): void;
@@ -4522,6 +4531,65 @@ export function createAudio(): Audio3D {
       // the sparkle: three short pings an octave and more above the triad
       [3.0, 4.0, 5.04].forEach((m, k) => tone(root * m, root * m, 0.07, 'sine', 0.028, 0.2 + k * 0.045));
       duckMusic(3, 0.4);
+    },
+    whistle() {
+      const c = ensure(); if (!c || !master) return;
+      logEv('whistle');
+      const m = master, t = c.currentTime + 0.01;
+      duckMusic(6, 1.6);
+      if (isGameday()) {
+        // the referee: two long blasts, the second one higher — full time
+        dTone(m, t, 0.36, 'square', 0.045, 2320, 2560, 2380, 0.012);
+        dTone(m, t, 0.36, 'sine', 0.06, 2320, 2560, 2380, 0.012);
+        dTone(m, t + 0.46, 0.8, 'square', 0.05, 2400, 2680, 2480, 0.012);
+        dTone(m, t + 0.46, 0.8, 'sine', 0.065, 2400, 2680, 2480, 0.012);
+      } else if (isPirate()) {
+        // the ship's bell, rung for the end of a watch: two double strikes
+        for (const off of [0, 0.3, 0.95, 1.25]) {
+          dTone(m, t + off, 1.9, 'sine', 0.1, 660, 0, 0, 0.003);
+          dTone(m, t + off, 1.2, 'sine', 0.05, 660 * 2.76, 0, 0, 0.003);
+          dTone(m, t + off, 0.6, 'sine', 0.025, 660 * 5.4, 0, 0, 0.003);
+        }
+      } else if (isLantern()) {
+        // the temple bell and the shrine's bells — never the drum tower
+        kane(m, t, 0.13, true); suzu(m, t + 0.18, 0.09, 0.9); kane(m, t + 0.62, 0.1, true);
+      } else if (isPowder()) {
+        // sleigh bells, shaken hard, then two sleigh-bell chimes on top
+        for (let i = 0; i < 14; i++)
+          dTone(m, t + i * 0.045 + Math.random() * 0.02, 0.16, 'sine', 0.04 + Math.random() * 0.03,
+            2600 + Math.random() * 2400, 0, 0, 0.002);
+        nHit(m, t, 0.7, 0.05, 'highpass', 5200, 0.7, 0, 0.01);
+        glock(m, 1567.98, t + 0.7, 1.0, 0.1); glock(m, 2093.0, t + 0.85, 1.2, 0.09);
+      } else if (isSkylark()) {
+        // the burner's whoosh, then the chime of a balloon touching down
+        grain(1100, 0.7, 0.55, 0.12); grain(2000, 0.8, 0.45, 0.08, 0.06);
+        for (const [k, f] of [1174.66, 1396.91, 1760.0].entries()) glock(m, f, t + 0.5 + k * 0.12, 1.1, 0.09);
+      } else {
+        // the town-hall bell, pitched at C5 — well above the 196 Hz clock that
+        // strikes the hours, because a phone speaker gives up below ~500 Hz and
+        // the first try at G4 (392 Hz) put its weight where the phone cannot
+        // play it (qa/chomp.mjs (j)). Two strikes: a clock never rings once.
+        for (const off of [0, 0.9])
+          for (const [k, v, d] of [[1, 1, 2.6], [1.2, 0.4, 1.8], [1.5, 0.3, 1.4], [2, 0.22, 1.0]] as number[][])
+            dTone(m, t + off, d, 'sine', 0.1 * v, 523.25 * k, 0, 0, 0.004);
+      }
+    },
+    finale(won) {
+      const c = ensure(); if (!c || !master) return;
+      logEv(`finale ${won ? 'win' : 'end'}`);
+      const m = master, t = c.currentTime + 0.05;
+      duckMusic(8, 3.0);
+      // VOIDLING: C5 E5 G5 A5 C6 — five notes, up, on the pentatonic the bites
+      // already walk. Each world plays it on its own instrument.
+      const motif = [523.25, 659.25, 783.99, 880.0, 1046.5];
+      motif.forEach((f, i) => {
+        const tt = t + i * 0.14, last = i === motif.length - 1, dur = last ? 1.1 : 0.32;
+        if (isPirate()) marimba(m, f, tt, dur + 0.2, 0.13);
+        else if (isLantern()) koto(m, f, tt, dur + 0.3, 0.1);
+        else if (isPowder() || worldId() === 'maple') glock(m, f, tt, dur + 0.4, 0.11);
+        else { tone(f, f, dur, 'triangle', 0.12, tt - c.currentTime); tone(f * 2, f * 2, dur * 0.6, 'sine', 0.035, tt - c.currentTime); }
+      });
+      if (won) setTimeout(() => this.win(), 720);
     },
     nomCash(n) {
       const c = ensure(); if (!c || !master) return;

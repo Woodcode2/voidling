@@ -4413,6 +4413,7 @@ _dbg.__matchState = () => ({
   band: rivals.bandStat(),   // QA: is the lane multiplier pinned at its clamp?
   fever: feverMult,          // QA: is a beat window live right now?
   combo,                     // QA: the chain qa/nomstream.mjs grades the pill and the cash-in against
+  mood: prevMood,            // QA: the face the void is making — qa/endparty.mjs reads it at the end
   t: started ? matchElapsed() : 0, clock: matchClock, score: playerScore, r: voidling.radius, eaten: matchEaten, ev: rivalEv,
   // QA, round 7 stream A: the arm/start split is invisible from outside without
   // these, and a goal card that never appeared cost a full diagnostic run to
@@ -8147,7 +8148,9 @@ function endMatch(result: GoalResult = null) {
     // Under a level the ear follows the GOAL rather than the percentage: a dot
     // won is a cheer even on a poor run, and a dot missed is still the soft
     // chime, never a loss sting (§4.3, "audio.ready(), never audio.lose()").
-    if (goal ? result === 'win' : newBest) audio.win(); else audio.ready();
+    // …and every card now plays the VOIDLING motif, with the win sting laid
+    // over it only for a win (research governor G4).
+    audio.finale(goal ? result === 'win' : newBest);
     if (newBest) localStorage.setItem('voidBestPct', String(devouredPct));
     const lvl2Before = rankInfo(xp).lvl;
     const gain2 = 8 + (newBest ? 8 : 0);
@@ -8164,7 +8167,8 @@ function endMatch(result: GoalResult = null) {
     if (lvlPay2) addCoins(lvlPay2);
     celebrateEnd(reward2 + troPay2.coins + lvlPay2, gain2,
       troPay2.count ? `🏆 ${troPay2.last.toUpperCase()} EARNED!`
-        : newBest ? 'NEW BEST!!' : `best: ${Math.max(best, devouredPct)}%`, false, troPay2.gems);
+        : newBest ? 'NEW BEST!!' : `best: ${Math.max(best, devouredPct)}%`,
+      (!!goal && result === 'win') || newBest, troPay2.gems);   // a won dot or a new best gets the confetti (G4)
     endList.innerHTML = '';
     endEl.classList.add('show');
     // ── BY MYSELF IS STILL PLAYING THE GAME ──────────────────────────────
@@ -8204,8 +8208,11 @@ function endMatch(result: GoalResult = null) {
   // chime, not the falling notes. A child who finished 4th but MET her goal
   // gets the cheer; one who came 1st on a dot asking for something else does
   // not get told she lost.
-  if (goal) { if (result === 'win') audio.win(); else audio.ready(); }
-  else if (myRank === 1) audio.win(); else audio.lose();
+  // …AND NOTHING PLAYS lose() ANY MORE (research governor G4). Every card
+  // gets the VOIDLING motif on the world's own instrument; the cheer rides on
+  // top of it for a won dot, or for first place when there is no dot. A child
+  // who came third has still just played a match, and the ear says so.
+  audio.finale(goal ? result === 'win' : myRank === 1);
   // everyone leaves with something; winning is 5x last place, not infinity-x
   const today = new Date().toDateString();
   // The score term was min(60, score/50) — SATURATED at 3,000 points, which a
@@ -8267,7 +8274,12 @@ function endMatch(result: GoalResult = null) {
     const lead = troPay.count ? `🏆 ${troPay.last.toUpperCase()} EARNED!`
       : leveledTo ? `⬆️ LEVEL ${leveledTo}!`
         : myRank === 1 ? COPY.winSub : `${rows[0].name} devoured the most`;
-    celebrateEnd(reward + troPay.coins + lvlPay, gain, lead, myRank === 1, gemGain + troPay.gems);
+    // WON is a won dot, first place, or a new best — any of the three is a
+    // child who did something, and all three get the confetti (G4). It was
+    // first place only, so a dot won from third got a bare card.
+    const bestBefore = Number(localStorage.getItem('voidBestScore') || 0);
+    const won = (!!goal && result === 'win') || myRank === 1 || Math.round(playerScore) > bestBefore;
+    celebrateEnd(reward + troPay.coins + lvlPay, gain, lead, won, gemGain + troPay.gems);
   }
   // THE RUN'S OWN NUMBERS. % DEVOURED was shown in Solo and nowhere else — the
   // figure a child watched climb for three minutes simply vanished at the
@@ -8529,6 +8541,48 @@ let combo = 0, comboT = 0, chompCd = 0;
  *  Nothing drains, counts down or scolds; a chain that ends is paid, not lost. */
 let chainPts = 0;
 const nomAt = new THREE.Vector3();
+/** ── THE PARTY ─────────────────────────────────────────────────────────────
+ *  Research governor G4. The end of a match used to be two rings and the card
+ *  sliding in — nothing happened IN THE WORLD for the child to watch. Now the
+ *  moment the whistle goes, 140 scraps of confetti burst out of the void and
+ *  fall over the town, before the card is up. DOM, transforms and opacity
+ *  only. They are retired on tClock rather than on animationend, like every
+ *  other timed thing in this file, so a dropped frame cannot strand one on
+ *  screen. Under reduced motion the CSS keeps them still and fades them. */
+const PARTY_N = 140, PARTY_LIFE = 1.8;
+const PARTY_COLS = ['#ffd23f', '#b875ff', '#7ef2a0', '#ff7da8', '#6fc8ff', '#ff9f43'];
+const _partyV = new THREE.Vector3();
+let partyNodes: HTMLElement[] = [], partyUntil = 0;
+function partyClear(): void {
+  for (const n of partyNodes) n.remove();
+  partyNodes = [];
+}
+function partyBurst(): void {
+  partyClear();
+  _partyV.copy(voidling.group.position).project(camera);
+  const x = (_partyV.x * 0.5 + 0.5) * window.innerWidth;
+  const y = (-_partyV.y * 0.5 + 0.5) * window.innerHeight;
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < PARTY_N; i++) {
+    const sp = document.createElement('i');
+    sp.className = 'wConf';
+    // up and out in a fan, then down: --dx/--dy is the top of the arc, and the
+    // fall below it is in the keyframes
+    const a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.25;
+    const d = 90 + Math.random() * 230;
+    sp.style.left = `${x.toFixed(0)}px`;
+    sp.style.top = `${y.toFixed(0)}px`;
+    sp.style.setProperty('--dx', `${(Math.cos(a) * d).toFixed(0)}px`);
+    sp.style.setProperty('--dy', `${(Math.sin(a) * d).toFixed(0)}px`);
+    sp.style.setProperty('--r', `${Math.round((Math.random() - 0.5) * 900)}deg`);
+    sp.style.background = PARTY_COLS[i % PARTY_COLS.length];
+    sp.style.animationDelay = `${(Math.random() * 0.12).toFixed(2)}s`;
+    frag.appendChild(sp);
+    partyNodes.push(sp);
+  }
+  document.body.appendChild(frag);
+  partyUntil = tClock + PARTY_LIFE;
+}
 function nomCash(): void {
   nomAt.set(voidState.x, voidling.radius + 3.2, voidState.z);
   bubbles.float(nomAt, `${combo} NOMS! +${chainPts.toLocaleString()}`, true, true);
@@ -10926,6 +10980,7 @@ function resetMatch() {
                 voidState.z + camOffset.z * camDist);
   playerScore = 0; hunger = 0; combo = 0; prevRank = 0; chompCd = 0; newsCd = COPY.signOn;
   comboT = 0; chainPts = 0; eatFloatK = 0; eatFloatLm = false;   // a chain never carries into the next match
+  partyClear();
   // the whole rank-announce machine restarts with the match, or a rematch
   // opens with a stale crown to lose and a stale announcedRank to suppress
   crownLive = false; everBehind = false; shownRank = 0; announcedRank = 0; rankHold = 0;
@@ -13183,7 +13238,9 @@ function animate() {
       outroT = 2.0;
       fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 5, 1);
       fx.ring(voidState.x, voidState.z, 0xb875ff, voidling.radius * 3.4, 0.8);
-      audio.evolve();
+      // the END sounds like the end — not evolve(), the form-up fanfare she
+      // hears forty times a match (research governor G4; qa/endparty.mjs)
+      audio.whistle(); partyBurst();
     }
     if (matchClock <= 0 && !ended && outroT <= 0) {
       // RIVALS is the one dot the clock itself decides: the rank is only true
@@ -13202,7 +13259,7 @@ function animate() {
       outroT = 2.0;   // slow-mo push-in beat before the results panel
       fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 5, 1);
       fx.ring(voidState.x, voidState.z, 0xb875ff, voidling.radius * 3.4, 0.8);
-      audio.evolve();
+      audio.whistle(); partyBurst();   // full time, in this world's own voice (G4)
     }
     // the 2D GROWTH LAW: radius can never outrun the clock (disabled for ?r= debug)
     if (!bigStart) {
@@ -13761,7 +13818,8 @@ function animate() {
       if (rv.r > R2 * 1.15 && Math.hypot(rv.x - voidState.x, rv.z - voidState.z) < R2 + rv.r + 16) { scared = true; break; }
     }
     if (tClock < hurtUntil) mood = 'hurt';
-    else if (outroT > 0) mood = playerScore >= Math.max(0, ...rivals.list.map((r) => r.score)) ? 'victory' : 'cruise';
+    // a WON DOT is a victory at any rank (G4): the dot is what she was asked for
+    else if (outroT > 0) mood = goal?.result === 'win' || playerScore >= Math.max(0, ...rivals.list.map((r) => r.score)) ? 'victory' : 'cruise';
     else if (scared) mood = 'scared';
     else if (tClock < smugUntil) mood = 'smug';
     else if (combo >= 5 && comboT > 0) mood = 'frenzy';
@@ -13940,6 +13998,7 @@ function animate() {
   bubbles.update(dt, { pos: voidling.group.position, r: voidling.radius });
   paintWayfinder();
   paintNoms();
+  if (partyNodes.length && tClock >= partyUntil) partyClear();
   const cy = voidling.group.position.y;
 
   for (const e of edibles) {
@@ -14564,12 +14623,20 @@ function animate() {
       // here, so the payout cannot happen before the number that explains it.
       // bubbles.flyTo guarantees it fires in every motion state — under
       // reduced motion the duration is zero and it lands on the next frame.
-      // …and it is as big as what went in. 1 + 0.22·log10(points), 1 to 1.8,
-      // and a quarter more when the bank holds a meal over half his size or a
-      // landmark. Inside a beat window it wears the beat's colour, so the
-      // doubled value is seen on the number that carries it.
-      const k = Math.min(2, Math.min(1.8, Math.max(1, 1 + 0.22 * Math.log10(eatFloatPts)))
-        * (eatFloatK >= EAT_TICK_BIG || eatFloatLm ? 1.25 : 1));
+      // …and it is as big as what went in. Two terms. The points: 1 +
+      // 0.22·log10(points), 1 to 1.8, so the numbers grow across a match. And
+      // the MEAL, graded on `bite` — the meal's size against his own, the scale
+      // every other eat cue in this file rides on — from x1 for crumbs to x1.6
+      // for a meal nearly his size or a landmark. The spec's version made the
+      // meal term a flat x1.25 over 0.55, and measured on a real spree
+      // (qa/nomstream.mjs, 2026-09-23) the biggest number came out only 1.30x
+      // the smallest: the log compresses the points, and one step cannot say
+      // "that was a big one". Capped at 2.2 (44px). Inside a beat window it
+      // wears the beat's colour, so the doubled value is seen on the number
+      // that carries it.
+      const meal = eatFloatLm ? 1 : Math.min(1, Math.max(0, (eatFloatK - 0.15) / 0.55));
+      const k = Math.min(2.2, Math.min(1.8, Math.max(1, 1 + 0.22 * Math.log10(eatFloatPts)))
+        * (1 + 0.6 * meal));
       bubbles.flyTo(eatFloatAt, `+${eatFloatPts.toLocaleString()}`, gBarTarget, gbarPay,
         { scale: k, color: feverMult > 1 ? `#${feverCol.toString(16).padStart(6, '0')}` : undefined });
       eatFloatPts = 0; eatFloatK = 0; eatFloatLm = false;
