@@ -14,7 +14,7 @@
 //     use mrnd()/mr()/mpick(), which run off a fixed seed.
 import * as THREE from 'three';
 import { mulberry32 } from './rng';
-import { part, mergedProp, PROP_SMOOTH_MAT, shade, tint } from './island';
+import { part, mergedProp, PROP_SMOOTH_MAT, shade } from './island';
 import { registerGloss } from './gloss';
 import { roundedBox } from './life';
 
@@ -1792,10 +1792,17 @@ export function makeMapleTree(): THREE.Mesh {
   // worst case (radA 1.9, yy 5.2, rr 2.1) their centres sit 2.04 from the
   // crown centre and their zeniths 2.15, both inside CR 2.25, while their
   // flanks reach 3.04 — so they weight the underside and break the outline
-  // low without one of them ever surfacing on top. The dapples sink into the
-  // crown's SHOULDER (31-56 degrees elevation, never the apex), centres at
-  // CR - 0.55*r, so each shows a bump of 0.45*r and stays more than half
-  // buried — the island reference tree's own worst satellite is 0.44*r.
+  // low without one of them ever surfacing on top.
+  //
+  // ── AND NO DAPPLES ───────────────────────────────────────────────────────
+  // Six lifted 8x6 "sun dapple" spheres used to sit sunk into the crown's
+  // shoulder. At the play camera they read as faceted polka dots on a smooth
+  // mass — two tessellations and two values on one crown, on 603 trees — and
+  // studio round 4 (2026-09-23, blocker B2, upheld by its skeptic) held the
+  // opening frame on them: Donut County's first rule is one tessellation style
+  // per frame. Deleted. 480 fewer triangles a tree, ~289k across Maple, and no
+  // change to the seeded stream: the dapples were arithmetic on draws already
+  // taken, and all four mr() draws per lobe stay.
   //
   // THE SEEDED STREAM IS STILL EXACTLY ONE mpick AND FOUR mr() PER LOBE, in
   // the same order and the SAME RANGES — every new shape is arithmetic on
@@ -1803,7 +1810,6 @@ export function makeMapleTree(): THREE.Mesh {
   // before, 25 after, ranges byte-identical.
   const dark = shade(leaf, 0.80);   // the under-mass — 20% down, same hue
   const dim = shade(leaf, 0.90);    // its alternate — VALUE steps, no hue edges
-  const lit = tint(leaf, 0.15);     // sun dapple — lifted, not cream
   const CY = 6.1, CR = 2.25;        // the crown mass every other sphere hides in
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2;
@@ -1815,13 +1821,6 @@ export function makeMapleTree(): THREE.Mesh {
     // bulges the outline low and dark, never surfaces on the lit top.
     p.push(part(new THREE.SphereGeometry(rr * 0.74, 10, 8), i % 2 ? dark : dim,
       Math.cos(a) * radA * 0.78, yy - 0.5, Math.sin(a) * radB * 0.78));
-    // DAPPLE: sunk into the crown's shoulder, over half buried, same hue.
-    const r2 = rr * 0.34;
-    const b = a + 0.62 + (radB - 1.5) * 0.4;
-    const el = 0.55 + (yy - 5.2) * 0.30;
-    const d = CR - r2 * 0.55;
-    p.push(part(new THREE.SphereGeometry(r2, 8, 6), lit,
-      Math.cos(b) * Math.cos(el) * d, CY + Math.sin(el) * d, Math.sin(b) * Math.cos(el) * d));
   }
   // THE MASS ITSELF: one sphere owns the silhouette and the entire lit top.
   // 14x10 because it is now the one curve the camera reads on 603 trees —

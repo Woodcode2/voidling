@@ -46,7 +46,7 @@ import { join } from 'path';
 // single-line call. The twelve are a counting-method difference and NOT twelve
 // spheres anybody fixed — recording them as progress would have been a lie in
 // the ratchet's own baseline, on its first day.
-const BASELINE = 153;
+const BASELINE = 152;
 
 // THE SPEND — the same counted calls, priced instead of judged:
 // 2*W*(H-1) summed per call SITE (not per instance; the probe cannot see
@@ -113,7 +113,7 @@ const BASELINE = 153;
 // This probe still cannot see a cylinder, and a person's chest, hips and
 // thighs are all cylinders. qa/peoplefacet.mjs covers that gap for people;
 // the world kits remain uncovered and that is known, not forgotten.
-const TRI_BASELINE = 39320;
+const TRI_BASELINE = 39240;
 
 const DIR = 'src/proto3d';
 const files = readdirSync(DIR).filter((f) => f.endsWith('.ts'));
