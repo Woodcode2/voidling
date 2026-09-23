@@ -804,9 +804,10 @@ interface PersonOpts {
 //                             then moved 0.04 further back (-0.55 without the
 //                             move held 26% at 65); the collar did not move
 //   flower       100/100/92   the garland tipped -0.55 about its OWN centre and
-//                             moved 0.04 back (untipped position: 48% at 65);
-//                             the three flowers turned about the garland's centre
-//                             with it
+//                             moved 0.04 back; the three flowers turned about
+//                             the garland's centre with it. Tipped in place,
+//                             without the 0.04 move back: 100/88/48. Untipped,
+//                             at its old seat: 0/0/0
 //
 // RE-AUTHORED — new sizes and seats, not a rotation of the old hat:
 //   cap, postal  100/100/85   crown -0.5 at y 0.16, z -0.04 (was y 0.14,
@@ -844,8 +845,8 @@ interface PersonOpts {
 //                             96/62/22; on the forehead the mouth reads 100
 //
 // (Single-hat alternatives are from the same probe run over a copy of this
-// file, FACERAY_SRC: the helmet's and the snorkel's across all nine hairs,
-// the rest across five of the nine.)
+// file, FACERAY_SRC: the helmet's, the snorkel's and the flower's across all
+// nine hairs, the rest across five of the nine.)
 //
 // THREE HATS KEEP THEIR EYES COVERED, BY THE GOVERNOR'S CONVENTION, and
 // qa/faceray.mjs exempts them by name: the sun hat, the straw hat and the
@@ -1597,11 +1598,12 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
   // bandana, hood, helmet, bucket, tricorn, captain, sun, straw — that is
   // exactly where the crown sits, so they either poke through it as bumps or
   // are buried inside it: 840 triangles (5 x the 168 of a 12x8 B.dot, counted
-  // off the geometry) for nothing or for worse. Under the toque and the bellhop
-  // (closed drums of radius 0.45 and 0.46, against lumps whose outer edge is
-  // 0.51-0.57 from the head's axis) they poke out through the drum. Under the
-  // OPEN hats — the visor, the flower garland and the snorkel mask — nothing
-  // covers them, so there the swap is a visible change, not a saving: a
+  // off the geometry) for nothing or for worse. Under the toque, the bellhop and
+  // the shako (closed drums of radius 0.45, 0.46 and 0.48, against lumps whose
+  // outer edge is 0.51-0.57 from the head's axis) they poke out through the
+  // drum. Under the OPEN hats — the visor, the flower garland and the snorkel
+  // mask — nothing covers them, so there the swap is a visible change, not a
+  // saving: a
   // curly-haired lifeguard, spa guest in a robe or snorkeller reads as
   // short-haired. That is what the spec asks for, and it is recorded here so
   // nobody reads the saving as the reason. Same Math.random draws in the same
