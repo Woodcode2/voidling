@@ -181,6 +181,10 @@ const GAMEDAY_PLAN: Biome[][] = [
   ['treeline', 'rvpark', 'rvpark', 'greek', 'greek', 'treeline'],
 ];
 let WORLD_ID: WorldId = 'pirate';
+/** QA ONLY: `?qaleaves=0` bakes Maple's ground without its warm leaf paint —
+ *  the drift pass and the protest patch — so qa/leafsurface.mjs can diff the
+ *  two bakes and see exactly which texels that paint touched, and on what. */
+const QA_NO_LEAVES = typeof location !== 'undefined' && new URLSearchParams(location.search).get('qaleaves') === '0';
 let PLAN: Biome[][] = PIRATE_PLAN;
 // pick the world BEFORE createIsland — the bake and populate both read it
 export function setWorld(id: WorldId): void {
@@ -2918,8 +2922,30 @@ const QUIET_LEDGER: number[][] = [];
     // gathers, and the bare patch the parking-meter protest has worn into it
     g.fillStyle = '#e2ddcd';
     g.fillRect(pxW(6120), pyW(gy0 - 60), pxW(190) - pxW(0), pyW(gy1 - gy0 + 120) - pyW(0));
-    g.fillStyle = quiet('rgba(186,166,116,0.45)');
-    g.beginPath(); g.ellipse(pxW(6300), pyW(5090), pxW(190) - pxW(0), pyW(140) - pyW(0), 0.2, 0, Math.PI * 2); g.fill();
+    // …and the protest's worn patch is WORN GRASS, not a tan disc on the
+    // paving. It was a flat rgba(186,166,116,0.45) ellipse laid over the apron
+    // and the green alike, which on the cream apron read as one more spill
+    // (studio round 4, Job 3). Now: a radial falloff toward a cool trodden-grass
+    // tone, applied only to texels that are grass.
+    if (!QA_NO_LEAVES) {
+      const ecx = pxW(6300), ecy = pyW(5090);
+      const erx = pxW(190) - pxW(0), ery = pyW(140) - pyW(0);
+      const bx = Math.max(0, Math.floor(ecx - erx)), by = Math.max(0, Math.floor(ecy - ery));
+      const bw2 = Math.min(TEX - bx, Math.ceil(erx * 2)), bh2 = Math.min(TEX - by, Math.ceil(ery * 2));
+      if (bw2 > 0 && bh2 > 0) {
+        const im = g.getImageData(bx, by, bw2, bh2), dd = im.data;
+        const worn = [150, 162, 128];   // trodden sage: cooler and duller than the lawn, never tan
+        for (let yy = 0; yy < bh2; yy++) for (let xx = 0; xx < bw2; xx++) {
+          const nx = (bx + xx - ecx) / erx, ny = (by + yy - ecy) / ery, q = nx * nx + ny * ny;
+          if (q >= 1) continue;
+          const k = (yy * bw2 + xx) * 4, r = dd[k], gg = dd[k + 1], bb = dd[k + 2];
+          if (!(gg > r + 6 && gg > bb + 6)) continue;   // grass only
+          const a = 0.5 * (1 - q) * (1 - q);
+          dd[k] = r + (worn[0] - r) * a; dd[k + 1] = gg + (worn[1] - gg) * a; dd[k + 2] = bb + (worn[2] - bb) * a;
+        }
+        g.putImageData(im, bx, by);
+      }
+    }
   }
 
   // LAKESIDE's sand runs to the WATERLINE, not to the block grid. The 6x6 grid
@@ -3414,7 +3440,7 @@ const QUIET_LEDGER: number[][] = [];
   // Mean held on purpose: qa/ground.mjs reported 0.623 before any of this and
   // the warm paint is kept sparse enough to leave it there. island.ts has blown
   // this level's exposure out twice before by stacking alpha.
-  if (WORLD_ID === 'maple') {
+  if (WORLD_ID === 'maple' && !QA_NO_LEAVES) {
     let _ds = 0x1eaf5;
     const dr = () => {
       _ds |= 0; _ds = (_ds + 0x6D2B79F5) | 0;
@@ -3457,6 +3483,27 @@ const QUIET_LEDGER: number[][] = [];
       const cxB = blockCenter(gx), cyB = blockCenter(gy);
       const x0 = pxW(cxB - BLOCK_SIZE / 2), y0 = pyW(cyB - BLOCK_SIZE / 2);
       const bw = pxW(cxB + BLOCK_SIZE / 2) - x0, bh = pyW(cyB + BLOCK_SIZE / 2) - y0;
+      // ── …AND A "GRASSY" BLOCK IS NOT ALL GRASS ────────────────────────────
+      // The plan's biome is per BLOCK, and the plaza block is mostly pale stone
+      // walks — so the rule above still put drifts on the square's walks, in
+      // the opening frame of every new install's first match (studio round 4,
+      // blocker B1: "two coffee stains"), plus paving and the pond. So the
+      // block's ground is read ONCE before its leaves go down, and a lobe is
+      // filled only when its centre and four rim points are green-dominant.
+      // Every dr() below is still drawn, in the same order, whether its lobe is
+      // filled or not: the drift stream is local, and every surviving lobe
+      // lands exactly where it landed before. qa/leafsurface.mjs diffs the
+      // bake against ?qaleaves=0 and counts leaf texels off the grass.
+      const M = Math.ceil(4.8 * U);
+      const sx = Math.max(0, Math.floor(x0 - M)), sy = Math.max(0, Math.floor(y0 - M));
+      const sw = Math.min(TEX - sx, Math.ceil(bw + 2 * M)), sh = Math.min(TEX - sy, Math.ceil(bh + 2 * M));
+      const snap = g.getImageData(sx, sy, sw, sh).data;
+      const onGrass = (x: number, y: number) => {
+        const ix = Math.round(x) - sx, iy = Math.round(y) - sy;
+        if (ix < 0 || iy < 0 || ix >= sw || iy >= sh) return false;
+        const k = (iy * sw + ix) * 4, r = snap[k], gg = snap[k + 1], bb = snap[k + 2];
+        return gg > r + 6 && gg > bb + 6;
+      };
       for (let d = 0; d < piles; d++) {
         const dx = x0 + dr() * bw, dy = y0 + dr() * bh;
         const R = drange(1.6, 3.6) * U;        // the drift's own radius, in 3D units
@@ -3465,11 +3512,17 @@ const QUIET_LEDGER: number[][] = [];
         for (let i = 0; i < lobes; i++) {
           // two uniforms averaged: dense in the middle, frayed at the rim
           const ox = (dr() + dr() - 1) * R, oy = (dr() + dr() - 1) * R;
-          g.fillStyle = i % 3 === 0 ? LEAF[Math.floor(dr() * LEAF.length)] : col;
-          g.globalAlpha = drange(0.10, 0.22);   // was 0.16-0.34: a tint, not a spill
+          const fill = i % 3 === 0 ? LEAF[Math.floor(dr() * LEAF.length)] : col;
+          const alpha = drange(0.10, 0.22);   // was 0.16-0.34: a tint, not a spill
           const lw = drange(0.5, 1.15) * U;
+          const ly = lw * drange(0.55, 0.9), rot = dr() * Math.PI;
+          const cx = dx + ox, cy = dy + oy;
+          if (!(onGrass(cx, cy) && onGrass(cx + lw, cy) && onGrass(cx - lw, cy)
+            && onGrass(cx, cy + lw) && onGrass(cx, cy - lw))) continue;
+          g.fillStyle = fill;
+          g.globalAlpha = alpha;
           g.beginPath();
-          g.ellipse(dx + ox, dy + oy, lw, lw * drange(0.55, 0.9), dr() * Math.PI, 0, Math.PI * 2);
+          g.ellipse(cx, cy, lw, ly, rot, 0, Math.PI * 2);
           g.fill();
         }
       }

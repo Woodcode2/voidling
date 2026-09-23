@@ -541,6 +541,14 @@ const SUITE = [
     cmd: ['node', 'qa/blackprops.mjs'], verdict: pf,
     why: 'no prop face renders as a flat black hole — every pure-black region in a shipped frame is concave enough to be a shadow' },
 
+  // Studio round 4, Job 3 (B1): Maple's leaf drifts and the protest's worn
+  // patch land on grass only. A diff of the bake against ?qaleaves=0 with
+  // Math.random seeded in both, so every changed texel is leaf paint.
+  // Measured 16,866 leaf texels off the grass before, 7 after (bar 20).
+  { id: 'leafsurface', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 900,
+    cmd: ['node', 'qa/leafsurface.mjs', PORT], verdict: pf,
+    why: 'the leaves are on the grass — no drift painted onto the square\'s walks, the paving or the pond reads as a stain in the opening frame' },
+
   { id: 'roundlod', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/roundlod.mjs'], verdict: pf,
     why: 'no NEW round thing ships under the 14x10 bar island.ts states — the debt is frozen at 153 and visible every run' },

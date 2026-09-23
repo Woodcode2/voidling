@@ -132,5 +132,8 @@ if (want('c')) {
 }
 
 await b.close();
-console.log(`\n${bad ? 'FAIL' : 'PASS'} — ${bad ? `${bad} of ${bars}` : bars} bar(s)`);
+// two literal verdicts, not one templated one: qa/idiomguard.mjs (#2a) reads
+// the source for both tokens, and a ternary hides them from it
+if (bad) console.log(`\nFAIL — ${bad} of ${bars} bar(s)`);
+else console.log(`\nPASS — ${bars} bar(s)`);
 process.exit(bad ? 1 : 0);
