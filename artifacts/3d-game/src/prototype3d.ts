@@ -2595,6 +2595,14 @@ let goalProp: Edible | null = null;
  *  because she cannot tell it is one.
  *  0 means she is not on the board at all, which is not a placing. */
 const rivalsMet = (r: number): boolean => r >= 1 && r <= LEVEL_SPEC[pickedWorld].rank;
+/** SOLO CANNOT TAKE A RACE. Dot 4 is RIVALS — "finish top 3" — and rank is
+ *  counted among JOINED rivals only (currentRank). A solo match feeds the
+ *  rivals a match time of zero forever, so nobody ever joins, the child is
+ *  1st of 1, and rivalsMet() hands over the dot for nothing. Found by the
+ *  2026-09-23 research governor (G1); qa/firstrun.mjs bar (c).
+ *  Applied where every match passes — beginMatch, and resetMatch's rival reset
+ *  just before it — because PLAY AGAIN reaches beginMatch without startFresh. */
+const soloFor = (solo: boolean): boolean => solo && playingGoal !== 4;
 
 function goalMet(): boolean {
   if (!goal) return false;
@@ -4376,6 +4384,12 @@ _dbg.__matchState = () => ({
   // intro. qa/edgespeed.mjs reconstructed it from the radius and got a cap four
   // times too low, which inflated every ratio it reported.
   camDist,
+  // QA: THE STEERING CAP ITSELF, not a recipe for it. qa/edgespeed.mjs carried
+  // its own copy — `16 * (camDist / 50)` — and SPAWN_SPEED and PLAY_DIST moved
+  // under it (now 12.16 and 22), so it understated the real cap by 42% and
+  // reported the shore as a 2.33x trampoline in Pirate while the clamp here
+  // was holding it at 1.35x exactly. The probe reads this number now.
+  steer: steerCap(camDist),
   // QA day 2: the board's own rank (place among JOINED rivals), not a rank a
   // probe re-derived from the score list — see lastRank.
   rank: lastRank,
@@ -4920,7 +4934,7 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   // off you plus half her score, so it has to land like the ending it is
   // No card: bubbles.float() at the kill site already says the name, the title
   // and the points where the child is actually looking, under two rings, two
-  // flashes, a camera punch, audio.bigEat() and an 80ms buzz.
+  // flashes, a camera punch, audio.chomp(..., "rival") and an 80ms buzz.
   // …and the town notices a second hole vanishing, without ever learning that
   // it had a name. COPY.rivalGoneNews was one string per world; this is a pool,
   // through the same cooldown as every other reaction, so a marquee kill and a
@@ -4939,7 +4953,7 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   camPunch(6); fx.kick(rx - voidState.x, rz - voidState.z, 9);
   floatPos.set(rx, rr + 5, rz);
   bubbles.float(floatPos, `${FAMILY_TITLE[name] ?? ''} ${name} DEVOURED! +${pts}`, true);
-  audio.bigEat();
+  audio.chomp(rr, voidling.radius, 'rival');
   buzz(80);
 };
 // ── the void's EMOTIONS: game state resolves to a mood every frame ──────────
@@ -8717,7 +8731,7 @@ function capture(e: Edible, giveHunger = true) {
   // cooldown — a couple of CHOMPs a match, each one earned.
   if (e.radius > voidling.radius && tClock > chompCd) {
     chompCd = tClock + 7;
-    bubbles.float(floatPos, 'CHOMP!', true); audio.bigEat(); buzz(30);
+    bubbles.float(floatPos, 'CHOMP!', true); audio.chomp(e.radius, voidling.radius, 'prop'); buzz(30);
   } else { audio.pop(combo, e.radius, voidling.radius); buzz(e.radius > 2 ? 15 : 8); }
   if (combo > 0 && combo % 5 === 0) bubbles.float(floatPos, `COMBO ×${comboMult.toFixed(1)}`, true);
   // ── THE HAT HAS OPINIONS ────────────────────────────────────────────────
@@ -9079,8 +9093,8 @@ function beginMatch(solo = false) {
   // finished loading (and finally have real footprints) also get validated
   _revalQueue = [tClock + 8, tClock + 22];
   bakeContactShadows();   // and again on each re-sweep, for late GLB arrivals
-  soloMode = solo;
-  matchLen = solo ? 120 : MATCH_LEN;
+  soloMode = soloFor(solo);
+  matchLen = soloMode ? 120 : MATCH_LEN;
   matchClock = matchLen;
   // THE DEAL. Which two middle beats, and which hour — the matchdeck cycles
   // both so a rematch never replays the match before it, and match 1 of a
@@ -9591,6 +9605,14 @@ const soloOn = () => localStorage.getItem('voidSolo') === '1';
 // (hole.io's onboarding). The menu earns its place from session two.
 if (!DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW && !localStorage.getItem('voidPlayed')) {
   menuEl.style.display = 'none';
+  // …AND IT IS DOT 1, NOT A MATCH ON NO LADDER AT ALL. This called beginMatch()
+  // with no level, so a child's first match — the one she is most likely to
+  // win, with the hand guiding her — counted for none of the thirty dots on the
+  // ladder the owner built, and (being goal-free) ended on the red EAT FASTER
+  // clock. levelCurrent() on a fresh profile is 1. Spawn, the hand and the
+  // match-1 deck are unchanged; the title card simply gains its goal line.
+  // qa/firstrun.mjs bar (a).
+  playingGoal = levelCurrent(pickedWorld);
   withWorldReady(() => beginMatch());
 }
 /** THE POSTERS.
@@ -10727,7 +10749,7 @@ function resetMatch() {
   // join times are scaled to the clock they'll run on. beginMatch() sets
   // matchLen further down, so pass the length it is ABOUT to choose — reading
   // the live one here would scale the new match's joins to the old match's clock.
-  rivals.reset(soloMode ? 120 : MATCH_LEN);
+  rivals.reset(soloFor(soloMode) ? 120 : MATCH_LEN);
   curStage = 0; bestStage = 0; evolveCeremonies = 0;
   voidling.setStage(0); voidling.setRadius(START_R);
   // FIXED START, deliberately. A replay review argued for randomising this —
@@ -12932,14 +12954,11 @@ function animate() {
       // So the ritual keys on goal state (MENU-BRIEF §4.2), and it splits in
       // two, because the two halves are saying different things.
       //
-      // `hurry` is the NAG — the red clock and the EAT FASTER banner. It is
-      // "you are running out of time to do the thing", and under a ladder with
-      // the goal unmet that is pressure on a six-year-old about a dot that is
-      // about to not move. It survives only where finishing IS the progress:
-      //   · no level at all — every match before a dot is chosen, and every
-      //     harness match: unchanged, this is the game that shipped
-      //   · the goal already met — day 5 ends the match on the spot, so this
-      //     only ever reads true for the frames in between
+      // `hurry` WAS the NAG — the red clock and the EAT FASTER banner: "you are
+      // running out of time to do the thing". Under a ladder with the goal unmet
+      // that is pressure on a six-year-old about a dot that is about to not
+      // move. 3d8b414 kept it for goal-free matches as "the game that shipped";
+      // 2026-09-23 removed it there too (see below), so it no longer exists.
       //
       // `bell` is the CELEBRATION — the hot numerals and the rising tick. It is
       // "here it comes", and it keeps one case the nag does not: RIVALS at #1,
@@ -12962,14 +12981,19 @@ function animate() {
       // would have turned the clock red and fired EAT FASTER at her. Under a
       // level there is never anything to hurry for: unmet, the nag is the
       // pressure the owner's floor forbids; met, the match is already over.
-      const hurry = !goal;
-      const bell = hurry || (goal !== null && goal.n === 4 && rivalsMet(lastRank));
-      if (hurry) timerEl.style.color = '#ff8a8a';
-      // The warning used to fire at 30s — the exact frame the TREASURE FEAST
-      // beat fires — and announce() overwrote the beat banner in the same
-      // animate() call. The game's biggest scoring moment was silent in every
-      // logged run. Moved to 35s so the two never collide.
-      if (hurry && !moments.last30 && !ended) { moments.last30 = true; announce('⏰ 35 SECONDS — EAT FASTER!!'); }
+      // ── AND THE NAG IS GONE FROM EVERY MATCH, NOT JUST LEVEL ONES ─────────
+      // This read `const hurry = !goal`, which kept the red clock and "⏰ 35
+      // SECONDS — EAT FASTER!!" for any match with no level — described above
+      // as "the game that shipped", kept by 3d8b414 as a control for its own
+      // probe rather than by anyone's decision. And a goal-free match is exactly
+      // what first launch built: every new child's very first match finished on
+      // the pressure the owner ruled out ("no timers that pressure"). Found by
+      // the 2026-09-23 research governor (G1); qa/firstrun.mjs bar (b).
+      //
+      // The countdown itself stays everywhere — the gold numerals and the flat
+      // tick are an ending, not a threat. `bell` keeps its one exemption, RIVALS
+      // at #1, where the hot countdown is the bell to a win.
+      const bell = goal !== null && goal.n === 4 && rivalsMet(lastRank);
       // ── THE FINAL TEN SECONDS ARE A RITUAL, NOT A SURPRISE ───────────────
       // Between the 35-second banner and the buzzer there was NOTHING: the
       // match's whole ending was a red timer in a corner a child in a scramble

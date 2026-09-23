@@ -133,7 +133,16 @@ for (const wid of WORLDS) {
         // player could actually steer at 51, and every ratio this printed was
         // inflated by roughly four. Reconstructing a value the code owns is the
         // snapshot fault in a different coat.
-        accCap = Math.min(96, 16 * (window.__matchState().camDist / 50));
+        // THE GAME'S OWN NUMBER — GOVERNOR.md rule 4. This used to be a copy of
+        // the formula, `Math.min(96, 16 * (camDist / 50))`, and the constants
+        // moved under it (SPAWN_SPEED 12.16, PLAY_DIST 22): the copy understated
+        // the cap by 42%, inflated every ratio by 1.73x, and reported Pirate's
+        // shore as a 2.33x trampoline while the game's clamp was holding it at
+        // 1.35x. It reads __matchState().steer, and throws if that is missing
+        // rather than falling back to a guess.
+        const steer = window.__matchState().steer;
+        if (typeof steer !== 'number') throw new Error('__matchState().steer is missing — cannot grade speed against a cap this probe cannot read');
+        accCap = steer;
         n++;
         const R = vs.r * 1.2;
         if (!window.__solidAt(vs.x + R, vs.z, vs.r) || !window.__solidAt(vs.x - R, vs.z, vs.r)

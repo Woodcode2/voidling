@@ -46,10 +46,22 @@ compacted conversation loses nothing.
   nothing is designed to make room for one. (Note for that conversation: a game
   aimed at 6-11 year olds sits under COPPA whether or not it is in Apple's Kids
   Category, and the Kids Category itself forbids most third-party ads.)
-- Fun means **fun that brings a child back**, not a hook that holds one. Bloomberg's
-  2026 investigation into kid-rated games using addictive design is the line: no
-  streak-loss punishment, no loss-aversion timers, no near-miss manipulation, no
-  spend prompts inside play.
+
+**The list above is the owner's.** What follows is NOT — it is the crew's reading of
+the research, and it was wrongly written into this list on 2026-09-23 as though he
+had said it. The research governor then ranked a change to features he designed
+(G2: the daily streak and the streak-gated skins) as a P0 "constraint breach" on the
+strength of a rule he never stated. Corrected the same day, before anything was
+built on it:
+
+- *Crew practice, from research — his call wherever it touches something he
+  designed:* fun that brings a child back rather than a hook that holds one.
+  Bloomberg's 2026 investigation into kid-rated games using addictive design draws
+  the line at streak-loss punishment, loss-aversion timers, near-miss manipulation
+  and spend prompts inside play. Where a change on these grounds would remove or
+  alter something the owner built, it goes to him as a recommendation, not into
+  the build queue as a P0. (His own rule, "no timers that pressure", stands on its
+  own and does not need this paragraph.)
 - Ship via `git push` only. Never deploy by hand. Nothing reaches `main` without
   the push gate green.
 
@@ -61,8 +73,8 @@ compacted conversation loses nothing.
 
 | id | rank | item | source | evidence / bar |
 |---|---|---|---|---|
-| Q1 | LEAD | **Bigger voids never react to you.** `rivalnotice` last read 0.0/min in maple, gate open 0% — the owner's own item 1 | gate.mjs:250, quality profile | re-measure; the bar is in the probe |
-| Q2 | LEAD | **The shore launches the player.** `edgespeed` last read 1.78x against a 1.35x bar — the owner's own item 3 | gate.mjs:208-216, quality profile | re-measure |
+| Q1 | PART-MEASURED | **Bigger voids react to you — in Maple, measured.** Re-run 2026-09-23: maple **4.0 looks/min**, inside the 0.8-7 band; family joined 83%, whole gate open 41%. The old "0.0/min" predated two threshold moves. Pirate timed out waiting on the harness (1500 s) — no verdict, so no claim. | gate --profile=quality | Pirate needs a run that reaches its own conclusion |
+| Q2 | PROBE WAS WRONG | **The shore launches the player** — re-run read Pirate 2.33x, maple 1.24x. But the probe carried its own copy of the steering formula, `16 * camDist/50`, and the game's is `12.16 * camDist/22`: the copy understated the cap by 42% and inflated every ratio 1.73x. Re-derived, Pirate's 20.2 u/s is **1.34x the real cap — exactly where the game's shore clamp holds it (1.35x)**. The probe now reads `__matchState().steer`. Re-measure pending before this is called fixed. | qa/edgespeed.mjs vs prototype3d.ts:1644, :873 | re-run on the new build |
 | Q3 | LEAD | **Food pacing misses on four worlds** — F2 lantern 1.83s, gameday 2.11s, pirate 3.00s vs 1.5s; F1 powder 11.5% vs 20% | gate.mjs:350-355 | re-measure |
 | A1 | LEAD | **SKYLARK FIELD has no match music** — plays the generic synth bed while five worlds play composed tracks | assetrefs KNOWN_NOWHERE `/assets/music/skylark.mp3` | owner may need to fetch a generated track (CDN egress is blocked here) |
 | C1 | LEAD | **Two scrapbooks have no art** — POWDER and SKYLARK, 16 of 16 stickers missing each | assetrefs, 32 entries | |
@@ -70,6 +82,44 @@ compacted conversation loses nothing.
 | Q1n | note | rivalnotice's "0.0/min" in gate.mjs predates two threshold moves (1.2x -> 0.85x -> 0.75x, each set from a measured size distribution). Re-measure before treating Q1 as open. The code raises the real PLAY question itself: the rivals that "notice" you sit at 0.75-0.85x your size, so they cannot actually eat you — "making it literally true means raising the family's cap, which is a measured balance number, and that is his call". | rivals.ts:1430-1475 | |
 | S4 | P1 | **Analytics has been silently dropped since the COPPA fix.** The deployed `ingest-events` (v1, unversioned until now) REQUIRES `user_id`; the client correctly stopped sending one. Every batch -> 400 `missing fields`. | read of the deployed function via the Supabase connector, 2026-09-23 | fix written: `supabase/functions/ingest-events/index.ts`. Deploy is production infra -> OWNER QUEUE |
 | S2 | LEAD | **All 8 App Store screenshots show a menu the game no longer has** | readiness audit (store) | reshoot at the required sizes |
+
+### The research governor's build order (2026-09-23)
+
+Five research lenses (genre, retention, feel, audio, graphics) against a source inventory; 14 agents; the governor's verdict, verbatim: *"No. It is not AAA yet, and today it would not reliably bring a 6-11 year old back."*
+
+| id | rank | item | team | cost | status |
+|---|---|---|---|---|---|
+| G1 | P0 | Every child's first match is Maple dot 1, and no match ever nags | PLAY + UI | hours | **IN PROGRESS** — before measured on the live build: first match goal 0; timer red + "EAT FASTER!!" |
+| G2 | OWNER | Pull out every calendar hook: missing a day costs nothing | PLAY | a day | OWNER DECISION — removes the daily streak and streak-gated skins he designed; the rule it enforces is the crew's, not his (see Fixed). Recommended: yes — his "come back and your void turns SHINY" survives as a count-up. |
+| G3 | P0 | The biggest bite makes the biggest sound: CHOMP and eating a rival | AUDIO | hours | **DONE** d529a31 — CHOMP −20.6 dB → +3.4 dB vs a big bite; rival +26.2 dB; 50 buffers → 1 (call sites land with G1) |
+| G4 | P1 | Every match ends as a party in the world, with its own whistle | CHOREOGRAPHY + AUDIO | a day | queued |
+| G5 | P1 | What you eat talks back | AUDIO | days | queued |
+| G6 | P1 | One number stream a child can read, and a chain she can see | UI | a day | queued |
+| G7 | P1 | 'Now I can eat that!' is heard and seen | PLAY + AUDIO | days | queued |
+| G8 | P1 | Time, not the camera, sells the marquee moments | CHOREOGRAPHY | a day | queued |
+| G9 | P1 | Follow-through: he savours it, and the BURP OF CHAMPIONS finally exists | HERO | a day | queued |
+| G10 | P1 | Anti-aliasing back on the two best rungs | LIGHT | hours | **NEXT** — probe qa/aamsaa.mjs written; the ladder is inverted on edges (rungs 0-1 composer target: 0 samples; rungs 2+ direct: AA) |
+| G11 | P1 | The WORLD ENDER minute survives a phone: the crowd stops casting shadows | STATIC + MOTION | days | queued |
+| G12 | OWNER | Win the dot, keep the show: bank the goal and play on to the bell | PLAY | a day | OWNER DECISION — reverses his 2026-09-06 decision 1 (a won dot ends the match on the spot). |
+| G13 | P1 | Progress pays: stars on every dot, a cousin for every world, a party at 30/30 | PLAY + UI | days | queued |
+| G14 | P1 | Scale she can feel: 'as big as a HOUSE!', a town that gasps, and a before-and-after | UI + CHOREOGRAPHY | days | queued |
+| G15 | P1 | Worlds that breathe: snow, fireflies, falling leaves | MOTION | days | queued |
+| G16 | P2 | Growth that keeps accelerating: an exponential ceiling | PLAY | days | queued |
+| G17 | P2 | Mouthful: the big meal sits in his cheeks before the gulp | HERO | days | queued |
+| G18 | P2 | He wants it: his eyes find the big meal before he eats it | HERO | days | queued |
+| G19 | P2 | Pals: a creature collection earned by play, plus secret pals for silly deeds | PLAY | days | queued |
+| G20 | P2 | The void's-eye dictionary: a joke the first time she tastes each thing | UI | days | queued |
+| G21 | P2 | Wonders: about one match in four, something amazing wanders through | CHOREOGRAPHY | days | queued |
+| G22 | P2 | A void with her name, a goodnight and a good morning | UI | days | queued |
+| G23 | P2 | SNAP: a photo of the WORLD ENDER over the half-eaten town | UI | a day | queued |
+| G24 | P2 | The recorded music opens up as you grow | AUDIO | hours | queued |
+| G25 | P2 | Water you can splash through, in every world that has it | GROUND | days | queued |
+| G26 | P2 | Soft, cool shadows | LIGHT | a day | queued |
+| G27 | P2 | Progress survives the phone | PLAY | days | queued |
+| G28 | P2 | Props into BatchedMesh, sized from the phone | STATIC | a week+ | needs an owner asset |
+| G29 | P2 | Every bite and stinger in the key of the track | AUDIO | a day | needs an owner asset |
+
+Full change + probe text for every item: the research workflow journal; each is copied into the item's commit when it is built. Rejected by the governor, with reasons, include: drums over the recordings (owner vetoed twice), ground rings behind the void (owner item 4, 2026-08-25), new HUD chips (owner clutter complaint, 2026-08-29), earnable hats (his revenue and his economy line).
 
 ### Research and review — in flight
 
@@ -88,6 +138,8 @@ compacted conversation loses nothing.
 | item | why only him |
 |---|---|
 | Approve deploying the fixed `ingest-events` function (S4), and check `vd_events.user_id` is nullable first | production Supabase — outward-facing infra |
+| **G2** — replace the daily streak with a count-up? Today missing a day resets the streak to 1, steps the daily calendar a week down, and two skins (Ember, Prism) need unbroken days; the drops escalate to "the BIG one — more tomorrow". Proposal: Ember = play on 2 different days, Prism = 7 different days, the calendar counts days played, one flat drop per match. Anyone who owns them keeps them. | it changes features he designed, on a rule the crew wrote, not him |
+| **G12** — when she wins a dot, keep playing to the bell? Today on 4 of 5 dots a winning child is cut to the end card before the ×3 finale set piece and WORLD ENDER — the best minute in the game. Proposal: bank the win, let the match run to the buzzer. | it reverses his 2026-09-06 decision 1 |
 | Download the two missing posters into `public/assets/hf/` (maple, skylark) | CDN egress is blocked from the crew's environment. URLs are in the 2026-09-22 conversation and resolve from any browser |
 | Decide on ads | reopens a standing constraint — see Fixed |
 | App Store Connect: record, 17 IAP products, Paid Applications agreement, banking/tax, support URL, age-rating questionnaire, privacy label | account-holder only |
