@@ -244,7 +244,8 @@ const SUITE = [
     cmd: ['node', 'qa/albedo.mjs'], verdict: pf,
     why: 'no saturated albedo on a lit surface under the 0.08 second/dominant bar — the Game Day crimson rule, by search (round 5)' },
   { id: 'ringmeaning', tier: 'quality', profiles: ['quality'], timeout: 900,
-    cmd: ['node', 'qa/ringmeaning.mjs', PORT], verdict: pf },
+    cmd: ['node', 'qa/ringmeaning.mjs', PORT], verdict: pf,
+    why: 'the ground ring under a void tells the truth — no sibling\'s own colour can be mistaken for "green = you can eat them, red = RUN", the only danger channel a pre-reader can use' },
   { id: 'rivalnotice', tier: 'quality', profiles: ['quality'], timeout: 2400,
     cmd: ['node', 'qa/rivalnotice.mjs', PORT, 'maple', 'pirate'], verdict: pf,
     why: 'a bigger void reacts to you often enough to notice and rarely enough not to swarm (owner item 1)' },
@@ -555,7 +556,7 @@ const SUITE = [
 
   { id: 'assetrefs', tier: 'build', profiles: ['push', 'live', 'quality'], timeout: 30,
     cmd: ['node', 'qa/assetrefs.mjs'], verdict: pf,
-    why: 'every /assets path the game asks for resolves somewhere — 153 references expanded from the same tables the game reads, classified on-disk / rewritten / nowhere, with the 35 that resolve nowhere frozen BY NAME so the debt can only shrink (scripts/asset-refs.mjs matches one pattern and sees 16 of them, which is how a whole world shipped with no stickers)' },
+    why: 'every /assets path the game asks for resolves somewhere — 153 references expanded from the same tables the game reads, classified on-disk / rewritten / nowhere, with the ones that resolve nowhere frozen BY NAME so the debt can only shrink (the count is not written here: it was 35 in this string for a day after it became 34 — run the step) (scripts/asset-refs.mjs matches one pattern and sees 16 of them, which is how a whole world shipped with no stickers)' },
 
   { id: 'ladderflag', tier: 'ui', profiles: ['push', 'live'], timeout: 600,
     cmd: ['node', 'qa/ladderflag.mjs', '4177'], verdict: pf,

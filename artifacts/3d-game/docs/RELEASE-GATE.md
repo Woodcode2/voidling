@@ -35,14 +35,33 @@ automated, and the reading has one rule above all others:
 node qa/gate.mjs --list                # what would run, and what each step protects
 node qa/gate.mjs --selftest            # prove the gate can still fail
 node qa/gate.mjs --profile=push        # before any push to the working branch
-node qa/gate.mjs                       # the LIVE profile — everything, all five worlds
+node qa/gate.mjs --profile=quality     # the owner's own complaints, as instruments
+node qa/gate.mjs                       # the LIVE profile — everything, all six worlds
 ```
 
-| profile | when | what |
+**This table deliberately does not list the steps.** It used to, and the copy
+rotted from the 5 push steps it named to the 55 the gate actually ran, while
+"five worlds" stayed in print four times after SKYLARK FIELD made six. A person
+reads this file before deciding to ship; it must not describe a gate that no
+longer exists. The gate describes itself:
+
+```bash
+node qa/gate.mjs --list --profile=push   # every step, and the one line on what it protects
+```
+
+| profile | when | size (read 2026-09-23 — re-read it, do not trust this) |
 |---|---|---|
-| `push` | before every push | typecheck, Maple smoke, econ, iapdoc, uisystem |
-| `art` | after any visual change | smoke, juice, uisystem, postpipe and hero on all five worlds |
-| `live` | **before anything reaches production** | all of the above plus traverse, vary, aftermatch, switch, newsarc, newsstyle, fresh, joyedge, joyrelease, trackprofile, across all five worlds |
+| `push` | before every push, and **nothing reaches `main` without it green** | 55 steps |
+| `art` | after any visual change | 35 |
+| `quality` | the owner's own complaints, each with a band at BOTH ends — too little and nothing changed, too much and it is "a shit show for a six-year-old" | 12 |
+| `live` | **before anything reaches production** | 101 |
+
+**`quality` is where the owner's complaints live, and it is on probation.** Its
+instruments run as their own profile until each has a green reading, then they
+are promoted into `push` and `live` one at a time, on evidence. A step that has
+never passed is not protection, it is a blocked pipeline. The probation list is
+kept at the top of the quality tier in `qa/gate.mjs`, beside the steps
+themselves, and the open ones are ledgered in `docs/AAA-LOOP.md`.
 
 Exit 0 only if every required step reached its own conclusion and that
 conclusion was pass. The report lands in `qa/out/gate/report.md`.
@@ -74,7 +93,7 @@ and default to NOT REAL when uncertain. Only what survives goes on the work list
 | lens | asks |
 |---|---|
 | art-first-glance | what a child sees in the first second, judged against a real render |
-| world-openings | the opening frame of each of the five worlds |
+| world-openings | the opening frame of each of the six worlds |
 | kids-privacy | what leaves the device, what is behind the parental gate, the 4+ rating |
 | store-readiness | APPSTORE.md vs the client, the rename sweep, what blocks an archive |
 | perf-memory | the stated budget: 60fps tiers, 450 MB heap, 120Hz constants |
@@ -128,10 +147,13 @@ out so it can be looked at rather than argued about.
 ## The procedure before going live
 
 1. `node qa/gate.mjs --selftest` — the gate can still fail.
-2. `node qa/gate.mjs` — the LIVE profile, green, all five worlds.
+2. `node qa/gate.mjs` — the LIVE profile, green, all six worlds. Then
+   `--profile=quality`, and every red in it either fixed or ledgered as a
+   known, owner-accepted gap in `docs/AAA-LOOP.md`.
 3. The agent panel, with the skeptic pass. No open kids-privacy or
    store-readiness finding.
-4. A ledger entry in `docs/AAA-BRIEF.md` §7 for every change: MEASURED /
-   CHANGED / NOW / GATE, and retractions loudly.
+4. A ledger entry for every change: `docs/AAA-LOOP.md` since 2026-09-23
+   (`docs/AAA-BRIEF.md` §7 before it). MEASURED / CHANGED / NOW / GATE, and
+   retractions loudly.
 5. The owner's eyes on a real phone.
 6. Only then: push to `main`. Push is deploy — never deploy by hand.
