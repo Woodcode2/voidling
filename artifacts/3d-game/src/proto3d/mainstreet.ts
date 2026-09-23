@@ -516,12 +516,15 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
       // the equator, showed 0.00421 / 0.00349 / 0.00258: 52-62% less, and no
       // number held it. The lens cannot grow much more than it has. Upward,
       // its top rim leaves the ring: 0.85 up at 0.01 T above the equator
-      // reaches 0.3566 T. Downward, it meets the mouth: the mouth stands
-      // further out than the eyes, so from above it rises toward them in the
-      // image, and 0.90 up centred on the equator (0.00335 T^2 from 65
-      // degrees) puts an eye against a mouth corner, which is where the ball
-      // was. 0.85 up and 0.0075 T above the equator keeps about 0.006 T
-      // between them in the image from 65 degrees and 0.014 T from 46. On the
+      // reaches 0.3566 T. Downward, it meets the mouth. Where an eye's lower
+      // rim comes nearest a mouth corner, the EYE is the further out (0.326-
+      // 0.327 against 0.320-0.321 T forward) and 0.026-0.027 T higher. From a
+      // raised camera a point further out draws lower, so from above the eye
+      // drops toward the corner while that height foreshortens. 0.90
+      // up centred on the equator (0.00335 T^2 from 65 degrees) puts an eye
+      // against a mouth corner, which is where the ball was. 0.85 up and
+      // 0.0075 T above the equator keeps about 0.006 T between them in the
+      // image from 65 degrees and 0.014 T from 46. On the
       // drawn geometry, the same on every townsperson: no point further than
       // 0.3562 T from the head centre, and from 46, 55 and 65 degrees at least
       // 86% of each eye draws in front of the skull. qa/townface.mjs checks

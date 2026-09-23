@@ -53,10 +53,12 @@
 //     (check 4) stands past it. That is by design, and it is measured rather
 //     than argued: every azimuth round the person, 1 degree apart, at each play
 //     elevation, the mark's vertices against the hull of the skull's own. The
-//     lens eye stands at most 0.0056 T past, and within a tenth of that with
-//     the person turned anywhere from 66 to 114 degrees from the camera; the
-//     ball eye it replaced stood 0.039 T past, from 57 to 151 degrees. Printed
-//     every run, not gated beyond the ring.
+//     lens eye stands at most 0.0056 T past, with the person turned 67-68 and
+//     112-113 degrees from the camera, and within a tenth of that only at
+//     66-69 and 111-114: two narrow runs, not one band. Side-on (90 degrees)
+//     it stands 0.0031 T past. The ball eye it replaced stood 0.039 T past,
+//     and within a tenth of that across one run, 57 to 151 degrees. Printed
+//     every run, as runs, with the side-on number; not gated beyond the ring.
 //  4. INK PROUD OF THE DRAWN SKULL. Along its own outward direction, each
 //     eye's highest drawn point has to clear the drawn skull under its centre
 //     by 0.005 T. The drawn skull is not the nominal 0.36 T sphere: between
@@ -100,9 +102,15 @@
 //     surfaces, not drawn ones: the ruff is two NOMINAL surfaces agreeing to
 //     within the facets' error, which is exactly what a drawn gap cannot see.
 //  7. THE EYES CLEAR THE MOUTH. Each eye sits right above a corner of the
-//     mouth, and the mouth stands further out than the eyes, so from above it
-//     rises toward them in the image: a taller eye closes the gap from both
-//     sides. On the same face grid as 5(b), the nearest eye cell to the
+//     mouth. At the nearest pair of cells, the eye's lower rim is the further
+//     forward, 0.3264-0.3274 T against the corner's 0.3203-0.3214 T, and
+//     0.026-0.027 T higher. From a camera `e` degrees up, a point further
+//     forward draws LOWER in the image (image height = height x cos e -
+//     forward x sin e), so from above the eye drops toward the corner while
+//     the height between them foreshortens: 0.0266 cos 46 - 0.0062 sin 46 =
+//     0.0140 T, 0.0270 cos 65 - 0.0060 sin 65 = 0.0060 T, the measured gaps
+//     (the pair is one above the other in the image, 0.0000 T apart across).
+//     On the same face grid as 5(b), the nearest eye cell to the
 //     nearest mouth cell, centre to centre, must be at least 0.005 T (the
 //     studio's clearance number, reused; 0.002 T is one cell and means they
 //     touch). The ball eye measured 0.0020 T from 65 degrees — touching; the
@@ -140,23 +148,32 @@
 // (bar 32.8%), the way qa/roundlod.mjs holds its debt. The spec's gate — no
 // ink part through the silhouette — is met by the eyes and frozen for the
 // mouth. If the mouth ever improves, this file says which numbers to lower.
-import * as THREE from 'three';
 import { readFileSync } from 'node:fs';
 
-const MS_PATH = 'src/proto3d/mainstreet.ts';
-const IS_PATH = 'src/proto3d/island.ts';
-const MS = readFileSync(MS_PATH, 'utf8');
-const IS = readFileSync(IS_PATH, 'utf8');
 // AN ABORT IS A FAIL, AND IT HAS TO SAY SO IN THE WORDS THE GATE READS. By the
 // time the face is measured, checks 1-2 have already printed four PASS lines,
 // and a pf reader takes PASS lines with no FAIL line as consent. The first
 // version printed "ABORTED — ..." and exited 2: recolour one eye and the mouth
 // and the run ended on four PASS lines and no FAIL line. So every way out that
 // is not the end of the file prints a FAIL line first, including a throw this
-// file did not foresee.
+// file did not foresee. That is why nothing is loaded above this line but
+// node:fs: the next version read the two source files first, and run from the
+// wrong directory it died on a raw ENOENT with no FAIL line. three and the
+// sources are loaded below, each behind an abort.
 const abort = (why) => { console.log(`FAIL — ABORTED — ${why}`); process.exit(2); };
 process.on('uncaughtException', (e) => abort(`the probe threw: ${e?.stack || e}`));
 process.on('unhandledRejection', (e) => abort(`the probe threw: ${e?.stack || e}`));
+
+let THREE;
+try { THREE = await import('three'); } catch (e) { abort(`three did not load: ${e.message}`); }
+const MS_PATH = 'src/proto3d/mainstreet.ts';
+const IS_PATH = 'src/proto3d/island.ts';
+const readSource = (path) => {
+  try { return readFileSync(path, 'utf8'); }
+  catch (e) { abort(`${path} is not readable from ${process.cwd()} (${e.code || e.message}). Run this from artifacts/3d-game; if the file moved, this probe has to move with it.`); }
+};
+const MS = readSource(MS_PATH);
+const IS = readSource(IS_PATH);
 
 const PROUD_MIN = 0.005;        // T — check 4, the studio's number
 const DRAW_MIN = 0.5;           // share — check 5(a), Job 4's number
@@ -505,9 +522,15 @@ for (let k = 0; k < LANDINGS; k++) {
 }
 console.log(`\n  3-5, 7. the face against the drawn skull — ${LANDINGS} facings across one 22.5-degree skull period, camera at ${ELEVATIONS.join('/')} degrees`);
 console.log('    mark    reach   outline   proud    sag    draws   past the drawn outline, worst play view');
+// Whole degrees as their contiguous runs, "66-69, 111-114". The previous
+// version printed the first and last degree, and the lens eye's two runs read
+// as one band, 66-114, across a 90-degree side-on view that stands 55% as far
+// past. So the side-on number is printed beside it.
+const runs = (ds) => ds.reduce((rs, d) => { const r = rs[rs.length - 1]; if (r && d === r[1] + 1) r[1] = d; else rs.push([d, d]); return rs; }, [])
+  .map(([a, b]) => (a === b ? `${a}` : `${a}-${b}`)).join(', ');
 for (const [cls, st] of stats) {
-  const band = [...st.byAz.keys()].filter((a) => st.byAz[a] >= 0.9 * st.past);
-  console.log(`    ${cls.padEnd(6)} ${st.reach.toFixed(4)}T  ${st.sil.toFixed(4)}T  ${st.proud.toFixed(4)}T  ${st.sag.toFixed(4)}T  ${(100 * st.draw).toFixed(1).padStart(5)}%   ${st.past.toFixed(4)}T (within 10% of that with the person turned ${band[0]}-${band[band.length - 1]} deg from the camera)   (worst of ${st.n})`);
+  const near = [...st.byAz.keys()].filter((a) => st.byAz[a] >= 0.9 * st.past);
+  console.log(`    ${cls.padEnd(6)} ${st.reach.toFixed(4)}T  ${st.sil.toFixed(4)}T  ${st.proud.toFixed(4)}T  ${st.sag.toFixed(4)}T  ${(100 * st.draw).toFixed(1).padStart(5)}%   ${st.past.toFixed(4)}T (within 10% of that with the person turned ${runs(near)} deg from the camera; ${st.byAz[90].toFixed(4)}T side-on)   (worst of ${st.n})`);
 }
 console.log('    looking her in the face:  elevation   ink area per eye   eye-mouth gap');
 for (const r of faceRows) console.log(`                              ${String(r.el).padStart(4)} deg     ${r.area.toFixed(5)} T^2       ${r.gap.toFixed(4)} T`);
@@ -543,8 +566,19 @@ verdict(mouth.reach <= MOUTH_REACH_MAX,
 verdict(mouth.draw >= MOUTH_DRAW_MIN,
   `at least ${(100 * mouth.draw).toFixed(1)}% of the mouth draws in front of the skull from every play elevation (recorded ${(100 * MOUTH_DRAW_MIN).toFixed(1)}%)`,
   `only ${(100 * mouth.draw).toFixed(1)}% of the mouth draws in front of the skull on the worst facing, below the recorded ${(100 * MOUTH_DRAW_MIN).toFixed(1)}% — the skull is eating it.`);
-if (mouth.reach < MOUTH_REACH_MAX - 0.0005 || mouth.draw > MOUTH_DRAW_MIN + 0.02)
-  console.log(`  the mouth IMPROVED: lower MOUTH_REACH_MAX to ${Math.ceil(mouth.reach * 1e4) / 1e4} and raise MOUTH_DRAW_MIN to ${Math.floor(mouth.draw * 1e3) / 1e3} in this file, so the ground cannot be given back.`);
+// The advice is for a mouth that got better and no worse. The previous version
+// printed it when EITHER number improved and named both constants: moved to
+// 0.310 T forward, the mouth failed on reach at 0.38808 T and was told to
+// lower MOUTH_REACH_MAX to 0.3881 — a raise; moved to 0.300 T it failed on
+// draws at 25.0% and was told to set MOUTH_DRAW_MIN to 0.25 — a cut. Following
+// it turned the regression green. So: only on a pass of both, only the
+// constant that improved, and never past the bar it replaces.
+if (mouth.reach <= MOUTH_REACH_MAX && mouth.draw >= MOUTH_DRAW_MIN) {
+  const tighten = [];
+  if (mouth.reach < MOUTH_REACH_MAX - 0.0005) tighten.push(`lower MOUTH_REACH_MAX to ${Math.min(MOUTH_REACH_MAX, Math.ceil(mouth.reach * 1e4) / 1e4)}`);
+  if (mouth.draw > MOUTH_DRAW_MIN + 0.02) tighten.push(`raise MOUTH_DRAW_MIN to ${Math.max(MOUTH_DRAW_MIN, Math.floor(mouth.draw * 1e3) / 1e3)}`);
+  if (tighten.length) console.log(`  the mouth IMPROVED: ${tighten.join(' and ')} in this file, so the ground cannot be given back.`);
+}
 
 // ══ 6. SAME-COLOUR SPHERE / CAP PAIRS ═══════════════════════════════════════
 console.log('\n  6. same-colour sphere / cylinder-cap pairs, nominal surfaces');
