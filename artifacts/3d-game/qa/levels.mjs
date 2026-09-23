@@ -806,10 +806,18 @@ if (ONLY.includes('c')) {
   }
 
   // ── THE CONTROL ─────────────────────────────────────────────────────────
-  // …and the ritual is not removed, it is keyed. A match with no level is the
-  // game that shipped, and it must STILL close with the red timer, the banner
-  // and the hot numerals — otherwise the bar above would pass on a build that
-  // had simply deleted the ending.
+  // This used to require the OPPOSITE of what it requires now: that a match
+  // with no level still close on the red timer, the "35 SECONDS — EAT FASTER"
+  // banner and the hot numerals, so the no-nag rule above was proven KEYED to
+  // levels rather than deleted. Research governor G1 (f20e21c) took the nag out
+  // of every match — the owner's own rule is "no timers that pressure", and a
+  // goal-free match is still a child playing — and qa/firstrun.mjs (b) measured
+  // it: red clock + EAT FASTER on the build before, white and silent after.
+  // This control then failed both bars on the first push gate after G1.
+  //
+  // The "removed, not keyed" worry is answered by rivals@1 above, which still
+  // requires the hot countdown as the bell to a RIVALS win. What this checks
+  // now is the other half of G1: a match with no level does not nag either.
   {
     const p = await open({ voidUnlocked: UNLOCK_ALL }, '?w=maple&len=15');
     await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0, null, { timeout: 600000 })
@@ -836,10 +844,10 @@ if (ONLY.includes('c')) {
     if (r.playing !== null) bad(`(c) control: a harness match with no ?g= reads playing=${JSON.stringify(r.playing)}`);
     if (r.goalVis) bad(`(c) control: #goal was visible on ${r.goalVis} frames of a goal-free match — a HUD element nobody asked for`);
     else ok('(c) control: #goal stays hidden on a goal-free match');
-    if (!r.hot) bad('(c) control: #count never went hot on a goal-free match — the ending was removed, not keyed');
-    else ok(`(c) control: the shipped ending is intact — #count hot on ${r.hot} frames`);
-    if (r.banner === null) bad('(c) control: the 35-second banner never fired on a goal-free match — the ending was removed, not keyed');
-    else ok(`(c) control: the shipped banner is intact — "${r.banner}"`);
+    if (r.hot) bad(`(c) control: #count went hot on ${r.hot} frames of a goal-free match — a clock that pressures (G1)`);
+    else ok('(c) control: a goal-free match keeps its countdown calm — #count never hot (G1)');
+    if (r.banner !== null) bad(`(c) control: a goal-free match nagged — the banner read "${r.banner}" (G1)`);
+    else ok('(c) control: no hurry-up banner on a goal-free match (G1)');
   }
 }
 
