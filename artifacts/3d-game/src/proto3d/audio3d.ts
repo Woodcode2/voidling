@@ -42,8 +42,10 @@ export interface Audio3D {
   alert(): void;                   // defense wave banner
   bigEat(): void;                  // crunching a building
   /** the HEADLINE bite — a CHOMP, or a rival devoured. Keeps the tuned note and
-   *  lays a crunch and a gulp over it, all above 250 Hz (see the method). */
-  chomp(mealR?: number, voidR?: number, kind?: 'prop' | 'rival', combo?: number): void;
+   *  lays a crunch and a gulp over it, all above 250 Hz (see the method).
+   *  `plain` keeps only the tuned note, still let past pop()'s 75 ms gate: the
+   *  headline bite inside the end's whistle, heard but not announced. */
+  chomp(mealR?: number, voidR?: number, kind?: 'prop' | 'rival', combo?: number, plain?: boolean): void;
   ready(): void;                   // a power just charged
   /** THE CHAIN'S CROWN — every tenth link of an unbroken eating chain. A
    *  rising major triad on the pop's own pentatonic ladder, a step higher per
@@ -762,8 +764,11 @@ export function createAudio(): Audio3D {
     // the newest call's floor for the whole extended hold, so a 3 dB crown
     // 0.4 s into the evolve fanfare's 6 dB duck ramped the score back UP under
     // the fanfare (pre-merge review, audio-5). While a hold is live the floor
-    // is the deeper of the two; once it has recovered, it starts fresh.
-    if (t >= duckUntil + 0.4) duckFloor = 1;
+    // is the deeper of the two. Once the hold is over it starts fresh — at the
+    // end of the HOLD, not of the release ramp after it: a 3 dB cue landing in
+    // that ramp is a new duck, and dragging it down to the old 6 dB floor made
+    // a shallow chime dip the music twice as far as it asked (verify pass).
+    if (t >= duckUntil) duckFloor = 1;
     const floor = Math.min(duckFloor, Math.pow(10, -db / 20));
     duckFloor = floor;
     duckUntil = Math.max(duckUntil, t + 0.12 + hold);
@@ -4417,10 +4422,10 @@ export function createAudio(): Audio3D {
     //   3. a GULP — a sine that swallows 900 -> 300 Hz, 0.18 s in
     //   4. a rival adds a rising GLOCK arpeggio and the score steps aside
     // The bay's squeezebox joke rides every fifth one, as it did on bigEat.
-    chomp(mealR = 3.2, voidR = 3.0, kind: 'prop' | 'rival' = 'prop', combo = 0) {
+    chomp(mealR = 3.2, voidR = 3.0, kind: 'prop' | 'rival' = 'prop', combo = 0, plain = false) {
       const c = ensure(); if (!c || !master) return;
       const now = c.currentTime;
-      if (isPirate() && ++bigEatCount % 5 === 2) yoHo(now + 0.1);
+      if (!plain && isPirate() && ++bigEatCount % 5 === 2) yoHo(now + 0.1);
       // pop() skips a bite inside 75 ms of the last one. The headline bite must
       // never be the one skipped, so it is let through — without resetting the
       // melody (a gap under 1.1 s keeps walking the ladder).
@@ -4429,6 +4434,7 @@ export function createAudio(): Audio3D {
       // it, so the biggest bite of a chain could land an octave under the bites
       // either side of it (review audio-6)
       this.pop(combo, mealR, voidR);
+      if (plain) return;
       const big = kind === 'rival';
       [1500, 2200, 3000, 4000].forEach((fc, i) =>
         grain(fc * (big ? 0.9 : 1), 1.2, 0.022, (big ? 0.16 : 0.13) - i * 0.005, 0.012 + i * 0.03));
@@ -4551,16 +4557,22 @@ export function createAudio(): Audio3D {
       const step = UP[Math.min(UP.length - 1, Math.max(0, Math.floor(n / 10) - 1))];
       const root = 523.25 * Math.pow(2, step / 12);
       const t = c.currentTime;
+      // …and the ladder's top does not whistle. Two octaves up the root is
+      // 2093 Hz and the sparkle landed at 6.3/8.4/10.5 kHz, where a child's
+      // ear is at its sharpest (verify pass, audio-3). Anything over 6 kHz
+      // folds down an octave: the old ladder's ceiling, kept as a ceiling
+      // (qa/chomp.mjs part 7).
+      const fold = (f: number) => (f > 6000 ? f / 2 : f);
       [0, 4, 7].forEach((semi, k) => {
         const f = root * Math.pow(2, semi / 12);
         if (isPirate()) marimba(master!, f, t + k * 0.075, 0.45, 0.12);
         else {
           tone(f, f, 0.2, 'sine', 0.11, k * 0.075);
-          tone(f * 2, f * 2, 0.12, 'triangle', 0.03, k * 0.075);
+          tone(fold(f * 2), fold(f * 2), 0.12, 'triangle', 0.03, k * 0.075);
         }
       });
       // the sparkle: three short pings an octave and more above the triad
-      [3.0, 4.0, 5.04].forEach((m, k) => tone(root * m, root * m, 0.07, 'sine', 0.028, 0.2 + k * 0.045));
+      [3.0, 4.0, 5.04].forEach((m, k) => tone(fold(root * m), fold(root * m), 0.07, 'sine', 0.028, 0.2 + k * 0.045));
       duckMusic(3, 0.4);
     },
     whistle() {

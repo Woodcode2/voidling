@@ -549,6 +549,18 @@ const SUITE = [
     cmd: ['node', 'qa/leafsurface.mjs', PORT], verdict: pf,
     why: 'the leaves are on the grass — no drift painted onto the square\'s walks, the paving or the pond reads as a stain in the opening frame' },
 
+  // Studio round 4, Job 5 (B7): glow means a light. The census renders the
+  // frame linear, as RenderPass hands it to bloom, and counts pixels over the
+  // bloom cut that are not a light. Maple failed on its white planters (75
+  // cells at L 1.18 against a 1.05 cut), Pirate on lacquered blossoms (2 cells,
+  // specular sparks at 2.6). Art + live until a second green promotes it.
+  { id: 'halocensus', tier: 'art', profiles: ['live', 'art'], timeout: 1500,
+    cmd: ['node', 'qa/halocensus.mjs', PORT, 'maple'], verdict: pf,
+    why: 'nothing but a light crosses the bloom threshold in Maple\'s opening frame — no white paint wearing a lamp\'s halo' },
+  { id: 'halocensus-pirate', tier: 'art', profiles: ['live', 'art'], timeout: 1500,
+    cmd: ['node', 'qa/halocensus.mjs', PORT, 'pirate'], verdict: pf,
+    why: 'no flower, float or painted thing on the bay throws a specular spark past the bloom threshold' },
+
   { id: 'roundlod', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/roundlod.mjs'], verdict: pf,
     why: 'no NEW round thing ships under the 14x10 bar island.ts states — the debt is frozen at 153 and visible every run' },
@@ -630,6 +642,21 @@ const SUITE = [
   { id: 'nomstream', tier: 'feel', profiles: ['live', 'quality'], timeout: 3000,
     cmd: ['node', 'qa/nomstream.mjs', PORT], verdict: pf,
     why: 'one number stream a child can read, and an eating chain she can see and hear pay out' },
+
+  // The pre-merge review and its verify pass: a pause holds the chain, the
+  // reduced-motion number stays up long enough to read, and the end beat
+  // belongs to the whistle — no crown on the winning bite, a pause holds the
+  // outro, and leaving from inside it means leaving. Each measured failing on
+  // the build before its fix. Quality + live until a second green.
+  { id: 'pausechain', tier: 'feel', profiles: ['live', 'quality'], timeout: 1800,
+    cmd: ['node', 'qa/pausechain.mjs', PORT], verdict: pf,
+    why: 'a pause holds the eating chain — no cash-in chime under the sheet, and the chain is still there when she comes back' },
+  { id: 'calmnumber', tier: 'feel', profiles: ['live', 'quality'], timeout: 1800,
+    cmd: ['node', 'qa/calmnumber.mjs', PORT], verdict: pf,
+    why: 'under reduced motion every points number stays up long enough to read — a still number, not a one-frame flash' },
+  { id: 'endbeat', tier: 'feel', profiles: ['live', 'quality'], timeout: 3000,
+    cmd: ['node', 'qa/endbeat.mjs', PORT], verdict: pf,
+    why: 'the whistle owns the end: no crown on the bite that wins, a pause holds the outro, and leaving from inside it lands on the menu with no results card and no fanfare' },
 
   { id: 'questable', tier: 'money', profiles: ['live'], timeout: 1600,
     cmd: ['node', 'qa/questable.mjs', PORT, ...WORLDS], verdict: pf,

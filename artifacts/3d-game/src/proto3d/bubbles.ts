@@ -550,9 +550,9 @@ const style = document.createElement('style');
       // frame is dropped the slot still retires rather than sticking on screen.
       f.until = clock + 0.6;
       f.lx = -1; f.ly = -1;
-      // dur 0 under reduced motion, so it lands on the very next update frame —
-      // the payout must still happen, it just does not travel.
-      f.fly = { t: 0, dur: reduceMotion() ? 0 : 0.28, sx: -1, sy: -1, target, onArrive };
+      // (reduced motion returned above: the number stands still and the payout
+      // happens at once, so this path always travels)
+      f.fly = { t: 0, dur: 0.28, sx: -1, sy: -1, target, onArrive };
     },
     flightStats() { return { ...fStats }; },
     formSweep(a, box) { return formPlace(Math.min(1, Math.max(0, a)), box ?? heroBox); },

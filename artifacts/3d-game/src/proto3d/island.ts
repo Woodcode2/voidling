@@ -5699,7 +5699,12 @@ function makeFlowers(): THREE.Group {
     const top = 0.5 + H * R * Math.sqrt(1 - d * d);      // the dome's own surface here
     const col = pick([0xff6fb0, 0xffd23f, 0xff5a4d, 0xa87bff, 0xffffff]);
     parts.push(part(new THREE.CylinderGeometry(0.022, 0.032, 0.26, 4), 0x4a8f52, bx, top + 0.10, bz));
-    parts.push(part(new THREE.SphereGeometry(0.15, 6, 5), col, bx, top + 0.25, bz));
+    // PETALS ARE NOT LACQUER. Four of these five hexes are mainstreet's
+    // "lacquered round things" at gloss 0.42, and the gloss table is keyed by
+    // hex across every world — so each blossom threw a specular spark at 2.6
+    // linear, past the bloom cut, and bloomed like a bulb (qa/halocensus.mjs,
+    // Pirate Bay, 2026-09-23). The canopy's own low sheen instead.
+    parts.push(glossy(part(new THREE.SphereGeometry(0.15, 6, 5), col, bx, top + 0.25, bz), 0.14));
   }
   const g = new THREE.Group(); g.add(mergedProp(parts));
   return noFront(g);
@@ -6109,15 +6114,20 @@ function makeFerrisWheel(): THREE.Group {
   // standing axle (pre-merge review, content-1 / render-2; the committed
   // landmark render shows it). Now each pair meets under the axle: centres at
   // x ±1.45, feet ±2.84, tops ±0.06 at y 8.0, and the tie beam spans the legs
-  // where they cross y 1.5 (±2.3).
+  // where they cross y 0.75 (±2.56).
+  // THE TIES SIT UNDER THE WHEEL. At y 1.5 the cross tie ran through both rims
+  // at their lowest point (the rims bottom out at y 1.5 on x 0), so the wheel
+  // read as resting on it (verify pass, content-1). At 0.75 it clears the
+  // rims' underside by 0.34 and still meets both tie beams.
+  const TIE_Y = 0.75;
   for (const dz of [-HALF - 0.7, HALF + 0.7]) {
     for (const sx of [-1.45, 1.45]) {
       p.push(part(new THREE.CylinderGeometry(0.24, 0.38, 8.6, 8), TRIM,
         sx, HY / 2 - 0.05, dz, 0, 0, sx > 0 ? 0.33 : -0.33));
     }
-    p.push(part(new THREE.BoxGeometry(4.6, 0.26, 0.26), TRIM, 0, 1.5, dz));       // tie beam
+    p.push(part(new THREE.BoxGeometry(5.2, 0.26, 0.26), TRIM, 0, TIE_Y, dz));     // tie beam
   }
-  p.push(part(new THREE.BoxGeometry(0.3, 0.3, HALF * 2 + 1.4), TRIM, 0, 1.5, 0)); // cross tie
+  p.push(part(new THREE.BoxGeometry(0.3, 0.3, HALF * 2 + 1.4), TRIM, 0, TIE_Y, 0)); // cross tie
 
   const g = new THREE.Group(); g.add(mergedProp(p));
   return g;

@@ -340,6 +340,106 @@ const rising = tk.pitches.every((f, i) => i === 0 || f > tk.pitches[i - 1]);
 bar(rising, `(m) the eight count-up ticks rise, every one: ${tk.pitches.join(' → ')} Hz`,
   `(m) the count-up does not rise all the way: ${tk.pitches.join(' → ')} Hz`);
 
+// ══ PART 6 — THE END BEAT'S RIVAL IS HEARD, NOT ANNOUNCED ══════════════════
+// Verify pass on the pre-merge fixes: inside the outro a rival kill was moved
+// from chomp() to a plain pop() so its fanfare would not talk over the whistle
+// — and pop() drops anything inside 75 ms of the last bite, which in a hoover
+// is nearly every frame, so the kill went down in silence. The game now plays
+// chomp(…, plain = true): the tuned note, let past the gate, and nothing else.
+// Rendered here: a bite at 0 and the rival at 20 ms, three ways.
+const pl = await p.evaluate(async () => {
+  const mod = await import('/src/proto3d/audio3d.ts');
+  const seed = () => { let x = 777; Math.random = () => ((x = (x * 1103515245 + 12345) % 2147483648) / 2147483648); };
+  const realRandom = Math.random;
+  const render = async (fn) => {
+    seed();
+    const ctx = new OfflineAudioContext(1, Math.floor(44100 * 1.2), 44100);
+    const RealAC = window.AudioContext;
+    window.AudioContext = function () { return ctx; };
+    try { const a = mod.createAudio(); a.setMuted?.(false); fn(a, ctx); }
+    finally { window.AudioContext = RealAC; }
+    return Array.from((await ctx.startRendering()).getChannelData(0));
+  };
+  const at = (ctx, t) => Object.defineProperty(ctx, 'currentTime', { value: t, configurable: true });
+  const rms = (d, t0, len) => { const a = Math.floor(t0 * 44100), n = Math.floor(len * 44100);
+    let q = 0; for (let i = a; i < a + n; i++) q += (d[i] || 0) ** 2; return 20 * Math.log10(Math.sqrt(q / n) || 1e-9); };
+  const bite = await render((a, ctx) => { at(ctx, 0); a.pop(0, 1.3, 2.5); });
+  const viaPop = await render((a, ctx) => { at(ctx, 0); a.pop(0, 1.3, 2.5); at(ctx, 0.02); a.pop(0, 6, 3); });
+  const viaPlain = await render((a, ctx) => { at(ctx, 0); a.pop(0, 1.3, 2.5); at(ctx, 0.02); a.chomp(6, 3, 'rival', 0, true); });
+  const full = await render((a, ctx) => { at(ctx, 0); a.pop(0, 1.3, 2.5); at(ctx, 0.02); a.chomp(6, 3, 'rival', 0); });
+  const plainAlone = await render((a, ctx) => { at(ctx, 0.02); a.chomp(6, 3, 'rival', 0, true); });
+  const popAlone = await render((a, ctx) => { at(ctx, 0.02); a.pop(0, 6, 3); });
+  Math.random = realRandom;
+  const minus = (x) => x.map((v, i) => v - bite[i]);
+  return {
+    pop: rms(minus(viaPop), 0.02, 0.2), plain: rms(minus(viaPlain), 0.02, 0.2),
+    // the glock arpeggio lives at 0.3-0.73 s: what a plain chomp adds there over a bare pop
+    tailPlain: rms(plainAlone, 0.32, 0.45), tailPop: rms(popAlone, 0.32, 0.45), tailFull: rms(minus(full), 0.32, 0.45),
+  };
+});
+console.log(`\n  THE END BEAT'S RIVAL — a bite at 0, the rival at 20 ms`);
+console.log(`    as a plain pop() (the outro path the verify pass flagged): ${pl.pop.toFixed(1)} dBFS;  as chomp(plain): ${pl.plain.toFixed(1)} dBFS`);
+console.log(`    0.32-0.77 s, where the rival's glock sits: plain ${pl.tailPlain.toFixed(1)}, a bare pop ${pl.tailPop.toFixed(1)}, the full chomp ${pl.tailFull.toFixed(1)} dBFS`);
+bar(pl.plain > -40, `(n) the end beat's rival sounds 20 ms after a bite (${pl.plain.toFixed(1)} dBFS; bar -40)`,
+  `(n) the end beat's rival is swallowed 20 ms after a bite (${pl.plain.toFixed(1)} dBFS; bar -40)`);
+bar(pl.tailPlain <= pl.tailPop + 1 && pl.tailFull > pl.tailPlain + 6,
+  `(o) and it carries no fanfare: its tail is a bare pop's (${pl.tailPlain.toFixed(1)} vs ${pl.tailPop.toFixed(1)}), the full chomp's is ${pl.tailFull.toFixed(1)}`,
+  `(o) the plain rival still carries more than a pop (${pl.tailPlain.toFixed(1)} vs ${pl.tailPop.toFixed(1)}; full ${pl.tailFull.toFixed(1)})`);
+
+// ══ PART 7 — THE TOP OF THE CROWN LADDER IS NOT A WHISTLE IN HER EAR ═══════
+// Verify pass (audio-3): the crown ladder now climbs two octaves and holds, so
+// from a chain of 110 the root is 2093 Hz and the sparkle pings (root x 3, 4,
+// 5.04) land at 6.3, 8.4 and 10.5 kHz — against 5.3 kHz before the ladder was
+// fixed. A child's ears are at their most sensitive up there. Rendered: the
+// crown at 10, at 60 (root 1046.5 Hz — the old ladder's ceiling) and at 110,
+// and the share of each above 7 kHz — by FFT, not by filter: a cascade of
+// one-pole high-passes at 7 kHz (part 3's thud tool) leaks the crown's own
+// 2-3 kHz triad into the band at the top of the ladder, where the triad is
+// forty times louder than the sparkle, and read that as harshness. BAR: the new top is no harsher up there than the old top was — the
+// crown at 110 within 3 dB of the crown at 60.
+const cr = await p.evaluate(async () => {
+  const mod = await import('/src/proto3d/audio3d.ts');
+  const render = async (n) => {
+    const ctx = new OfflineAudioContext(1, Math.floor(44100 * 0.8), 44100);
+    const RealAC = window.AudioContext;
+    window.AudioContext = function () { return ctx; };
+    try { const a = mod.createAudio(); a.setMuted?.(false); a.nomCrown(n); }
+    finally { window.AudioContext = RealAC; }
+    return Array.from((await ctx.startRendering()).getChannelData(0));
+  };
+  // radix-2 FFT over the first 32768 samples (0.74 s — the whole crown), Hann window
+  const band = (d, fc) => {
+    const N = 32768, re = new Float64Array(N), im = new Float64Array(N);
+    for (let i = 0; i < N; i++) re[i] = (d[i] || 0) * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1)));
+    for (let i = 1, j = 0; i < N; i++) { let bit = N >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit;
+      if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; } }
+    for (let len = 2; len <= N; len <<= 1) {
+      const ang = (-2 * Math.PI) / len, wr = Math.cos(ang), wi = Math.sin(ang);
+      for (let i = 0; i < N; i += len) {
+        let cr = 1, ci = 0;
+        for (let k = 0; k < len / 2; k++) {
+          const a = i + k, b2 = a + len / 2;
+          const tr = re[b2] * cr - im[b2] * ci, ti = re[b2] * ci + im[b2] * cr;
+          re[b2] = re[a] - tr; im[b2] = im[a] - ti; re[a] += tr; im[a] += ti;
+          const nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+        }
+      }
+    }
+    let all = 0, hi = 0; const kc = Math.round((fc * N) / 44100);
+    for (let k = 1; k < N / 2; k++) { const m = re[k] * re[k] + im[k] * im[k]; all += m; if (k >= kc) hi += m; }
+    return { all: 10 * Math.log10(all || 1e-30), hi: 10 * Math.log10(hi || 1e-30) };
+  };
+  const out = {};
+  for (const n of [10, 60, 110]) out[n] = band(await render(n), 7000);
+  return out;
+});
+const share = (x) => x.hi - x.all;
+console.log('\n  THE TOP OF THE CROWN LADDER — energy above 7 kHz, relative to the whole crown');
+console.log(`    crown at 10: ${share(cr[10]).toFixed(1)} dB;  at 60 (the old ceiling): ${share(cr[60]).toFixed(1)} dB;  at 110: ${share(cr[110]).toFixed(1)} dB`);
+const lim = share(cr[60]) + 3;
+bar(share(cr[110]) <= lim, `(p) the top of the ladder is no harsher above 7 kHz than the old top (${share(cr[110]).toFixed(1)} vs ${share(cr[60]).toFixed(1)} dB; bar ${lim.toFixed(1)})`,
+  `(p) the crown at 110 puts ${share(cr[110]).toFixed(1)} dB of itself above 7 kHz against the old top's ${share(cr[60]).toFixed(1)} (bar ${lim.toFixed(1)}) — a whistle in a child's ear`);
+
 await b.close();
 console.log(`\n${bad ? 'FAIL' : 'PASS'} — ${bad} bad`);
 process.exit(bad ? 1 : 0);

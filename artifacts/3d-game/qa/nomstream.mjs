@@ -203,6 +203,7 @@ if (flights.length >= 2) {
   const fsz = flights.map((r) => r.fs);
   const lo = Math.min(...fsz), hi = Math.max(...fsz);
   const pts = flights.map((r) => Number(r.text.replace(/[^\d]/g, '')));
+  console.log(`  ·    the flights in order: ${flights.map((r) => `${r.text} ${r.fs.toFixed(1)}px`).join(', ')}`);
   bar(hi / lo >= 1.4, 'c', `flying numbers ${lo.toFixed(1)}px → ${hi.toFixed(1)}px = ${(hi / lo).toFixed(2)}x across banks of `
     + `${Math.min(...pts).toLocaleString()} → ${Math.max(...pts).toLocaleString()} (bar 1.4x)`);
 } else bar(false, 'c', `only ${flights.length} flight(s) seen — nothing to size`);

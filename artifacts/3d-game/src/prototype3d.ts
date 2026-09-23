@@ -252,8 +252,9 @@ function ensureComposer(): EffectComposer {
     // asserts he survives (sat loss ≤ 0.05 with the glow on).
     0.5,    // strength — bloom rolls through ACES now, which compresses it
     0.42,   // radius — tighter, so what does bleed stays local to its source
-    1.05,   // threshold: LINEAR — above diffuse white, below every emitter
+    1.05,   // threshold: LINEAR — the floor; bloomCut() sets each world's own just below
   );
+  bloomPass.threshold = bloomCut();   // per world and hour — see WorldLight.bloomCut
   composer.addPass(bloomPass);
   // Tone map + grade + sRGB encode, exactly once, at the end of the chain.
   // OutputPass honours CustomToneMapping (it compiles the same patched
@@ -1773,6 +1774,16 @@ interface WorldLight {
   // shadow map is the single most expensive thing that could be added here, and
   // a fill light does not need one.
   fill: number; fillI: number; fillOff: [number, number, number];
+  // ── GLOW MEANS A LIGHT, SO THE CUT SITS ABOVE THE WORLD'S BRIGHTEST PAINT ─
+  // The bloom threshold is linear luminance, and the comment at ensureComposer
+  // set it at 1.05 on the grounds that diffuse paint "cannot exceed its
+  // illumination (~1.0)". Under Maple's noon rig it does: white paint (the
+  // planters, the sign lettering) is lit to 1.18, so it bloomed like a lamp
+  // in the opening frame (studio round 4, B7). Measured per world by
+  // qa/halocensus.mjs, which reports each world's "diffuse ceiling" (99.9th
+  // percentile of luminance off the lights) at hour 0; the cut is that plus
+  // 6%, never under BLOOM_FLOOR. Absent means the floor already clears it.
+  bloomCut?: number;
 }
 const WORLD_LIGHT: Record<WorldId, WorldLight> = {
   // ── MAPLE, RE-LIT AGAINST THE REFERENCE ─────────────────────────────────
@@ -1794,7 +1805,8 @@ const WORLD_LIGHT: Record<WorldId, WorldLight> = {
   // colour at the new key, so that probe must be re-run, not assumed.
   maple:   { sun: 0xfff8ee, sunI: 2.00, hemiSky: 0xeef5ff, hemiGround: 0xb4bcc6, hemiI: 0.62,
              off: [-55, 95, 42], dusk: 0, normalBias: 0.15, exposure: 1.12,
-             fill: 0xb0d8ff, fillI: 0.84, fillOff: [62, 46, -58] },
+             fill: 0xb0d8ff, fillI: 0.84, fillOff: [62, 46, -58],
+             bloomCut: 1.25 },   // white paint lit to 1.177 at noon (halocensus)
   pirate:  { sun: 0xfff2d8, sunI: 1.75, hemiSky: 0xdfeaff, hemiGround: 0x4a4468, hemiI: 0.5,
              off: [-55, 95, 42], dusk: 0, normalBias: 0.15, exposure: 1.0,
              fill: 0x8fd6ff, fillI: 0.58, fillOff: [62, 46, -58] },
@@ -2045,7 +2057,14 @@ const HOURS: Record<WorldId, WorldHour[]> = {
  *  and preserves what they asked for, for whoever dials them in next. */
 const HEMI_APPLIED = new Set<WorldId>(['maple']);
 const hemiNow = (): number => (HEMI_APPLIED.has(pickedWorld) ? LIGHT.hemiI : RIG.hemiI);
+/** The bloom threshold for this world at this hour: the world's cut scaled by
+ *  the dealt hour's sun (paint is lit by it; a 1.1x morning lifts the white
+ *  planters by nearly as much), never under the floor that keeps the void's
+ *  own sclera — which peaks at 1.0 — from blooming him. */
+const BLOOM_FLOOR = 1.05;
+const bloomCut = (): number => Math.max(BLOOM_FLOOR, (LIGHT.bloomCut ?? BLOOM_FLOOR) * hourSunK);
 function applyLightRig(): void {
+  if (bloomPass) bloomPass.threshold = bloomCut();
   sun.intensity = RIG.sunI * hourSunK;
   hemi.intensity = hemiNow();
   // the fill rides the same dimmer as the key, so a world that dims at dusk
@@ -2692,6 +2711,16 @@ function goalMet(): boolean {
     case 4: return false;
     default: return devouredPct >= sp.clear;
   }
+}
+/** THE END BEAT: from the frame a goal is met until the match is over. The
+ *  outro alone is not enough — the goal check runs near the top of animate(),
+ *  before the rivals and the eat loop, so the bite (or the rival) that meets a
+ *  goal lands with outroT still 0 and the whistle blows one frame later, on
+ *  top of whatever that bite just played: a crown, a rival's fanfare, the
+ *  countdown's next tick (verify pass on the pre-merge fixes, logic-2 and
+ *  audio-4). Everything that would talk over the whistle asks this instead. */
+function endBeat(): boolean {
+  return outroT > 0 || (!!goal && !goal.met && !ended && goalMet());
 }
 /** The five kinds in dot order. levels.ts owns the same list; this is the
  *  render side's copy of the NAME only, never of the rule. */
@@ -5004,10 +5033,13 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   // than how long the clock ran. Scaled by the meal: eating the chaser, who is
   // the biggest thing on the island, is worth more than eating a straggler.
   feastR += FEAST_PER_RIVAL * (marquee ? 1.6 : 1) * THREE.MathUtils.clamp(rr / 6, 0.55, 1.5);
-  smugUntil = tClock + 2.4; audio.voice('happy');
+  smugUntil = tClock + 2.4;
   // no breakingNews here: announceFam already puts a full-screen card up for
   // this, and a ticker headline three seconds later is the same news twice
   playerScore += pts;
+  // read AFTER the points: the rival that meets the goal is itself the end
+  const beat = endBeat();
+  if (!beat) audio.voice('happy');
   lastEatAt = tClock;   // a rival is a meal, and feastR is delivered BY the floor
   addCoins(15);
   questEvent('rival');
@@ -5036,11 +5068,12 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   camPunch(6); fx.kick(rx - voidState.x, rz - voidState.z, 9);
   floatPos.set(rx, rr + 5, rz);
   bubbles.float(floatPos, `${FAMILY_TITLE[name] ?? ''} ${name} DEVOURED! +${pts}`, true);
-  // inside the outro the rival goes down with a plain bite: the whistle owns
-  // the end, and the chomp's fanfare and duck would talk over it (review audio-4)
-  if (outroT <= 0) audio.chomp(rr, voidling.radius, 'rival', combo);
-  else audio.pop(combo, rr, voidling.radius);
-  buzz(80);
+  // inside the end beat the rival goes down with a plain bite: the whistle owns
+  // the end, and the chomp's fanfare and duck would talk over it (review audio-4).
+  // Plain, not pop(): pop() skips anything inside 75 ms of the last bite, and in
+  // a hoover that is nearly every frame, so the kill went down in silence.
+  audio.chomp(rr, voidling.radius, 'rival', combo, beat);
+  buzz(beat ? 15 : 80);
 };
 // ── the void's EMOTIONS: game state resolves to a mood every frame ──────────
 let hungryT = -99, hurtUntil = 0, smugUntil = 0, prevMood: Mood = 'cruise';
@@ -7884,7 +7917,7 @@ function paintMenuLadder(): void {
         }
         track('level_tap', { world: pickedWorld, goal: g, from: cur });
         playingGoal = g;
-        startFresh(false);
+        startFresh(soloOn());   // BY MYSELF persists — see soloOn below
       });
     });
     return nodes;
@@ -8455,6 +8488,7 @@ function endMatch(result: GoalResult = null) {
       const gs = document.getElementById('endShop');
       if (gs) gs.addEventListener('click', () => {
         track('shop_view', { coins, from: 'end' });
+        audio.cancelCheer();   // the cheer belongs to the card, not the shop (verify pass)
         endEl.classList.remove('show');
         document.body.classList.add('menu');
         menuEl.style.display = ''; enterMenu();   // her ladder, and the world behind it
@@ -8947,18 +8981,10 @@ function capture(e: Edible, giveHunger = true) {
   // CHOMP! is an EVENT, not wallpaper. The growth law parks the player just
   // above their staple food size, so the bar is "bigger than YOU" + a long
   // cooldown — a couple of CHOMPs a match, each one earned.
-  if (e.radius > voidling.radius && tClock > chompCd) {
-    chompCd = tClock + 7;
-    bubbles.float(floatPos, 'CHOMP!', true); audio.chomp(e.radius, voidling.radius, 'prop', combo); buzz(30);
-  } else { audio.pop(combo, e.radius, voidling.radius); buzz(e.radius > 2 ? 15 : 8); }
-  // The decimal 'COMBO ×1.5' that stood here is gone: a six-year-old does not
-  // read a decimal. The chain is counted in NOMS instead, on the pill, and
-  // every tenth link is a crown she can hear.
-  if (combo % 10 === 0 && outroT <= 0) {   // not over the whistle and the party (review logic-2)
-    nomAt.set(voidState.x, voidling.radius + 3.6, voidState.z);
-    bubbles.float(nomAt, `${combo} NOMS!`, true, true);
-    audio.nomCrown(combo); buzz(25);
-  }
+  // The cooldown is taken HERE, where the hat below reads it; the sound and
+  // the callout wait for the end of capture (see THE BITE'S SOUND, LAST).
+  const headline = e.radius > voidling.radius && tClock > chompCd;
+  if (headline) chompCd = tClock + 7;
   // ── THE HAT HAS OPINIONS ────────────────────────────────────────────────
   // Legendary hats only, and RARELY. A hat that comments on every bite is a
   // hat a child mutes inside one match; one that pipes up every half-minute
@@ -9017,6 +9043,26 @@ function capture(e: Edible, giveHunger = true) {
   // no COPY row for this one: 'rv' is tagged on RV Row and nowhere else, so it
   // can only ever fire on GAME DAY. It should still sound like the booth.
   if (qk === 'rv' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🚐 A WHOLE MOTORHOME! Gone.'); breakingNews('A whole MOTORHOME, Bill. Somebody was living in that until Sunday.'); }
+  // ── THE BITE'S SOUND, LAST ──────────────────────────────────────────────
+  // After byPlayer and the tallies above, because those are what goalMet()
+  // reads for a SET or a LANDMARK: asked any earlier, the bite that meets the
+  // goal did not know it yet, played its crown, and the whistle landed a frame
+  // later on top of it. In the end beat the headline bite is a plain one —
+  // heard, not announced — and there is no crown (review logic-2).
+  const beat = endBeat();
+  floatPos.set(e.mesh.position.x, voidling.radius + 2, e.mesh.position.z);
+  if (headline && !beat) {
+    bubbles.float(floatPos, 'CHOMP!', true); audio.chomp(e.radius, voidling.radius, 'prop', combo); buzz(30);
+  } else if (headline) { audio.chomp(e.radius, voidling.radius, 'prop', combo, true); buzz(15); }
+  else { audio.pop(combo, e.radius, voidling.radius); buzz(e.radius > 2 ? 15 : 8); }
+  // The decimal 'COMBO ×1.5' that stood here is gone: a six-year-old does not
+  // read a decimal. The chain is counted in NOMS instead, on the pill, and
+  // every tenth link is a crown she can hear.
+  if (combo % 10 === 0 && !beat) {
+    nomAt.set(voidState.x, voidling.radius + 3.6, voidState.z);
+    bubbles.float(nomAt, `${combo} NOMS!`, true, true);
+    audio.nomCrown(combo); buzz(25);
+  }
 }
 
 // converging suck streaks — sells the "vacuum" on GULP / COLLAPSE
@@ -9761,7 +9807,10 @@ el('btnPlay').addEventListener('click', () => {
   const g = levelCurrent(pickedWorld);
   track('play_tap', { played: stats.matches, lvl: rankInfo(xp).lvl, world: pickedWorld, goal: g });
   playingGoal = g;
-  startFresh(false);
+  // BY MYSELF persists, so PLAY honours it: this passed false, and every match
+  // started from PLAY — and every PLAY AGAIN after it — was a race whatever
+  // the toggle said (verify pass, logic-4)
+  startFresh(soloOn());
 });
 // the world's name IS the door to the picker — and it is a BUTTON now, not the
 // bare label. #mlWorld measured 144.8 x 19 at every phone width (qa/navtap.mjs),
@@ -11164,6 +11213,10 @@ el('btnHome').addEventListener('click', () => {
   });
   const doQuit = () => {
     resume();
+    // a quit from inside the outro: without this the outro ran out on the
+    // menu and endMatch put the results card over it, and a queued cheer
+    // played there (verify pass, logic-3)
+    outroT = 0; audio.cancelCheer();
     qBtn.textContent = '⌂'; qBtn.classList.remove('arm');
     saveStats();   // partial progress (things eaten) still counts toward trophies
     countMatch();
@@ -12991,7 +13044,9 @@ function animate() {
   perfFrame(dtRaw);
   frameTime(dtRaw);
   let dtw = dt;
-  if (outroT > 0) { outroT -= dt; if (outroT <= 0) endMatch(goal?.result ?? null); else dtw = dt * 0.3; }
+  // held while paused: counting on under the sheet ran endMatch there — the
+  // finale, the cheer and the confetti behind a modal (verify pass, logic-1)
+  if (outroT > 0 && !paused) { outroT -= dt; if (outroT <= 0) endMatch(goal?.result ?? null); else dtw = dt * 0.3; }
   stopCd = Math.max(0, stopCd - dt);
   if (stopT > 0) { stopT = Math.max(0, stopT - dt); dtw *= 0.06; }
   tClock += dt;
@@ -13242,7 +13297,7 @@ function animate() {
       // docs/OVERNIGHT.md), and a late multiplier would quietly stale that
       // calibration for the sake of a spectacle the ritual delivers anyway.
       const cs = Math.ceil(matchClock);
-      if (cs <= 10 && cs >= 1 && cs !== countTick && !ended && outroT <= 0) {   // a won dot's outro is the end (review audio-4)
+      if (cs <= 10 && cs >= 1 && cs !== countTick && !ended && !endBeat()) {   // a won dot's whistle is the end (review audio-4)
         countTick = cs;
         const cEl = el('count').firstElementChild as HTMLElement;
         cEl.textContent = String(cs);
@@ -14598,7 +14653,7 @@ function animate() {
     // outro, so a form-up can land in it — measured at the buzzer by
     // qa/endparty.mjs (e): "whistle … evolve" inside 0.6 s. The end owns that
     // moment; the form still changes, silently (research governor G4).
-    if (outroT <= 0) audio.evolve();
+    if (!endBeat()) audio.evolve();
     // the LENS marks the evolution too: a punch plus a 7% distance pop that
     // the follow lerp eases home over the next second — the world exhales.
     // The final-form moment used to be ~8x weaker than a rival bite; this
@@ -14656,13 +14711,15 @@ function animate() {
     // cashes in beside the void. No "combo broken" sound, by design.
     // not inside the outro: the whistle and the party own it, and the points
     // are already scored — a cash-in there is one more sound on the end
-    if (combo >= 5 && started && !ended && !paused && outroT <= 0) nomCash();
+    if (combo >= 5 && started && !ended && !paused && !endBeat()) nomCash();
     combo = 0; chainPts = 0;
   }
   // …and the banked bite points leave as one number when the burst stops. Runs
   // on REAL dt rather than game time so a hit-stop cannot hold the payout back:
   // the number is feedback about what just happened, not part of the ceremony.
-  if (eatFloatT > 0) {
+  // Held while paused, though: the pause sheet is not a hit-stop, and a bank
+  // paid under it punched the bar where she could not see it (verify pass).
+  if (eatFloatT > 0 && !paused) {
     eatFloatT -= dt;
     if (eatFloatT <= 0 && eatFloatPts > 0) {
       // ── THE NUMBER GOES INTO THE BAR ───────────────────────────────────
@@ -14675,7 +14732,8 @@ function animate() {
       // gbarPay is handed over as the arrival callback rather than called
       // here, so the payout cannot happen before the number that explains it.
       // bubbles.flyTo guarantees it fires in every motion state — under
-      // reduced motion the duration is zero and it lands on the next frame.
+      // reduced motion the number stands still where it rose and the bar
+      // takes its step at once (qa/calmnumber.mjs).
       // …and a BIG ONE looks big. Sized against her own recent run of numbers
       // rather than on any fixed scale: 1 + 0.6·log2(bank / recent average),
       // 1 to 1.8 — an ordinary bank at 20px, one twice her usual at ~1.6x, a
@@ -14688,8 +14746,15 @@ function animate() {
       // number came out 40px. Relative to her own average, the standout reads
       // as a standout at every size. Inside a beat window it wears the beat's
       // colour, so the doubled value is seen on the number that carries it.
+      // …AND A SMALL ONE LOOKS SMALL. The scale stopped at 1 below, so a bank a
+      // third of her usual came out the same 20px as an ordinary one: on
+      // Gameday a +21 after a run of +50s and the +35 that opened the spree
+      // were both 20px, and the spread across banks 21→66 read 1.36x
+      // (qa/nomstream.mjs (c), cross-world run 2026-09-23; Lantern 1.31x).
+      // The same law runs down to 0.85 — 17px, still bold at a phone's body
+      // size — so the size tracks the value both ways.
       const rel = eatFloatAvg > 0 ? eatFloatPts / eatFloatAvg : 1;
-      const k = eatFloatLm ? 1.8 : Math.min(1.8, Math.max(1, 1 + 0.6 * Math.log2(rel)));
+      const k = eatFloatLm ? 1.8 : Math.min(1.8, Math.max(0.85, 1 + 0.6 * Math.log2(rel)));
       eatFloatAvg = eatFloatAvg > 0 ? eatFloatAvg * 0.75 + eatFloatPts * 0.25 : eatFloatPts;
       bubbles.flyTo(eatFloatAt, `+${eatFloatPts.toLocaleString()}`, gBarTarget, gbarPay,
         { scale: k, color: feverMult > 1 ? `#${feverCol.toString(16).padStart(6, '0')}` : undefined });
