@@ -206,7 +206,10 @@ const SUITE = [
   // its steps join push and live. A gate step that has never passed is not
   // protection, it is a blocked pipeline — so they are promoted on evidence,
   // one at a time, and this comment records which are still on probation:
-  //   · edgespeed    ON PROBATION — last read 1.78x against a 1.35x bar
+  //   · edgespeed    FIRST GREEN 2026-09-23 — Pirate 1.35x, Maple 0.99x, timed
+  //                  on tClock (it had been timing the void on the match clock,
+  //                  which hitStop() slows and the void ignores); one more green
+  //                  reading and it joins push
   //   · rivalnotice  ON PROBATION — last read 0.0/min in maple, gate open 0%
   //   · ringcount    not a gate step yet; it is a census with no bar, and the
   //                  bar has to come from a measured normal minute, not a guess
