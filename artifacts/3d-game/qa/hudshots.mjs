@@ -90,6 +90,15 @@ console.log(`  2  ${OUT}/maple-party.png — ${s2.conf} confetti scraps, mood '$
 console.log('     look for: paper confetti bursting up out of the void over the town; no card yet');
 
 // 3 — the card
+// The card's confetti is removed by a WALL-clock setTimeout 3.2 s after it
+// lands, and a software-rendered screenshot can take that long on its own:
+// the second run logged 40 scraps and photographed none. Hold .endConf
+// removal for the shutter only (a phone at 0.9 s still has every scrap).
+await p.evaluate(() => {
+  const orig = Element.prototype.remove;
+  window.__holdConf = true;
+  Element.prototype.remove = function () { if (window.__holdConf && this.classList?.contains('endConf')) return; return orig.call(this); };
+});
 await p.waitForFunction(() => document.getElementById('end')?.classList.contains('show'), null, { timeout: 900000, polling: 30 });
 // the card's own entrance and the confetti run on the wall clock and the
 // confetti is removed 3.2 s (wall) after it lands: freeze both at ~0.9 s
@@ -97,6 +106,7 @@ const froze3 = await freeze('#end, #end *', 900);
 const s3 = await p.evaluate(() => ({ hd: document.getElementById('endHd')?.textContent, conf: document.querySelectorAll('#end .endConf').length }));
 await p.screenshot({ path: `${OUT}/maple-endcard.png` });
 await thaw('#end, #end *');
+await p.evaluate(() => { window.__holdConf = false; document.querySelectorAll('.endConf').forEach((e) => e.remove()); });
 console.log(`     (${froze3} card animations frozen at 900 ms for the shutter)`);
 console.log(`  3  ${OUT}/maple-endcard.png — "${s3.hd}", ${s3.conf} card confetti`);
 console.log('     look for: the win headline and the confetti falling over the card; no match HUD left showing through');
