@@ -14,7 +14,7 @@
 //     use mrnd()/mr()/mpick(), which run off a fixed seed.
 import * as THREE from 'three';
 import { mulberry32 } from './rng';
-import { part, mergedProp, PROP_SMOOTH_MAT, shade } from './island';
+import { part, mergedProp, PROP_SMOOTH_MAT, shade, glossy } from './island';
 import { registerGloss } from './gloss';
 import { roundedBox } from './life';
 
@@ -1699,8 +1699,15 @@ export function makePlanter(): THREE.Mesh {
     part(cyl(0.655, 0.60, 0.10, 10), CREAM, 0, 0.28, 0),
     part(cyl(0.635, 0.565, 0.10, 10), CREAM, 0, 0.76, 0),
   ];
+  // THE BLOOMS ARE PETALS, NOT LACQUER. Four of these five colours are the
+  // "lacquered round things" registered at gloss 0.42 below, and on a six-
+  // segment sphere under the noon key that throws a specular spark to 2.9
+  // linear — over the bloom cut, so each planter wore bulbs (qa/halocensus.mjs,
+  // Maple, 2026-09-23: the last two cells after the cut was raised). The
+  // canopy's low sheen instead; the table entry stays for whatever else wears
+  // those colours.
   for (let i = 0; i < 6; i++) {
-    p.push(part(sph(0.2, 6, 5), mpick([0xff6fb0, 0xffd23f, RED, 0xa87bff, WHITE]), mr(-0.4, 0.4), mr(1.2, 1.5), mr(-0.4, 0.4)));
+    p.push(glossy(part(sph(0.2, 6, 5), mpick([0xff6fb0, 0xffd23f, RED, 0xa87bff, WHITE]), mr(-0.4, 0.4), mr(1.2, 1.5), mr(-0.4, 0.4)), 0.14));
   }
   p.push(part(sph(0.55, 8, 6), GRASSY, 0, 1.15, 0, 0, 0, 0, 1, 0.5, 1));
   return noFront(M(p));
