@@ -58,10 +58,40 @@
 // TRAP: a profile with a best score shows `★ BEST n` instead, which is short and
 // hides the bug — so this deliberately seeds a FRESH profile.
 import { chromium } from 'playwright';
+import { settle, restState, atRest, describeRest } from './_atrest.mjs';
 import { ALL_WORLDS } from './worlds.mjs';
 import { openPicker } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4177';
+
+// ── --atrest: THE PICKER HAS TO HAVE ARRIVED BEFORE IT IS PHOTOGRAPHED ───────
+// Studio round 4 (Job 7) put modalIn on #worlds, and its first keyframe is
+// opacity 0 and scale(0.94). openPicker() adds .show, and this probe then
+// waits 1600 ms before it reads the card boxes and takes its two screenshots.
+// A CSS animation's time only advances on a rendered frame, and qa/navtap.mjs
+// traced this machine drawing about one every 2.5 s, with a 240 ms animation
+// still at t=0 1.2 s after it started — so nothing in that wait promises the
+// picker is at full opacity and full size when the boxes are read and the
+// first screenshot is taken. Whether it is on this machine has not been
+// measured.
+//
+// With --atrest, every finite animation on #worlds, its subtree and its
+// ancestors is finished before the card boxes are read (qa/_atrest.mjs); the
+// probe prints the opacity it read before and after, FAILS unless #worlds is
+// at opacity 1 with nothing finite running, and asks again after each
+// screenshot. The flag exists because this file is a push step and this code
+// has not been run: qa/gate.mjs registers `pickerfit-atrest` in live and
+// quality, and the push step keeps the unflagged probe until a run has read
+// this one.
+const ATREST = process.argv.includes('--atrest');
+// installed on the --atrest path only, so the unflagged path is the one the
+// push gate has run plus the flag tests
+if (ATREST) {
+  process.on('uncaughtException', (e) => {
+    console.log(`\nFAIL — pickerfit threw: ${String(e && e.message || e).split('\n')[0]}`); process.exit(1); });
+  process.on('unhandledRejection', (e) => {
+    console.log(`\nFAIL — pickerfit rejected: ${String(e && e.message || e).split('\n')[0]}`); process.exit(1); });
+}
 
 // WCAG AA for body text. This audience is six years old and reading is the
 // thing they are worst at, so the large-text relaxation to 3:1 is not taken
@@ -89,6 +119,15 @@ await p.waitForSelector('#btnPlay', { state: 'visible', timeout: 400000 });
 await openPicker(p);
 await p.waitForSelector('#worldRow .wCard[data-world="maple"]', { state: 'visible', timeout: 400000 });
 await p.waitForTimeout(1600);
+if (ATREST) {
+  const rest = await settle(p, '#worlds');
+  console.log(`  rest      #worlds before the photographs: ${describeRest(rest)}`);
+  if (!atRest(rest)) {
+    await b.close();
+    console.log(`\nFAIL — the picker was not at rest when it was about to be photographed (${describeRest(rest)})`);
+    process.exit(1);
+  }
+}
 
 // ── MEASURE ─────────────────────────────────────────────────────────────
 // Geometry and the computed text colour first, from the live DOM.
@@ -154,6 +193,15 @@ const cards = await p.evaluate(() => {
 // taking a percentile, subtracting a guess at coverage) is estimating a number
 // this can simply read.
 const shown = await p.screenshot({ type: 'png' });
+if (ATREST) {
+  const again = await restState(p, '#worlds');
+  console.log(`  rest      #worlds after the first photograph: ${describeRest(again)}`);
+  if (!atRest(again)) {
+    await b.close();
+    console.log(`\nFAIL — the picker left rest while it was being photographed (${describeRest(again)})`);
+    process.exit(1);
+  }
+}
 await p.evaluate(() => {
   const st = document.createElement('style');
   st.id = '__hideType';
@@ -162,6 +210,15 @@ await p.evaluate(() => {
 });
 await p.waitForTimeout(500);
 const bare = await p.screenshot({ type: 'png' });
+if (ATREST) {
+  const again = await restState(p, '#worlds');
+  console.log(`  rest      #worlds after the second photograph: ${describeRest(again)}`);
+  if (!atRest(again)) {
+    await b.close();
+    console.log(`\nFAIL — the picker left rest while it was being photographed (${describeRest(again)})`);
+    process.exit(1);
+  }
+}
 const { PNG } = await import('pngjs');
 const img = PNG.sync.read(bare);     // type hidden — the raw backdrop, for diagnosis
 const lit = PNG.sync.read(shown);    // type visible — what a child actually sees

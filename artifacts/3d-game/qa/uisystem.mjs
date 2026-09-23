@@ -1,7 +1,8 @@
 // THE TYPE SYSTEM'S CONTRACT — weights that exist, sizes a child can read.
 //
-//   node qa/uisystem.mjs [port] [world]             the four screens + two targets
-//   node qa/uisystem.mjs [port] [world] --match     the live-match walk (below)
+//   node qa/uisystem.mjs [port]                      the four screens
+//   node qa/uisystem.mjs [port] [world] --targets    #soloTog + the scrapbook tabs
+//   node qa/uisystem.mjs [port] [world] --match      the live-match walk (below)
 //
 // Fredoka ships 300/400/500/600/700. The CSS used to demand 800 (26x) and
 // 900 (83x), and the browser synthesised fake bold from the 700 face —
@@ -32,15 +33,25 @@
 //     card — for rendered height and for a Fredoka family, because a <button>
 //     that forgets `font-family: inherit` draws in the platform's face
 //
-// ── TWO HALVES, BECAUSE ONE OF THEM HAS NEVER RUN ────────────────────────────
-// Without --match this walks the four screens (the probe as it was, which the
-// push gate has run: 32 s in its run of 2026-09-23 10:54) plus #soloTog and the
-// scrapbook tabs, which open from the same front door. With --match it runs
-// ONLY the live-match walk: the four chips, the blur sweep and MY NUMBERS on
-// the results card. The match walk was written while a browser gate held this
-// machine and has not been run, so qa/gate.mjs registers it as its own step
-// (`uisystem-match`) outside the push profile until a run has read it.
+// ── THREE PARTS, AND ONLY ONE OF THEM HAS EVER RUN ───────────────────────────
+// With no flag this walks the four screens and nothing else: the probe as it
+// stood from aadebff to ea6b384, which the push gate has run (32 s in its run
+// of 2026-09-23 10:54). That walk reads computed font-weight and font-size of
+// every element that carries text, and skips one only on a zero-sized rect,
+// display:none or visibility:hidden — never on opacity — so modalIn's
+// opacity-0 first keyframe does not hide the three sheets that now arrive on
+// it from this walk.
+//
+// --targets reads #soloTog on the picker and the scrapbook's world tabs, each
+// in its own page opened from the same front door. --match walks the live
+// match: the four chips, the blur sweep and MY NUMBERS on the results card.
+// Both were written while a browser gate held this machine and NEITHER HAS
+// BEEN RUN — not the targets, not the match walk, not the arrival-finishing
+// that both depend on (qa/_atrest.mjs). So qa/gate.mjs registers each as its
+// own step (`uisystem-targets`, `uisystem-match`) in live and quality only,
+// and the push step `uisystem` runs this file with no flag.
 import { chromium } from 'playwright';
+import { settle, describeRest } from './_atrest.mjs';
 
 process.on('uncaughtException', (e) => {
   console.log(`\nFAIL — uisystem threw: ${String(e && e.message || e).split('\n')[0]}`); process.exit(1); });
@@ -51,6 +62,7 @@ const POS = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const PORT = POS[0] || '4177';
 const WORLD = POS[1] || 'maple';
 const MATCH = process.argv.includes('--match');
+const TARGETS = process.argv.includes('--targets');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 const fails = [];
@@ -68,27 +80,21 @@ const fails = [];
 // 44 x 0.94 = 41.4px. CSS animation time only advances on a rendered frame,
 // and qa/navtap.mjs traced this box drawing the island about once every 2.5 s,
 // with its pips still at t=0 1.2 s after they started — so a 600 ms wait is no
-// promise of getting past the first keyframe. Every finite animation on the
-// target and on each of its ancestors is finished first, the way navtap does
-// it (anything infinite is left alone: finish() throws on it). Rendered height
-// is still the reading, so a transform in the resting state still counts.
+// promise of getting past the first keyframe. settle() (qa/_atrest.mjs)
+// finishes every finite animation on the target, its subtree and its
+// ancestors first, the way navtap does it, and says how many it finished.
+// Rendered height is still the reading, so a transform in the resting state
+// still counts.
 const targets = async (pg, where, sel) => {
-  await pg.evaluate((s) => {
-    // a CSS animation exists only once style has been computed with the .show
-    // class on, and no frame may have been drawn since the door was opened —
-    // so compute it here, before asking for the animations
-    void document.documentElement.getBoundingClientRect();
-    for (const e of document.querySelectorAll(s)) {
-      for (let a = e; a; a = a.parentElement) {
-        for (const an of a.getAnimations()) {
-          const t = an.effect && an.effect.getComputedTiming();
-          if (!t || t.iterations === Infinity) continue;
-          try { an.finish(); } catch { /* not finishable */ }
-        }
-      }
-    }
-  }, sel);
-  await pg.waitForTimeout(120);
+  const rest = await settle(pg, sel);
+  console.log(`  ${where.padEnd(9)} arrival: ${describeRest(rest)}`);
+  // a finite animation still running after settle() means the height below
+  // would be read mid-flight, so it is not read
+  if (rest.left) {
+    console.log(`  ${where.padEnd(9)} BAD: ${sel} still animating after its arrival was finished — nothing was measured`);
+    fails.push(`${where}: ${sel} not at rest`);
+    return;
+  }
   const got = await pg.evaluate((s) => [...document.querySelectorAll(s)]
     .filter((e) => e.getClientRects().length)
     .map((e) => ({ h: e.getBoundingClientRect().height, fam: getComputedStyle(e).fontFamily,
@@ -108,7 +114,7 @@ const targets = async (pg, where, sel) => {
   [...new Set(bad)].forEach((x) => fails.push(`${where}: ${x}`));
 };
 
-if (!MATCH) {
+if (!MATCH && !TARGETS) {
 const p = await b.newPage({ viewport: { width: 430, height: 932 } });
 await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
 await p.addInitScript(() => { try {
@@ -171,21 +177,35 @@ for (const [name, open, proof] of SCREENS) {
   console.log(`  ${name.padEnd(9)} ${bad.length ? 'BAD: ' + bad.join(', ') : 'ok'}`);
   bad.forEach((x) => fails.push(`${name}: ${x}`));
 }
+} // end of the four-screen walk (no flag); b.close() below closes its page, as it did at ea6b384
 
-{
-  await p.evaluate(() => { document.getElementById('settings')?.classList.remove('show');
-    document.getElementById('worldSwitch')?.click(); });
-  await p.waitForTimeout(600);
-  if (await p.evaluate(() => !!document.querySelector('#worlds.show'))) await targets(p, 'picker', '#soloTog');
+// ── THE FRONT DOOR'S TWO 44px TARGETS (--targets, NOT YET RUN) ──────────────
+// Own page, same seed as the four-screen walk, so a failure here cannot be an
+// artefact of whatever that walk left open.
+if (TARGETS) {
+  const t = await b.newPage({ viewport: { width: 430, height: 932 } });
+  await t.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
+  await t.addInitScript(() => { try {
+    localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
+    localStorage.setItem('voidMute', '1');
+    localStorage.setItem('voidDailyLast', new Date().toDateString());
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
+  } catch { /* private mode */ } });
+  await t.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
+  await t.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
+  await t.evaluate(() => document.querySelectorAll('.show')
+    .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
+  await t.evaluate(() => document.getElementById('worldSwitch')?.click());
+  await t.waitForTimeout(600);
+  if (await t.evaluate(() => !!document.querySelector('#worlds.show'))) await targets(t, 'picker', '#soloTog');
   else { console.log('  picker    BAD: the door did not open #worlds'); fails.push('picker: door (targets)'); }
-  await p.evaluate(() => { document.getElementById('worlds')?.classList.remove('show');
+  await t.evaluate(() => { document.getElementById('worlds')?.classList.remove('show');
     document.getElementById('btnBook')?.click(); });
-  await p.waitForTimeout(600);
-  if (await p.evaluate(() => !!document.querySelector('#profile.show #book.show'))) await targets(p, 'scrapbook', '.bkTabs button');
+  await t.waitForTimeout(600);
+  if (await t.evaluate(() => !!document.querySelector('#profile.show #book.show'))) await targets(t, 'scrapbook', '.bkTabs button');
   else { console.log('  scrapbook BAD: the door did not open MY VOID on its stickers pane'); fails.push('scrapbook: door'); }
+  await t.close();
 }
-await p.close();
-} // end of the front-door half (no --match)
 
 // ── THE FOUR CHIPS, IN A LIVE MATCH ──────────────────────────────────────────
 // A LEVEL match, because the goal chip is hidden on every match nobody chose a
@@ -273,7 +293,10 @@ if (MATCH) {
   await m.close();
 }
 await b.close();
-console.log('\n  ' + (fails.length ? `FAIL — ${fails.length} violations${MATCH ? ' in the live match' : ''}`
-  : MATCH ? 'PASS — the four HUD chips are one system, no backdrop blur over the match, MY NUMBERS is a 44px target in our face'
-    : 'PASS — every weight is a real face, every size is readable, the front door\'s 44px targets are set in our face') + '\n');
+// the no-flag verdict is ea6b384's line, word for word
+if (!MATCH && !TARGETS) console.log('\n  ' + (fails.length ? `FAIL — ${fails.length} violations` : 'PASS — every weight is a real face, every size is readable') + '\n');
+else console.log('\n  ' + (fails.length ? `FAIL — ${fails.length} violations (${[TARGETS && 'front-door targets', MATCH && 'live match'].filter(Boolean).join(' + ')})`
+  : 'PASS — ' + [TARGETS && '#soloTog and the scrapbook tabs are 44px targets set in our face',
+    MATCH && 'the four HUD chips are one system, no backdrop blur over the match, MY NUMBERS is a 44px target in our face']
+    .filter(Boolean).join('; ')) + '\n');
 process.exit(fails.length ? 1 : 0);

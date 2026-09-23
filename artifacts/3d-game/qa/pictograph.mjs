@@ -1,6 +1,7 @@
 // ── NO EMOJI ON A SCREEN A CHILD LOOKS AT ──────────────────────────────────
 //
-//   node qa/pictograph.mjs [port]
+//   node qa/pictograph.mjs [port]              the walk the push gate has run
+//   node qa/pictograph.mjs [port] --atrest     each sheet finished arriving first
 //
 // docs/MENU-BRIEF.md §1.4 ends with one sentence that was never built:
 // "The probe for bar 1.3.7 fails on any emoji or dingbat." §1.3.7 names `.pips`
@@ -25,8 +26,42 @@
 // expectations forgives every future regression. A fix is a deletion from that
 // list; a new pictograph anywhere is a red on the next push.
 import { chromium } from 'playwright';
+import { settle, atRest, describeRest } from './_atrest.mjs';
 
 const PORT = process.argv[2] || '4177';
+
+// ── --atrest: THE WALK CAN GO BLIND, AND WITHOUT THIS FLAG IT WOULD SAY PASS ──
+// The walk below skips any text node with an ancestor at computed opacity 0,
+// which is right for a card that is not showing. Studio round 4 (Job 7) then
+// put modalIn on #worlds, #shop and #profile — the three screens every KNOWN
+// entry is on — and modalIn's first keyframe is opacity 0. A CSS animation's
+// time only advances on a rendered frame, and qa/navtap.mjs traced this
+// machine drawing about one every 2.5 s, with a 240 ms animation still at t=0
+// 1.2 s after it started. If no frame is drawn during the 700 ms wait below,
+// every text node on those three sheets is skipped: 0 of the 10 KNOWN match,
+// the "match nothing any more" line is a note and not a failure, and a new
+// emoji on those screens passes unseen. Whether that happens on this machine
+// has not been measured.
+//
+// With --atrest, each screen's sheet (its proof element, that element's
+// subtree and its ancestors) has every finite animation finished before the
+// walk (qa/_atrest.mjs), the probe prints the opacity it read before and
+// after, and it FAILS if the sheet is not at opacity 1 with nothing finite
+// still running. It also FAILS when a screen that has KNOWN entries shows none
+// of them: all of one screen's offenders going at once is either a fix, which
+// deletes them from KNOWN in the same change, or a walk that did not see the
+// sheet. The flag exists because this file is a push step and this code has
+// not been run; qa/gate.mjs registers `pictograph-atrest` in live and quality,
+// and the push step keeps the unflagged walk until a run has read this one.
+const ATREST = process.argv.includes('--atrest');
+// installed on the --atrest path only, so the unflagged path is the one the
+// push gate has run plus the flag tests
+if (ATREST) {
+  process.on('uncaughtException', (e) => {
+    console.log(`\nFAIL — pictograph threw: ${String(e && e.message || e).split('\n')[0]}`); process.exit(1); });
+  process.on('unhandledRejection', (e) => {
+    console.log(`\nFAIL — pictograph rejected: ${String(e && e.message || e).split('\n')[0]}`); process.exit(1); });
+}
 
 /** UNICODE ALREADY DRAWS THIS LINE, so use its line rather than a hand-picked
  *  range. \p{Emoji_Presentation} is the property for characters that render as
@@ -116,11 +151,16 @@ await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show')
   .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
 
-const found = [], doors = [];
+const found = [], doors = [], unsettled = [];
 for (const [name, open, proof] of SCREENS) {
   if (open) { await p.evaluate(open); await p.waitForTimeout(700); }
   const there = await p.evaluate((s) => !!document.querySelector(s), proof);
   if (!there) { doors.push(`${name} (${proof})`); continue; }
+  if (ATREST) {
+    const rest = await settle(p, proof);
+    console.log(`  rest ${name.padEnd(9)} ${proof}: ${describeRest(rest)}`);
+    if (!atRest(rest)) unsettled.push(`${name} (${describeRest(rest)})`);
+  }
   const hits = await p.evaluate((src) => {
     const re = new RegExp(src, 'u');
     const out = [];
@@ -156,6 +196,12 @@ if (doors.length) {
   process.exit(1);
 }
 
+if (unsettled.length) {
+  console.log(`\nFAIL — ${unsettled.length} sheet(s) were not at rest after their arrival was finished, `
+    + `so text on them could be skipped as invisible: ${unsettled.join('; ')}\n`);
+  process.exit(1);
+}
+
 const key = (f) => `${f.screen} ${f.where}`;
 const fresh = [], debt = [];
 const seen = new Set();
@@ -176,6 +222,20 @@ if (fresh.length) {
     + `MENU-BRIEF §1.3.7. Draw it into the inline symbol sheet in index.html and use it, `
     + `or add it to this file's KNOWN set as debt with a reason.\n`);
   process.exit(1);
+}
+if (ATREST) {
+  // a screen whose KNOWN offenders ALL vanished at once
+  const blind = [];
+  for (const [name] of SCREENS) {
+    const mine = [...KNOWN].filter((k) => k.startsWith(`${name} `));
+    if (mine.length && !mine.some((k) => seen.has(k))) blind.push(`${name} (0 of ${mine.length})`);
+  }
+  if (blind.length) {
+    console.log(`\nFAIL — ${blind.length} screen(s) showed none of their known offenders: ${blind.join(', ')}. `
+      + `Either every one was fixed in the same change (delete them from KNOWN) or the walk did not see the sheet\n`);
+    process.exit(1);
+  }
+  console.log(`\n  every walked sheet was at rest (opacity 1, nothing finite running) when its text was read`);
 }
 console.log(debt.length
   ? `\nPASS — no NEW pictograph on any walked screen; ${debt.length} known offender(s) remain, listed above\n`

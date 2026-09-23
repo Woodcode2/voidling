@@ -27,10 +27,39 @@
 // FIRST sight of this screen is two live cards and three locked ones — not the
 // all-unlocked view every other probe seeds.
 import { chromium } from 'playwright';
+import { settle, restState, atRest, describeRest } from './_atrest.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { openPicker } from './_enter.mjs';
 
 const PORT = process.argv[2] || '4177';
+
+// ── --atrest: THE PICKER HAS TO HAVE ARRIVED BEFORE IT IS PHOTOGRAPHED ───────
+// Studio round 4 (Job 7) put modalIn on #worlds, and its first keyframe is
+// opacity 0 and scale(0.94). openPicker() adds .show, and this probe then
+// waits 2200 ms before it reads the poster boxes and takes its screenshot.
+// A CSS animation's time only advances on a rendered frame, and qa/navtap.mjs
+// traced this machine drawing about one every 2.5 s, with a 240 ms animation
+// still at t=0 1.2 s after it started — so nothing in that wait promises the
+// picker is at full opacity and full size when the boxes are read and the
+// screenshot is taken. Whether it is on this machine has not been measured.
+//
+// With --atrest, every finite animation on #worlds, its subtree and its
+// ancestors is finished before the poster boxes are read (qa/_atrest.mjs);
+// the probe prints the opacity it read before and after, FAILS unless
+// #worlds is at opacity 1 with nothing finite running, and asks again after
+// the screenshot. The flag exists because this file is a push step and this
+// code has not been run: qa/gate.mjs registers `lockedcards-atrest` in live
+// and quality, and the push step keeps the unflagged probe until a run has
+// read this one.
+const ATREST = process.argv.includes('--atrest');
+// installed on the --atrest path only, so the unflagged path is the one the
+// push gate has run plus the flag tests
+if (ATREST) {
+  process.on('uncaughtException', (e) => {
+    console.log(`\nFAIL — lockedcards threw: ${String(e && e.message || e).split('\n')[0]}`); process.exit(1); });
+  process.on('unhandledRejection', (e) => {
+    console.log(`\nFAIL — lockedcards rejected: ${String(e && e.message || e).split('\n')[0]}`); process.exit(1); });
+}
 
 // THE BAR. Squint deltaE between two posters reduced to a 4x5 mosaic: "at
 // thumbnail size, do these read as different places?" 10 is the bar — under it
@@ -65,6 +94,15 @@ await p.waitForSelector('#btnPlay', { state: 'visible', timeout: 400000 });
 await openPicker(p);
 await p.waitForSelector('#worldRow .wCard[data-world="maple"]', { state: 'visible', timeout: 400000 });
 await p.waitForTimeout(2200);
+if (ATREST) {
+  const rest = await settle(p, '#worlds');
+  console.log(`  rest      #worlds before the photograph: ${describeRest(rest)}`);
+  if (!atRest(rest)) {
+    await b.close();
+    console.log(`\nFAIL — the picker was not at rest when it was about to be photographed (${describeRest(rest)})`);
+    process.exit(1);
+  }
+}
 
 const cards = await p.evaluate(() => [...document.querySelectorAll('#worldRow .wCard[data-world]')].map((c) => {
   const art = c.querySelector('.wArt');
@@ -73,6 +111,15 @@ const cards = await p.evaluate(() => [...document.querySelectorAll('#worldRow .w
     box: { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) } };
 }));
 const shot = await p.screenshot({ type: 'png' });
+if (ATREST) {
+  const again = await restState(p, '#worlds');
+  console.log(`  rest      #worlds after the photograph: ${describeRest(again)}`);
+  if (!atRest(again)) {
+    await b.close();
+    console.log(`\nFAIL — the picker left rest while it was being photographed (${describeRest(again)})`);
+    process.exit(1);
+  }
+}
 // Keep the frame. The numbers below say whether the posters are separable;
 // only the picture says whether they still read as LOCKED.
 mkdirSync('qa/out/locked', { recursive: true });

@@ -528,9 +528,10 @@ const SUITE = [
   // Studio round 4, Job 7. The static halves, each observed failing on the
   // commit before its fix and passing on the fix: glyphs and ovlwire on ea6b384
   // -> 3a5170c, sheetbox on 3a5170c -> the commit that registered it. The
-  // browser halves of the same job (uisystem-match, endghost, modalin,
-  // countdown) have NOT been run: they sit in live and quality only, next to
-  // uisystem below, until a run has read them.
+  // browser halves of the same job (uisystem-targets, uisystem-match,
+  // endghost, modalin, countdown, and the --atrest runs of pictograph,
+  // pickerfit and lockedcards) have NOT been run: they sit in live and quality
+  // only, next to uisystem below, until a run has read them.
   { id: 'glyphs', tier: 'build', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/glyphs.mjs'], verdict: pf,
     why: 'no → ▾ ▴ ▶ ⌂ in text a child sees — each is outside every unicode-range the Fredoka imports declare, read from the @fontsource CSS, so it would come out of the platform\'s fallback face; every drawn <use> resolves to a symbol' },
@@ -687,23 +688,22 @@ const SUITE = [
     cmd: ['node', 'qa/aftermatch.mjs', PORT], verdict: pf,
     why: 'the menu theme comes home after TIME!, by both ways out' },
 
-  // THE FRONT-DOOR HALF STAYS IN PUSH; THE MATCH WALK DOES NOT. Job 7 added a
-  // live-match walk to this probe and raised the timeout to 900 for it, so a
-  // walk that had never run went into the push gate inside a step that had.
-  // It is `--match` now, registered below outside push. This step is the four
-  // screens it always walked (32 s in the push gate's 2026-09-23 10:54 report,
-  // against the 300 it had) plus #soloTog and the scrapbook tabs: two 600 ms
-  // waits, with every finite arrival animation finished before the height is
-  // read (modalIn starts at scale 0.94; see targets() in the probe).
+  // ONLY THE WALK THAT HAS RUN STAYS IN PUSH. Job 7 added a live-match walk to
+  // this probe and two front-door 44px targets, and none of that has run. The
+  // match walk is `--match` and the targets are `--targets`, each registered
+  // below outside push. This step runs the probe with no flag, which is the
+  // four-screen walk as it stood at ea6b384 (32 s in the push gate's
+  // 2026-09-23 10:54 report, against the 300 it has).
   { id: 'uisystem', tier: 'ui', profiles: ['push', 'live', 'art'], timeout: 300,
     cmd: ['node', 'qa/uisystem.mjs', PORT], verdict: pf,
-    why: 'every computed font weight is a face that exists and every size is readable; #soloTog and the scrapbook tabs are 44px targets set in our face' },
+    why: 'every computed font weight is a face that exists and every size is readable' },
 
   // ── STUDIO ROUND 4, JOB 7: THE BROWSER HALVES, NOT YET RUN ────────────────
-  // All four were written while another browser gate held this machine, and
+  // All five were written while another browser gate held this machine, and
   // none has been run. So: live and quality only, never push, until a run has
   // read each one's FAIL on ea6b384 and PASS on the fix and recorded its wall
-  // time. The timeouts are NOT measured. They are sized from the source: the
+  // time. The timeouts are NOT measured. The four that play a match
+  // (uisystem-match, endghost, modalin, countdown) are sized from the source: the
   // match clock advances by a dt clamped to 0.05 s a frame (animate() in
   // prototype3d.ts) and qa/navtap.mjs traced this box drawing about one frame
   // per 2.5 s, which puts one second of match clock near 50 s of wall — and
@@ -712,6 +712,13 @@ const SUITE = [
   // countdown is EXPECTED to fail bar (b) until #count is placed from its own
   // printed number (index.html's #count note) — that failure is the job's
   // open item, not the probe's.
+  //
+  // uisystem-targets plays no match: it boots the menu the way the
+  // four-screen walk does, and that walk's measured 32 s is the only number
+  // behind its 300.
+  { id: 'uisystem-targets', tier: 'ui', profiles: ['live', 'quality'], timeout: 300,
+    cmd: ['node', 'qa/uisystem.mjs', PORT, 'maple', '--targets'], verdict: pf,
+    why: 'studio round 4\'s uisystem, on the front door: #soloTog on the picker and the scrapbook\'s world tabs are 44px targets set in our face, read after their sheet\'s modalIn has been finished rather than waited for' },
   { id: 'uisystem-match', tier: 'ui', profiles: ['live', 'quality'], timeout: 1200,
     cmd: ['node', 'qa/uisystem.mjs', PORT, 'maple', '--match'], verdict: pf,
     why: 'studio round 4\'s uisystem, walked through a live level match: #goal, #coins, #growth and #btnQuit are .clay, solid, radius on the 12/18/26/999 scale, no blur; no backdrop blur over the match frame with a banner up; MY NUMBERS on the results card is 44px in our face' },
@@ -724,6 +731,32 @@ const SUITE = [
   { id: 'countdown', tier: 'ui', profiles: ['live', 'quality'], timeout: 3000,
     cmd: ['node', 'qa/countdown.mjs', PORT, 'maple'], verdict: pf,
     why: 'the final-ten numeral carries a contour of at least 4px and covers under 10% of the hero\'s face box at ?len=15, clock 7, on 430x932, 390x844 and 360x780' },
+
+  // ── THREE PUSH PROBES THAT JOB 7'S modalIn MAY HAVE BLINDED ───────────────
+  // pictograph, pickerfit and lockedcards open #worlds (and pictograph #shop
+  // and #profile too) and read them after a fixed wait. Job 7 made those
+  // sheets arrive on modalIn, whose first keyframe is opacity 0, and none of
+  // the three finishes it: pictograph skips text under an opacity-0 ancestor
+  // and only NOTES known entries that match nothing, so a blind walk prints
+  // PASS; the other two photograph the picker. Whether any of them is blind
+  // on this machine has not been measured. Each probe's --atrest path
+  // finishes the arrival first (qa/_atrest.mjs), fails if the sheet is not at
+  // opacity 1, and — for pictograph — fails when a screen shows none of its
+  // KNOWN entries. That code has not been run, so it is here and not in push;
+  // the push steps keep the unflagged probes, which have. Timeouts are the
+  // push steps' own, not measured: --atrest adds two to three page evaluates
+  // and one 120 ms wait per sheet it reads.
+  // Once a run is green, promotion is adding '--atrest' to the push step's
+  // cmd and deleting the step here.
+  { id: 'pictograph-atrest', tier: 'ui', profiles: ['live', 'quality'], timeout: 600,
+    cmd: ['node', 'qa/pictograph.mjs', PORT, '--atrest'], verdict: pf,
+    why: 'no emoji on a screen a child looks at, read with each sheet at rest — a walk that skips #worlds, #shop and #profile as invisible because their arrival had not begun cannot pass by finding nothing' },
+  { id: 'pickerfit-atrest', tier: 'ui', profiles: ['live', 'quality'], timeout: 300,
+    cmd: ['node', 'qa/pickerfit.mjs', PORT, '--atrest'], verdict: pf,
+    why: 'a six-year-old can read every world name and tagline on the picker, measured on a picker that is at opacity 1 when it is photographed' },
+  { id: 'lockedcards-atrest', tier: 'ui', profiles: ['live', 'quality'], timeout: 300,
+    cmd: ['node', 'qa/lockedcards.mjs', PORT, '--atrest'], verdict: pf,
+    why: 'a child can still tell the locked worlds apart, measured on a picker that is at opacity 1 when it is photographed' },
 
   ...WORLDS.map(w => ({ id: `postpipe:${w}`, tier: 'art', profiles: ['live', 'art'], timeout: 420,
     cmd: ['node', 'qa/postpipe.mjs', w, PORT, '--gate'], verdict: exitCode,
