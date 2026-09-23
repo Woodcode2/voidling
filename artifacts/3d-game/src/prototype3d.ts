@@ -8471,9 +8471,10 @@ function endMatch(result: GoalResult = null) {
  *  The growth bar's step rides the same schedule, so the number and the bar
  *  move together rather than at two different rhythms. */
 let eatFloatPts = 0, eatFloatT = 0;
-/** the biggest bite in the bank, and whether a landmark went in — the flight's
- *  size reads both. See the flush in the frame loop. */
-let eatFloatK = 0, eatFloatLm = false;
+/** whether a landmark went into the bank — its flight is always full size */
+let eatFloatLm = false;
+/** a running average of the banks she has been paid this match (see the flush) */
+let eatFloatAvg = 0;
 const eatFloatAt = new THREE.Vector3();
 const EAT_FLOAT_WINDOW = 0.45;
 /** ── AND THE BAR HAS TO SAY IT GOT IT ──────────────────────────────────────
@@ -8780,7 +8781,6 @@ function capture(e: Edible, giveHunger = true) {
   // satisfying read: the burst becomes one punch instead of a stutter of ones.
   eatFloatPts += pts;
   chainPts += pts;
-  eatFloatK = Math.max(eatFloatK, bite);
   if (e.mesh.userData.landmark) eatFloatLm = true;
   eatFloatAt.set(e.mesh.position.x, voidling.radius + 2.2, e.mesh.position.z);
   if (eatFloatT <= 0) eatFloatT = EAT_FLOAT_WINDOW;   // LEADING: arm on the first bite, never re-arm
@@ -10979,7 +10979,7 @@ function resetMatch() {
                 camOffset.y * camDist,
                 voidState.z + camOffset.z * camDist);
   playerScore = 0; hunger = 0; combo = 0; prevRank = 0; chompCd = 0; newsCd = COPY.signOn;
-  comboT = 0; chainPts = 0; eatFloatK = 0; eatFloatLm = false;   // a chain never carries into the next match
+  comboT = 0; chainPts = 0; eatFloatLm = false; eatFloatAvg = 0;   // a chain never carries into the next match
   partyClear();
   // the whole rank-announce machine restarts with the match, or a rematch
   // opens with a stale crown to lose and a stale announcedRank to suppress
@@ -14623,23 +14623,24 @@ function animate() {
       // here, so the payout cannot happen before the number that explains it.
       // bubbles.flyTo guarantees it fires in every motion state — under
       // reduced motion the duration is zero and it lands on the next frame.
-      // …and it is as big as what went in. Two terms. The points: 1 +
-      // 0.22·log10(points), 1 to 1.8, so the numbers grow across a match. And
-      // the MEAL, graded on `bite` — the meal's size against his own, the scale
-      // every other eat cue in this file rides on — from x1 for crumbs to x1.6
-      // for a meal nearly his size or a landmark. The spec's version made the
-      // meal term a flat x1.25 over 0.55, and measured on a real spree
-      // (qa/nomstream.mjs, 2026-09-23) the biggest number came out only 1.30x
-      // the smallest: the log compresses the points, and one step cannot say
-      // "that was a big one". Capped at 2.2 (44px). Inside a beat window it
-      // wears the beat's colour, so the doubled value is seen on the number
-      // that carries it.
-      const meal = eatFloatLm ? 1 : Math.min(1, Math.max(0, (eatFloatK - 0.15) / 0.55));
-      const k = Math.min(2.2, Math.min(1.8, Math.max(1, 1 + 0.22 * Math.log10(eatFloatPts)))
-        * (1 + 0.6 * meal));
+      // …and a BIG ONE looks big. Sized against her own recent run of numbers
+      // rather than on any fixed scale: 1 + 0.6·log2(bank / recent average),
+      // 1 to 1.8 — an ordinary bank at 20px, one twice her usual at ~1.6x, a
+      // landmark always at the top. Two fixed scales were measured first on a
+      // real spree (qa/nomstream.mjs, 2026-09-23) and both failed to tell a big
+      // bank from a small one: the spec's 1 + 0.22·log10(points) with x1.25
+      // over a half-size meal read 1.30x largest to smallest, and a meal term
+      // graded on `bite` read 1.13x — at the start of a match the void is so
+      // small that nearly every meal is "big" to him, so it saturated and every
+      // number came out 40px. Relative to her own average, the standout reads
+      // as a standout at every size. Inside a beat window it wears the beat's
+      // colour, so the doubled value is seen on the number that carries it.
+      const rel = eatFloatAvg > 0 ? eatFloatPts / eatFloatAvg : 1;
+      const k = eatFloatLm ? 1.8 : Math.min(1.8, Math.max(1, 1 + 0.6 * Math.log2(rel)));
+      eatFloatAvg = eatFloatAvg > 0 ? eatFloatAvg * 0.75 + eatFloatPts * 0.25 : eatFloatPts;
       bubbles.flyTo(eatFloatAt, `+${eatFloatPts.toLocaleString()}`, gBarTarget, gbarPay,
         { scale: k, color: feverMult > 1 ? `#${feverCol.toString(16).padStart(6, '0')}` : undefined });
-      eatFloatPts = 0; eatFloatK = 0; eatFloatLm = false;
+      eatFloatPts = 0; eatFloatLm = false;
     }
   }
   // …and the bar's own acknowledgement, on the same real-time clock — it is
