@@ -1,6 +1,6 @@
 // "NOW I CAN EAT THAT!" — is the moment a threat becomes food heard and seen?
 //
-//   node qa/nowfood.mjs [port] [world] [--only=a,b,c]
+//   node qa/nowfood.mjs [port] [world] [--only=k,a,b,c]
 //
 // Found by the 2026-09-23 research governor (G7). The instant something that
 // was too big becomes food is the genre's central rush, and here it was
@@ -18,8 +18,12 @@
 // THE DRIVE, each part on its own page and on the GAME's clocks
 // (__matchState().t and tClock — under this software renderer the match
 // clock runs about 14x slower than the wall, so nothing here waits on wall
-// time):
+// time), and one that needs no page at all:
 //
+//   (k) the source itself, in node: the kind table the class float names a
+//       wave from, against every kind tag the island writes. It reads ./src
+//       of the CWD — a preview server cannot be asked for its source — so run
+//       this probe from the tree the build under test was made from.
 //   (a) r 2 (__setVoidR). Every sibling is pulled onto the island at once by
 //       __setRivalScores, which moves each one's joinAt into the past so the
 //       real arrival code places and sizes it: NIBBLES arrives at 1.18x the
@@ -28,7 +32,13 @@
 //       window (55-72%), so NIBBLES is stuffed at whatever she reached and no
 //       sibling can grow back over the line. Then __eatNearest, one bite a
 //       frame, until the void is past 1.2x NIBBLES, and two seconds of tClock
-//       with no eating to catch a late or repeated cue.
+//       with no eating to catch a late or repeated cue. On the frame the void
+//       first passes her line the form-name callout goes up (__formCall), so
+//       the float she earns is raised under a live callout.
+//       Then a SECOND page, set up the same way to the end of her hunt, where
+//       the void is put down on NIBBLES and set past her line in one step, so
+//       the frame that first sees the crossing swallows her; it is watched
+//       until 1.5 s of tClock after she is back on the island, tiny.
 //   (b) The goal card is let finish; the void is put down on bare land
 //       beside the biggest cluster of TAGGED static props over r 2 and set
 //       just under that cluster's smallest member (see below for why both),
@@ -49,6 +59,11 @@
 //       the prop's own shakeT edge — and left sitting inside it for 1.5 s.
 //
 // THE BARS
+//   (k1) every kind tag the source writes (as `.qk = '...'`, or as the kind
+//        argument of the island's drop() and plant()) has a KIND_WORD entry or
+//        is one kindWord() handles by name — a tag with none goes to the
+//        generic line exactly as a deliberate `null` does, so the omission is
+//        silent
 //   (a1) exactly ONE outgrown cue (__outgrownN), and it is NIBBLES's
 //   (a2) exactly one 'outgrow' in the audio call log and exactly one float
 //        naming NIBBLES, both inside the second of tClock after the first frame
@@ -61,6 +76,16 @@
 //        and never covers the NOMS pill, at any visible pose of its rise on any
 //        frame it is up — and at least one pose is seen, or there was nothing
 //        to measure. Poses, not frames: see the sampler for why
+//   (a5) a sibling EATEN on the frame she crosses the line is not announced:
+//        no cue, no 'outgrow', no BIGGER THAN float from the step through her
+//        respawn and 1.5 s after it. Found by review on the first fix: the
+//        eat branch runs before the latch and skips it, the dying and respawn
+//        branches skip it too, so the latch never saw the crossing — and she
+//        came back tiny, the player past her line, and was announced then
+//   (a6) the float never covers the form-name callout at any visible pose,
+//        graded against every visible point of the callout's path (the
+//        interface promises a head float clears it) — and at least one pose
+//        is seen while the callout is up
 //   (b1) each of the three steps un-greyed a wave, read off the props: 8 or
 //        more in one tick, or a non-mover over r 2 — the precondition
 //   (b2) the game counted the same number of waves the props showed
@@ -84,22 +109,26 @@
 // or in the outro; qa/endbeat.mjs and qa/endparty.mjs hold that end. And the
 // ring census is qa/ringcount.mjs's: this change adds no ring, and its AWAY
 // share is read on both builds, not asserted here.
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { enterMatch } from './_enter.mjs';
 
 const POS = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const PORT = POS[0] || '4177', WORLD = POS[1] || 'maple';
-// --only=a,c runs just those parts (each is its own page) — for working on one
-// of them; the gate runs all three
-const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '--only=a,b,c').slice(7).split(',');
+// --only=a,c runs just those parts (each is its own page, and (k) needs none)
+// — for working on one of them; the gate runs all four
+const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '--only=k,a,b,c').slice(7).split(',');
 const OUT_RE = /BIGGER THAN/i, CLASS_RE = /ARE FOOD NOW/i;
 
 const die = (m) => { console.log(`FAIL — ${m}`); process.exit(1); };
 process.on('uncaughtException', (e) => die(`threw: ${String((e && e.message) || e).split('\n')[0]}`));
 process.on('unhandledRejection', (e) => die(`rejected: ${String((e && e.message) || e).split('\n')[0]}`));
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
-  args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
+// launched on the first page a part asks for: (k) alone runs in node, no page
+let b = null;
+const browser = async () => (b ??= await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+  args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] }));
 
 let bad = 0, bars = 0;
 const bar = (ok, id, msg) => { bars++; console.log(`  ${ok ? 'ok  ' : 'BAD '} (${id}) ${msg}`); if (!ok) bad++; };
@@ -111,7 +140,7 @@ async function waitT(p, s, from) {
 }
 
 async function open(r0) {
-  const p = await b.newPage({ viewport: { width: 430, height: 932 } });
+  const p = await (await browser()).newPage({ viewport: { width: 430, height: 932 } });
   p.on('pageerror', (e) => console.log('  PAGEERR ' + String(e).slice(0, 160)));
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
   await p.addInitScript(() => { try {
@@ -145,7 +174,7 @@ async function open(r0) {
   // against the face box bubbles.ts itself dodges and against the NOMS pill.
   await p.evaluate(([outSrc, clsSrc]) => {
     const OUT = new RegExp(outSrc, 'i'), CLS = new RegExp(clsSrc, 'i');
-    const L = window.__nf = { raises: [], frames: 0, face: 0, pill: 0, off: 0, worst: null };
+    const L = window.__nf = { raises: [], frames: 0, face: 0, pill: 0, off: 0, worst: null, formFrames: 0, form: 0, formWorst: null };
     const d = Object.getOwnPropertyDescriptor(Element.prototype, 'className');
     document.querySelectorAll('.vf').forEach((el) => {
       Object.defineProperty(el, 'className', {
@@ -178,6 +207,24 @@ async function open(r0) {
           const fb = window.__formBox();
           const noms = document.getElementById('noms');
           const nr = noms && noms.classList.contains('on') ? noms.getBoundingClientRect() : null;
+          // ── …AND THE FORM-NAME CALLOUT'S WHOLE PATH, WHEN IT IS UP ─────────
+          // The callout rides him on the bubbles' own clock and this float on
+          // the wall clock, so no pose of one can be paired with a pose of the
+          // other. The callout is graded as its PATH instead: every point of
+          // its life that is visible (opacity over 0.05), placed by the game's
+          // own geometry (__formSweep, against this frame's face box) as the
+          // box its unscaled self would fill — its bottom edge at y and its
+          // own layout height above that. The scaled box (transform-origin at
+          // its bottom centre) is always inside that one.
+          const formEl = document.getElementById('form');
+          const path = [];
+          if (formEl && formEl.classList.contains('on') && fb.on) {
+            const w = formEl.offsetWidth, h = formEl.offsetHeight;
+            for (let i = 0; i <= 50; i++) {
+              const f = window.__formSweep(i / 50);
+              if (f && f.o > 0.05) path.push({ left: f.x - w / 2, right: f.x + w / 2, top: f.y - h, bottom: f.y, a: i / 50 });
+            }
+          }
           const an = (el.getAnimations ? el.getAnimations() : [])[0];
           const dur = an ? Number(an.effect.getTiming().duration) || 0 : 0;
           const keep = an ? an.currentTime : null;
@@ -190,6 +237,15 @@ async function open(r0) {
             if (fb.on && inter(r, fb)) { L.face++; L.worst = L.worst ?? { text, pose: k, r: [r.left, r.top, r.right, r.bottom].map(Math.round), fb: [fb.left, fb.top, fb.right, fb.bottom].map(Math.round) }; }
             if (nr && nr.width && inter(r, nr)) L.pill++;
             if (r.left < 0 || r.right > innerWidth || r.top < 0) L.off++;
+            if (path.length) {
+              L.formFrames++;
+              const hit = path.find((q) => inter(r, q));
+              if (hit) {
+                L.form++;
+                L.formWorst = L.formWorst ?? { text, pose: k, r: [r.left, r.top, r.right, r.bottom].map(Math.round),
+                  callout: [hit.left, hit.top, hit.right, hit.bottom].map(Math.round), a: hit.a };
+              }
+            }
           }
           if (an && keep !== null) an.currentTime = keep;
         }
@@ -203,6 +259,49 @@ async function open(r0) {
 const calls = (p, from) => p.evaluate((x) => window.__audioCalls().filter((c) => c.t >= x), from);
 
 console.log(`\n  NOW I CAN EAT THAT — ${WORLD} on :${PORT}\n`);
+
+// ══ (k) EVERY KIND HAS A WORD, OR IS GENERIC ON PURPOSE ══════════════════════
+// kindWord() sends a tag it has no entry for to the generic line — the same
+// place a tag deliberately listed as `null` goes — so a missing entry is
+// silent: the wave is named "BIGGER THINGS" and nothing says why. Read off
+// the source, not a copy: KIND_WORD's keys and the tags kindWord() tests by
+// name, against every tag the source writes as a literal, through the three
+// routes it uses — `.qk = '<tag>'`, and the kind argument of the island's
+// drop() and plant() placements. A route that finds nothing is an abort,
+// not a pass: the call sites have moved and this bar would be blind.
+if (ONLY.includes('k')) {
+  const SRC = join(process.cwd(), 'src');
+  const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : e.name.endsWith('.ts') ? [join(d, e.name)] : []));
+  const files = walk(SRC);
+  const proto = readFileSync(join(SRC, 'prototype3d.ts'), 'utf8');
+  const tbl = proto.match(/const KIND_WORD: Record<string, string \| null> = \{([\s\S]*?)\n\};/);
+  const fn = proto.match(/function kindWord\(e: Edible\)[^{]*\{([\s\S]*?)\n\}/);
+  if (!tbl || !fn) die(`(k1) ${!tbl ? 'KIND_WORD' : 'kindWord()'} is not where prototype3d.ts had it — the kind table cannot be read`);
+  const keys = new Set([...tbl[1].matchAll(/(\w+)\s*:/g)].map((m) => m[1]));
+  const named = new Set([...fn[1].matchAll(/qk === '([\w-]+)'/g)].map((m) => m[1]));
+  const routes = {
+    assign: /\.qk\s*=\s*'([\w-]+)'/g,
+    drop: /\bdrop\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*?,\s*'([\w-]+)'\s*(?:,\s*[^,()']+)?\)/g,
+    plant: /\bplant\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*?,\s*'([\w-]+)'\s*(?:,\s*[^,()']+)?\)/g,
+  };
+  const tags = new Map();   // tag -> first file:line it is written at
+  const perRoute = {};
+  for (const f of files) {
+    const s = readFileSync(f, 'utf8');
+    for (const [k, re] of Object.entries(routes)) {
+      for (const m of s.matchAll(re)) {
+        perRoute[k] = (perRoute[k] ?? 0) + 1;
+        if (!tags.has(m[1])) tags.set(m[1], `${f.slice(SRC.length + 1)}:${s.slice(0, m.index).split('\n').length}`);
+      }
+    }
+  }
+  const blind = Object.keys(routes).filter((k) => !perRoute[k]);
+  if (blind.length) die(`(k1) no kind tag found through ${blind.join(', ')} — the call sites have moved and the census would be blind`);
+  const miss = [...tags].filter(([t]) => !keys.has(t) && !named.has(t));
+  console.log(`  ·   (k1) ${tags.size} kind tags written (${Object.entries(perRoute).map(([k, n]) => `${k} ${n}`).join(', ')}); KIND_WORD has ${keys.size}, kindWord() names ${[...named].join(', ')}`);
+  bar(!miss.length, 'k1', miss.length ? `tag(s) with no entry, so their wave is named generically by omission: ${miss.map(([t, at]) => `'${t}' (${at})`).join(', ')}`
+    : 'every kind tag the island writes has a word, or is listed as generic on purpose');
+}
 
 // ══ (a) THE SIBLING WHO BECOMES FOOD ═════════════════════════════════════════
 if (ONLY.includes('a')) {
@@ -221,14 +320,20 @@ if (ONLY.includes('a')) {
   // past the hunt and past the surge window: nobody grows back over the line
   await p.evaluate(() => { const ms = window.__matchState(); window.__rushClock((ms.t + ms.clock) * 0.25); });
   await p.waitForFunction(() => !window.__matchState().rivals.find((r) => r.name === 'NIBBLES').hunt, null, { timeout: 900000, polling: 200 });
-  // the crossing, read every frame off the game's own radii
+  // the crossing, read every frame off the game's own radii — and on that
+  // frame the form-name callout goes up (__formCall, the qa/formcall.mjs
+  // route), so the float is raised under a live callout: growth drives both,
+  // and the bite that takes her past NIBBLES can be the bite that evolves her
   await p.evaluate(() => {
     const X = window.__nfx = { rows: 0, cross: null };
     const tick = () => {
       const ms = window.__matchState();
       const n = ms.rivals.find((r) => r.name === 'NIBBLES');
       X.rows++;
-      if (!X.cross && n && ms.r > n.r * 1.2) X.cross = { tc: ms.tClock, R: ms.r, rN: n.r };
+      if (!X.cross && n && ms.r > n.r * 1.2) {
+        X.cross = { tc: ms.tClock, R: ms.r, rN: n.r };
+        window.__formCall('CHOMPOSAURUS');
+      }
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
@@ -271,6 +376,74 @@ if (ONLY.includes('a')) {
     : `nothing for the ${smaller.length} sibling(s) who joined already smaller`);
   bar(L.frames > 0 && !L.face && !L.pill && !L.off, 'a4', !L.frames ? 'the float was never on screen to measure — face and NOMS pill untested'
     : `the float over ${L.frames} visible pose(s): on his face ${L.face}, on the NOMS pill ${L.pill}, off screen ${L.off}${L.worst ? ` — ${JSON.stringify(L.worst)}` : ''}${L.err ? ` (sampler: ${L.err})` : ''}`);
+  bar(L.formFrames > 0 && !L.form, 'a6', !L.formFrames ? 'the float was never on screen while the form-name callout was up — the callout untested'
+    : `the float over ${L.formFrames} visible pose(s) under a live form-name callout: on the callout's path ${L.form}${L.formWorst ? ` — ${JSON.stringify(L.formWorst)}` : ''}`);
+
+  // ── (a5) EATEN ON THE CROSSING ─────────────────────────────────────────────
+  // The likeliest way a child eats NIBBLES as the marquee meal: the gold PRIZE
+  // halo shows from 1.05x, a sibling does not run until she can be swallowed,
+  // so the child sits on her and takes her on the very frame she crosses the
+  // 1.2x line. That meal is not news to be told later — the child just ate
+  // her. Its own page, set up exactly as above (her hunt over, nobody else
+  // able to cross back), and then ONE step: the void put down on her and set
+  // past her line in the same evaluate, so the frame that first sees the
+  // crossing is the frame that swallows her. Then graded from that step
+  // until 1.5 s of tClock after she is seen back on the island — the tiny
+  // respawn is where a stale cue would land — for no cue, no 'outgrow' and no
+  // float naming anyone as outgrown. Her return is read off the game (her
+  // position jumps from the pit to the far coast), not timed from a copied
+  // respawn constant.
+  {
+    const q = await open(2);
+    await q.evaluate(() => window.__setRivalScores([]));
+    await q.waitForFunction(() => { const ms = window.__matchState(); return ms.rivals.length > 0 && ms.rivals.every((r) => r.joined); },
+      null, { timeout: 900000, polling: 200 });
+    await q.evaluate(() => { const ms = window.__matchState(); window.__rushClock((ms.t + ms.clock) * 0.25); });
+    await q.waitForFunction(() => !window.__matchState().rivals.find((r) => r.name === 'NIBBLES').hunt, null, { timeout: 900000, polling: 200 });
+    const s0 = await q.evaluate(() => {
+      const ms = window.__matchState(), n = ms.rivals.find((r) => r.name === 'NIBBLES');
+      return { R: ms.r, rN: n.r, eaten: ms.ev.eaten, outN: window.__outgrownN() };
+    });
+    if (s0.R > s0.rN * 1.2) die(`(a5) NIBBLES is already under the player's line before the step (r ${s0.rN.toFixed(2)} vs R ${s0.R.toFixed(2)}) — no crossing to take in one step`);
+    // her whole story, frame by frame: the frame she goes into the pit, and
+    // the frame she is back on land
+    await q.evaluate((eaten0) => {
+      const E = window.__nfe = { eat: null, back: null, last: null };
+      const tick = () => {
+        const ms = window.__matchState(), n = ms.rivals.find((r) => r.name === 'NIBBLES');
+        if (!E.eat && ms.ev.eaten > eaten0) E.eat = { tc: ms.tClock, outN: window.__outgrownN() };
+        if (E.eat && !E.back && E.last && Math.hypot(n.x - E.last.x, n.z - E.last.z) > 20)
+          E.back = { tc: ms.tClock, R: ms.r, rN: n.r };
+        E.last = { x: n.x, z: n.z };
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }, s0.eaten);
+    const step = await q.evaluate(() => {
+      const ms = window.__matchState(), n = ms.rivals.find((r) => r.name === 'NIBBLES');
+      window.__warpVoid(n.x, n.z); window.__setVoidR(n.r * 1.3);
+      return { tc: ms.tClock, rN: n.r, R: n.r * 1.3 };
+    });
+    await q.waitForFunction((x) => !!window.__nfe.eat || window.__matchState().tClock > x, step.tc + 1.0, { timeout: 900000, polling: 100 });
+    const E1 = await q.evaluate(() => window.__nfe);
+    if (!E1.eat) { await q.close(); die(`(a5) the void was put down on NIBBLES at ${step.R.toFixed(2)} (her r ${step.rN.toFixed(2)}) and she was not eaten inside 1 s of tClock — the step did not happen`); }
+    await q.waitForFunction(() => !!window.__nfe.back, null, { timeout: 900000, polling: 250 });
+    const back = await q.evaluate(() => window.__nfe.back);
+    await waitT(q, 1.5, back.tc);
+    const L5 = await q.evaluate(() => window.__nf);
+    const cs5 = await calls(q, step.tc);
+    const outN5 = await q.evaluate(() => window.__outgrownN()) - s0.outN;
+    await q.close();
+    const outs5 = cs5.filter((c) => c.id === 'outgrow');
+    const fl5 = L5.raises.filter((r) => r.tc >= step.tc && OUT_RE.test(r.text));
+    console.log(`  ·   (a5) stepped onto NIBBLES (r ${step.rN.toFixed(2)}) at R ${step.R.toFixed(2)} at tClock ${step.tc.toFixed(2)}; eaten at ${E1.eat.tc.toFixed(2)} `
+      + `with ${E1.eat.outN - s0.outN} cue(s) so far; back on the island at ${back.tc.toFixed(2)} (r ${back.rN.toFixed(2)} against R ${back.R.toFixed(2)}); `
+      + `watched to ${(back.tc + 1.5).toFixed(2)}: cues ${outN5}; outgrow calls ${outs5.map((c) => c.t.toFixed(2)).join(' ') || 'none'}; floats ${fl5.map((r) => `"${r.text}" @${r.tc.toFixed(2)}`).join(' ') || 'none'}`);
+    bar(!outN5 && !outs5.length && !fl5.length, 'a5', !outN5 && !outs5.length && !fl5.length
+      ? 'eaten on the frame she crossed: no outgrown cue, no \'outgrow\' and no float, through her respawn and 1.5 s after it'
+      : `eaten on the frame she crossed, and still announced: ${outN5} cue(s), ${outs5.length} 'outgrow' call(s), ${fl5.length} float(s) — `
+        + `${fl5.concat(outs5).map((r) => `+${((r.tc ?? r.t) - back.tc).toFixed(2)} s after her respawn`).join(', ')}`);
+  }
 }
 
 // ══ (b) THE WORLD LIGHTS UP ══════════════════════════════════════════════════
@@ -487,6 +660,7 @@ if (ONLY.includes('b')) {
   }
   bar(L.frames > 0 && !L.face && !L.pill && !L.off, 'b6', !L.frames ? 'the class float was never on screen to measure — face and NOMS pill untested'
     : `the class float over ${L.frames} visible pose(s): on his face ${L.face}, on the NOMS pill ${L.pill}, off screen ${L.off}${L.worst ? ` — ${JSON.stringify(L.worst)}` : ''}${L.err ? ` (sampler: ${L.err})` : ''}`);
+
 }
 
 // ══ (c) THE BUMP ═════════════════════════════════════════════════════════════
@@ -534,8 +708,8 @@ if (ONLY.includes('c')) {
   bar(w1 === w0, 'c3', w1 === w0 ? 'the shore did not answer: the bonk is the prop\'s' : `the wall cue fired ${w1 - w0} time(s) — the bonk cannot be attributed to the prop`);
 }
 
-await b.close();
+if (b) await b.close();
 if (bad) console.log(`\nFAIL — ${bad} of ${bars} bar(s)`);
-else if (ONLY.length < 3) console.log(`\nPASS — ${bars} bar(s) of part(s) ${ONLY.join(', ')} (the gate runs all three)`);
+else if (ONLY.length < 4) console.log(`\nPASS — ${bars} bar(s) of part(s) ${ONLY.join(', ')} (the gate runs all four)`);
 else console.log(`\nPASS — ${bars} bar(s): the sibling she outgrows is announced once, the world lights up outward with one class float, and a bump into something too big says "not yet" once`);
 process.exit(bad ? 1 : 0);

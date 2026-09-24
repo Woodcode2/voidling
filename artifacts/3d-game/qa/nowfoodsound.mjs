@@ -8,6 +8,16 @@
 // imports /src, so [devport] must be a vite DEV server serving the build under
 // test (`npx vite --port <p>` from artifacts/3d-game), not a preview of dist/.
 //
+// AND IT MUST BE RUN FROM THE TREE THAT SERVER SERVES. Two of its halves read
+// two different places: (b1), (b2), (o1), (o2), (s1) and (s2) render the synth
+// the dev server imports, and (b3) bundles the synth from ./src of the cwd
+// (qa/_synthgraph.mjs, loadSynth). Run from one worktree against a server on
+// another, it graded two builds and printed one verdict — found in review: 6
+// of 7 on a pre-fix server, where the pre-fix tree run on itself read 7 of 7
+// BAD. So the first thing it does is ask the server for the two files the
+// synth bundle is entered from (?raw, the file as it sits on disk) and abort
+// if either differs from the cwd's copy.
+//
 // THE THREE CUES, AND THE ONE RULE THE BUMP INHERITS
 // A touch on a prop that is still too big means "you can't have that (yet)",
 // and since studio round 4's Job 10 that meaning has ONE sound: bonk() — the
@@ -47,6 +57,7 @@
 //        lighting up, not a reward: peak at or under the pop's) and still
 //        audible (peak within 12 dB of the quietest pop's)
 //   (s2) sparkle() rises, first sounding window to last, as (o2)
+import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { loadSynth, rig } from './_synthgraph.mjs';
 import { ALL_WORLDS } from './worlds.mjs';
@@ -60,6 +71,24 @@ const p = await b.newPage();
 // a static page on the dev server's origin — the import below needs only the
 // origin, and loading `/` would build a whole world for a probe that draws nothing
 await p.goto(`http://127.0.0.1:${PORT}/privacy.html`, { waitUntil: 'domcontentloaded', timeout: 300000 });
+
+// ── ONE TREE, NOT TWO ─────────────────────────────────────────────────────────
+{
+  const ENTRY = ['src/proto3d/audio3d.ts', 'src/proto3d/island.ts'];
+  const served = await p.evaluate(async (paths) => {
+    const out = {};
+    for (const f of paths) {
+      try { out[f] = (await import(`/${f}?raw`)).default; } catch { out[f] = null; }
+    }
+    return out;
+  }, ENTRY);
+  const differ = ENTRY.filter((f) => served[f] !== readFileSync(f, 'utf8'));
+  if (differ.length) {
+    await b.close();
+    die(`the dev server on :${PORT} serves ${differ.map((f) => (served[f] === null ? `no ${f}` : `a different ${f}`)).join(' and ')} from the one in ${process.cwd()} — `
+      + '(b3) would grade this checkout and every other bar the server\'s. Run it from the tree the server serves');
+  }
+}
 
 const R = await p.evaluate(async () => {
   let mod;
