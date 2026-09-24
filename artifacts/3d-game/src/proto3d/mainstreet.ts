@@ -17,6 +17,7 @@ import { mulberry32 } from './rng';
 import { part, mergedProp, PROP_SMOOTH_MAT, shade, glossy } from './island';
 import { registerGloss } from './gloss';
 import { roundedBox } from './life';
+import { voiced } from './eatvoice';
 
 /** A prop with NO FRONT. island.ts's place() turns anything tagged here by a
  *  hash of its own position, because 87% of Maple Falls sat at exactly 0
@@ -1232,9 +1233,10 @@ export function makeGrainElevator(): THREE.Mesh {
   return M(p);
 }
 
-/** THE TRACTOR. Green, obviously. */
+/** THE TRACTOR. Green, obviously. It meeps when eaten, like every other
+ *  thing with wheels and a driver (eatvoice.ts). */
 export function makeTractor(): THREE.Mesh {
-  return M([
+  return voiced(M([
     part(box(3.4, 1.1, 1.5), 0x3f7a4e, 0, 1.5, 0),                      // body
     part(box(1.7, 1.4, 1.4), 0x3f7a4e, -0.8, 2.4, 0),                   // hood/engine
     part(box(1.5, 1.5, 1.6), 0x2f5f3c, 1, 2.5, 0),                      // cab base
@@ -1248,7 +1250,7 @@ export function makeTractor(): THREE.Mesh {
     part(cyl(0.6, 0.6, 0.3, 10), NEON_GOLD, 1.1, 1.15, -1.45, 0, 0, Math.PI / 2),
     part(cyl(0.16, 0.2, 1.6, 6), 0x2c2438, -1.3, 3.7, 0.5),             // exhaust
     part(box(1.6, 0.24, 0.24), RED, -2.2, 1.2, 0),
-  ]);
+  ]), 'meep');
 }
 
 /** THE FARMHOUSE — white, porch all the way round, one rocking chair. */
@@ -1945,5 +1947,5 @@ export function makeMapleTree(): THREE.Mesh {
   // and `leaf` raw is the registered gloss hex, so the 0.14 canopy sheen
   // finally lands on the surface it was priced for.
   p.push(part(new THREE.SphereGeometry(CR, 14, 10), leaf, 0, CY, 0));
-  return noFront(mergedProp(p, PROP_SMOOTH_MAT));
+  return voiced(noFront(mergedProp(p, PROP_SMOOTH_MAT)), 'rustle');
 }

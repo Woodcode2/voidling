@@ -32,6 +32,7 @@
 import * as THREE from 'three';
 import { part, mergedProp, PROP_GLOW_MAT, PROP_SMOOTH_MAT } from './island';
 import { registerGloss } from './gloss';
+import { voiced } from './eatvoice';
 
 /** A prop with NO FRONT. island.ts's place() turns anything tagged here by a
  *  hash of its own position, because 87% of Maple Falls sat at exactly 0
@@ -154,7 +155,10 @@ export function makeLantern(col = G_AMBER, h = 1.15): THREE.Group {
   solid.push(part(new THREE.CylinderGeometry(r * 0.62, r * 0.5, h * 0.1, 8), CHAR, 0, h * 0.04, 0));
   // the tassel
   solid.push(part(new THREE.CylinderGeometry(0.03, 0.03, h * 0.22, 4), VERM, 0, -h * 0.09, 0));
-  return lit(solid, glow);
+  // paper over a frame: eaten, it crinkles and pings (eatvoice.ts). So do the
+  // string, the floating lantern and the step lantern's paper box; the stone
+  // lantern is granite with a slit of light in it, and stays silent.
+  return voiced(lit(solid, glow), 'crinkle');
 }
 
 /** A run of lanterns on a slack wire, for spanning the canal. `span` is the
@@ -186,7 +190,7 @@ export function makeLanternString(span = 16, n = 5): THREE.Group {
     solid.push(part(new THREE.CylinderGeometry(r * 0.48, r * 0.6, 0.09, 8), CHAR, x, y - 0.16, 0));
     solid.push(part(new THREE.CylinderGeometry(r * 0.6, r * 0.48, 0.09, 8), CHAR, x, y - 1.08, 0));
   }
-  return lit(solid, glow);
+  return voiced(lit(solid, glow), 'crinkle');
 }
 
 /** A stone lantern: square hood, a burning slit on each face, moss at the
@@ -384,7 +388,7 @@ export function makeFloatLantern(): THREE.Group {
   solid.push(part(new THREE.BoxGeometry(0.9 * k, 0.1 * k, 0.9 * k), TIMBER_D, 0, 0.05 * k, 0));
   glow.push(part(new THREE.BoxGeometry(0.62 * k, 0.62 * k, 0.62 * k), pick([G_PAPER, G_AMBER, G_RED]), 0, 0.42 * k, 0));
   solid.push(part(new THREE.BoxGeometry(0.7 * k, 0.06 * k, 0.7 * k), CHAR, 0, 0.76 * k, 0));
-  return lit(solid, glow);
+  return voiced(lit(solid, glow), 'crinkle');
 }
 
 /** A stand of bamboo. The valley wall, and the only thing at the rim — it is
@@ -404,7 +408,7 @@ export function makeBamboo(): THREE.Object3D {
       p.push(part(new THREE.BoxGeometry(1.5, 0.05, 0.22), GREEN_L,
         x + rnd(-0.6, 0.6), h * rnd(0.72, 0.95), z + rnd(-0.6, 0.6), 0, rnd(0, 6.28), rnd(-0.4, 0.4)));
   }
-  return noFront(mergedProp(p, PROP_SMOOTH_MAT));
+  return voiced(noFront(mergedProp(p, PROP_SMOOTH_MAT)), 'rustle');
 }
 
 /** The teahouse: a low cedar building with a deep eave, paper screens lit from
@@ -949,7 +953,7 @@ export function makeFernClump(): THREE.Object3D {
       Math.cos(a) * L * 0.42, rnd(0.25, 0.5), Math.sin(a) * L * 0.42,
       0, -a, rnd(-0.5, -0.2)));
   }
-  return noFront(mergedProp(p, PROP_SMOOTH_MAT));
+  return voiced(noFront(mergedProp(p, PROP_SMOOTH_MAT)), 'rustle');
 }
 
 /** A weathered path marker: a squared post with a carved face, half sunk.
@@ -1026,7 +1030,7 @@ export function makeStepLantern(): THREE.Group {
   solid.push(part(new THREE.BoxGeometry(0.16, 0.36, 0.16), CHAR, 0, 0.26, 0));
   glow.push(part(new THREE.BoxGeometry(0.36, 0.34, 0.36), G_PAPER, 0, 0.6, 0));
   solid.push(part(new THREE.BoxGeometry(0.46, 0.07, 0.46), TILE_D, 0, 0.8, 0));
-  return lit(solid, glow);
+  return voiced(lit(solid, glow), 'crinkle');
 }
 
 // ══════════════════════════════════════════════════════════════════════════

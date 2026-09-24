@@ -21,6 +21,7 @@ import * as THREE from 'three';
 // new one has to be justified as a rock or a crystal before it can ship.
 import { part, mergedProp } from './island';
 import { registerGloss } from './gloss';
+import { voiced } from './eatvoice';
 
 /** A prop with NO FRONT. island.ts's place() turns anything tagged here by a
  *  hash of its own position, because 87% of Maple Falls sat at exactly 0
@@ -700,7 +701,7 @@ export function makePalmLux(): THREE.Group {
     p.push(part(new THREE.SphereGeometry(0.11, 6, 5), i % 3 ? GOLD_B : 0xfff0b8,
       Math.sin(lean) * 3.4 * t + Math.cos(a) * 0.34, 0.5 + t * 6.6, Math.sin(a) * 0.34));
   }
-  return noFront(finish(p));
+  return voiced(noFront(finish(p)), 'rustle');
 }
 
 /** Marble mermaid fountain, ~9 across, ~8 tall. */

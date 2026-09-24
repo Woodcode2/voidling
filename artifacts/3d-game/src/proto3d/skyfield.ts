@@ -60,6 +60,7 @@
 // ══════════════════════════════════════════════════════════════════════════
 import * as THREE from 'three';
 import { part, mergedProp, PROP_GLOW_MAT } from './island';
+import { voiced } from './eatvoice';
 
 // ── the palette ────────────────────────────────────────────────────────────
 // The field's own colours are cold and drained. Nothing in this block is
@@ -769,7 +770,9 @@ export function skTussock(): THREE.Object3D {
     p.push(part(cone(5), i % 2 ? 0x6f7d5e : GRASS_D, Math.cos(a) * 0.18, 0.28, Math.sin(a) * 0.18,
       Math.cos(a) * 0.25, 0, Math.sin(a) * 0.25, 0.20, 0.62, 0.20));
   }
-  return mergedProp(p);
+  // the field's own greenery rustles when eaten, like a tree does elsewhere —
+  // an airfield has no trees (eatvoice.ts)
+  return voiced(mergedProp(p), 'rustle');
 }
 
 export function skWildflowerClump(): THREE.Object3D {
@@ -780,16 +783,16 @@ export function skWildflowerClump(): THREE.Object3D {
     p.push(part(cyl(0.02, 0.03, 4), 0x6f7d5e, Math.cos(a) * r, 0.22, Math.sin(a) * r, 0, 0, 0, 1, 0.45, 1));
     p.push(part(sph(), petals[i % 3], Math.cos(a) * r, 0.46, Math.sin(a) * r, 0, 0, 0, 0.16, 0.10, 0.16));
   }
-  return mergedProp(p);
+  return voiced(mergedProp(p), 'rustle');
 }
 
 export function skThistle(): THREE.Object3D {
-  return mergedProp([
+  return voiced(mergedProp([
     part(cyl(0.03, 0.05, 5), 0x6f7d5e, 0, 0.34, 0, 0, 0, 0, 1, 0.68, 1),
     part(sph(), 0x8f7fb8, 0, 0.72, 0, 0, 0, 0, 0.22, 0.26, 0.22),
     part(cone(6), 0x6f7d5e, 0, 0.60, 0, 0, 0, 0, 0.22, 0.20, 0.22),
     part(box(), 0x6f7d5e, 0.14, 0.30, 0, 0, 0, 0.7, 0.26, 0.05, 0.10),
-  ]);
+  ]), 'rustle');
 }
 
 /** THE SKYLARK. The world is named after it, so it must be findable and it

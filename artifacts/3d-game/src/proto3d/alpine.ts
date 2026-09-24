@@ -58,6 +58,7 @@
 import * as THREE from 'three';
 import { part, mergedProp, PROP_GLOW_MAT, PROP_SMOOTH_MAT } from './island';
 import { registerGloss } from './gloss';
+import { voiced } from './eatvoice';
 
 /** A prop with NO FRONT. island.ts's place() turns anything tagged here by a
  *  hash of its own position, because 87% of Maple Falls sat at exactly 0
@@ -431,7 +432,7 @@ export function makePine(h = rnd(4.5, 8.5)): THREE.Object3D {
   // the topmost snow, a blob rather than a point — points don't hold snow,
   // but every pine in a photograph of a snowfall has one anyway
   p.push(part(new THREE.SphereGeometry(h * 0.06, 6, 5), SNOW, 0, h * 1.0, 0, 0, 0, 0, 1, 0.8, 1));
-  return noFront(mergedProp(p));
+  return voiced(noFront(mergedProp(p)), 'rustle');
 }
 
 /** A snowdrift: the deep-snow mound the void carves through, so it is the
@@ -449,7 +450,7 @@ export function makeDrift(): THREE.Object3D {
   p.push(part(new THREE.SphereGeometry(0.7 * k, 7, 5), SNOW, 0.8 * k, 0.2 * k, 0.5 * k, 0, rnd(0, 3), 0, 1.2, 0.5, 1));
   p.push(part(new THREE.SphereGeometry(0.55 * k, 7, 5), SNOW, -0.5 * k, 0.34 * k, -0.6 * k, 0, rnd(0, 3), 0, 1, 0.6, 1));
   p.push(part(new THREE.SphereGeometry(0.95 * k, 8, 6), SNOW_D, -0.55 * k, 0.16 * k, 0.1 * k, 0, rnd(0, 3), 0, 1.35, 0.42, 1));
-  return noFront(mergedProp(p, PROP_SMOOTH_MAT));
+  return voiced(noFront(mergedProp(p, PROP_SMOOTH_MAT)), 'poof');
 }
 
 // ── the villagers' handiwork ──────────────────────────────────────────────
@@ -506,7 +507,7 @@ export function makeSnowman(): THREE.Group {
     solid.push(part(new THREE.SphereGeometry(0.3 * k, 8, 6), wool, wob * 2 * k, 2.1 * k, 0.02 * k, 0, 0, 0, 1, 0.75, 1));
     solid.push(part(new THREE.SphereGeometry(0.1 * k, 6, 5), SNOW, wob * 2 * k, 2.34 * k, 0.02 * k));
   }
-  return lit(solid, glow);
+  return voiced(lit(solid, glow), 'poof');
 }
 
 /** A kid-built snowball pyramid: ammunition, stockpiled with real project
@@ -526,7 +527,7 @@ export function makeSnowballStack(): THREE.Object3D {
   // one loose ball that rolled, in shadow colour where it sits in the pile's lee
   if (Math.random() < 0.6)
     p.push(part(new THREE.SphereGeometry(r * 0.8, 6, 5), SNOW_D, -0.55 * k, r * 0.8, 0.4 * k));
-  return noFront(mergedProp(p, PROP_SMOOTH_MAT));
+  return voiced(noFront(mergedProp(p, PROP_SMOOTH_MAT)), 'poof');
 }
 
 /** The red runner sled, parked nose-up the way sleds are abandoned. The

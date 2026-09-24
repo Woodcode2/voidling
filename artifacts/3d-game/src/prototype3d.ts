@@ -36,6 +36,7 @@ import { buildHat } from './proto3d/hatgeo';
 import { createRivals, RIVAL_VOICE, FAMILY_INK } from './proto3d/rivals';
 import { createFx, reduceMotion, setReduceMotion, type Fx } from './proto3d/fx';
 import { createAudio } from './proto3d/audio3d';
+import { EAT_VOICES, type EatVoice } from './proto3d/eatvoice';
 import { SKINS, VOID, type Skin } from './proto3d/palette';
 import { buildGallery, updateLodBias, requestedReady } from './proto3d/assets3d';
 import { pickNews, resetNews, BRAND as PB_BRAND, type Dist as PBDist } from './proto3d/newsroom';
@@ -3530,6 +3531,8 @@ const _dbg = new Proxy(_dbgStore, {
   __composer: () => unknown;
   __juiceState: () => { fov: number; fovKick: number; stop: number; puffs: number; buzzes: number; stopCd: number; kitCd: number };
   __eatNearest: (rel: number) => { r: number; R: number } | null;
+  __eatVoice: (v: string, n?: number, maxR?: number) => { n: number; r: number[]; ids: number[] };
+  __voiceCensus: () => { edibles: number; voices: Record<string, number>; silent: number; silentTags: Record<string, number> };
   __quality: () => { level: number; pinned: number | null; shadows: boolean; shSize: number; pr: number };
   __warpVoid: (x: number, z: number) => void;
   __inDeepWater3: (x: number, z: number, m: number) => boolean;
@@ -3574,7 +3577,7 @@ const _dbg = new Proxy(_dbgStore, {
   __music: () => ReturnType<typeof audio.musicState>;
   __audioLog: () => string[];
   __audioCalls: () => { t: number; w: number; id: string }[];
-  __biteLog: () => { id: number; r: number; cap: number; sink: number; sndT: number; snd: string; gulp: number }[];
+  __biteLog: () => { id: number; r: number; cap: number; sink: number; sndT: number; snd: string; gulp: number; vc: string }[];
   __newsArc: () => {
     log: { t: number; phase: number; tier: number; react: boolean; brand: string; text: string }[];
     arc: { phase: number; cards: number; high: number };
@@ -3625,6 +3628,41 @@ _dbg.__eatNearest = (rel: number) => {
   }
   if (best) capture(best);
   return best ? { r: best.radius, R } : null;
+};
+/** QA (qa/eatvoice.mjs): eat up to `n` of the nearest props whose eat voice is
+ *  `v`, through capture(), so the bite is classified, paid and heard by the
+ *  game's own path. `maxR` keeps it to meals no bigger than that — a caller
+ *  that passes the void's radius gets ordinary bites, not CHOMPs. Returns how
+ *  many it found, their radii and their mesh ids (the key __biteLog is read
+ *  by); a class with none left says 0, which is a finding, not a skip. */
+_dbg.__eatVoice = (v: string, n = 1, maxR = Infinity) => {
+  const pool = edibles.filter((e) => !e.eaten && e.mesh.visible && !e.mesh.userData.departed
+    && !e.mesh.userData.tethered && e.radius <= maxR && eatVoiceOf(e) === v)
+    .sort((a, b) => Math.hypot(a.mesh.position.x - voidState.x, a.mesh.position.z - voidState.z)
+      - Math.hypot(b.mesh.position.x - voidState.x, b.mesh.position.z - voidState.z));
+  const r: number[] = [], ids: number[] = [];
+  for (const e of pool.slice(0, n)) { capture(e); r.push(+e.radius.toFixed(2)); ids.push(e.mesh.id); }
+  return { n: r.length, r, ids };
+};
+/** QA (qa/eatvoice.mjs): the eat-voice census of the world as it stands —
+ *  every uneaten edible's voice, and, for the silent ones, the tag that could
+ *  not be given a voice (qk, else kind, else 'untagged'). Read off the live
+ *  world, so the report is the world a child plays, not a list. */
+_dbg.__voiceCensus = () => {
+  const voices: Record<string, number> = Object.fromEntries(EAT_VOICES.map((v) => [v, 0]));
+  const silentTags: Record<string, number> = {};
+  let silent = 0, n = 0;
+  for (const e of edibles) {
+    if (e.eaten || !e.mesh.visible) continue;
+    n++;
+    const v = eatVoiceOf(e);
+    if (v) { voices[v]++; continue; }
+    silent++;
+    const u = e.mesh.userData;
+    const tag = (u.qk as string) || (u.kind as string) || (u.mover ? 'mover' : 'untagged');
+    silentTags[tag] = (silentTags[tag] ?? 0) + 1;
+  }
+  return { edibles: n, voices, silent, silentTags };
 };
 _dbg.__fadeStats = () => fadeStats;   // QA: why a prop did or did not get its own material
 // QA: the promise dot 4's card makes, so qa/levels.mjs can require the rule
@@ -3682,7 +3720,7 @@ _dbg.__audioCalls = () => audioCalls.slice();
  *  the capture, of the frame the drain crossed T_FALL, of the sound asked for
  *  there, and of the swallow (-1 until each happens). Copies, so a probe cannot
  *  write back into what the drain is about to pay. */
-_dbg.__biteLog = () => biteLog.map((b) => ({ id: b.id, r: b.r, cap: b.cap, sink: b.sink, sndT: b.sndT, snd: b.snd, gulp: b.gulp }));
+_dbg.__biteLog = () => biteLog.map((b) => ({ id: b.id, r: b.r, cap: b.cap, sink: b.sink, sndT: b.sndT, snd: b.snd, gulp: b.gulp, vc: b.vc }));
 // QA: put a hat on the live void. Needed to measure OCCLUSION from the play
 // camera — the thing qa/hatsheet.mjs cannot see, because it renders a hat alone
 // in a bare scene from near-horizontal angles while the game looks DOWN at a
@@ -6375,6 +6413,43 @@ const HARD_Q = HARD_BY_WORLD[pickedWorld] ?? HARD_BY_WORLD.maple;   // easy rota
 // BUILDING never fired on that world either.
 const HOUSE_LIKE = ['house', 'rv', 'chalet', 'lodge', 'hut'];
 
+// ── WHAT DOES THIS MEAL SAY WHEN IT GOES IN? (research governor G5) ─────────
+// Read off the tags the worlds ALREADY write, before the one new tag: a
+// person is anything makePerson built (it always leaves `limbs`), a vehicle is
+// every qk 'car' — life.ts's road and track traffic, Pirate Bay's buggies,
+// Game Day's pickups, Skylark's spectator cars — plus Game Day's motorhomes,
+// Powder's gritter and Skylark's vans, trailers and caravans; a farm animal is
+// the prize goat and Skylark's sheep. Only what no field could say is tagged at
+// its factory (eatvoice.ts's `voiced`): trees, bushes, bamboo and grasses,
+// paper lanterns, snow, the zoo's sheep, Maple's tractor, and the pond ducks
+// — which are tagged and never heard, because none of the four reaches the
+// scene: addWanderer's spawn tests turn their pond-side spawn points down
+// (a scene traverse finds no object tagged 'quack'; qa/eatvoice.mjs's Maple
+// census reads quack 0).
+//
+// ORDER IS MEANING. A person carrying a balloon is a person. A motorhome is
+// 'rv' in HOUSE_LIKE, because it is somebody's house for the quest board, and
+// still a van with a horn when it is eaten. A factory's own tag outranks the
+// world's quest tag for the same reason, and both outrank a CHILD's tag: a
+// wrapper Group (the mature trees, the ancient palms) hands the game an object
+// whose only tagged part is the tree inside it, but a landmark built out of
+// smaller kits must not speak as one of its lanterns. Anything that fits none
+// of this stays silent, and that is allowed: a silent kind is better than a
+// wrong one. qa/eatvoice.mjs prints the census, world by world.
+function eatVoiceOf(e: Edible): EatVoice | null {
+  const u = e.mesh.userData as Record<string, unknown>;
+  const qk = u.qk as string | undefined, kind = u.kind as string | undefined;
+  if (u.limbs || qk === 'sledkid') return 'wheee';
+  if (u.balloon) return 'squeak';
+  if (qk === 'car' || qk === 'rv' || qk === 'gritter' || kind === 'van' || kind === 'trailer' || kind === 'caravan') return 'meep';
+  if (qk === 'goat' || kind === 'sheep') return 'baa';
+  if (qk === 'snowball' || qk === 'snowballs' || qk === 'snowman' || qk === 'drift') return 'poof';
+  if (u.eatVoice) return u.eatVoice as EatVoice;
+  if ((qk && (HOUSE_LIKE.includes(qk) || qk === 'big')) || u.landmark) return 'crumble';
+  for (const c of e.mesh.children) if (c.userData.eatVoice) return c.userData.eatVoice as EatVoice;
+  return null;
+}
+
 // The three pools this world can draw from, published for qa/questable.mjs.
 // The probe replays a year of day-seeds against them and against what the world
 // actually tags, so a pool and a level can never quietly disagree again.
@@ -8936,6 +9011,7 @@ interface BitePay {
   combo: number;   // this bite's link in the chain: the pop's pitch, and a crown at every tenth
   head: boolean;   // a CHOMP — decided at capture, because the hat reads its cooldown there
   kx: number; kz: number;   // the pull at capture, for the landmark kit's recoil
+  vc: EatVoice | '';   // what this meal says when it goes in — eatVoiceOf(), '' for a silent kind (G5)
 }
 /** The last 64 bites, oldest first — the same objects the drain pays, so a row
  *  fills in as its bite goes down. QA only (__biteLog); nothing in the game
@@ -9258,7 +9334,7 @@ function capture(e: Edible, giveHunger = true) {
   // and after the frame loop's goal check has had its turn. Everything the
   // sound depends on is written down here, as it stands at the bite.
   const pay: BitePay = { id: e.mesh.id, r: e.radius, cap: tClock, sink: -1, sndT: -1, snd: '', gulp: -1,
-    bite, vr: voidling.radius, combo, head: headline, kx: dx, kz: dz };
+    bite, vr: voidling.radius, combo, head: headline, kx: dx, kz: dz, vc: eatVoiceOf(e) ?? '' };
   e.pay = pay;
   biteLog.push(pay);
   if (biteLog.length > 64) biteLog.shift();
