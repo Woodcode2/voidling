@@ -3546,6 +3546,9 @@ const _dbg = new Proxy(_dbgStore, {
   __calm: () => void;
   /** how many times the shore answered a push this match — qa reads this */
   __wallCues: () => number;
+  /** G7: outgrown cues played / un-gate waves seen this match (qa/nowfood.mjs) */
+  __outgrownN: () => number;
+  __ungateWaveN: () => number;
   __faceWrap: (v: number) => void;
   __groundSurf: (road: number, grass: number, debug?: number) => void;
   __pickFresh: <T>(arr: T[]) => T;
@@ -3825,6 +3828,14 @@ _dbg.__calm = () => voidling.calm();
 // read. qa/edgespeed.mjs drives into the shore for 900 frames; >0 proves the
 // cue fires, and a count near the frame count would prove the throttle broke.
 _dbg.__wallCues = () => wallCueN;
+// QA (G7): the two moments "now I can eat that" is about, counted where the
+// game decides them — a sibling the player has just outgrown (the cue that
+// answered its halo turning green), and an un-gate pass that turned a wave of
+// greyed props back to colour. qa/nowfood.mjs reads both against what it can
+// see for itself: the rivals' radii, the props' own gated flags, the floats
+// and the audio call log.
+_dbg.__outgrownN = () => outgrownN;
+_dbg.__ungateWaveN = () => ungateWaveN;
 // How far the face is seated onto the sphere, 0..0.9. A look knob — see
 // FACE_WRAP in void3d.ts. Exposed so qa/facewrap.mjs can render the same
 // frame at several values and the choice can be made from pictures.
@@ -7141,6 +7152,11 @@ function showNews() {
 
 const GATE_GREY = new THREE.Color(0x6b6b7a);
 let gateT = 0;      // throttle for the too-big-to-eat tint
+// QA (research governor G7, qa/nowfood.mjs): how many times this match a
+// sibling's "you're bigger than me" edge was answered, and how many un-gate
+// passes were big enough to count as a WAVE. Read-only counters; see
+// __outgrownN and __ungateWaveN.
+let outgrownN = 0, ungateWaveN = 0;
 // Maple's biome ids to the newsroom's district ids. Written to cover BOTH the
 // old zoning and the re-zone that is landing separately, so a headline never
 // falls back to "general" just because a cell got renamed.
@@ -11382,6 +11398,7 @@ function resetMatch() {
   // opens with a stale crown to lose and a stale announcedRank to suppress
   crownLive = false; everBehind = false; shownRank = 0; announcedRank = 0; rankHold = 0;
   feastR = 0;     // the ceiling a rival bought you does not carry into the next match
+  outgrownN = 0; ungateWaveN = 0;   // QA counters are per match (G7)
   for (const k in moments) (moments as Record<string, boolean>)[k] = false;
   countTick = 0;
   renderQuests();
