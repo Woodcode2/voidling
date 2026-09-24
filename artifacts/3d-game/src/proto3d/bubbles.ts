@@ -25,6 +25,15 @@ export interface Bubbles {
    *  not the pink of a bite or the green of a set piece, so the one thing a
    *  child can build on purpose reads as its own class of number. */
   float(pos: THREE.Vector3, text: string, big?: boolean, gold?: boolean): void;   // rising score/juice text
+  /** A FLOAT OVER HIS HEAD THAT CAN NEVER BE ON HIS FACE (research governor
+   *  G7). float() anchors a world point and projects it, so whether the text
+   *  clears the face depends on the camera's pitch, the radius and how far the
+   *  lens has settled; this one is placed every frame from the same face box
+   *  every bubble here dodges — its lowest edge at any point of the rise sits
+   *  above the face box's top — and clamped to stay on screen. A second one
+   *  raised while the first is still up stacks above it, and both clear the
+   *  form-name callout when that is up. Same pooled node, same rise. */
+  headFloat(text: string, opts?: { scale?: number; color?: string }): void;
   /** THE NUMBER GOES INTO THE BAR. The owner, on hole.io: "when you eat like
    *  points are going into the bar". Same pooled node as float(), but instead
    *  of rising and fading in world space it flies to a SCREEN point and fires
@@ -88,6 +97,9 @@ interface Slot {
     target: (() => { x: number; y: number } | null) | null;
     onArrive: (() => void) | null;
   } | null;
+  /** set only on a head float — see headFloat(): its place in the stack, 0 is
+   *  the lowest. -1 (or absent) is an ordinary world-anchored float. */
+  head?: number;
 }
 
 // Was a flat 150. The camera pulls back to 300 at WORLD ENDER, so every
@@ -282,8 +294,51 @@ const style = document.createElement('style');
   let formEl: HTMLElement | null = null;
   let formUntil = -1, formT0 = 0, formLX = -1, formLY = -1, formLO = -1;
   const FORM_LIFE = 0.80;
+  /** the callout's height, read once in formCall() — a head float raised while
+   *  it is up clears it, and reading it per frame would be a read in the write
+   *  phase of update() */
+  let formH = 0;
   const hudR: DOMRect[] = []; let hudN = 0;
   const bandR: DOMRect[] = []; let bandN = 0;
+
+  /** ── WHERE A HEAD FLOAT GOES ─────────────────────────────────────────────
+   *  Research governor G7: "you're BIGGER than NIBBLES!" and "HOUSES ARE FOOD
+   *  NOW!" rise off HIM, and the bar G6 set for anything near him stands — none
+   *  of it on his face, none of it on the NOMS pill.
+   *
+   *  vfRise moves the box from translate(-50%,-30%) scale(0.6) through
+   *  (-70%, 1.12) to (-230%, 1), about the box's own centre, so for an element
+   *  whose top is at y its bottom edge sits at y + 0.5h, y + 0.36h and y - 1.3h
+   *  at those three keys: the LOWEST it ever reaches is y + 0.5h, on the first
+   *  frame (the reduced-motion hold, translate -70% unscaled, sits at y + 0.3h).
+   *  So y is the face box's top, or one radius above his centre if that is
+   *  higher — the top of his head — less half a box and a 4 px gap. The NOMS
+   *  pill sits beside the disc at 0.15 of a radius above his centre
+   *  (prototype3d.ts, paintNoms), which is below the face box's top, so a box
+   *  that never comes down past that top cannot reach it either.
+   *
+   *  Clamped on screen sideways at the 1.12 peak scale, and under the HUD
+   *  strip at the top; a float that would have to go under the strip to clear
+   *  his face waits there instead, which only happens while the lens is still
+   *  travelling (the same failure formPlace() chooses for the callout). */
+  function placeHead(f: Slot): void {
+    if (!heroBox.on) {
+      if (f.lx < 0) f.el.style.visibility = 'hidden';   // never a frame at the corner
+      return;
+    }
+    const W = window.innerWidth;
+    const halfW = Math.min(f.w * 0.56 + 8, W / 2);
+    const x = Math.min(W - halfW, Math.max(halfW, heroBox.cx));
+    let floor = Math.min(heroBox.top, heroBox.cy - heroBox.ry) - 4;
+    if (formUntil >= 0) floor -= formH + 6;   // over the form-name callout too, when it is up
+    const y = Math.max(HUD_TOP, floor - 0.5 * f.h - (f.head ?? 0) * (f.h + 6));
+    if (f.el.style.visibility) f.el.style.visibility = '';
+    if (Math.abs(x - f.lx) > 0.5 || Math.abs(y - f.ly) > 0.5) {
+      f.lx = x; f.ly = y;
+      f.el.style.left = `${x.toFixed(1)}px`;
+      f.el.style.top = `${y.toFixed(1)}px`;
+    }
+  }
 
   /** Where the callout's BOTTOM edge sits this frame, and how opaque it is.
    *  Split out so a probe can sweep it without driving a ceremony: a rising
@@ -358,7 +413,35 @@ const style = document.createElement('style');
       formT0 = clock; formUntil = clock + FORM_LIFE;
       formLX = -1; formLY = -1; formLO = -1;
       formPaint(0);
+      formH = formEl.offsetHeight;   // formPaint just laid it out; see placeHead()
       formEl.classList.add('on');
+    },
+    headFloat(text, opts) {
+      text = sentence(text);
+      const f = floats[fHead]; fHead = (fHead + 1) % floats.length;
+      // a recycled slot in flight pays out on the way past (see float())
+      if (f.fly) {
+        const cb = f.fly.onArrive; f.fly.onArrive = null; f.fly = null;
+        if (cb) cb();
+      }
+      // above any head float still rising, so two in one beat never overlap
+      let stack = 0;
+      for (const o of floats) {
+        if (o !== f && o.active && (o.head ?? -1) >= 0 && clock <= o.until) stack = Math.max(stack, (o.head ?? 0) + 1);
+      }
+      f.active = true; f.until = clock + 0.9; f.head = stack;
+      f.el.textContent = text;
+      f.el.style.fontSize = opts?.scale ? `${(20 * opts.scale).toFixed(1)}px` : '';
+      f.el.style.color = opts?.color ?? '';
+      f.el.style.transform = '';
+      f.el.className = 'vf';
+      // ONE measurement, taken on the layout the animation restart below pays
+      // for anyway (float() forces the same one with its offsetWidth read)
+      f.w = f.el.offsetWidth; f.h = f.el.offsetHeight;
+      f.lx = -1; f.ly = -1;
+      // placed NOW, like the form callout: never a frame at a stale spot
+      placeHead(f);
+      f.el.classList.add('go');
     },
     say(pos, text, kind, opts) {
       text = sentence(text);
@@ -499,6 +582,7 @@ const style = document.createElement('style');
         if (cb) cb();
       }
       f.active = true; f.pos.copy(pos); f.until = clock + 0.9;
+      f.head = -1; f.el.style.visibility = '';   // …and so does a head float's place (headFloat)
       f.el.textContent = text;
       f.el.style.fontSize = ''; f.el.style.color = '';   // a flight's size and tint die with it
       f.el.className = `vf${big ? ' big' : ''}${gold ? ' gold' : ''}`;
@@ -509,6 +593,7 @@ const style = document.createElement('style');
       fStats.launched++;
       text = sentence(text);
       const f = floats[fHead]; fHead = (fHead + 1) % floats.length;
+      f.head = -1; f.el.style.visibility = '';   // a recycled head float is a flight now
       // …and the same for a flight displacing a flight (see float() above)
       if (f.fly) {
         const cb = f.fly.onArrive; f.fly.onArrive = null; f.fly = null;
@@ -578,6 +663,7 @@ const style = document.createElement('style');
         f.el.style.fontSize = ''; f.el.style.color = '';
         f.lx = -1; f.ly = -1;
         f.fly = null;   // a pending payout dies with the match, not into the next one
+        f.head = -1; f.el.style.visibility = '';
       }
     },
     update(dt: number, hero?: { pos: THREE.Vector3; r: number }) {
@@ -819,6 +905,7 @@ const style = document.createElement('style');
           continue;
         }
         if (clock > f.until) { f.active = false; f.el.classList.remove('go'); continue; }
+        if ((f.head ?? -1) >= 0) { placeHead(f); continue; }   // rides HIM, not a world point
         v.copy(f.pos).project(camera);
         if (v.z > 1) continue;
         const fx2 = (v.x * 0.5 + 0.5) * w, fy2 = (-v.y * 0.5 + 0.5) * h;

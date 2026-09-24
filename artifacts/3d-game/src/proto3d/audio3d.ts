@@ -80,8 +80,23 @@ export interface Audio3D {
    *  could not eat. One meaning, "you can't have that (yet)": it also answers
    *  a tapped locked level dot and a tapped locked world card, which played
    *  alert() and, in Job 10's first cut, pop(0) (studio round 4, Job 10;
-   *  qa/padlock.mjs reads both handlers and this cue's graph). */
-  bonk(): void;
+   *  qa/padlock.mjs reads both handlers and this cue's graph).
+   *
+   *  `ratio` is the fourth thing it answers, and the same meaning again: a
+   *  touch on a prop still too big to eat, as the prop's radius over the eat
+   *  line (>= 1). The same three voices, softer than the wall and pitched DOWN
+   *  as the prop gets bigger (research governor G7). With no argument it is
+   *  exactly the wall's bonk, voice for voice. */
+  bonk(ratio?: number): void;
+  /** NOW I CAN EAT THAT — the player has just outgrown a sibling. Two rising
+   *  notes and the void's happy coo, which does not wait on voice()'s
+   *  cooldown: this is the one moment the coo must not be skipped
+   *  (research governor G7). Everything sits above 500 Hz. */
+  outgrow(): void;
+  /** A WAVE OF PROPS JUST BECAME FOOD — the greyed ones turning back to
+   *  colour. One rising three-note glock run, quiet: it is the world lighting
+   *  up, not a reward (research governor G7). */
+  sparkle(): void;
   startMusic(): void;              // the match loop — tempo + layers ride the stage
   setMusicStage(n: number): void;
   stopMusic(): void;
@@ -901,6 +916,17 @@ export function createAudio(): Audio3D {
   // indistinguishable from a synth that makes no sound.)
   let lastPop = -1;
   const voiceCd: Record<string, number> = {};
+  /** The void's coos themselves, with no cooldown. voice() rate-limits them
+   *  (six seconds a kind) so the void sounds sweet and never chatty; outgrow()
+   *  is the one caller that must not be skipped by that limit — it happens
+   *  once per sibling per match and the coo is half of what it says. */
+  function coo(kind: 'happy' | 'yum' | 'scared' | 'hurt' | 'sleepy', when = 0) {
+    if (kind === 'happy') { tone(660, 760, 0.09, 'sine', 0.09, when); tone(880, 990, 0.13, 'sine', 0.09, when + 0.1); }
+    else if (kind === 'yum') { tone(330, 300, 0.12, 'sine', 0.08, when); tone(370, 335, 0.16, 'sine', 0.08, when + 0.14); }
+    else if (kind === 'scared') { tone(740, 470, 0.2, 'triangle', 0.07, when); }
+    else if (kind === 'hurt') { tone(430, 250, 0.22, 'sine', 0.09, when); }
+    else if (kind === 'sleepy') { tone(340, 300, 0.55, 'sine', 0.045, when); }
+  }
   // warm bus: music -> soft lowpass -> (dry + echo) -> master. The gentle
   // feedback echo is what turns bare oscillators into something that sounds
   // PRODUCED instead of 8-bit.
@@ -4500,11 +4526,7 @@ export function createAudio(): Audio3D {
       const now = c.currentTime;
       if (now - (voiceCd[kind] ?? -99) < 6) return;
       voiceCd[kind] = now;
-      if (kind === 'happy') { tone(660, 760, 0.09, 'sine', 0.09); tone(880, 990, 0.13, 'sine', 0.09, 0.1); }
-      else if (kind === 'yum') { tone(330, 300, 0.12, 'sine', 0.08); tone(370, 335, 0.16, 'sine', 0.08, 0.14); }
-      else if (kind === 'scared') { tone(740, 470, 0.2, 'triangle', 0.07); }
-      else if (kind === 'hurt') { tone(430, 250, 0.22, 'sine', 0.09); }
-      else if (kind === 'sleepy') { tone(340, 300, 0.55, 'sine', 0.045); }
+      coo(kind);
     },
     win() {
       duckMusic(7, 1.8);   // the win sting is the loudest thing in the match, on purpose
@@ -4682,12 +4704,77 @@ export function createAudio(): Audio3D {
       const f = 783.99 * Math.pow(2, UP[Math.max(0, k)] / 12);
       marimba(master, f, c.currentTime + 0.005, 0.22, 0.13);   // at least as loud as the pop tick it replaced (-39.1 dBFS)
     },
-    bonk() {
+    bonk(ratio) {
       const c = ensure(); if (!c || !master) return;
       const t = c.currentTime;
-      dTone(master, t, 0.11, 'sine', 0.09, 520, 330, 0, 0.003);
-      dTone(master, t, 0.06, 'triangle', 0.035, 1040, 700, 0, 0.002);
-      grain(900, 1.4, 0.03, 0.04);
+      // ── ONE "NOT YET", FOUR PLACES (research governor G7) ────────────────
+      // The wall, a locked level dot, a locked world card — and now a touch on
+      // a prop still too big to eat, which means the same thing: you can't
+      // have that (yet). The governor asked for a second sound, a rubbery
+      // boing; Job 10 had just made this THE sound for that meaning, and a
+      // pre-reader learns a meaning from one sound, not from two. So the
+      // touch is the same three voices, told apart by two things:
+      //   · SOFTER. The eat is the reward and plays fifty times a match; the
+      //     touch must never compete with it. The wall itself sits only 8.7 dB
+      //     under pop(0) in full-band RMS and 6.2 dB under the cone-sized pop
+      //     above 450 Hz (qa/nowfoodsound.mjs, on the build before this), so
+      //     the touch cannot simply BE the wall. At 0.5 of its level the
+      //     loudest touch, bonk(1), measures 13.1 dB under the quietest pop in
+      //     full-band RMS, 14.1 in peak and 11.1 above 450 Hz — the closest
+      //     of the three, and over the governor's 10 (the same probe, (b1)).
+      //   · LOWER FOR BIGGER. The pitch scales by 1 - 0.12·log2(ratio) — a
+      //     prop just over the line bonks where the wall does, one four times
+      //     over it bonks 24% lower — and stops at 0.76, where the fall's last
+      //     note is 251 Hz: nothing in "not yet" goes under the 250 Hz floor
+      //     qa/padlock.mjs holds the wall to.
+      // No argument is exactly the wall, voice for voice.
+      const k = ratio === undefined ? 1 : Math.min(1, Math.max(0.76, 1 - 0.12 * Math.log2(Math.max(1, ratio))));
+      const g = ratio === undefined ? 1 : 0.5;
+      dTone(master, t, 0.11, 'sine', 0.09 * g, 520 * k, 330 * k, 0, 0.003);
+      dTone(master, t, 0.06, 'triangle', 0.035 * g, 1040 * k, 700 * k, 0, 0.002);
+      grain(900 * k, 1.4, 0.03, 0.04 * g);
+    },
+    outgrow() {
+      // ── NOW I CAN EAT THAT (research governor G7) ──────────────────────────
+      // The instant a threat becomes food was silent: the sibling's halo just
+      // turned green. Two notes going UP a fifth — C5 to G5, each lifted 3%
+      // into its pitch, because "bigger" is up — then the void's own happy
+      // coo on top (660 up to 990 Hz), which voice() would have swallowed if
+      // it had cooed in the last six seconds. The whole cue climbs from its
+      // first note to its last (qa/nowfoodsound.mjs (o2)); the first draft
+      // put the pair an octave higher, C6 to G6, and the coo then landed
+      // BELOW them, so the cue ended lower than it began. It sits at the chain
+      // cash-in's level, not the evolve fanfare's: good news about one
+      // sibling, not a new form. Everything is above 500 Hz, nothing is
+      // square, and on the bay the notes are the marimba the resort's other
+      // good news is played on.
+      const c = ensure(); if (!c || !master) return;
+      logEv('outgrow');
+      const t = c.currentTime;
+      for (const [k, f] of [523.25, 783.99].entries()) {
+        if (isPirate()) marimba(master, f, t + k * 0.12, 0.45, 0.13);
+        else {
+          dTone(master, t + k * 0.12, 0.2, 'triangle', 0.12, f * 0.97, f, 0, 0.004);
+          dTone(master, t + k * 0.12, 0.14, 'sine', 0.04, f * 2 * 0.97, f * 2, 0, 0.004);
+        }
+      }
+      coo('happy', 0.3);
+      voiceCd.happy = c.currentTime;   // …and a coo from anywhere else waits its turn after this one
+      duckMusic(3, 0.5);
+    },
+    sparkle() {
+      // ── A WAVE OF THE WORLD BECOMES FOOD (research governor G7) ────────────
+      // The greyed props turning back to colour, rolling outward from the void.
+      // One rising run of three glock notes — C6 E6 G6, the root triad an
+      // octave over the crown's — quiet, because it is the world lighting up
+      // and not a reward: at or under the pop in peak (qa/nowfoodsound.mjs
+      // (s1)). A first draft at 0.05 a note peaked at -21.4 dBFS against the
+      // loudest pop's -25.6, because the three notes' tails overlap and their
+      // peaks add; at 0.026 it peaks at -26.5. The caller holds it to one in
+      // three seconds.
+      const c = ensure(); if (!c || !master) return;
+      const t = c.currentTime + 0.005;
+      [1046.5, 1318.51, 1567.98].forEach((f, k) => glock(master!, f, t + k * 0.07, 0.5, 0.026));
     },
     finale(cheer) {
       const c = ensure(); if (!c || !master) return;
