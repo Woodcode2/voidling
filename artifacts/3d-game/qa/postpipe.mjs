@@ -63,11 +63,21 @@ const out = await p.evaluate(() => {
     g.drawImage(ren.domElement, 0, 0);
     return g.getImageData(0, 0, W, H).data;
   };
-  // the hero's own disc, from the game's state — not a guessed centre
+  // the hero's own disc, from the game's state — not a guessed centre.
+  // ON HIS BODY, NOT UNDER IT (2026-09-23). This projected the GROUND point
+  // below him (y 0) with a radius of r x 14 px floored at 18, so the "hero"
+  // disc was his shadow and the ground at his feet. When studio Job 9 lit
+  // Lantern's lamps, their glow on that ground read as the hero losing 0.211
+  // saturation — while in the settled play frame his body lost 0.010 (0.733
+  // -> 0.723, qa/out/shippedlook/lantern_j911*.png). Now: his centre at y = r,
+  // and the inner 55% of his projected radius, as qa/shippedlook.mjs samples.
   const v = window.__voidState();
-  const proj = new window.__THREE.Vector3(v.x, 0, v.z).project(cam);
+  const c3 = new window.__THREE.Vector3(v.x, v.r, v.z);
+  const proj = c3.clone().project(cam);
   const cx = Math.round((proj.x * 0.5 + 0.5) * W), cy = Math.round((-proj.y * 0.5 + 0.5) * H);
-  const discR = Math.max(18, Math.min(90, Math.round(v.r * 14)));
+  const camD = Math.max(1, cam.position.distanceTo(c3));
+  const pxR = (H / (2 * camD * Math.tan(cam.fov * Math.PI / 360))) * v.r;
+  const discR = Math.max(6, Math.round(0.55 * pxR));
   const stats = (d) => {
     let n = 0, nAll = 0, sSum = 0, vSum = 0; const lums = [];
     for (let y = 0; y < H; y += 3) for (let x = 0; x < W; x += 3) {
