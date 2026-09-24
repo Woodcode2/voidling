@@ -37,9 +37,11 @@
 //  every lit pane rides PROP_GLOW_MAT, which is unlit and HDR. Until studio
 //  round 4 the 1.75 it multiplies by did NOT put warm glass past the bloom
 //  threshold: a window's side face measured 0.83 against the cut's 1.05, and
-//  on the "cold bright morning" hour the cut is 1.197 (qa/emitters.mjs). The
-//  glass halos now because island.ts floors every lamp's luminance at 1.29x
-//  the world's cut, whatever its hue. The
+//  on the "cold bright morning" hour the cut is 1.197 (qa/emitters.mjs). Now
+//  island.ts floors every lamp's luminance at 1.29x the world's cut, whatever
+//  its hue: the glass's dimmest seen face lands at 1.29x the cut
+//  (qa/emitters.mjs). That it halos in the frame is owed to qa/lampglow.mjs
+//  powder and a person's read of the frame. The
 //  reason is the fiction as much as the frame: it is a SNOW DAY. School is
 //  shut, the council has issued a statement, and every single person in this
 //  valley is indoors with the heating on. A village with dark windows on a

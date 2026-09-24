@@ -628,11 +628,15 @@ const SUITE = [
   // node from nightmarket.ts and split by vertex index range: before, 49.0% of
   // rib vertices outside the paper, the pole 16 of its radii off the apex, the
   // lowest point 0.059 up, 0.0% of the moss showing; after 0, 0, -0.087 and at
-  // least 93.3%. Exit code, because it prints the umbrella's PASS lines before
-  // it builds a rock.
+  // least 93.3%. Its review added the pole's top through the paper (U4), the
+  // canopy carried off its placement origin by the lean (U5), the studio's
+  // literal "25% of the moss above the rock's top" (M3) and the moss's rim over
+  // the rock (M4): after, 0 pole vertices out, 1.000x the rim radius, 31.1%
+  // and 0.000 of the rock's height, the moss outside the rock 72.2%. Exit
+  // code, because it prints the umbrella's PASS lines before it builds a rock.
   { id: 'propfit', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 60,
     cmd: ['node', 'qa/propfit.mjs'], verdict: exitCode,
-    why: 'Lantern Night\'s umbrella is one object — ribs under the paper, pole up the canopy\'s axis, foot on the ground — and its moss rock shows its moss and sits on the ground' },
+    why: 'Lantern Night\'s umbrella is one object — ribs and pole under the paper, pole up the canopy\'s axis, foot on the ground, canopy over the spot it was planted on — and its moss rock wears its moss on top, rim on the stone, and sits on the ground' },
   // The lamp census in the frame: at least 90% of on-screen lamps with half
   // their pixels over the cut, and no lamp on a clone of the glow material
   // (the too-big-to-eat grey cloned lamps and dropped the floor with the

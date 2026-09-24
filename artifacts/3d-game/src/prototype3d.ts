@@ -255,6 +255,7 @@ function ensureComposer(): EffectComposer {
     1.05,   // threshold: LINEAR — the floor; bloomCut() sets each world's own just below
   );
   bloomPass.threshold = bloomCut();   // per world and hour — see WorldLight.bloomCut
+  setGlowFloor(bloomCut());           // the lamps' floor rides the cut — see PROP_GLOW_MAT (island.ts)
   composer.addPass(bloomPass);
   // Tone map + grade + sRGB encode, exactly once, at the end of the chain.
   // OutputPass honours CustomToneMapping (it compiles the same patched

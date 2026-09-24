@@ -16,7 +16,9 @@
 //   THE MOSS ROCK. The moss is a cap at 0.72 k; the rock under it is a
 //   dodecahedron of radius k at 0.52 k, whose top reaches 1.32-1.52 k whatever
 //   way it is turned. The cap's own top is 1.11 k, so the moss was inside the
-//   rock: a grey boulder with no moss on it.
+//   rock: a grey boulder with no moss on it. Squashing the rock out from under
+//   the cap (the first fix) left the cap's rim standing over the rock by up to
+//   0.298 of the rock's height (M4): a lid.
 //
 // ── IT RUNS THE SOURCE, IT DOES NOT COPY IT ─────────────────────────────────
 // Governor rule 4. makeUmbrella and makeMossRock are lifted out of
@@ -47,19 +49,39 @@
 //      vertices) of the apex. Built in one frame and tilted once, both are
 //      zero to float precision, so a pole visibly off the axis fails.
 //  U3. IT STANDS ON THE GROUND. The umbrella's lowest vertex at or under
-//      y = 0 in every build: a lean about anything but the foot lifts it.
+//      y = 0 in every build: a lean about anything but the foot lifts it (a
+//      slide along the ground after the lean does not).
+//  U4. THE POLE'S TOP STAYS UNDER THE PAPER. Every pole vertex above the
+//      rim's plane inside the paper's facets, as U1 asks of the ribs. With the
+//      pole's top at 2.0 k its 0.05 rim came through the paper for k under
+//      about 0.98: 2820 of 7200 top vertices over 200 builds, by up to 0.0034.
+//  U5. THE CANOPY STANDS OVER ITS PLACEMENT ORIGIN. No vertex further across
+//      from the origin (x = z = 0, where plant() drops the prop and centres
+//      its eat radius and ground claim) than the canopy rim's own radius —
+//      what an upright umbrella of the same size reaches. A lean about the
+//      foot left the foot on the origin and carried the canopy off it: 1.58x
+//      the rim radius, 1.85 units, the rim's centre 0.85 off.
 //  M1. THE MOSS SHOWS. At least 25% of the moss's area (the studio's bar) must
 //      lie outside the rock and the chunk, in every build — area inside a
 //      rock's hull is area the camera can never see. The rock is a convex
 //      polyhedron after any turn and squash, so inside means inside every one
-//      of its face planes. The studio wrote "above the rock's top". Read
-//      literally — above the rock's highest vertex — it is printed beside
-//      this and not barred: after the fix it reads 19.7% in the lowest of 200
-//      builds and 42.0% in the median, and moss lower than a rock's highest
-//      vertex but outside the rock is moss the camera sees.
+//      of its face planes.
 //  M2. NOTHING FLOATS. The rock's and the chunk's lowest vertices at or under
 //      the ground (y = 0) in every build, because the squash the fix applies
 //      lifts a rock's bottom toward it.
+//  M3. THE MOSS CROWNS THE ROCK — the studio's own wording, "at least 25% of
+//      the moss above the rock's top", read literally: 25% of the moss's area
+//      above the rock's highest vertex, in every build. M1 is the looser
+//      reading (outside the rock anywhere); both are barred. The squash alone
+//      met M1 (93.3% lowest) and failed this (19.7% lowest, 42.0% median).
+//  M4. THE MOSS SITS ON THE ROCK. The moss's rim — its outermost ring,
+//      found across from the cap's middle, since a rim laid on a rock is not
+//      level — must be over the rock (none past its outline) and stand no more
+//      than 2% of the rock's height above the rock's upper surface straight
+//      below it, in every build. Before round 4 the rim stood at most 0.004
+//      of the rock's height over it in the median build and 0.110 in the
+//      worst, with the moss inside the rock; the squash alone left 0.163 and
+//      0.298.
 import { readFileSync } from 'node:fs';
 
 const abort = (why) => { console.log(`FAIL — ABORTED — ${why}`); process.exit(2); };
@@ -78,6 +100,8 @@ const RIB_OUT_MAX = 0;        // U1: rib vertices outside the paper
 const AXIS_DEG_MAX = 1;       // U2
 const APEX_OFF_MAX = 0.2;     // U2, in pole radii
 const MOSS_SHOWN_MIN = 0.25;  // M1, the studio's number
+const MOSS_ABOVE_MIN = 0.25;  // M3, the same number on the studio's own wording
+const RIM_GAP_MAX = 0.02;     // M4, of the rock's height
 const EPS = 1e-6;
 
 const NM_PATH = 'src/proto3d/nightmarket.ts';
@@ -231,6 +255,7 @@ console.log(`\n  DO THE PARTS FIT — nightmarket.ts's umbrella and moss rock, $
 {
   let ribOut = 0, ribAll = 0, worstPoke = -Infinity, worstPokeK = 0, worstDepth = 0, leastDepth = Infinity;
   let worstAng = 0, worstOff = 0, builds = 0, footMax = -Infinity;
+  let poleOut = 0, poleAll = 0, polePoke = -Infinity, reachOver = -Infinity, reachMax = 0, centreOff = 0, rMin = Infinity, rMax = 0, footOff = 0;
   for (let b = 0; b < N; b++) {
     const parts = build('makeUmbrella', SEED + b);
     const paper = parts.filter((p) => /^Cone/.test(p.kind));
@@ -262,6 +287,24 @@ console.log(`\n  DO THE PARTS FIT — nightmarket.ts's umbrella and moss rock, $
       if (poke > worstPoke) { worstPoke = poke; worstPokeK = k; }
       if (poke <= EPS) { worstDepth = Math.max(worstDepth, -poke / k); leastDepth = Math.min(leastDepth, -poke / k); }
     }
+    // the pole's top end, where it meets the paper: every pole vertex above
+    // the rim's plane inside the paper's facets, as the ribs are
+    for (const p of pole[0].pts) {
+      const h = new THREE.Vector3().subVectors(p, rimC).dot(axis);
+      if (h <= 0) continue;
+      poleAll++;
+      const poke = outside(planes, p);
+      if (poke > EPS) poleOut++;
+      polePoke = Math.max(polePoke, poke);
+    }
+    // where the canopy stands against the placement origin (x = z = 0, the
+    // point plant() drops the prop on and claims ground around): the rim's
+    // centre off it, and how far any part reaches from it against the rim's
+    // own radius — what an upright umbrella of the same size reaches
+    centreOff = Math.max(centreOff, Math.hypot(rimC.x, rimC.z));
+    const reach = Math.max(...parts.flatMap((q) => q.pts.map((v) => Math.hypot(v.x, v.z))));
+    reachOver = Math.max(reachOver, reach / R); reachMax = Math.max(reachMax, reach);
+    rMin = Math.min(rMin, R); rMax = Math.max(rMax, R);
     // the pole
     const { c, u } = principalAxis(pole[0].pts);
     const ang = Math.acos(Math.min(1, Math.abs(u.dot(axis)))) * 180 / Math.PI;
@@ -270,12 +313,16 @@ console.log(`\n  DO THE PARTS FIT — nightmarket.ts's umbrella and moss rock, $
     const poleR = Math.max(...pole[0].pts.map((q) => { const d = new THREE.Vector3().subVectors(q, c); return d.sub(u.clone().multiplyScalar(d.dot(u))).length(); }));
     const off = toApex.sub(u.clone().multiplyScalar(toApex.dot(u))).length() / poleR;
     worstAng = Math.max(worstAng, ang); worstOff = Math.max(worstOff, off);
+    // where the pole's line meets the ground, against the origin
+    if (Math.abs(u.y) > 1e-6) { const t = -c.y / u.y; footOff = Math.max(footOff, Math.hypot(c.x + u.x * t, c.z + u.z * t) / k); }
     footMax = Math.max(footMax, Math.min(...parts.flatMap((q) => q.pts.map((v) => v.y))));
     builds++;
     void H;
   }
   console.log(`  ·  umbrella: ${builds} builds; rib vertices outside the paper ${ribOut} of ${ribAll} (${(100 * ribOut / ribAll).toFixed(1)}%), furthest ${worstPoke > 0 ? `${worstPoke.toFixed(3)} (${(worstPoke / worstPokeK).toFixed(3)} k) past it` : 'none past it'}; rib vertices under it by ${Number.isFinite(leastDepth) ? leastDepth.toFixed(3) : '-'} to ${worstDepth.toFixed(3)} k`);
   console.log(`  ·  umbrella: pole axis off the canopy's by up to ${worstAng.toFixed(2)} deg; its line passes up to ${worstOff.toFixed(2)} pole radii from the apex; lowest point of the umbrella at most ${footMax.toFixed(3)} (0 is the ground)`);
+  console.log(`  ·  umbrella: pole vertices above the rim outside the paper ${poleOut} of ${poleAll}${polePoke > EPS ? `, furthest ${polePoke.toFixed(4)} past it` : ''}`);
+  console.log(`  ·  umbrella: canopy rim radius ${rMin.toFixed(2)}-${rMax.toFixed(2)}; the rim's centre up to ${centreOff.toFixed(3)} off the placement origin; the umbrella reaches up to ${reachMax.toFixed(2)} from it, ${reachOver.toFixed(3)}x its own rim radius (plant() drops it at r 1.0, sep 1.0); the pole meets the ground up to ${footOff.toFixed(3)} k from it`);
   verdict(ribOut <= RIB_OUT_MAX,
     `U1 every rib is under the paper, in all ${builds} builds (split from the paper by index range)`,
     `U1 ${ribOut} of ${ribAll} rib vertices are outside the paper (furthest ${worstPoke.toFixed(3)} past it): ribs show through the canopy`);
@@ -285,11 +332,17 @@ console.log(`\n  DO THE PARTS FIT — nightmarket.ts's umbrella and moss rock, $
   verdict(footMax <= EPS,
     `U3 every umbrella stands on the ground (its lowest point at most ${footMax.toFixed(3)})`,
     `U3 an umbrella floats: its lowest point is ${footMax.toFixed(3)} above the ground — tilted about the pole's middle, the foot swings up`);
+  verdict(poleOut === 0,
+    `U4 the pole's top stays under the paper (${poleAll} vertices above the rim, all ${builds} builds)`,
+    `U4 ${poleOut} of ${poleAll} pole vertices above the rim are outside the paper (furthest ${polePoke.toFixed(4)} past it): the pole's end pokes through the canopy`);
+  verdict(reachOver <= 1 + EPS,
+    `U5 the canopy stands over its placement origin: nothing reaches further from it than the rim's own radius (${reachOver.toFixed(3)}x at most, all ${builds} builds)`,
+    `U5 the umbrella reaches ${reachOver.toFixed(2)}x its canopy's radius from its placement origin (${reachMax.toFixed(2)} units; the rim's centre up to ${centreOff.toFixed(2)} off it): the lean carried the canopy off the ground plant() reserved for it`);
 }
 
 // ══ THE MOSS ROCK ════════════════════════════════════════════════════════════
 {
-  const shown = [], above = [], rimGap = [];
+  const shown = [], above = [], rimGap = [], rimSunk = [], rimHang = [];
   let floatMax = -Infinity, chunks = 0, rimOver = 0, rimAll = 0;
   for (let b = 0; b < N; b++) {
     const parts = build('makeMossRock', SEED + 0x10000 + b);
@@ -312,35 +365,47 @@ console.log(`\n  DO THE PARTS FIT — nightmarket.ts's umbrella and moss rock, $
       if (cen.y > rockTop) up += a;
     }
     shown.push(out / area); above.push(up / area);
-    // REPORTED, NOT BARRED: how the moss's lowest ring meets the rock. For
-    // each rim vertex, the rock's top surface straight below it — the lowest
-    // of the rock's upward-facing planes over that point — or none, when the
-    // vertex hangs past the rock's outline. As a share of the rock's height.
+    // M4: how the moss's rim meets the rock. The rim is the cap's outer ring:
+    // the vertices furthest across from the cap's middle (the mean of its
+    // vertices, which its seven even segments put on its axis) — found across,
+    // not by height, because a rim laid on the rock is not level. For each rim
+    // vertex, the rock's upper surface straight below it — the lowest of the
+    // rock's upward-facing planes over that point — or none, when the vertex
+    // hangs past the rock's outline. As a share of the rock's height.
     const rp = hulls[0], upP = rp.filter((q) => q.n.y > 1e-6), dnP = rp.filter((q) => q.n.y < -1e-6);
     const ys = rocks[0].pts.map((p) => p.y), rockH = Math.max(...ys) - Math.min(...ys);
-    const low = Math.min(...M.map((v) => v.y));
-    let gap = -Infinity;
-    for (const v of M) {
-      if (v.y > low + 1e-4) continue;
+    const mcx = M.reduce((a, v) => a + v.x, 0) / M.length, mcz = M.reduce((a, v) => a + v.z, 0) / M.length;
+    const across = M.map((v) => Math.hypot(v.x - mcx, v.z - mcz)), far = Math.max(...across);
+    let gap = -Infinity, sunk = Infinity, hang = 0;
+    M.forEach((v, i) => {
+      if (across[i] < 0.93 * far) return;   // the next ring in is 0.85 of the rim's radius
       rimAll++;
       const yTop = Math.min(...upP.map((q) => (q.d - q.n.x * v.x - q.n.z * v.z) / q.n.y));
       const yBot = Math.max(...dnP.map((q) => (q.d - q.n.x * v.x - q.n.z * v.z) / q.n.y));
-      if (yTop < yBot) { rimOver++; continue; }
-      gap = Math.max(gap, (v.y - yTop) / rockH);
-    }
-    if (Number.isFinite(gap)) rimGap.push(gap);
+      if (yTop < yBot) { rimOver++; hang++; return; }
+      gap = Math.max(gap, (v.y - yTop) / rockH); sunk = Math.min(sunk, (v.y - yTop) / rockH);
+    });
+    if (Number.isFinite(gap)) { rimGap.push(gap); rimSunk.push(sunk); }
+    rimHang.push(hang);
   }
   const sorted = (a) => [...a].sort((x, y) => x - y);
   const q = (a, f) => sorted(a)[Math.min(a.length - 1, Math.floor(f * a.length))];
   console.log(`  ·  moss rock: ${N} builds (${chunks} with the second chunk); moss area outside the rock: lowest ${(100 * q(shown, 0)).toFixed(1)}%, median ${(100 * q(shown, 0.5)).toFixed(1)}%, highest ${(100 * q(shown, 0.999)).toFixed(1)}%`);
-  console.log(`  ·  moss rock: moss area above the rock's highest point (the studio's phrasing): lowest ${(100 * q(above, 0)).toFixed(1)}%, median ${(100 * q(above, 0.5)).toFixed(1)}%`);
+  console.log(`  ·  moss rock: moss area above the rock's highest point (the studio's wording): lowest ${(100 * q(above, 0)).toFixed(1)}%, median ${(100 * q(above, 0.5)).toFixed(1)}%`);
   console.log(`  ·  moss rock: highest bottom of a rock or chunk ${floatMax.toFixed(3)} (0 is the ground)`);
-  if (rimGap.length) console.log(`  ·  moss rock: the moss's lowest ring, over the rock's top below it: ${rimOver} of ${rimAll} rim vertices hang past the rock's outline; the rest stand at most ${q(rimGap, 0.5).toFixed(2)} (median build) and ${q(rimGap, 0.999).toFixed(2)} (worst) of the rock's height above it — negative is inside the rock`);
+  const gapWorst = rimGap.length ? q(rimGap, 0.999) : Infinity;
+  if (rimGap.length) console.log(`  ·  moss rock: the moss's rim over the rock's upper surface below it: ${rimOver} of ${rimAll} rim vertices hang past the rock's outline; the rest stand at most ${q(rimGap, 0.5).toFixed(3)} (median build) and ${gapWorst.toFixed(3)} (worst) of the rock's height above it, the deepest ${q(rimSunk, 0.5).toFixed(3)} (median) and ${q(rimSunk, 0).toFixed(3)} (worst) — negative is inside the rock`);
   verdict(q(shown, 0) >= MOSS_SHOWN_MIN,
     `M1 the moss shows: at least ${(100 * q(shown, 0)).toFixed(1)}% of it outside the rock in every build (bar ${100 * MOSS_SHOWN_MIN}%)`,
     `M1 the moss is buried: as little as ${(100 * q(shown, 0)).toFixed(1)}% of it outside the rock (median ${(100 * q(shown, 0.5)).toFixed(1)}%, bar ${100 * MOSS_SHOWN_MIN}% in every build)`);
   verdict(floatMax <= EPS,
     `M2 nothing floats: every rock and chunk reaches the ground (highest bottom ${floatMax.toFixed(3)})`,
     `M2 a rock or chunk floats: its lowest vertex is ${floatMax.toFixed(3)} above the ground`);
+  verdict(q(above, 0) >= MOSS_ABOVE_MIN,
+    `M3 the moss crowns the rock: at least ${(100 * q(above, 0)).toFixed(1)}% of it above the rock's highest point in every build (bar ${100 * MOSS_ABOVE_MIN}%, the studio's wording)`,
+    `M3 the moss does not crown the rock: as little as ${(100 * q(above, 0)).toFixed(1)}% of it above the rock's highest point (median ${(100 * q(above, 0.5)).toFixed(1)}%, bar ${100 * MOSS_ABOVE_MIN}% in every build)`);
+  verdict(rimOver === 0 && rimGap.length === N && gapWorst <= RIM_GAP_MAX,
+    `M4 the moss sits on the rock: every rim vertex over the rock, none more than ${gapWorst.toFixed(3)} of the rock's height above its surface (bar ${RIM_GAP_MAX}, every build)`,
+    `M4 the moss floats: its rim stands up to ${gapWorst.toFixed(3)} of the rock's height over the rock (median build ${rimGap.length ? q(rimGap, 0.5).toFixed(3) : '-'}, bar ${RIM_GAP_MAX}), ${rimOver} rim vertices past the rock's outline — a lid, not a cushion`);
 }
 process.exit(failed ? 1 : 0);

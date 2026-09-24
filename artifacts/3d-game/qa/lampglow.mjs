@@ -37,6 +37,12 @@
 // under each lamp's interior pixels, grouped by the lamp colour's hue, and its
 // median displayed hue and saturation are printed beside the source's. A
 // person reads that table against the frame.
+// A read-back that comes back all zeros (HDR frame or displayed frame) is a
+// FAIL, not a measurement: three leaves the buffer zeroed when it refuses one.
+//
+// NOT YET RUN (studio round 4, Job 9). It stays in the live and quality
+// profiles, out of push, until its first output on Lantern and Powder has been
+// read.
 //
 // Keyed on the game's clock (__matchState().t), never on wall time.
 import { chromium } from 'playwright';
@@ -88,6 +94,11 @@ const res = await p.evaluate(({ MIN_PX, HALO_SHARE }) => {
   const sz = r.getDrawingBufferSize(new T.Vector2()), W = sz.x, H = sz.y;
   const rt = new T.WebGLRenderTarget(W, H, { type: T.FloatType });
   const read = (target) => { const buf = new Float32Array(W * H * 4); r.readRenderTargetPixels(target, 0, 0, W, H, buf); return buf; };
+  // A read-back three refuses (a target type or format this GPU will not read
+  // back) logs a console error and leaves the buffer as it was made: zeros.
+  // Zeros read as "no lamp over the cut" and as a black hue table, so a frame
+  // with nothing in it is an error here, not a measurement.
+  const blank = (buf) => { for (let i = 0; i < buf.length; i++) if (buf[i] !== 0) return false; return true; };
   // the composer's targets are HalfFloat, which WebGL reads back only into a
   // Uint16Array of half floats
   const readAny = (target) => {
@@ -110,6 +121,7 @@ const res = await p.evaluate(({ MIN_PX, HALO_SHARE }) => {
   // 1. HDR: the frame as bloom sees it
   r.setRenderTarget(rt); r.clear(); r.render(scene, cam);
   const hdr = read(rt);
+  if (blank(hdr)) { r.setRenderTarget(prevRT); rt.dispose(); return { err: 'the HDR frame read back as all zeros (the float target was not read back) — nothing was measured' }; }
   // 2 + 3. ID and SOURCE: every visible mesh swapped for one of two flat
   // materials, everything that is not a mesh hidden, then all put back
   const saved = [], hidden = [];
@@ -150,6 +162,7 @@ const res = await p.evaluate(({ MIN_PX, HALO_SHARE }) => {
     disp = readAny(c.writeBuffer);
   } finally { c.renderToScreen = true; }
   r.setRenderTarget(prevRT); rt.dispose(); black.dispose(); srcMat.dispose(); idMat.forEach((m) => m.dispose());
+  if (blank(disp)) return { err: `the displayed frame read back as all zeros from the composer's ${c.writeBuffer.texture.type === T.HalfFloatType ? 'half-float' : 'float'} target — the hue table would be read off an empty buffer` };
 
   // screen rows run top-down; every read-back runs bottom-up
   const idAt = new Int32Array(W * H).fill(-1);
