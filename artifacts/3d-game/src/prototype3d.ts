@@ -9483,15 +9483,15 @@ function burpPop(): boolean {
 }
 /** Could the ceremony block play an EVOLVED ceremony on THIS frame? Asked by
  *  burpPop() from inside voidling.update(), ahead of the drain and the block.
- *  The block moves to evoHold.due()'s form, or one up on __forceEvolve, and
- *  plays a ceremony when that form is above BOTH curStage and bestStage. Of
- *  what feeds it, only the drain runs between here and there, and a held meal
- *  it swallows owes its form on this frame — so any held meal counts, as it
- *  already does in the due block. The radius's own form and the owed one are
- *  what the block will read: the growth law ran at the top of the frame, and a
- *  capture later in this one that crosses a threshold is held, never shown on
- *  its own frame (proto3d/evohold.ts). Read through state(), not due(), which
- *  tidies.
+ *  The block moves to the form the hold's due() hands it, or one up on
+ *  __forceEvolve, and plays a ceremony when that form is above BOTH curStage
+ *  and bestStage. Of what feeds it, only the drain runs between here and there,
+ *  and a held meal it swallows owes its form on this frame — so any held meal
+ *  counts, as it already does in the due block. The radius's own form and the
+ *  owed one are what the block will read: the growth law ran at the top of the
+ *  frame, and a capture later in this one that crosses a threshold is held,
+ *  never shown on its own frame (proto3d/evohold.ts). Read through state(), not
+ *  due(), which tidies.
  *  BOTH, because the first cut asked only `> bestStage` and refused every pop
  *  on qa/savour.mjs page 2 — no burp at all from three big bites. __setVoidR
  *  sets curStage straight from the radius and leaves bestStage behind, so the
