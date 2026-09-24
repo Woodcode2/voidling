@@ -26,6 +26,17 @@
 // is accepted for the house signature and not used. Math.random is seeded per
 // render, so two renders differ only by what was asked.
 //
+// EVERY SOUND IS ASKED FOR AT T0 = 0.3 s INTO ITS RENDER, NEVER AT ZERO. The
+// master chain ends in a DynamicsCompressor, and in this probe's first run the
+// same pop() measured a -24.5 dBFS peak asked for at 0.00 s and -17.6 asked
+// for at 0.10 s (and the CHOMP -21.0 against -16.1), while the burp — which
+// schedules itself 5 ms after the call — read -21.5 and -21.2: sounds asked
+// for at the very top of a render come out several dB down, and not all by
+// the same amount. A comparison between them measured where each started. So
+// the clock is moved on first, and every window below is read from T0. Asked
+// for at T0, the next run read that pop at -17.3 and the CHOMP at -17.2 —
+// their in-sequence levels — and the burp at -21.0.
+//
 // ── THE BARS, written before the first render ──────────────────────────────
 //   (a) audio.burp() exists.
 //   (b) 0.25 s IN TOTAL: the burp alone is under -60 dBFS from 0.28 s after
@@ -105,18 +116,21 @@ await p.evaluate(({ world, rate }) => {
   };
 }, { world: WORLD, rate: RATE });
 
-const render = (body, secs) => p.evaluate(({ body, secs }) =>
-  window.__render(new Function('a', 'at', body), secs), { body, secs });
+const T0 = 0.3;
+const render = (body, secs) => p.evaluate(({ body, secs, t0 }) =>
+  window.__render(new Function('a', 'at', `at(${t0}); ${body}`), secs + t0), { body, secs, t0: T0 });
+/** the render from T0 on: the sound and what follows it, nothing before */
+const fromT0 = (r) => ({ ...r, d: r.d.slice(Math.floor(T0 * RATE)) });
 
-const burp = await render('if (typeof a.burp !== "function") return false; a.burp();', 0.6);
+const burp = fromT0(await render('if (typeof a.burp !== "function") return false; a.burp();', 0.6));
 console.log(`\n  THE BURP — ${WORLD}, the real createAudio() at ${RATE / 1000} kHz; tonic ${TONIC} Hz (pop()'s root, read from its line)\n`);
 if (!burp.has) {
   await b.close();
   die('(a) audio3d.ts has no burp() — the BURP OF CHAMPIONS every world\'s win title promises does not exist');
 }
 console.log('  ok   (a) audio.burp() exists');
-const pop = await render('a.pop(0, 1.3, 2.5);', 0.6);
-const chomp = await render('a.chomp(3.2, 3.0, "prop", 0);', 1.0);
+const pop = fromT0(await render('a.pop(0, 1.3, 2.5);', 0.6));
+const chomp = fromT0(await render('a.chomp(3.2, 3.0, "prop", 0);', 1.0));
 const ctxRender = { pop: pop.d, chomp: chomp.d };
 
 // ── measurement ────────────────────────────────────────────────────────────
@@ -213,7 +227,7 @@ const wav = (d) => {
 // the gaps are 0.6 s of silence after each sound has actually ended — each end
 // read off its own render at -60 dBFS, never a guessed length
 const popEnd = lastAbove(ctxRender.pop, 0.001), chompEnd = lastAbove(ctxRender.chomp, 0.001);
-const T_POP = 0.1, T_CHOMP = T_POP + popEnd + 0.6, T_BURP = T_CHOMP + chompEnd + 0.6;
+const T_POP = T0, T_CHOMP = T_POP + popEnd + 0.6, T_BURP = T_CHOMP + chompEnd + 0.6;
 const seq = await p.evaluate(({ tp, tc, tb, secs }) => window.__render((a, at) => {
   at(tp); a.pop(0, 1.3, 2.5);
   at(tc); a.chomp(3.2, 3.0, 'prop', 0);
