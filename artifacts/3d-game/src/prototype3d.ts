@@ -9006,7 +9006,9 @@ interface BitePay {
 // burp is rare or it is not a joke.
 // NEVER OVER THE WHISTLE: nothing is owed from inside the end beat, a burp that
 // comes due in it is dropped, and one already in its cheek hold is refused at
-// the pop (the rig asks). The end belongs to the whistle (endBeat()).
+// the pop (the rig asks). The end belongs to the whistle (endBeat()). A PAUSE
+// is not the end: a hold that runs out under the sheet is owed again, and the
+// burp comes once she is back (burpPop()).
 // AND NEVER ON THE CEREMONY: a burp coming due inside EVO_CLEAR of an EVOLVED
 // ceremony, or while a meal that earned a form is still in the drain (its
 // swallow is a ceremony on its way), WAITS it out rather than being skipped —
@@ -9030,10 +9032,29 @@ function oweBurp(wait: number) {
 /** asked by the rig at the end of its 150 ms cheek hold: is the moment still
  *  free? If it is, this is where the burp is heard and seen. */
 function burpPop(): boolean {
-  if (!started || ended || paused || outroT > 0 || endBeat()) return false;
-  if (tClock - lastCeremonyAt < EVO_CLEAR) {
-    // a ceremony landed inside the hold: owe it again, after the ceremony
-    burpCdUntil = -99; burpWait = lastCeremonyAt + EVO_CLEAR - tClock;
+  if (!started || ended || outroT > 0 || endBeat()) return false;
+  // ── OWED AGAIN, NOT LOST ─────────────────────────────────────────────────
+  // Three moments the pop refuses without spending the burp. It is owed again
+  // at once with the cooldown cleared, and the due block — which runs AFTER
+  // the ceremony block, so this frame's ceremony is known there — decides
+  // when: EVO_CLEAR after a ceremony, in 0.1 s steps while a meal that earned
+  // a form is in the drain, and not at all until the pause sheet is down.
+  //   · A CEREMONY INSIDE THE HOLD, which lastCeremonyAt already knows.
+  //   · A CEREMONY ON THIS VERY FRAME, which it does not. This is asked from
+  //     inside voidling.update(), and the drain and the ceremony block run
+  //     after it, so a ceremony landing on the pop frame itself went off with
+  //     the burp (the G9 review). qa/savour.mjs (j) forces one onto the pop
+  //     frame: on the build before this the burp was heard on the ceremony's
+  //     own frame, +0.00 s after it, in both runs. ceremonyMayLand() asks
+  //     what the block will do, with what can be known here.
+  //   · A PAUSE. voidling.update() keeps running under the pause sheet — only
+  //     the sim and the outro hold — so a hold begun as she tapped pause ran
+  //     out behind the sheet and was refused here, while the 20 s cooldown,
+  //     set when the burp came due, ran on with nothing played. (k), on the
+  //     build before this: paused with 0.15 s of the hold to run, nothing
+  //     when she came back, and 19.4 s of cooldown already running for it.
+  if (paused || tClock - lastCeremonyAt < EVO_CLEAR || ceremonyMayLand()) {
+    burpCdUntil = -99; burpWait = 0;
     return false;
   }
   audio.burp();
@@ -9041,6 +9062,31 @@ function burpPop(): boolean {
   // sentence case at the glass (bubbles.ts): this reads "Burp!" on screen
   bubbles.float(floatPos.set(voidState.x, voidling.radius + 3, voidState.z), 'burp!');
   return true;
+}
+/** Could the ceremony block play an EVOLVED ceremony on THIS frame? Asked by
+ *  burpPop() from inside voidling.update(), ahead of the drain and the block.
+ *  The block moves to evoHold.due()'s form, or one up on __forceEvolve, and
+ *  plays a ceremony when that form is above BOTH curStage and bestStage. Of
+ *  what feeds it, only the drain runs between here and there, and a held meal
+ *  it swallows owes its form on this frame — so any held meal counts, as it
+ *  already does in the due block. The radius's own form and the owed one are
+ *  what the block will read: the growth law ran at the top of the frame, and a
+ *  capture later in this one that crosses a threshold is held, never shown on
+ *  its own frame (proto3d/evohold.ts). Read through state(), not due(), which
+ *  tidies.
+ *  BOTH, because the first cut asked only `> bestStage` and refused every pop
+ *  on qa/savour.mjs page 2 — no burp at all from three big bites. __setVoidR
+ *  sets curStage straight from the radius and leaves bestStage behind, so the
+ *  radius's form sat above bestStage on every frame while the block, which
+ *  also wants it above curStage, never played a ceremony to close the gap.
+ *  In play curStage never passes bestStage (only a demotion writes it outside
+ *  the block, and that writes it down), so mirroring the block exactly costs
+ *  nothing there. */
+function ceremonyMayLand(): boolean {
+  const h = evoHold.state();
+  if (h.held.length) return true;
+  const ns = _forceEvolve ? Math.min(FORMS.length - 1, curStage + 1) : Math.max(stageFor(voidling.radius), h.owed);
+  return ns > curStage && ns > bestStage;
 }
 /** The last 64 bites, oldest first — the same objects the drain pays, so a row
  *  fills in as its bite goes down. QA only (__biteLog); nothing in the game
@@ -13791,8 +13837,14 @@ function animate() {
       // hears forty times a match (research governor G4; qa/endparty.mjs)
       audio.whistle(); partyBurst();
       // …and he HOPS: G4's victoryHop, landed with G9 (void3d.ts). A goal met
-      // is a win at any rank, so every door through here is one.
-      voidling.victoryHop();
+      // is a win at any rank, so every door through here is one. Under BIG
+      // MOTION off he squashes and stretches where he stands and does not
+      // rise: the rise is the hero travelling up the screen under a camera
+      // that does not follow it, and travel that only decorates is what the
+      // setting takes away (the menu ladder's pip hop, bubbles.ts's floaters),
+      // while scale stays, as it does on the eat. qa/savour.mjs (l): on the
+      // build before this the body rose 0.35 R under BIG MOTION off.
+      voidling.victoryHop(!reduceMotion());
     }
     if (matchClock <= 0 && !ended && outroT <= 0) {
       // RIVALS is the one dot the clock itself decides: the rank is only true
@@ -13812,7 +13864,7 @@ function animate() {
       fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 5, 1);
       fx.ring(voidState.x, voidState.z, 0xb875ff, voidling.radius * 3.4, 0.8);
       audio.whistle(); partyBurst();   // full time, in this world's own voice (G4)
-      if (goal?.result === 'win') voidling.victoryHop();   // dot 4 won at the buzzer
+      if (goal?.result === 'win') voidling.victoryHop(!reduceMotion());   // dot 4 won at the buzzer (no rise under BIG MOTION off, as above)
     }
     // the 2D GROWTH LAW: radius can never outrun the clock (disabled for ?r= debug)
     if (!bigStart) {

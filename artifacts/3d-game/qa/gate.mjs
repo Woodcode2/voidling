@@ -839,13 +839,16 @@ const SUITE = [
   // Measured on the fix (dist built from the G9 commit's source): savour, three
   // pages of play, 649 s and 641 s on two runs with one other browser on the
   // machine, so 2000; burp renders offline in a blank page (no match, no
-  // server) and took 2 s, so 120.
+  // server) and took 2 s, so 120. The G9 review added a fourth page (a treat
+  // on its own, a ceremony on the pop frame, a pause in the cheek hold, the hop
+  // under BIG MOTION off): 841 s on the build before its fix and 759 s on the
+  // fix, each run through the two-slot browser lock — 2000 still stands.
   { id: 'savour', tier: 'feel', profiles: ['live', 'quality'], timeout: 2000,
     cmd: ['node', 'qa/savour.mjs', PORT, 'maple'], verdict: pf,
-    why: 'a big swallow puffs his cheeks, squints his eyes and sloshes him a second time; the burp is off without ?burp=1, comes once per 20 s with it, and never plays over the whistle; a goal win hops him on a clock the 0.3x outro cannot slow' },
+    why: 'a big swallow puffs his cheeks, squints his eyes and sloshes him a second time; the burp is off without ?burp=1, comes once per 20 s with it, is owed by a landmark on its own, and never plays over the whistle, on a ceremony\'s own frame, or into a pause that loses it; a goal win hops his drawn body on a clock the 0.3x outro cannot slow, with no rise under BIG MOTION off' },
   { id: 'burp', tier: 'feel', profiles: ['live', 'quality'], timeout: 120,
     cmd: ['node', 'qa/burp.mjs', PORT, 'maple'], verdict: pf,
-    why: 'the burp exists, sits on the eat sounds\' own tonic, lasts 0.25 s, carries nothing under 100 Hz, and is heard on a phone under the bite, never over the CHOMP' },
+    why: 'the burp exists, sits on the eat sounds\' own tonic, lasts 0.25 s, has no partial under 120 Hz, nothing under 100 Hz and less under 120 Hz than a plain bite, and is heard on a phone under the bite, never over the CHOMP' },
 
   { id: 'aftermatch', tier: 'feel', profiles: ['live'], timeout: 420,
     cmd: ['node', 'qa/aftermatch.mjs', PORT], verdict: pf,

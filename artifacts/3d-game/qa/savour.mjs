@@ -70,9 +70,11 @@
 //         RETRACTED (GOVERNOR.md rule 3b). As committed in e61abf0 this bar
 //         read faceState().hop, which is hopNow: the factor the rig MEANT to
 //         multiply the body by, not the body. Delete `* hopNow` from the
-//         squash, or the rise from group.position, and it still read 0.80 and
-//         1.20 — and nothing read the rise at all (the G9 review). Both are
-//         now read off the objects that drew them.
+//         squash, or the rise from group.position, and it would still read
+//         0.80 and 1.20, because hopNow is computed before either use; and
+//         nothing read the rise at all (the G9 review). Both are now read off
+//         the objects that drew them. A mutant with both uses cut (page 1
+//         only) reads squash 1.00, stretch 1.00, rise 0.00 R, and (e) FAILS.
 //   PAGE 2 — ?burp=1&g=1
 //     (f) THE BURP: the same three bites earn exactly one burp — counted by the
 //         rig, one 'burp' in the audio call log — and its float is on screen

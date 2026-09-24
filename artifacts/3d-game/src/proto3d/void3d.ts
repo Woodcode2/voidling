@@ -114,8 +114,9 @@ export interface Void3D {
    *  progress is ignored. */
   burp(pop: () => boolean): void;
   /** G4's goal-win hop, on the frame loop's own clock (`s.t`, tClock), which
-   *  runs at full speed while the outro slows the world to 0.3x. */
-  victoryHop(): void;
+   *  runs at full speed while the outro slows the world to 0.3x. `rise` false
+   *  (BIG MOTION off) keeps the squash and the stretch and drops the rise. */
+  victoryHop(rise?: boolean): void;
   /** QA/capture: hold the jaw shut so the face shows its MOOD and nothing else.
    *  The gape is driven by eating, not by mood, so a hero parked anywhere with
    *  food in reach is mid-bite in almost every frame and cannot be
@@ -1860,7 +1861,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   let burpPop: (() => boolean) | null = null;
   // the victory hop: pending until the next update() reads the clock, then
   // timed off s.t (see victoryHop())
-  let hopPending = false, hopT0 = -1, hopNow = 1;
+  let hopPending = false, hopT0 = -1, hopNow = 1, hopRiseOn = true;
   // what this frame would have drawn with no hop — the body's height and the
   // group's — kept only so faceState() can report the drawn body against it
   let restSYNow = 1, restYNow = 0;
@@ -1954,7 +1955,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       if (burpAge >= 0) return;
       burpAge = 0; burpPop = pop;
     },
-    victoryHop() { hopPending = true; },
+    victoryHop(rise = true) { hopPending = true; hopRiseOn = rise; },
     pinMouth(shut) { mouthPinShut = shut; if (shut) { mouthT = 0; mouthMax = 0; mouthAge = 0; } },
     pinGape(v) {
       if (v <= 0) { mouthT = 0; mouthMax = 0; return; }
@@ -2280,7 +2281,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       if (hopT0 >= 0) {
         const u = s.t - hopT0;
         if (u >= HOP_LEN) hopT0 = -1;
-        else { hopNow = hopSquash(u); hopLift = hopRise(u); }
+        else { hopNow = hopSquash(u); hopLift = hopRiseOn ? hopRise(u) : 0; }
       }
 
       // evolution rings + glow intensify with the form (rings are a child of the

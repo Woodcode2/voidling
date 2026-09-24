@@ -84,7 +84,7 @@ export interface Audio3D {
   bonk(): void;
   /** THE BURP OF CHAMPIONS (research governor G9) — the joke all six worlds'
    *  win titles promise. A falling triangle an octave under the eat sounds'
-   *  tonic, a sine 'b' on the tonic and a puff of air: 0.25 s, nothing under
+   *  tonic, a sine 'b' on the tonic and a puff of air: 0.25 s, no partial under
    *  120 Hz. Plays only under ?burp=1 until the owner has heard it
    *  (qa/burp.mjs writes it to qa/out/burp/ for him). */
   burp(): void;
@@ -4707,10 +4707,15 @@ export function createAudio(): Audio3D {
     // at step 0 and depth 0 is where every bite's melody starts, so the burp
     // lands in the key the child has been eating in all match. qa/burp.mjs
     // reads pop()'s line and fails if the two ever part.
-    // NOTHING UNDER 120 Hz (phone speakers; the owner's rule set). The body
+    // NO PARTIAL UNDER 120 Hz (phone speakers; the owner's rule set). The body
     // ends at 126.1 Hz, just over it, and its own decay skirts a few hertz
     // either side of every partial, so the bus runs through a 120 Hz
-    // Butterworth high-pass: the rule held by construction, not by luck.
+    // Butterworth high-pass. That does NOT make the band under 120 Hz empty,
+    // and this comment used to say it did: a 126 Hz partial given 130 ms to
+    // die is a few hertz wide, and qa/burp.mjs reads -20.0 dB of the whole
+    // under 120 Hz, -21.5 dB of it between 115 and 120 Hz and -38.6 dB
+    // under 100 — the partial's own skirt, not a sub. A plain bite, pop(),
+    // carries -15.8 dB under 120 Hz; the burp is graded against it.
     // It is still a low sound FALLING — the shape the owner called an "8-bit
     // thud" on bigEat() (160 Hz, down). That is why it ships switched off and
     // he hears it first: a burp is low and falling or it is not a burp.
