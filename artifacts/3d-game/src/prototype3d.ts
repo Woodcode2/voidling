@@ -3528,7 +3528,11 @@ const _dbg = new Proxy(_dbgStore, {
     band: Record<string, { n: number; rMin: number; rMax: number }> };
   __renderBloom: () => void;
   __composer: () => unknown;
-  __juiceState: () => { fov: number; fovKick: number; stop: number; puffs: number; buzzes: number; stopCd: number; kitCd: number };
+  __juiceState: () => { fov: number; fovKick: number; stop: number; puffs: number; buzzes: number; stopCd: number; kitCd: number;
+    worldK: number; flashes: number; stops: number; longStops: number };
+  __hitStop: (sec: number) => number;
+  __rivalBeside: (name?: string, dist?: number, rel?: number) => Record<string, unknown> | null;
+  __rivalFace: (name: string) => { dyingT: number; visible: boolean; pupils: { x: number; y: number }[] } | null;
   __eatNearest: (rel: number) => { r: number; R: number } | null;
   __quality: () => { level: number; pinned: number | null; shadows: boolean; shSize: number; pr: number };
   __warpVoid: (x: number, z: number) => void;
@@ -3611,7 +3615,68 @@ _dbg.__juiceState = () => ({
   // both to clear before it forces its bite, so another meal's swallow cannot
   // have spent them.
   stopCd, kitCd,
+  // ── WHAT TIME THE WORLD IS ON (research governor G8, qa/timebeat.mjs) ──
+  // worldK is the share of the frame's dt the WORLD was handed — dtw / dt on
+  // the last frame animate() ran, read off the two numbers the loop actually
+  // used, not off any constant: 0.06 inside a hit-stop, 0.3 in the outro, 1
+  // in ordinary play. flashes is fx's own count of washes shown (not calls).
+  // stops counts every freeze that began; longStops those that ran past 100
+  // ms, a freeze being counted once at whatever length the ladder took it to.
+  worldK: lastWorldK, flashes: fx.flashCount(), stops: stopN, longStops: longStopN,
 });
+// QA: arm a hit-stop through the REAL hitStop() — its own cooldown gate
+// included, so a probe must wait for stopCd to read clear or be told 0.
+// Returns the freeze now armed (stopT). qa/timebeat.mjs (b) freezes the world
+// with it and reads the hero's own clock off faceState().hold while it lasts.
+_dbg.__hitStop = (sec: number) => { hitStop(sec); return stopT; };
+// QA: put a member of the family BESIDE the void, small enough to swallow by
+// the family's own rule (`pr > rv.r * 1.2 && dp < pr * 0.95`, rivals.ts), so
+// the next rivals.update() devours it through the real hole-vs-hole branch:
+// dyingT, onRivalEaten, the points, the rings, the flash and the sound are all
+// the ones a real kill fires. Nothing here calls onRivalEaten itself.
+//
+// A rival who has not walked in yet is walked in the way __setRivalScores does
+// it — joinAt into the past, so the next update() runs the real arrival — and
+// the call returns null; call again on a later frame. `dist` is the gap from
+// the void's centre in multiples of HIS radius (0.5 is inside the 0.95 eat
+// line, 1.6 is outside it — a probe can walk one in over several frames) and
+// `rel` her radius as a share of his (under 1/1.2 or she cannot be eaten).
+// She is put on the camera's right of him, so both are in the play frame.
+// A name picks her; with none, the first joined sibling who is not the
+// hunter, then the hunter. A rival mid-gulp or waiting to respawn is skipped.
+_dbg.__rivalBeside = (name?: string, dist = 0.5, rel = 0.6) => {
+  type Priv = { joinAt: number; dyingT: number; respawnT: number; arch: string; joined: boolean;
+    r: number; x: number; z: number; vx: number; vz: number; hunting?: boolean; name: string };
+  const all = rivals.list as unknown as Priv[];
+  const free = (r: Priv) => !(r.dyingT > 0) && !(r.respawnT > 0);
+  const pick = name ? all.find((r) => r.name === name)
+    : (all.find((r) => r.joined && free(r) && r.arch !== 'BULLY') ?? all.find((r) => r.joined && free(r))
+      ?? all.find((r) => !r.joined));
+  if (!pick) return null;
+  if (!pick.joined) { pick.joinAt = -1; return null; }
+  if (!free(pick)) return null;
+  const R = voidling.radius;
+  // camera right on the ground: camOffset points from the void back to the
+  // lens, so (camOffset.z, -camOffset.x) is the screen's right, flattened
+  const fl = Math.hypot(camOffset.x, camOffset.z) || 1;
+  const ax = camOffset.z / fl, az = -camOffset.x / fl;
+  pick.r = R * rel;
+  pick.x = voidState.x + ax * R * dist; pick.z = voidState.z + az * R * dist;
+  pick.vx = pick.vz = 0;
+  return { name: pick.name, arch: pick.arch, r: pick.r, R, x: pick.x, z: pick.z, dist,
+    marquee: pick.arch === 'BULLY' && !pick.hunting };
+};
+// QA: a sibling's face, read off the meshes — her gulp clock and where each
+// pupil sits on her billboarded eye group (children 1 and 3 of rv.eyes: each
+// eye is a white then its pupil, rivals.ts makeRivalMesh). The rest pose of a
+// pupil is its eye's centre, (+-0.32, 0.08).
+_dbg.__rivalFace = (name: string) => {
+  const rv = (rivals.list as unknown as { name: string; dyingT: number; eyes: THREE.Group; group: THREE.Group }[])
+    .find((r) => r.name === name);
+  if (!rv) return null;
+  const pu = [rv.eyes.children[1], rv.eyes.children[3]].map((c) => ({ x: c.position.x, y: c.position.y }));
+  return { dyingT: rv.dyingT, visible: rv.group.visible, pupils: pu };
+};
 // QA: force-eat the nearest edible at least `rel` of the void's radius —
 // drives the REAL capture() path (hit-stop, lens punch, kick, particles,
 // audio, haptics), not a simulation of it.
@@ -13355,9 +13420,20 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { beginMatch(); }
 // nothing else ever read it.
 let stopT = 0;         // seconds of freeze left
 let stopCd = 0;        // …and the gate that stops a hoover spree stuttering
+// QA (qa/timebeat.mjs, __juiceState): every freeze that begins, and every one
+// that runs past 100 ms — counted once, at whatever length the freeze reached
+// (tClock since it began plus what is left of it), because a freeze extended
+// while it is running is still ONE stop on the screen. lastWorldK is dtw / dt
+// of the frame animate() last ran.
+let stopN = 0, longStopN = 0, freezeAt = 0, freezeLong = false, lastWorldK = 1;
+function countFreeze() {
+  if (!freezeLong && tClock - freezeAt + stopT > 0.1 + 1e-9) { freezeLong = true; longStopN++; }
+}
 function hitStop(sec: number) {
   if (stopCd > 0) return;
+  if (!(stopT > 0)) { stopN++; freezeAt = tClock; freezeLong = false; }
   stopT = Math.max(stopT, sec);
+  countFreeze();
   stopCd = 0.35;
 }
 function animate() {
@@ -13379,6 +13455,7 @@ function animate() {
   if (outroT > 0 && !paused) { outroT -= dt; if (outroT <= 0) endMatch(goal?.result ?? null); else dtw = dt * 0.3; }
   stopCd = Math.max(0, stopCd - dt);
   if (stopT > 0) { stopT = Math.max(0, stopT - dt); dtw *= 0.06; }
+  lastWorldK = dt > 0 ? dtw / dt : 1;   // QA: __juiceState().worldK
   tClock += dt;
   if (_revalQueue.length && tClock >= _revalQueue[0]) { _revalQueue.shift(); validateWorld(); bakeContactShadows(); }
   island.update(dt, tClock, camera);

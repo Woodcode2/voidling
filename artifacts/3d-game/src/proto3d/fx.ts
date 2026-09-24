@@ -21,6 +21,12 @@ export interface Fx {
    *  and literally sub-pixel on a colossus. Scaled here, once, so every call
    *  site keeps its authored number and means the same thing at both ends. */
   update(dt: number, camDist?: number): THREE.Vector3;   // returns a camera-shake offset to add
+  /** QA: how many times flash() has written the overlay's BACKGROUND since
+   *  boot — the number of washes a child was actually shown a colour of.
+   *  Calls are not washes: two calls in one frame are one wash on screen,
+   *  because the second write replaces the first before anything draws it.
+   *  qa/timebeat.mjs (c) reads this through __juiceState().flashes. */
+  flashCount(): number;
 }
 
 // ── REDUCE MOTION ───────────────────────────────────────────────────────────
@@ -104,6 +110,7 @@ export function createFx(scene: THREE.Scene): Fx {
   flashEl.style.cssText = 'position:fixed;inset:0;z-index:4;pointer-events:none;opacity:0;transition:opacity 0.05s linear;';
   document.body.appendChild(flashEl);
   let flashT = 0;
+  let flashN = 0;   // QA: background writes (see flashCount)
 
   let shakeAmt = 0;
   let kickAmt = 0, kickX = 0, kickZ = 0, kickAge = 0;
@@ -118,8 +125,9 @@ export function createFx(scene: THREE.Scene): Fx {
       r.mesh.visible = true; r.mesh.position.set(x, 0.15, z);
       r.mat.color.set(color); r.t = 0; r.dur = dur; r.maxR = maxR;
     },
+    flashCount() { return flashN; },
     flash(color, alpha = 0.5) {
-      flashEl.style.background = color;
+      flashEl.style.background = color; flashN++;
       // REDUCE MOTION caps the wash rather than removing it. The flash is a
       // readable signal — "you ate a rival", "you reached the final form" — so
       // silencing it outright would cost information; what makes it a
