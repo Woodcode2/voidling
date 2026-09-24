@@ -34,8 +34,14 @@
 //  between this world and a whiteout, and all three are enforced here.
 //
 //  ON THE WINDOWS. This is a daytime world and the windows still burn —
-//  every lit pane rides PROP_GLOW_MAT, which is unlit and HDR (island.ts
-//  pushes it to 1.75, past the bloom threshold, so warm glass halos). The
+//  every lit pane rides PROP_GLOW_MAT, which is unlit and HDR. Until studio
+//  round 4 the 1.75 it multiplies by did NOT put warm glass past the bloom
+//  threshold: a window's side face measured 0.83 against the cut's 1.05, and
+//  on the "cold bright morning" hour the cut is 1.197 (qa/emitters.mjs). Now
+//  island.ts floors every lamp's luminance at 1.29x the world's cut, whatever
+//  its hue: the glass's dimmest seen face lands at 1.29x the cut
+//  (qa/emitters.mjs). That it halos in the frame is owed to qa/lampglow.mjs
+//  powder and a person's read of the frame. The
 //  reason is the fiction as much as the frame: it is a SNOW DAY. School is
 //  shut, the council has issued a statement, and every single person in this
 //  valley is indoors with the heating on. A village with dark windows on a
@@ -94,7 +100,8 @@ const ORANGE_D = 0xb45c14;  // its shadowed panels
 const SMOKE = 0xb9c2d4;     // chimney smoke: blue-grey, so it reads over the
                             // white cap it drifts across (white-on-white dies)
 
-// the glows — unlit and HDR, so these are the literal pixels on screen
+// the glows — unlit and HDR. These set a lamp's HUE; how bright it shows is
+// island.ts's luminance floor (PROP_GLOW_MAT), the same for every lamp
 const G_WINDOW = 0xffc978;  // the workhorse: every lit pane in the valley
 const G_DOOR = 0xffe9c4;    // an open doorway, paler — a room not a lamp
 const G_HEARTH = 0xff8e40;  // the lodge entrance: the warmest note in the map

@@ -4947,23 +4947,82 @@ export function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0
 }
 // unlit accent material: anything merged with this ignores the lighting, which
 // is the only way a neon strip reads as neon on the dark dance floor
-// ── THE GAME'S LIGHT SOURCES LIVE IN HDR NOW ───────────────────────────────
+// ── THE GAME'S LIGHT SOURCES LIVE IN HDR ───────────────────────────────────
 // Every glow surface in all four worlds rides this one material — the paper
 // lanterns, the stall interiors, the dance rig — and MeshBasicMaterial is
 // unlit: its output is the vertex colour, which cannot exceed 1.0. Measured
 // (qa/_hdrprobe.mjs): the lantern-market frame peaked at 1.381 linear with 64
 // pixels over the bloom threshold, because the art was authored SDR — a
 // "light source" and a white wall were the same number, and no threshold can
-// separate them. `color` multiplies vertexColors, so raising it past white
-// lifts every glow prop into HDR: the paper clears the linear bloom cut
-// (1.05) and halos, while diffuse surfaces — which cannot exceed their
-// illumination — stay under it. The tone map compresses the core back into
-// range on every rung, composer or not, so the unbloomed look shifts only
-// slightly brighter; the HALO carries the hue, which is what "lit from
-// within" reads as. 1.75 is measured, not chosen: high enough that amber
-// paper (luminance ~0.7) clears the cut, low enough that the ACES'd core
-// keeps its colour instead of blowing to white.
+// separate them. `color` multiplies vertexColors, so the 1.75 below lifts
+// every glow prop past white into HDR. Whether anything that is NOT a light
+// crosses the cut is qa/halocensus.mjs's question (Job 5).
+// This note used to say 1.75 was measured to put amber paper (luminance ~0.7)
+// over the linear bloom cut (1.05); it does not (next section), and the
+// luminance floor below is what puts every lamp over it.
+// NOT MEASURED, AND OWED: what the displayed core does. The tone map
+// compresses it back into range on every rung, composer or not, but with the
+// floor's gain of up to x5 on top of the 1.75, whether a lamp's ACES'd core
+// keeps its hue or goes to white, and how much brighter the rungs without
+// bloom look, are for qa/lampglow.mjs's hue table (rung 0) and a person's
+// read of one rung-2 frame per lamp world.
+//
+// ── …AND AMBER PAPER DID NOT CLEAR IT (studio round 4, B7) ─────────────────
+// The old claim was false, and the lanterns on the wire showed it: in
+// lantern_look.png only the paper-white one wore a halo. Bloom keys on
+// LUMINANCE, and part() bakes the skylight into a lamp's vertex colours like
+// any prop's, so a lamp's side face is its colour x 0.74 x 1.75 — amber lands
+// at 0.696, the old note's "~0.7", which is UNDER 1.05, not over it. Measured by
+// qa/emitters.mjs, which runs every builder that merges a part onto this
+// material and reads back the colours part() baked: on the dimmest face the
+// play camera can see, Lantern's amber paper is 0.585 and its red 0.344, and
+// all 20 lamp colours in the four worlds that use this material (Lantern,
+// Powder, Pirate's dance rig, Skylark's runway lights) sat under 1.2x their
+// world's cut at its brightest hour — 0.29x to 1.10x. A saturated lamp is a
+// dim NUMBER to bloom however bright it looks: the red needs x3.92 to reach
+// the floor below, the paper-white x1.20.
+//
+// So the floor is set on luminance, per fragment, once the vertex colour is
+// in: a face under the floor is scaled up to it with its hue untouched, and a
+// face already over it (a paper-white lantern's top) is left alone. The floor
+// is GLOW_OVER x the world's bloom cut, fed through setGlowFloor() by
+// applyLightRig() — the one writer of the cut — so it holds on every world and
+// every hour. At the 1.05 floor cut that is the studio's 1.35. A fixed 1.35
+// does not hold since the cut went per world and per hour: run that way, 9 of
+// the 20 colours land under 1.2x at their world's brightest hour — Pirate's
+// "morning tide" 1.17x, Powder's "cold bright morning" 1.13x, Skylark's "sun
+// on the deck" 1.09x (its cut is 1.239).
+//
+// GLOW_GAIN_MAX is for a FUTURE dark emitter — a near-black trim merged onto
+// this material by mistake should not come out as a lamp. It must hold down no
+// lamp that ships, or that lamp lands dimmer than its siblings, which is the
+// hue-dependence this removes: the most any shipping lamp needs is 4.44
+// (Pirate's pink neon, #ff2fa0, at "morning tide"), so the studio's proposed
+// 4.0 would have caught it. qa/emitters.mjs fails the day one needs more.
 export const PROP_GLOW_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1.75, 1.75, 1.75) });
+const GLOW_OVER = 1.35 / 1.05;
+const GLOW_GAIN_MAX = 5.0;
+// one object, shared by reference with every program this material compiles,
+// so setGlowFloor() reaches them all. It holds the floor cut's value (1.05)
+// until setGlowFloor() first runs: from ensureComposer() where the bloom
+// threshold is first set, and from applyLightRig() at every match start
+// (applyHour, in beginMatch) and on the rematch path.
+const glowFloor = { value: 1.05 * GLOW_OVER };
+const GLOW_BODY = `
+  diffuseColor.rgb *= clamp(uGlowFloor / max(luminance(diffuseColor.rgb), 1e-3), 1.0, ${GLOW_GAIN_MAX.toFixed(1)});
+`;
+PROP_GLOW_MAT.onBeforeCompile = (shader) => {
+  // Checked, as installPropShader checks its hooks: a three upgrade that
+  // renames the chunk would otherwise leave the lamps dark with nothing to say so.
+  const needle = '#include <color_fragment>';
+  if (!shader.fragmentShader.includes(needle)) { console.warn(`VOIDLING: glow shader hook "${needle}" not found`); return; }
+  shader.uniforms.uGlowFloor = glowFloor;
+  shader.fragmentShader = 'uniform float uGlowFloor;\n' + shader.fragmentShader.replace(needle, needle + GLOW_BODY);
+};
+/** Every lamp's dimmest face lands at GLOW_OVER x this cut. Called with the
+ *  bloom threshold wherever the threshold is set (ensureComposer,
+ *  applyLightRig). */
+export function setGlowFloor(cut: number): void { glowFloor.value = cut * GLOW_OVER; }
 // ── CONTACT SHADING, BAKED INTO THE COLOUR THAT IS ALREADY THERE ───────────
 // Measured: aoMap covers 0% of the scene on all four worlds, while 80-94% of
 // every world's triangles ride one of two vertex-coloured materials. So the
