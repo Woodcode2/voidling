@@ -75,9 +75,48 @@ export interface Void3D {
    *  pure size term the evolution pop and the bite's wind-up both write
    *  (qa/mouthwind.mjs). All four are READ from the frame that used them,
    *  never recomputed, so a probe cannot be told a number the render did not
-   *  draw. */
+   *  draw.
+   *  The follow-through after a bite (research governor G9, qa/savour.mjs)
+   *  reads five more, each off the object that drew it: `blush` is the
+   *  cheeks' opacity as the face asked for it and `blushOpacity` what the
+   *  material was handed after the small-size fade; `scleraY` is the first
+   *  eye's sclera.scale.y, which the lid and the blink both squash; `faceX`
+   *  is the face billboard's width over its height; `wobble` is the jelly
+   *  slosh the body shader was handed. `burpN` counts the burps the face has
+   *  popped this session, and `hop` is the victory hop's vertical factor on
+   *  the body this frame (1 at rest).
+   *  `hop` is the number the rig MEANT to use, so it cannot tell a probe
+   *  whether the body was ever moved by it (the G9 review: delete `* hopNow`
+   *  from the squash and `hop` still reads 0.80). So the body is reported as
+   *  it was drawn, next to what this frame would have drawn with no hop:
+   *  `bodySY` is bob.scale.y and `restSY` is dispR times the frame's squash
+   *  before the hop's factor; `bodyY` is group.position.y and `restY` the
+   *  height this frame set before the hop's rise; `dispR` is the radius both
+   *  were built on. bodySY / restSY is the hop on the body; (bodyY - restY) /
+   *  dispR is the rise in radii. `burpLeft` is the seconds of the burp's cheek
+   *  hold still to run before the pop is asked (0: the next update() asks;
+   *  -1: no burp is in its hold). */
   faceState(): { mood: Mood; maw: number; smile: boolean; biting: boolean; hold: number;
-    move: number; lid: number; shut: number; uniformK: number };
+    move: number; lid: number; shut: number; uniformK: number;
+    blush: number; blushOpacity: number; scleraY: number; faceX: number; wobble: number;
+    burpN: number; hop: number; bodySY: number; restSY: number; bodyY: number; restY: number;
+    dispR: number; burpLeft: number };
+  /** THE FOLLOW-THROUGH (research governor G9). Call on the SWALLOW of a meal —
+   *  the frame the drain lets go of it — with the grade the bite was taken at
+   *  (the meal against the void, 0.12..1). The cheeks puff, the body sloshes a
+   *  second time 80 ms later, and a bite of at least half his size squints
+   *  him happy. See the constants at AFTER_BITE for what each is and why. */
+  afterBite(bite: number): void;
+  /** THE BURP. A 150 ms puffed-cheek hold, then `pop` is asked whether the
+   *  moment is still free — the caller owns the end beat, the rig does not —
+   *  and on true the mouth pops, the blush flushes and burpN counts one. On
+   *  false the cheeks simply let go. One at a time: a call while one is in
+   *  progress is ignored. */
+  burp(pop: () => boolean): void;
+  /** G4's goal-win hop, on the frame loop's own clock (`s.t`, tClock), which
+   *  runs at full speed while the outro slows the world to 0.3x. `rise` false
+   *  (BIG MOTION off) keeps the squash and the stretch and drops the rise. */
+  victoryHop(rise?: boolean): void;
   /** QA/capture: hold the jaw shut so the face shows its MOOD and nothing else.
    *  The gape is driven by eating, not by mood, so a hero parked anywhere with
    *  food in reach is mid-bite in almost every frame and cannot be
@@ -1761,6 +1800,97 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // what update() last multiplied the body by, kept only so faceState() can
   // report the frame's own number instead of a probe re-deriving it
   let uniformKNow = 1;
+  // …and the cheeks' opacity as the face asked for it, before the small-size
+  // fade — kept for the same reason (faceState(), qa/savour.mjs)
+  let blushNow = 0.5;
+  // ── AFTER_BITE: HE SAVOURS IT (research governor G9) ────────────────────
+  // After a bite the creature only wobbled. chomp() opens the jaw and kicks the
+  // slosh at the CAPTURE, and from then until the next meal the face did
+  // nothing at all about what had just gone down. Measured on the build
+  // before this (qa/savour.mjs, Maple, three swallows of meals 0.70 of his
+  // size, somewhere nothing else was eating): on the first frame after each
+  // swallow the drawn blush was the rest face's 0.50, the face exactly as wide
+  // as it is tall, the eye's sclera.y 1.00, and the slosh read 0.00 on every
+  // frame of the 300 ms that followed.
+  // The follow-through runs from the SWALLOW, the frame the drain lets go of
+  // the meal, because since Job 11 that is where every reaction a child can see
+  // or hear is paid (prototype3d.ts, THE BITE PAYS OFF ON THE SWALLOW).
+  //
+  // THE CHEEKS. The blush comes up by PUFF_BLUSH — 0.5 to 0.8 on the rest
+  // face, the spec's numbers — and the face billboard widens by PUFF_X, then
+  // both let go over PUFF_DECAY. The envelope is read at its age BEFORE the
+  // frame's advance, so the first frame drawn after the swallow carries the
+  // whole puff at any frame rate: at the loop's 0.05 s dt clamp an
+  // advance-first read would already be 42% of the way down on that frame.
+  const PUFF_BLUSH = 0.3, PUFF_X = 0.06, PUFF_DECAY = 0.12;
+  // THE GULP: a second slosh, GULP_SHARE of the kick chomp() gave the same
+  // meal at its capture, GULP_DELAY after the swallow — the meal going down.
+  const GULP_DELAY = 0.08, GULP_SHARE = 0.4;
+  // THE HAPPY SQUINT, for a bite of at least SQUINT_BITE of his size: the eyes
+  // close for SQUINT_LEN and open again. CLOSED, not narrowed. An open eye at a
+  // low lid is the white slit this rig has shipped and taken back twice —
+  // sleepy at 0.26 and smug at 0.55 both read as drowsy at play size, and
+  // qa/moodrule.mjs bars every mood from it — so the squint uses the rig's
+  // other knob: `shut` fades the white and the pupil and the lid flattens the
+  // dark backing disc to SQUINT_LID, the line hurt already draws (0.20). With
+  // the grin and the flushed cheeks around it, that line is "mmm", not "ow".
+  // Shut AT ONCE, held, and open again over the last 80 ms. At once because a
+  // big swallow also stops the world (biteGulps' hit-stop, up to 105 ms at
+  // 0.06x) and this rig runs on that clock: a squint that eased shut would be
+  // frozen half-open for the whole of the freeze, and the freeze frame is the
+  // one pose a child is sure to see — cheeks full, eyes screwed shut.
+  // …AND NOT ON EVERY MOUTHFUL OF A SPREE. The swallow kit's own comment in
+  // prototype3d.ts records its relative gate alone (bite > 0.55) firing 141
+  // times a minute on Lantern (qa/_kickrate.mjs) — 2.35 big swallows a second,
+  // which at 200 ms apiece would hold his eyes shut 47% of the time, and the
+  // eyes are the character. So a squint may not start within SQUINT_GAP of the
+  // last one's start: at most a third of any stretch with his eyes shut, and
+  // at that Lantern rate every other big swallow squints. (Not in the spec; a
+  // spree was not in its picture.)
+  const SQUINT_BITE = 0.5, SQUINT_LEN = 0.2, SQUINT_LID = 0.2, SQUINT_GAP = 0.6;
+  // THE BURP: the cheeks held full for BURP_HOLD, then the pop — the jaw to
+  // BURP_MOUTH, as a reaction rather than a bite (no wind-up, the set pieces'
+  // rule below), open for BURP_OPEN — and the blush flushed to BURP_FLUSH for
+  // BURP_FLUSH_LEN. All four are the spec's.
+  const BURP_HOLD = 0.15, BURP_MOUTH = 0.4, BURP_OPEN = 0.25, BURP_FLUSH = 0.9, BURP_FLUSH_LEN = 0.3;
+  // THE SCARED FACE IS APPROVED AND HANDS-OFF (docs/GOVERNOR.md, "The fear face
+  // is approved"): neither the squint nor the widening may touch it. The blush
+  // is the cheeks, not the eyes, and still answers.
+  let puffAge = 9, gulpIn = -1, gulpK = 0, squintAge = 9, flushAge = 9;
+  let burpAge = -1, burpN = 0;
+  let burpPop: (() => boolean) | null = null;
+  // the victory hop: pending until the next update() reads the clock, then
+  // timed off s.t (see victoryHop())
+  let hopPending = false, hopT0 = -1, hopNow = 1, hopRiseOn = true;
+  // what this frame would have drawn with no hop — the body's height and the
+  // group's — kept only so faceState() can report the drawn body against it
+  let restSYNow = 1, restYNow = 0;
+  // chomp()'s slosh kick for a bite of grade g — the gulp takes its share of it
+  const biteKick = (g: number) => 0.30 + 0.55 * g;
+  // ── THE VICTORY HOP — G4's spec, which folded into G9 ───────────────────
+  // "squash 0.8 / stretch 1.2, back-ease settle over 450 ms, on a hero clock
+  // that runs at full speed while the outro runs at 0.3x". The body's height
+  // factor over u seconds: a crouch to 0.8 over 60 ms, HELD to 120 ms; the
+  // launch to 1.2 by 180 ms, HELD to 240 ms; then an easeOutBack home by 450
+  // ms, which dips a hair under rest (0.98 at its lowest) as he lands. The two
+  // holds are there to be SEEN: at the frame loop's 0.05 s dt clamp a 45 ms
+  // extreme can fall entirely between two frames, and a crouch nobody is
+  // shown is no crouch. The rise is a parabola between the launch and the
+  // landing, 0.35 of his radius at the top.
+  const HOP_LEN = 0.45;
+  const ease = (x: number) => x * x * (3 - 2 * x);
+  const hopSquash = (u: number): number => {
+    if (u < 0.06) return 1 - 0.2 * ease(u / 0.06);
+    if (u < 0.12) return 0.8;
+    if (u < 0.18) return 0.8 + 0.4 * ease((u - 0.12) / 0.06);
+    if (u < 0.24) return 1.2;
+    const x = Math.min(1, (u - 0.24) / (HOP_LEN - 0.24)) - 1, c1 = 1.70158;
+    return 1.2 - 0.2 * (1 + (c1 + 1) * x * x * x + c1 * x * x);
+  };
+  const hopRise = (u: number): number => {
+    const v = (u - 0.12) / 0.28;
+    return v <= 0 || v >= 1 ? 0 : 0.35 * 4 * v * (1 - v);
+  };
   let stretchT = 0;                // rocket stretch pulse
   let inhaleT = 0;                 // collapse inhale->burst envelope
   let evolveT = 0;                 // evolution celebration pop
@@ -1796,15 +1926,36 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     celebrate() { evolveT = 0.7; wobble = 1; ringBurst = 1; },
     arriveY(y: number) { arriveLift = Math.max(0, y); },
     bump() { wobble = Math.min(1, wobble + 0.42); },
-    calm() { evolveT = 0; wobble = 0; ringBurst = 0; },
+    calm() {
+      evolveT = 0; wobble = 0; ringBurst = 0;
+      // …and the follow-through's envelopes with it: a shutter is not a meal
+      puffAge = 9; gulpIn = -1; squintAge = 9; flushAge = 9; burpAge = -1; burpPop = null;
+      hopPending = false; hopT0 = -1;
+    },
     // `hold` is the SECONDS the jaw still owes, which is the number QA has to
     // see: `biting` only says the mouth is open, and the bug worth catching is
     // the mouth shutting EARLY — while the meal is still on its way down. A
     // boolean sampled at 1-2fps cannot tell those apart. qa/_eatmotion.mjs.
     faceState() {
       return { mood, maw: mp.maw, smile: mouth.visible, biting: mouthT > 0, hold: mouthT,
-        move: moveAmt, lid: mp.lid, shut: mp.shut, uniformK: uniformKNow };
+        move: moveAmt, lid: mp.lid, shut: mp.shut, uniformK: uniformKNow,
+        blush: blushNow, blushOpacity: blushMats.length ? blushMats[0].opacity : 0,
+        scleraY: eyes[0].sclera.scale.y, faceX: face.scale.y ? face.scale.x / face.scale.y : 1,
+        wobble: bodyMat.uniforms.uWobble.value as number, burpN, hop: hopNow,
+        bodySY: bob.scale.y, restSY: restSYNow, bodyY: group.position.y, restY: restYNow, dispR,
+        burpLeft: burpAge >= 0 ? Math.max(0, BURP_HOLD - burpAge) : -1 };
     },
+    afterBite(bite) {
+      const g = Math.min(1, Math.max(0, bite));
+      puffAge = 0;
+      gulpIn = GULP_DELAY; gulpK = GULP_SHARE * biteKick(g);
+      if (g >= SQUINT_BITE && squintAge >= SQUINT_GAP) squintAge = 0;
+    },
+    burp(pop) {
+      if (burpAge >= 0) return;
+      burpAge = 0; burpPop = pop;
+    },
+    victoryHop(rise = true) { hopPending = true; hopRiseOn = rise; },
     pinMouth(shut) { mouthPinShut = shut; if (shut) { mouthT = 0; mouthMax = 0; mouthAge = 0; } },
     pinGape(v) {
       if (v <= 0) { mouthT = 0; mouthMax = 0; return; }
@@ -2068,7 +2219,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       const w = Math.max(want, hold);
       if (mouthT < w) mouthT = w;
       mouthMax = Math.max(wide, cur);
-      wobble = Math.min(1, wobble + 0.30 + 0.55 * g);
+      wobble = Math.min(1, wobble + biteKick(g));
     },
     /** Kick the growth spring directly — an absorbed meal should shove the
      *  blob, not just raise its target radius. */
@@ -2097,7 +2248,41 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       dispR = Math.max(0.2, dispR + dispV * dt);
       // jelly slosh decays after each meal; a faint idle wave always survives
       wobble = Math.max(0, wobble - dt * 1.7);
+      // …and THE GULP (AFTER_BITE) lands its second slosh GULP_DELAY after the
+      // swallow, on the same slosh the shader is handed below
+      if (gulpIn >= 0) { gulpIn -= dt; if (gulpIn < 0) wobble = Math.min(1, wobble + gulpK); }
       bodyMat.uniforms.uWobble.value = wobble;
+      // THE BURP (AFTER_BITE): the cheeks held full for BURP_HOLD, then the
+      // caller is asked whether the moment is still free. Read at the age
+      // before this frame's advance, like the puff, so the pop lands on the
+      // first frame at or past BURP_HOLD at any frame rate. Placed above the
+      // jaw's own clock so a pop written here is drawn this frame.
+      if (burpAge >= 0) {
+        const a = burpAge; burpAge += dt;
+        puffAge = 0;   // held full through the hold; let go from the pop (or the refusal) over PUFF_DECAY
+        if (a >= BURP_HOLD) {
+          const go = burpPop ? burpPop() : false;
+          burpPop = null; burpAge = -1;
+          if (go) {
+            burpN++; flushAge = 0;
+            // a REACTION, not a bite — the set pieces' rule below: no wind-up
+            // (mouthAge past it), and a jaw already open on a meal is left open
+            if (!mouthPinShut && mouthT <= 0) { mouthT = BURP_OPEN; mouthMax = BURP_MOUTH; mouthAge = 0.3; }
+          }
+        }
+      }
+      // THE VICTORY HOP (victoryHop()) is timed off s.t — tClock, which the
+      // frame loop advances by the real dt — and never off this update's dt,
+      // which the outro hands in at 0.3x: on dt the 450 ms hop would take 1.5 s
+      // and still be in the air when the results card came up.
+      if (hopPending) { hopPending = false; hopT0 = s.t; }
+      let hopLift = 0;
+      hopNow = 1;
+      if (hopT0 >= 0) {
+        const u = s.t - hopT0;
+        if (u >= HOP_LEN) hopT0 = -1;
+        else { hopNow = hopSquash(u); hopLift = hopRiseOn ? hopRise(u) : 0; }
+      }
 
       // evolution rings + glow intensify with the form (rings are a child of the
       // group, which is positioned below; keep them local + centred on the orb)
@@ -2162,7 +2347,8 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // lift so the orb rests partly sunk into the ground; roll-bob while
       // moving — frenzy/victory add a real happy bounce
       const lift = dispR * (RADIUS_SINK + Math.abs(Math.sin(s.t * (6 + mp.bounce * 3) * slow)) * moveAmt * (0.05 + mp.bounce * 0.055));
-      group.position.set(s.x, lift + arriveLift, s.z);
+      restYNow = lift + arriveLift;   // faceState(): the height with no hop, for the drawn one to be read against
+      group.position.set(s.x, lift + arriveLift + hopLift * dispR, s.z);
 
       // squash/stretch + lean on the bob (body+glow only) — gentle, so the orb
       // stays a cute round orb, never pinched
@@ -2252,8 +2438,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       if (mouthT > 0) { mouthT -= dt; mouthAge += dt; }
       if (mouthT > 0 && mouthAge < 0.06) uniformK -= 0.04 * windG * Math.sin(Math.PI * Math.min(1, mouthAge / 0.06));
       uniformKNow = uniformK;
-      const lat = uniformK - breathe;
-      squash *= uniformK;
+      // the hop's squash and stretch keep his volume: a crouch to 0.8 is 1.12
+      // wide, a stretch to 1.2 is 0.91 wide. At rest hopNow is exactly 1 and
+      // both lines are what they were.
+      const lat = (uniformK - breathe) / Math.sqrt(hopNow);
+      restSYNow = dispR * squash * uniformK;   // faceState(): this frame's height with no hop
+      squash *= uniformK * hopNow;
       bob.scale.set(dispR * lat, dispR * squash, dispR * lat);
       hatSquash = squash;   // the hat rides the head's height, rigidly
       // the lean is a share of top speed too (see vRef above): 0.11 rad at full
@@ -2277,8 +2467,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       const small = THREE.MathUtils.clamp((64 - pxR) / 40, 0, 1);
       bodyMat.uniforms.uPxR.value = pxR;
 
-      // face: billboard to camera, scale with the void
-      face.scale.setScalar(dispR);
+      // face: billboard to camera, scale with the void — and THE CHEEKS
+      // (AFTER_BITE) widen it for PUFF_DECAY after a swallow. Not on the scared
+      // face: the widening carries the eyes with it, and those are hands-off.
+      const puffEnv = Math.max(0, 1 - puffAge / PUFF_DECAY);
+      puffAge += dt;
+      face.scale.set(dispR * (1 + (mood === 'scared' ? 0 : PUFF_X * puffEnv)), dispR, dispR);
       face.position.set(0, dispR * 0.1, 0);
       face.quaternion.copy(camera.quaternion);
       // ── AND THE FACE TAKES THE SAME LIGHT THE BODY DOES ──────────────────
@@ -2443,7 +2637,13 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       wrapTo(brows[1], brows[1].position.x, mp.browY, -mp.browAng);
       // blush turns to mud once the cheeks are a few pixels wide — fade it out
       // rather than let it grey down the two brightest parts of the silhouette
-      for (const bm of blushMats) bm.opacity = mp.blush * (1 - small * 0.45);
+      // …and the cheeks answer a swallow (PUFF_BLUSH over the mood's own blush)
+      // and a burp (flushed to BURP_FLUSH for BURP_FLUSH_LEN, let go over
+      // PUFF_DECAY), whichever is higher, never past fully opaque
+      const flushEnv = flushAge < BURP_FLUSH_LEN ? 1 : Math.max(0, 1 - (flushAge - BURP_FLUSH_LEN) / PUFF_DECAY);
+      flushAge += dt;
+      blushNow = Math.min(1, Math.max(mp.blush + PUFF_BLUSH * puffEnv, mp.blush + Math.max(0, BURP_FLUSH - mp.blush) * flushEnv));
+      for (const bm of blushMats) bm.opacity = blushNow * (1 - small * 0.45);
       (sweat.material as THREE.MeshBasicMaterial).opacity = mp.sweat;
       sweat.position.y = 0.52 + Math.sin(s.t * 9) * 0.045;
       sweat.scale.setScalar(0.9 + Math.sin(s.t * 9) * 0.1);
@@ -2473,6 +2673,13 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // which is what half-shut eyes do.
       const wanderX = mood === 'sleepy' ? Math.sin(s.t * 0.38) * 0.2 : 0;
       const wanderY = mood === 'sleepy' ? -0.75 + Math.sin(s.t * 0.29) * 0.12 : 0;
+      // THE HAPPY SQUINT (AFTER_BITE): shut at once, held, open over the last
+      // 80 ms of SQUINT_LEN, read at the age before the advance. Never on the
+      // scared face — those eyes are approved and hands-off.
+      const sqA = squintAge;
+      squintAge += dt;
+      const squint = mood === 'scared' || sqA >= SQUINT_LEN ? 0
+        : sqA < SQUINT_LEN - 0.08 ? 1 : (SQUINT_LEN - sqA) / 0.08;
       // AT SMALL SIZE THE FACE GROWS. The eyes ARE the character; at 18 px a
       // "correctly proportioned" eye is four pixels of mush. Caricature them
       // back up as he shrinks on screen, exactly the way an icon designer would.
@@ -2493,7 +2700,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         e.g.position.x = Math.sign(e.g.position.x || 1) * 0.36 * (1 + small * 0.05);
         // BLINK FROM THE TOP: a lid comes down, it does not implode toward the
         // middle of the eyeball. Anchoring the collapse high sells the lid.
-        const oy = Math.max(0.08, open) * mp.lid;
+        // the squint pulls the lid down to SQUINT_LID and never lifts a lid
+        // that is already lower (sleep's 0.13)
+        const oy = Math.max(0.08, open) * (mp.lid + (Math.min(mp.lid, SQUINT_LID) - mp.lid) * squint);
         const drop = SCL_R * (1 - oy) * 0.5;
         const room = Math.max(0, SCL_R - 0.122 * pk - 0.012);
         e.pupilGrp.position.x = THREE.MathUtils.clamp((s.lookX + wanderX) * 0.09, -room, room);
@@ -2519,7 +2728,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         // faded the white by opacity and switched the pupil with .visible, so
         // waking up passed through a frame of blank white ovals with no pupil —
         // the same dazed look this whole change exists to remove, just briefly.
-        const shut = mp.shut;
+        const shut = Math.max(mp.shut, squint);
         const eyeOpen = 1 - shut;
         e.white.visible = eyeOpen > 0.02;
         e.pupilGrp.visible = eyeOpen > 0.02;

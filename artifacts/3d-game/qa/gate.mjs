@@ -877,6 +877,22 @@ const SUITE = [
   { id: 'timebeat', tier: 'feel', profiles: ['live', 'quality'], timeout: 1800,
     cmd: ['node', 'qa/timebeat.mjs', PORT, 'maple'], verdict: pf,
     why: 'the hero lives through a hit-stop and the world eases out of one; five flashes in 200 ms show at most two washes, a third wash in a second is not drawn but a warning always is, and a warning paints over a live wash; the kill beat is OFF without ?killbeat=1 — and with it the kill freezes 0.14-0.16 s, slows to 0.25, pulses its rays once and leaves her dizzy, halved under reduce motion; the whistle freezes 0.12 s even inside a slow stretch and ends the stretch, the rays and the dizzy; nothing new fires in the outro; and in a whole match at most 8 freezes over 100 ms and at most 20 beats' },
+  // G9 (research governor, P1, HERO): the follow-through after a bite, the
+  // BURP OF CHAMPIONS behind ?burp=1 until the owner has heard it, and G4's
+  // victoryHop. Live + quality only until a second green promotes them.
+  // Measured on the fix (dist built from the G9 commit's source): savour, three
+  // pages of play, 649 s and 641 s on two runs with one other browser on the
+  // machine, so 2000; burp renders offline in a blank page (no match, no
+  // server) and took 2 s, so 120. The G9 review added a fourth page (a treat
+  // on its own, a ceremony on the pop frame, a pause in the cheek hold, the hop
+  // under BIG MOTION off): 841 s on the build before its fix and 759 s on the
+  // fix, each run through the two-slot browser lock — 2000 still stands.
+  { id: 'savour', tier: 'feel', profiles: ['live', 'quality'], timeout: 2000,
+    cmd: ['node', 'qa/savour.mjs', PORT, 'maple'], verdict: pf,
+    why: 'a big swallow puffs his cheeks, squints his eyes and sloshes him a second time; the burp is off without ?burp=1, comes once per 20 s with it, is owed by a landmark on its own, and never plays over the whistle, on a ceremony\'s own frame, or into a pause that loses it; a goal win hops his drawn body on a clock the 0.3x outro cannot slow, with no rise under BIG MOTION off' },
+  { id: 'burp', tier: 'feel', profiles: ['live', 'quality'], timeout: 120,
+    cmd: ['node', 'qa/burp.mjs', PORT, 'maple'], verdict: pf,
+    why: 'the burp exists, sits on the eat sounds\' own tonic, lasts 0.25 s, has no partial under 120 Hz, nothing under 100 Hz and less under 120 Hz than a plain bite, and is heard on a phone under the bite, never over the CHOMP' },
 
   { id: 'aftermatch', tier: 'feel', profiles: ['live'], timeout: 420,
     cmd: ['node', 'qa/aftermatch.mjs', PORT], verdict: pf,
