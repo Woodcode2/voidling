@@ -842,7 +842,7 @@ const SUITE = [
   // leaves over five times that for a machine under load.
   { id: 'timebeat', tier: 'feel', profiles: ['live', 'quality'], timeout: 1800,
     cmd: ['node', 'qa/timebeat.mjs', PORT, 'maple'], verdict: pf,
-    why: 'the hero lives through a hit-stop and the world eases out of one; five flashes in 200 ms show two washes; the kill beat is OFF without ?killbeat=1 — and with it the kill freezes 0.14-0.16 s, slows to 0.25, pulses its rays once and leaves her dizzy, halved under reduce motion, never over the whistle, and in a whole match at most 8 freezes that a beat takes past 100 ms' },
+    why: 'the hero lives through a hit-stop and the world eases out of one; five flashes in 200 ms show at most two washes, a third wash in a second is not drawn but a warning always is, and a warning paints over a live wash; the kill beat is OFF without ?killbeat=1 — and with it the kill freezes 0.14-0.16 s, slows to 0.25, pulses its rays once and leaves her dizzy, halved under reduce motion; the whistle freezes 0.12 s even inside a slow stretch and ends the stretch, the rays and the dizzy; nothing new fires in the outro; and in a whole match at most 8 freezes over 100 ms and at most 20 beats' },
 
   { id: 'aftermatch', tier: 'feel', profiles: ['live'], timeout: 420,
     cmd: ['node', 'qa/aftermatch.mjs', PORT], verdict: pf,

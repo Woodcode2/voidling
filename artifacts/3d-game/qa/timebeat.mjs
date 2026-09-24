@@ -1,6 +1,6 @@
 // TIME, NOT THE CAMERA, SELLS THE MARQUEE MOMENTS — research governor G8.
 //
-//   node qa/timebeat.mjs [port] [world] [--only=s,b,c,g,a,e,f,d]
+//   node qa/timebeat.mjs [port] [world] [--only=s,b,c,g,a,e,f,d]   ((b2) rides b, (c2) and (c3) c, (d2) d)
 //
 // Eating a sibling is the marquee play of the whole game, and until G8 it got
 // no pause at all. Its budget went to three calls the owner had already turned
@@ -34,10 +34,21 @@
 //   __rivalFace()    her gulp clock and her two pupils, off the meshes
 //   #kill            the ray pulse's own element, its inline opacity and scale
 //
+//   __fx.flashShown()  the wash overlay's own background and opacity: the
+//                    colour the child is being shown this frame
+//
 // ── THE BARS ──────────────────────────────────────────────────────────────
 //   (s) SOURCE. The rival handler in prototype3d.ts (rivals.onRivalEaten)
 //       calls none of fx.shake / camPunch / fx.kick — all three no-ops by the
 //       owner's order — and exactly one fx.flash. Throws if the handler moved.
+//       IT GRADES THE SOURCE TREE THIS PROBE SITS IN (../src/prototype3d.ts,
+//       printed on the line), NOT THE BUILD ON [port]: every other bar reads
+//       the served page, this one cannot — a minified bundle keeps fx.shake's
+//       property name but not camPunch's. So a copy of this probe in a fixed
+//       tree, pointed at a server of an older build, prints (s) PASS for the
+//       tree and FAILs the rest for the build (the G8 review did exactly that
+//       and saw it). To grade a build's handler, run the probe from that
+//       build's own tree (a git-archive export of the commit is enough).
 //   ── the switch OFF (the default, ?w= only) ──
 //   (b) THE HERO LIVES THROUGH A STOP. A hit-stop armed through the real
 //       hitStop(), the gape pinned so the jaw clock runs: on every frame the
@@ -50,6 +61,22 @@
 //       most 200 ms of tClock, after a second with no wash: at most TWO washes
 //       shown (spec: 2 per rolling second, a call inside the window blends
 //       into the live wash). Before G8: five.
+//   (c3) THE CAP, AND DANGER PAST IT. After a clean second: two washes of the
+//       probe's own start and fade, each called with nothing on screen; a
+//       third inside the same rolling second of tClock is NOT drawn (the
+//       spec's 2 a second, which (c) never reaches — its five calls all land
+//       inside one live wash); then a nibble through the REAL bite handler
+//       (__bite(false), violet) IS drawn — a warning is never the one the cap
+//       drops. The G8 build drew two of three and then dropped the nibble.
+//   (c2) DANGER PAINTS OVER A LIVE WASH. A gold wash of the probe's own, then,
+//       while it is still up, a form bite through the REAL bite handler
+//       (__bite(true)): the overlay must show RED (hue within 20 degrees of
+//       0, saturation 0.5 or more — qa/dangerchannel.mjs's own rule) — and
+//       a green call on the next frame, inside the red, must leave it red. The
+//       G8 build kept the gold: the governor's blend kept the colour already
+//       showing, so the bite that costs a form was shown as a reward.
+//       (c3) runs first: a nibble buys 2.5 s of the bite handler's mercy and a
+//       form bite 6, and the probe waits the nibble's out, not the form's.
 //   (g) THE SWITCH IS OFF BY DEFAULT. A sibling eaten beside him arms no stop
 //       and no slow motion, fires no ray pulse, leaves her pupils where they
 //       were, and shows exactly one wash.
@@ -63,16 +90,34 @@
 //       sheet's own control (#pauseMotion): the kill's freeze reads 0.07-0.08 s
 //       and the ray pulse is visible for at most 0.25 s + one frame, at one
 //       scale throughout.
-//   (f) THE WHISTLE OWNS THE END. The dot's goal met (__setScore to its EAT
-//       line): the goal-met freeze reads 0.12 s. Then a sibling eaten inside
-//       the outro arms nothing — no new freeze, no slow motion, no ray pulse.
+//   (f) THE WHISTLE OWNS THE END. A sibling eaten first, and the dot's goal
+//       met (__setScore to its EAT line) INSIDE her beat's slow stretch — the
+//       freeze over, slow under 1, her rays up and her pupils circling: the
+//       goal-met frame freezes 0.12 s, and from the frame after it slow reads
+//       1, no ray is up and her pupils do not move — the whistle takes the
+//       time and the stretch, the pulse and the dizzy end with it. Then a
+//       sibling eaten inside the outro arms nothing — no new freeze, no slow
+//       motion, no ray pulse. The G8 build met the goal in a stretch with no
+//       freeze at all (a beat landing in a stretch JOINS it, and the goal has
+//       no slow part to join with) and ran the stretch, the rays and the
+//       dizzy on into the outro. Before the review this bar met the goal with
+//       nothing running, which is the one case that could not show either.
 //   ── the whole match (?killbeat=1&len=180, a child driver, drawing off) ──
-//   (d) THE CEILING. At most 8 freezes that a marquee beat armed, or pushed
-//       past 100 ms, in one full match (__juiceState().longBeats). The owner
-//       once measured 141 camera kicks a minute; every new site here fires one
-//       to five times a match, and this is the bar that says so. Every freeze
-//       and every one over 100 ms is printed beside it, the bite hit-stop's
-//       own included, so the whole-match total is never out of sight.
+//   (d) THE CEILING — THE LEAD'S BAR, AS SET. At most 8 freezes longer than
+//       100 ms in one full match, every freeze counted, whoever took it
+//       (__juiceState().longStops). The owner once measured 141 camera kicks
+//       a minute; every new site here fires one to five times a match, and
+//       this is the bar that says so. How many of them a beat armed or pushed
+//       over (longBeats) is printed beside it. See REINSTATED, below.
+//   (d2) THE BEATS. At most 20 marquee beats armed in that match, every kind
+//       counted, the ones whose freeze is 100 ms or less (a sticker, the hero
+//       landmark, a form) included — (d) cannot see those at all, however
+//       many there are. 20 is the spec's own "one to five times a match" for
+//       each of the four sites a level-free Maple match can fire (a sibling
+//       eaten, the hero landmark, a sticker found, a form reached; the goal
+//       needs a level). The G8 review's run armed 11 (rival 2, sticker 4,
+//       evolve 5); a beat hung on anything frequent — every bite, every near
+//       miss — arms hundreds.
 //
 // ── RETRACTED BEFORE IT GATED ANYTHING: (d) COUNTED THE BITE, NOT THE BEAT ──
 // (d) was first written as "at most 8 freezes longer than 100 ms", every freeze
@@ -90,7 +135,25 @@
 // the game now says who took each freeze over the line (longBeatN, above
 // armStop in prototype3d.ts), this bar judges the beats', and the total and
 // the bite's share are printed on every run for whoever owns that rung.
+//
+// ── REINSTATED BY THE G8 REVIEW: THE LEAD'S BAR, AS WRITTEN ────────────────
+// The retraction above swapped the lead's bar for one of its own, and the
+// review found the swap worse than the fault it fixed: longBeats can count only
+// a rival, the marquee or the goal (a sticker's and the landmark's freeze are
+// exactly 0.10 s, a form's 0.08), so it was "at most 8 sibling kills a match"
+// and could not see the stutter it was written for. The review's own runs:
+// the G8 build, switch on, "37 freeze(s), 10 over 100 ms (2 armed or pushed
+// over by a marquee beat, 8 by the bite hit-stop alone)". So (d) is the lead's
+// bar again, every freeze counted, and the game — WITH ?killbeat=1 ONLY —
+// holds the bite's hit-stop to 0.100 s (biteGulps: the ladder's sticker and
+// landmark freeze, so no anonymous meal outlasts a named one's). That trims 0 to
+// 5 ms off meals of 0.9 of his radius or more and leaves every freeze the bar
+// counts a beat's; the game as it ships, switch off, keeps its rung to the
+// millisecond. (d2) is the half the review asked for that (d) cannot be: a
+// ceiling on the beats that are 100 ms or under. The retraction stays above
+// because it is still true of what it measured.
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { enterMatch } from './_enter.mjs';
 import { UNLOCK_ALL } from './worlds.mjs';
@@ -102,7 +165,7 @@ process.on('unhandledRejection', die);
 const POS = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const PORT = POS[0] || '4177', WORLD = POS[1] || 'maple';
 const onlyArg = process.argv.find((a) => a.startsWith('--only='));
-const ONLY = onlyArg ? onlyArg.slice(7).split(',') : ['s', 'b', 'c', 'g', 'a', 'e', 'f', 'd'];
+const ONLY = onlyArg ? onlyArg.slice(7).split(',') : ['s', 'b', 'c', 'g', 'a', 'e', 'f', 'd'];   // (b2) rides b, (c2)/(c3) c, (d2) d
 const want = (k) => ONLY.includes(k);
 const EPS = 1e-6;
 
@@ -113,7 +176,10 @@ const note = (s) => console.log(`    ${s}`);
 
 // ── (s) THE SOURCE ─────────────────────────────────────────────────────────
 if (want('s')) {
-  const SRC = readFileSync(new URL('../src/prototype3d.ts', import.meta.url), 'utf8');
+  // the tree this probe sits in, NOT the build on PORT (see the header's (s))
+  const SRC_URL = new URL('../src/prototype3d.ts', import.meta.url);
+  const SRC = readFileSync(SRC_URL, 'utf8');
+  console.log(`\n  (s) grades the source next to this probe, not the build on :${PORT} — ${fileURLToPath(SRC_URL)}`);
   const at = SRC.indexOf('rivals.onRivalEaten = (');
   if (at < 0) die(new Error('rivals.onRivalEaten is not in src/prototype3d.ts — the handler moved, and a probe that skips what it cannot find is worse than none'));
   const end = SRC.indexOf('\n};\n', at);
@@ -122,10 +188,10 @@ if (want('s')) {
   const code = SRC.slice(at, end).split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n');
   const noops = ['fx.shake(', 'camPunch(', 'fx.kick('].filter((s) => code.includes(s));
   const nFlash = (code.match(/fx\.flash\(/g) || []).length;
-  console.log(`\n  (s) rivals.onRivalEaten: ${noops.length ? `calls ${noops.join(' ')}` : 'no shake, punch or kick'}; ${nFlash} fx.flash() call(s)`);
+  console.log(`  (s) rivals.onRivalEaten: ${noops.length ? `calls ${noops.join(' ')}` : 'no shake, punch or kick'}; ${nFlash} fx.flash() call(s)`);
   verdict(!noops.length && nFlash === 1, 's', !noops.length && nFlash === 1
-    ? 'the rival handler spends nothing on the camera: no fx.shake, camPunch or fx.kick, and one fx.flash'
-    : `the rival handler still ${noops.length ? `calls ${noops.join(', ')} (no-ops by the owner's order)` : ''}${noops.length && nFlash !== 1 ? ' and ' : ''}${nFlash !== 1 ? `makes ${nFlash} fx.flash() calls, not one` : ''}`);
+    ? 'the rival handler (in the source beside this probe) spends nothing on the camera: no fx.shake, camPunch or fx.kick, and one fx.flash'
+    : `the rival handler (in the source beside this probe) still ${noops.length ? `calls ${noops.join(', ')} (no-ops by the owner's order)` : ''}${noops.length && nFlash !== 1 ? ' and ' : ''}${nFlash !== 1 ? `makes ${nFlash} fx.flash() calls, not one` : ''}`);
 }
 
 const pageParts = ['b', 'c', 'g', 'a', 'e', 'f', 'd'].filter(want);
@@ -181,8 +247,9 @@ async function open(query, label) {
   // no pixel is read on this page: drawing is the cost, and it goes
   await p.evaluate(() => { window.__renderer.render = () => { }; });
   const hooks = await p.evaluate(() => ['__juiceState', '__faceState', '__rivalBeside', '__rivalFace', '__hitStop',
-    '__setVoidR', '__pinGape', '__setScore', '__goalState', '__levelSpec', '__stages']
-    .filter((k) => typeof window[k] !== 'function').concat(window.__fx && typeof window.__fx.flash === 'function' ? [] : ['__fx.flash']));
+    '__setVoidR', '__pinGape', '__setScore', '__goalState', '__levelSpec', '__stages', '__bite']
+    .filter((k) => typeof window[k] !== 'function')
+    .concat(['flash', 'flashShown'].filter((m) => !(window.__fx && typeof window.__fx[m] === 'function')).map((m) => `__fx.${m}`)));
   if (hooks.length) die(new Error(`this build has no ${hooks.join(', ')} — nothing here can be measured without ${hooks.length > 1 ? 'them' : 'it'}`));
   await enterMatch(p, WORLD);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 900000, polling: 250 });
@@ -227,6 +294,44 @@ async function killOne(p) {
 }
 
 const fmt = (x, d = 3) => (x === null || x === undefined ? 'n/a' : Number(x).toFixed(d));
+
+// ── WHAT COLOUR IS UP ──────────────────────────────────────────────────────
+// The overlay's background as the browser normalised it, first colour stop
+// read. RED is qa/dangerchannel.mjs's rule, so the two probes cannot disagree
+// about what red is: hue within 20 degrees of 0 at HSV saturation 0.5 or more.
+const firstRgb = (bg) => {
+  const m = /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/.exec(String(bg));
+  return m ? { r: +m[1], g: +m[2], b: +m[3] } : null;
+};
+const hueOf = ({ r, g, b }) => {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  if (mx <= 0 || mx === mn) return { h: 0, s: 0 };
+  let h = mx === r ? 60 * (((g - b) / (mx - mn)) % 6) : mx === g ? 60 * ((b - r) / (mx - mn) + 2) : 60 * ((r - g) / (mx - mn) + 4);
+  return { h: (h + 360) % 360, s: (mx - mn) / mx };
+};
+const isRedBg = (bg) => { const c = firstRgb(bg); if (!c) return false; const { h, s } = hueOf(c); return s >= 0.5 && (h <= 20 || h >= 340); };
+const hueTxt = (bg) => { const c = firstRgb(bg); return c ? `hue ${Math.round(hueOf(c).h)}` : 'no colour'; };
+/** the overlay, now */
+const shown = (p) => p.evaluate(() => ({ ...window.__fx.flashShown(), fl: window.__juiceState().flashes, tc: window.__matchState().tClock }));
+/** step until 1.1 s of tClock (22 frames) has shown no new wash and nothing
+ *  is up — the governor's rolling second then holds only what the caller does
+ *  next. 22, not 20: twenty sums of 0.05 can land a hair under 1.0, and a wash
+ *  begun exactly one second back would still be in the window. Returns false
+ *  if the game would not go quiet. */
+async function quietSecond(p) {
+  let quiet = 0, last = (await row(p)).fl;
+  for (let i = 0; i < 400 && quiet < 22; i++) {
+    await step(p);
+    const s = await shown(p);
+    if (s.fl === last && !(s.op > 0)) quiet++; else { quiet = 0; last = s.fl; }
+  }
+  return quiet >= 22;
+}
+/** step until nothing is on the overlay, at most `n` frames */
+async function fade(p, n = 12) {
+  for (let i = 0; i < n; i++) { if (!((await shown(p)).op > 0)) return true; await step(p); }
+  return !((await shown(p)).op > 0);
+}
 
 // ═══ PAGE 1: THE SWITCH OFF ═════════════════════════════════════════════════
 if (['b', 'c', 'g'].some(want)) {
@@ -307,6 +412,70 @@ if (['b', 'c', 'g'].some(want)) {
       else verdict(out.washes <= 2, 'c', out.washes <= 2
         ? `the flash governor holds: five calls in ${Math.round(span * 1000)} ms showed ${out.washes} wash(es) (bar 2 — the rest blended into the live one)`
         : `five fx.flash() calls in ${Math.round(span * 1000)} ms showed ${out.washes} washes (bar 2): every call repaints the screen`);
+    }
+
+    // ── (c3) the cap: a third wash in a second is not drawn; a warning is ──
+    // Each ordinary call is made with NOTHING on screen, so each is a start,
+    // not a blend — the path (c) cannot reach. The colour is the probe's own
+    // (a pale blue that nothing in the game washes); the warning is the game's,
+    // through the real bite handler.
+    const OURS = 'rgba(120,200,255,0.3)';
+    let nibbleAt = null;
+    if (!(await quietSecond(p))) verdict(false, 'c3', 'the game would not go a second without a wash — no clean window to test the cap in');
+    else {
+      const s0 = await shown(p);
+      const seq = [];
+      // one call, then what the overlay shows; p.evaluate hands OURS through
+      // as the function's argument
+      const one = async (label, fn) => { await p.evaluate(fn, OURS); const s = await shown(p); seq.push({ label, ...s, at: s.tc - s0.tc }); return s; };
+      await one('A', (c) => window.__fx.flash(c, 0.3));
+      const fadedA = await fade(p);
+      await one('B', (c) => window.__fx.flash(c, 0.3));
+      const fadedB = await fade(p);
+      await one('C', (c) => window.__fx.flash(c, 0.3));
+      await one('nibble', () => window.__bite(false));
+      nibbleAt = seq[3].tc;
+      const [a, b1, c, n] = seq;
+      console.log(`  (c3) after a clean second: ${seq.map((x) => `${x.label} at +${Math.round(x.at * 1000)} ms -> washes ${x.fl - s0.fl}, `
+        + `${x.op > 0 ? `up (${hueTxt(x.bg)}, alpha ${fmt(x.op, 2)})` : 'nothing up'}`).join('; ')}`);
+      const bad = [];
+      if (!fadedA || !fadedB) bad.push(`inconclusive — ${!fadedA ? 'A' : 'B'} was still up after 12 frames, so the next call could only blend`);
+      else if (n.at > 0.9) bad.push(`inconclusive — the four calls spanned ${Math.round(n.at * 1000)} ms of tClock, not inside one rolling second with room to spare`);
+      else {
+        if (!(a.fl - s0.fl === 1 && a.op > 0) || !(b1.fl - s0.fl === 2 && b1.op > 0)) bad.push(`the first two washes were not both drawn (washes ${a.fl - s0.fl}, ${b1.fl - s0.fl})`);
+        if (c.fl !== b1.fl || c.op > 0) bad.push(`a third wash ${Math.round(c.at * 1000)} ms into the second was drawn (bar: two a second)`);
+        if (!(n.fl === c.fl + 1 && n.op > 0 && n.bg !== c.bg)) bad.push(`the nibble through the real bite handler was ${n.fl === c.fl ? 'NOT drawn — the cap dropped a warning' : `shown as ${hueTxt(n.bg)} at alpha ${fmt(n.op, 2)}`}`);
+      }
+      verdict(!bad.length, 'c3', bad.length ? bad.join('; ')
+        : `the cap holds and a warning passes it: two washes in ${Math.round(c.at * 1000)} ms, a third not drawn, then the nibble drawn (${hueTxt(n.bg)})`);
+    }
+
+    // ── (c2) a danger wash paints over a live one ─────────────────────────
+    // The bite handler ignores a bite inside its own mercy (2.5 s of tClock
+    // after a nibble), so that goes first, then a clean second.
+    if (nibbleAt !== null) while ((await shown(p)).tc < nibbleAt + 2.6) await step(p);
+    if (!(await quietSecond(p))) verdict(false, 'c2', 'the game would not go a second without a wash — no clean window to test danger in');
+    else {
+      const s0 = await shown(p);
+      await p.evaluate(() => window.__fx.flash('rgba(255,214,120,0.4)', 0.5));
+      await step(p);
+      const live = await shown(p);        // the gold, one frame on: still up?
+      await p.evaluate(() => window.__bite(true));
+      const bit = await shown(p);         // what the form bite left on screen
+      await step(p);
+      await p.evaluate(() => window.__fx.flash('rgba(126,242,160,0.3)', 0.3));
+      const after = await shown(p);       // an ordinary call inside the red
+      console.log(`  (c2) gold ${live.op > 0 ? `up (${hueTxt(live.bg)}, alpha ${fmt(live.op, 2)})` : 'already gone'} one frame on; `
+        + `the form bite -> ${hueTxt(bit.bg)} at alpha ${fmt(bit.op, 2)} (washes +${bit.fl - live.fl}); `
+        + `a green call a frame later -> ${hueTxt(after.bg)} at alpha ${fmt(after.op, 2)}`);
+      const bad = [];
+      if (!(live.op > 0) || isRedBg(live.bg) || live.fl !== s0.fl + 1) bad.push('inconclusive — the gold wash was not the one up when the bite landed');
+      else {
+        if (!(isRedBg(bit.bg) && bit.op > 0)) bad.push(`the form bite landed inside a live gold wash and the screen showed ${hueTxt(bit.bg)}, not red — the bite that costs a form was shown in the colour of a reward`);
+        else if (!isRedBg(after.bg) || !(after.op > 0)) bad.push(`an ordinary call inside the red repainted it (${hueTxt(after.bg)})`);
+      }
+      verdict(!bad.length, 'c2', bad.length ? bad.join('; ')
+        : `a danger wash outranks the governor: the form bite painted red over a live gold wash, and a green call inside the red left it red`);
     }
   }
 
@@ -445,35 +614,79 @@ if (['a', 'e', 'f'].some(want)) {
       const g0 = await p.evaluate(() => window.__goalState());
       if (!g0 || g0.n !== 1) verdict(false, 'f', `?g=1 did not make a dot-1 match (goal ${JSON.stringify(g0)})`);
       else {
-        await p.evaluate((e) => window.__setScore(e), eat);
-        let met = null, prev = await row(p);
-        for (let i = 0; i < 6 && !met; i++) {
-          await step(p);
-          const r = await row(p);
-          if (r.met) met = { r, prev }; else prev = r;
+        // ── a sibling first, then the goal met INSIDE her beat's slow stretch:
+        // the freeze over, slow under 1, her rays up, her pupils circling ────
+        const K0 = await killOne(p);
+        const pre = [];
+        let into = null;
+        if (!K0.why) {
+          pre.push(K0.at);
+          for (let i = 0; i < 8 && !into; i++) {
+            await step(p);
+            const r = await row(p, K0.placed.name);
+            pre.push(r);
+            if (!(r.stop > 0) && r.slow !== null && r.slow < 1 - EPS) into = r;
+          }
         }
-        if (!met) verdict(false, 'f', `the score set to the EAT line (${eat}) did not meet the goal in six frames`);
+        const rayUp = (r) => !!(r.ray && r.ray.shown && r.ray.op > 0);
+        let met = null;
+        if (into) {
+          await p.evaluate((e) => window.__setScore(e), eat);
+          let prev = into;
+          for (let i = 0; i < 6 && !met; i++) {
+            await step(p);
+            const r = await row(p, K0.placed.name);
+            if (r.met) met = { r, prev }; else prev = r;
+          }
+        }
+        if (K0.why) verdict(false, 'f', `inconclusive — ${K0.why}`);
+        else if (!into) verdict(false, 'f', `inconclusive — ${K0.placed.name}'s kill never reached its slow stretch in 8 frames (slow ${pre.map((r) => r.slow).join(' ')}), so there was no stretch to meet the goal inside`);
+        else if (!met) verdict(false, 'f', `the score set to the EAT line (${eat}) did not meet the goal in six frames`);
         else {
-          // a sibling eaten inside the outro
+          const w = met.prev;   // the last frame before the whistle
+          const post = await rows(p, 10, K0.placed.name);
+          const tail = [met.r, ...post];
+          const slowOn = post.filter((r) => r.slow !== null && r.slow < 1 - EPS);
+          const raysOn = tail.filter(rayUp);
+          // her pupils from the whistle frame on (the move INTO it is the
+          // whistle putting them back, and is not counted)
+          const dying = tail.filter((r) => r.face && r.face.dyingT > 0);
+          let moves = 0;
+          for (let i = 1; i < dying.length; i++) {
+            const a = dying[i - 1].face.pupils, c = dying[i].face.pupils;
+            if (a.some((q, j) => Math.hypot(q.x - c[j].x, q.y - c[j].y) > 0.005)) moves++;
+          }
+          let wmoves = 0;   // …and before it, to show she WAS dizzy
+          const wd = pre.concat([w]).filter((r) => r.face && r.face.dyingT > 0);
+          for (let i = 1; i < wd.length; i++) {
+            const a = wd[i - 1].face.pupils, c = wd[i].face.pupils;
+            if (a.some((q, j) => Math.hypot(q.x - c[j].x, q.y - c[j].y) > 0.005)) wmoves++;
+          }
+          console.log(`  (f) ${K0.placed.name} eaten; the goal met ${Math.round((met.r.tc - K0.at.tc) * 1000)} ms of tClock later, inside her beat `
+            + `(the frame before the whistle: stop ${fmt(w.stop)} s, slow ${w.slow}, rays ${rayUp(w) ? `up at ${fmt(w.ray.op, 2)}` : 'down'}, her pupils moved on ${wmoves} frame pair(s) so far):`);
+          note(`goal-met frame: stop ${fmt(met.r.stop)} s; slow on the frames after it: ${post.map((r) => fmt(r.slow, 2)).join(' ')}`);
+          note(`rays up on ${raysOn.length} of ${tail.length} frame(s) from the whistle on; her pupils moved on ${moves} of ${Math.max(0, dying.length - 1)} gulp frame pair(s) from the whistle on`);
+          const bad = [];
+          if (!(met.r.stop >= 0.12 - EPS && met.r.stop <= 0.12 + EPS)) bad.push(`the goal met inside a slow stretch froze ${fmt(met.r.stop)} s (bar 0.12 — the whistle's own freeze)`);
+          if (slowOn.length) bad.push(`slow motion ran on under the whistle (${post.map((r) => fmt(r.slow, 2)).join(' ')})`);
+          if (raysOn.length) bad.push(`her rays stayed up under the whistle (${raysOn.length} frame(s))`);
+          if (moves > 0) bad.push(`her pupils kept circling under the whistle (${moves} move(s))`);
+          // …and a sibling eaten inside the outro arms nothing
           const K = await killOne(p);
-          const kbad = [];
-          if (K.why) kbad.push(`inconclusive — ${K.why}`);
+          if (K.why) bad.push(`the outro kill was inconclusive — ${K.why}`);
           else {
             const after = await rows(p, 10, K.placed.name);
             const all = [K.at, ...after];
-            if (K.at.stops > K.before.stops) kbad.push(`the kill armed a new ${fmt(K.at.stop)} s freeze inside the outro`);
-            else if (K.at.stop > K.before.stop + EPS) kbad.push(`the kill lengthened the freeze to ${fmt(K.at.stop)} s inside the outro`);
-            const slow = all.map((r) => r.slow).filter((s) => s !== null && s < 1 - EPS);
-            if (slow.length) kbad.push(`slow motion ran at ${slow[0]} inside the outro`);
+            if (K.at.stops > K.before.stops) bad.push(`the kill armed a new ${fmt(K.at.stop)} s freeze inside the outro`);
+            else if (K.at.stop > K.before.stop + EPS) bad.push(`the kill lengthened the freeze to ${fmt(K.at.stop)} s inside the outro`);
+            const slow = all.map((r) => r.slow).filter((x) => x !== null && x < 1 - EPS);
+            if (slow.length) bad.push(`slow motion ran at ${slow[0]} after a kill inside the outro`);
             const kp = (all[all.length - 1].kp ?? 0) - (K.before.kp ?? 0);
-            if (kp > 0 || all.some((r) => r.ray && r.ray.shown && r.ray.op > 0)) kbad.push('the ray pulse fired inside the outro');
-            console.log(`  (f) goal met: freeze ${fmt(met.r.stop)} s; then ${K.placed.name} eaten in the outro: stop ${fmt(K.at.stop)} s (was ${fmt(K.before.stop)}), freezes ${K.before.stops} -> ${K.at.stops}, ray pulses +${kp}`);
+            if (kp > 0 || all.some(rayUp)) bad.push('the ray pulse fired inside the outro');
+            note(`then ${K.placed.name} eaten in the outro: stop ${fmt(K.at.stop)} s (was ${fmt(K.before.stop)}), freezes ${K.before.stops} -> ${K.at.stops}, ray pulses +${kp}`);
           }
-          const goalOk = met.r.stop >= 0.12 - EPS && met.r.stop <= 0.12 + EPS;
-          if (!goalOk && K.why) console.log(`  (f) goal met: freeze ${fmt(met.r.stop)} s`);
-          verdict(goalOk && !kbad.length, 'f', goalOk && !kbad.length
-            ? 'the whistle owns the end: the goal-met frame freezes 0.12 s, and a sibling eaten in the outro arms nothing'
-            : [goalOk ? '' : `the goal-met frame freezes ${fmt(met.r.stop)} s (bar 0.12)`, ...kbad].filter(Boolean).join('; '));
+          verdict(!bad.length, 'f', bad.length ? bad.join('; ')
+            : 'the whistle owns the end: met inside a kill\'s slow stretch, the goal-met frame freezes 0.12 s and the stretch, the rays and the dizzy end with it; a sibling eaten in the outro arms nothing');
         }
       }
     }
@@ -558,12 +771,23 @@ if (want('d')) {
   if (s1.beats) {
     note(`marquee beats armed: ${Object.keys(s1.beats).map((k) => `${k} ${s1.beats[k] - ((s0.beats || {})[k] || 0)}`).join(', ')}`);
   }
-  if (Math.abs(len - 180) > 1) verdict(false, 'd', `the match was ${Math.round(len)} s, not the 180 s the bar is about`);
-  else if (beatLong === null) verdict(false, 'd', `this build does not say which freezes its beats took over 100 ms (no longBeats in __juiceState) — `
-    + `${long} of ${all} freezes ran over 100 ms, and none can be told apart from the bite hit-stop's own`);
-  else verdict(beatLong <= 8, 'd', beatLong <= 8
-    ? `the ceiling holds: ${beatLong} freeze(s) armed or pushed past 100 ms by a marquee beat in a whole ${WORLD} match (bar 8); ${long} over 100 ms of ${all} in all`
-    : `${beatLong} freezes armed or pushed past 100 ms by a marquee beat in one ${WORLD} match (bar 8) — the beat is becoming the stutter the owner ruled out`);
+  // (d) THE LEAD'S BAR, every freeze over 100 ms, whoever took it; (d2) every
+  // beat armed, the ones (d) cannot see included
+  const beatsAll = s1.beats ? Object.keys(s1.beats).reduce((n, k) => n + s1.beats[k] - ((s0.beats || {})[k] || 0), 0) : null;
+  if (Math.abs(len - 180) > 1) {
+    verdict(false, 'd', `the match was ${Math.round(len)} s, not the 180 s the bar is about`);
+    verdict(false, 'd2', `the match was ${Math.round(len)} s, not the 180 s the bar is about`);
+  } else {
+    const who = beatLong === null ? 'none of them can be told apart from the bite hit-stop\'s own on this build'
+      : `${beatLong} armed or pushed over by a marquee beat, ${long - beatLong} by the bite hit-stop alone`;
+    verdict(long <= 8, 'd', long <= 8
+      ? `the ceiling holds: ${long} freeze(s) longer than 100 ms in a whole ${WORLD} match (bar 8; ${who}), of ${all} in all`
+      : `${long} freezes longer than 100 ms in one ${WORLD} match (bar 8; ${who}), of ${all} in all — more than the lead's ceiling`);
+    if (beatsAll === null) verdict(false, 'd2', 'this build keeps no count of its marquee beats (no beats in __juiceState)');
+    else verdict(beatsAll <= 20, 'd2', beatsAll <= 20
+      ? `the beats stay rare: ${beatsAll} marquee beat(s) armed in a whole ${WORLD} match (bar 20)`
+      : `${beatsAll} marquee beats armed in one ${WORLD} match (bar 20) — the beat is becoming the stutter the owner ruled out`);
+  }
 }
 
 await b.close();

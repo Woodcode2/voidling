@@ -27,6 +27,12 @@ export interface Fx {
    *  because the second write replaces the first before anything draws it.
    *  qa/timebeat.mjs (c) reads this through __juiceState().flashes. */
   flashCount(): number;
+  /** QA: what the overlay is painting right now — its inline background (the
+   *  colour a child is shown, as the browser normalised it) and its opacity
+   *  (0 when no wash is up). Read-only; qa/timebeat.mjs (c2) and (c3) read it
+   *  to see WHICH colour a burst of calls left on screen, not just how many
+   *  washes began. */
+  flashShown(): { bg: string; op: number };
 }
 
 // ── REDUCE MOTION ───────────────────────────────────────────────────────────
@@ -148,6 +154,7 @@ export function createFx(scene: THREE.Scene, now: () => number = () => performan
       r.mat.color.set(color); r.t = 0; r.dur = dur; r.maxR = maxR;
     },
     flashCount() { return flashN; },
+    flashShown() { return { bg: flashEl.style.background, op: Number(flashEl.style.opacity) || 0 }; },
     flash(color, alpha = 0.5) {
       // REDUCE MOTION caps the wash rather than removing it. The flash is a
       // readable signal — "you ate a rival", "you reached the final form" — so
