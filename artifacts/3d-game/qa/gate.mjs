@@ -187,16 +187,20 @@ const SUITE = [
     cmd: ['node', 'qa/mouthwind.mjs', PORT, 'maple'], verdict: pf,
     why: 'a real bite in a real match gathers the body on a frame before the jaw is first drawn' },
   // …and the PICTURES Job 8 still owes a person: "a person's read of the hurt
-  // face". qa/moodsheet.mjs is a picture-maker with one bar, framing. Its crop
-  // was measured once, before the first mood, while a void held at r 6 went on
-  // eating with the growth law's clamps off; three of its four frames came back
-  // as the inside of his face and it printed PASS (docs/AAA-LOOP.md, Job 8).
-  // The crop is now cut at every shutter and each frame must hold his whole
-  // projected disc. Written in a worktree with no browser and never run, so it
-  // sits in live and quality, not push, until a run has been read.
+  // face". qa/moodsheet.mjs is a picture-maker with one bar, framing. Seen in
+  // the lead's run: three of its four frames came back as the inside of his
+  // face and it printed PASS (docs/AAA-LOOP.md, Job 8). Read from the source
+  // and not measured: its one crop box, and its shutters, were taken on wall
+  // clock a few frames after t 0.2, inside the match's 1.2 game-s descent,
+  // where the camera closes from camDist 132 to 22 whatever his size. It now
+  // waits the descent out on __matchState().introT, settles the camera onto its
+  // aim before each shutter, cuts the crop at every shutter, and fails a frame
+  // shot inside the descent or not holding his whole projected disc. Written in
+  // a worktree with no browser and never run, so it sits in live and quality,
+  // not push, until a run has been read.
   { id: 'moodsheet:maple', tier: 'feel', profiles: ['live', 'quality'], timeout: 1200,
     cmd: ['node', 'qa/moodsheet.mjs', PORT, 'maple'], verdict: pf,
-    why: 'each of the mood sheet\'s four frames holds the void\'s whole projected disc, before and after its shutter — and leaves qa/out/mood/maple/*.png for a person to read' },
+    why: 'each of the mood sheet\'s four frames is shot after the descent and holds the void\'s whole projected disc, before and after its shutter — and leaves qa/out/mood/maple/*.png for a person to read' },
 
   // THE OPENING BELONGS TO THE PLAYER. Eighteen bars measured against HOLE.IO's own
   // recording: the clock must not move before the first touch, the descent runs

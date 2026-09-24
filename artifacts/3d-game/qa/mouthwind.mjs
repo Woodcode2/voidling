@@ -61,8 +61,10 @@
 //      leaves uniformK at exactly 1 on every frame after it. mouthAge only
 //      advances while mouthT > 0, so on the Job 8 commit that pin froze the
 //      gather at 0.9606 until the next bite from a closed mouth (flat over
-//      five seconds of 60 Hz frames) — on the exact frames qa/moodsheet.mjs,
-//      qa/moodrule.mjs and qa/gapesheet.mjs photograph.
+//      five seconds of 60 Hz frames) — on the exact frames qa/moodrule.mjs and
+//      qa/gapesheet.mjs photograph. (qa/moodsheet.mjs pins the jaw with
+//      __pinMouth(true) for its frames now, and calls __pinGape(0) only in its
+//      cleanup, after the last one.)
 //   E. A SPREE GATHERS ONCE. A second full chomp() 0.1 s into the first (the
 //      jaw wide open) does not dip the body again.
 //   F. GRADED ON THE RIG. A snack (chomp's own floor) gathers less than a full
