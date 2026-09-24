@@ -2,6 +2,9 @@
 //
 //   node qa/eatvoice.mjs [port] [world ...] [--only=graph,offline,live,end]
 //                                                  (default 4177 maple skylark)
+//   node qa/eatvoice.mjs [port] [world ...] --only=census
+//        the census and (r) alone, on as many worlds as are named — every
+//        world's classifier read against its props' shapes, without the bites
 //
 // Research governor G5. A car, a person, a sheep and a chalet sounded the same
 // apart from size: pop() is one tuned note whose depth follows the meal, and
@@ -43,9 +46,14 @@
 //       a voice has its own dice (wheee's pitch, a rustle's grains, two quacks
 //       or three), and "6 dB under" is a promise about every bite, not about
 //       the average one
-//   (d) past link 8 the voice is 0.4x: meep at combo 9 within 0.5 dB of
-//       20 log 0.4 = -7.96 dB against combo 0. Meep because it has no dice —
-//       the fade is one multiply every voice goes through
+//   (d) past link 8 the voice is 0.4x: meep and baa at combo 9 within 0.1 dB
+//       of 20 log 0.4 = -7.96 dB against combo 0. Those two because they
+//       have no dice. The fade is one multiply on the voice's level, so it is
+//       exact or it is not: anything past a tenth of a dB is a part of the
+//       voice that does not scale with it. This bar was 0.5 dB and passed
+//       meep at -7.61, which was exactly that: an envelope that ramped to an
+//       ABSOLUTE floor of 0.0006 and held it until the oscillator stopped,
+//       so at 0.4x the tail stood relatively louder (adversarial review)
 //   (e) no thud: below 250 Hz (four poles, qa/chomp.mjs part 3) no voice
 //       carries more than the pop's own + 1 dB
 //   (f) the gate: a voice 0.20 s after another is held (says null and adds
@@ -55,6 +63,15 @@
 //       so the transient is alone — its spectral-centroid SD at least 3% of
 //       its mean; then ten more with the noise disconnected — the body's f0
 //       SD under 1 cent
+//   (h2) the transient's LEVEL moves too: over the same ten transients, the
+//       RMS level's SD at least 1.0 dB and its whole spread no more than
+//       4.0 dB. The spec's "gain +-1.5 dB" dealt as two levels puts every
+//       take 1.5 dB from the centre, so ten read about 1.5 dB (a uniform
+//       draw inside +-1.5 would read 0.87, under the bar); the ceiling is
+//       the 3 dB between the two levels plus what 140 cents of cutoff moves
+//       through the transient's low-pass. (h) alone reads the centroid,
+//       which a gain cannot move, so a build that dropped the level half —
+//       or only reshuffled the noise buffer's offset — passed it
 //   (i) the bite has a side: two pops 0.3 s apart on a stereo render — each
 //       one's L-R RMS difference at least 2 dB, and of opposite sign
 //   (j) a pop and its voice together, at a tower's meal, peak at or under
@@ -69,18 +86,50 @@
 //   game's clock 0.5 match-seconds after the last (tClock never runs faster
 //   than the wall, so that is 0.5 s or more of audio clock too). Then a burst:
 //   three people taken in one task, whose sinks share a frame.
-//   (l) the census: every voice class and silent tag in the live world (info)
+//   (l) the census: every voice class and silent tag in the live world, and
+//       under each voice the tags its props carry — qk, kind, landmark,
+//       balloon stage, a factory's own tag — with their radii (info). This
+//       is how a person reads WHAT a voice is coming from; the bars below
+//       only know THAT it came
+//   (r) ONE SHAPE, ONE VOICE: every edible's geometry (vertex and index
+//       counts and bounding box of each mesh in it, per mesh, read off the
+//       live scene) and the game's own verdict on it (__eatVoiceOf); no
+//       shape may speak two different voices. A kind placed through two
+//       paths that tag it differently is a wrong voice on one of them — the
+//       same prop cannot be a balloon here and a house there. Silent is not
+//       a voice (a silent kind is better than a wrong one), so a shape that
+//       is voiced in one place and silent in another is printed, not failed.
+//       Its blind spot, stated: a kind that is mis-tagged EVERYWHERE is
+//       consistent, and only the (l) table shows it to a reader
 //   (m) every voice class the world's census offers was heard as 'eat:<voice>'
 //   (n) every bite driven was classified as the class it was driven as, and
 //       said its own name or was held by the gate — never another voice
 //   (o) no two 'eat:' entries within 0.35 s on the wall clock — the clock
-//       sounds play on (qa/endparty.mjs (g) reads it the same way)
+//       sounds play on (qa/endparty.mjs (g) reads it the same way). WHAT IT
+//       DOES NOT STRESS: the driven bites are half a match-second apart or
+//       more, and the closest pair it has read is 1.7 s, so the 0.35 s rule
+//       itself is proven offline by (f) and inside one frame by (p). (o)
+//       says that live play, the void eating on its own at r 8, never
+//       brought two voices closer than the gate allows
+//   (m) and (n) count ids and cannot tell a right voice from a wrong one:
+//       (n)'s meals are CHOSEN by the classifier, so "classified as itself"
+//       is true by construction. (r) is the bar that reads the props
 //   (p) the burst: at most one voice for the three, and the bite log says
 //       the others were held
 //   (m6) the spec's bar, across the worlds run: six or more distinct voices
 //       heard in one world. A world can only say what its census offers, and
 //       that is the world's, not this file's: Maple offers five today — its
 //       four pond ducks, the sixth, never reach the scene — and Skylark six.
+//       Each world's count is printed on its own line first, so a Maple-only
+//       run reads as the five-of-six it is rather than hiding in "best".
+//
+// RETRACTED, (m6)'s first green on Skylark. Six of that run's 26 voices were
+// 'crumble' and the bite driven for it was r 1.40 — a bagged balloon. The
+// arrivals scatter drops 57 bags with qk 'big' and no balloon tag, so the
+// classifier sent them to the building rule, while the same mesh dropped
+// through tagBalloon squeaked. The sixth voice was real; the prop saying it
+// was not a building. (m), (n) and (m6) all passed it, because each counts
+// voices and none reads the prop. (r) was written for it.
 //
 // END — Maple dot 1 (?g=1), the goal met through __setScore, then four voiced
 //   meals taken inside the outro, and every one of them followed down.
@@ -262,12 +311,15 @@ if (want('offline')) {
     // Ten transients FIRST, then ten bodies: the ten transients are then ten
     // bites in a row, which is what a child hears — interleaved, every other
     // bite's take went to a body render, and the ten read were not a run
-    const cents = [], f0s = [];
+    const cents = [], levels = [], f0s = [];
     for (let k = 0; k < 10; k++) {
       const tr = await render((a) => a.pop(0, ...CAR), { secs: 0.3, mute: 'osc' });
       const N = 4096, n = Math.floor(0.06 * SR), pw = fft(tr.d[0], 0, n, N, false);
       let s0 = 0, s1 = 0; for (let i = 1; i < N / 2; i++) { s0 += pw[i]; s1 += pw[i] * (i * SR / N); }
       cents.push(s1 / s0);
+      // (h2) the same transient's level: RMS over the whole render, which
+      // holds all of the burst and its tail
+      levels.push(rms(tr.d[0], 0, tr.d[0].length));
     }
     for (let k = 0; k < 10; k++) {
       const bd = await render((a) => a.pop(0, ...CAR), { secs: 0.3, mute: 'noise' });
@@ -277,6 +329,7 @@ if (want('offline')) {
       f0s.push(((bi + 0.5 * (y0 - y2) / (y0 - 2 * y1 + y2)) * SR) / M);
     }
     out.centroid = { mean: mean(cents), sdPct: (100 * sd(cents)) / mean(cents) };
+    out.level = { mean: mean(levels), sd: sd(levels), spread: Math.max(...levels) - Math.min(...levels) };
     const fm = mean(f0s);
     out.f0 = { mean: fm, sdCents: sd(f0s.map((f) => 1200 * Math.log2(f / fm))) };
 
@@ -320,11 +373,12 @@ if (want('offline')) {
       row.chomp = { chomp: ch, withVoice: chv, voice: vAlone };
       out.rows[v] = row;
     }
-    // (d) the fade, on meep (no dice)
-    {
-      const c0 = hp((await render((a) => a.eatVoice('meep', ...CAR, 0))).d[0]);
-      const c9 = hp((await render((a) => a.eatVoice('meep', ...CAR, 9))).d[0]);
-      out.fade = c9 - c0;
+    // (d) the fade, on the two voices with no dice
+    out.fade = {};
+    for (const v of ['meep', 'baa']) {
+      const c0 = hp((await render((a) => a.eatVoice(v, ...CAR, 0))).d[0]);
+      const c9 = hp((await render((a) => a.eatVoice(v, ...CAR, 9))).d[0]);
+      out.fade[v] = c9 - c0;
     }
     // (f) the gate
     {
@@ -340,7 +394,7 @@ if (want('offline')) {
   await p.close();
 
   console.log(`\n  OFFLINE — the real synth, rendered (${o.voices.length} voices in EAT_VOICES: ${o.voices.join(' ')})`);
-  console.log(`    the pop's transient, ten pops in a row: centroid ${o.centroid.mean.toFixed(0)} Hz, SD ${o.centroid.sdPct.toFixed(2)}%;  the body's f0 ${o.f0.mean.toFixed(1)} Hz, SD ${o.f0.sdCents.toFixed(3)} cents`);
+  console.log(`    the pop's transient, ten pops in a row: centroid ${o.centroid.mean.toFixed(0)} Hz, SD ${o.centroid.sdPct.toFixed(2)}%; level SD ${o.level.sd.toFixed(2)} dB;  the body's f0 ${o.f0.mean.toFixed(1)} Hz, SD ${o.f0.sdCents.toFixed(3)} cents`);
   console.log(`    two pops 0.3 s apart, L minus R: ${o.pan.map((x) => `${x >= 0 ? '+' : ''}${x.toFixed(2)} dB`).join(', ')}`);
   if (!o.has) {
     for (const id of ['a', 'b', 'c', 'd', 'e', 'f', 'j', 'k']) bar(false, id, 'there is no eatVoice() — a bite says nothing about what it was');
@@ -369,7 +423,9 @@ if (want('offline')) {
       : faint.length ? `more than 14 dB under the pop — not there to be heard: ${faint.join(', ')}`
         : `every voice sits 6-14 dB under the pop at a car's meal and a house's, in every render (${Math.min(...rows.flatMap(([, r]) => ['car', 'house'].map((l) => o.popAt[l] - r[l]))).toFixed(1)} dB at the closest, ${Math.max(...rows.flatMap(([, r]) => ['car', 'house'].map((l) => o.popAt[l] - r[`${l}Min`]))).toFixed(1)} at the farthest)`);
     const want04 = 20 * Math.log10(0.4);
-    bar(Math.abs(o.fade - want04) <= 0.5, 'd', `past link 8 the voice is ${o.fade.toFixed(2)} dB against link 0 (bar ${want04.toFixed(2)} +-0.5)`);
+    const fades = Object.entries(o.fade);
+    bar(fades.length === 2 && fades.every(([, x]) => Math.abs(x - want04) <= 0.1), 'd',
+      `past link 8 the voice is ${fades.map(([v, x]) => `${v} ${x.toFixed(2)}`).join(', ')} dB against link 0 (bar ${want04.toFixed(2)} +-0.1)`);
     const thud = rows.filter(([, r]) => r.low > o.popLow + 1);
     bar(!thud.length, 'e', thud.length ? `a thud below 250 Hz in: ${thud.map(([v, r]) => `${v} ${r.low.toFixed(1)}`).join(', ')} (pop ${o.popLow.toFixed(1)} dBFS)`
       : `no voice carries more below 250 Hz than the pop's own ${o.popLow.toFixed(1)} dBFS + 1 (loudest ${Math.max(...rows.map(([, r]) => r.low)).toFixed(1)})`);
@@ -387,6 +443,7 @@ if (want('offline')) {
     bar(!hot.length, 'j', hot.length ? `over -3 dBFS with its pop at a tower's meal: ${hot.map(([v, r]) => `${v} ${r.peak.toFixed(1)}`).join(', ')}` : `a pop and its voice at a tower's meal peak at ${Math.max(...rows.map(([, r]) => r.peak)).toFixed(1)} dBFS at the most (bar -3)`);
   }
   bar(o.centroid.sdPct >= 3 && o.f0.sdCents < 1, 'h', `ten pops in a row: the transient's centroid SD ${o.centroid.sdPct.toFixed(2)}% (bar 3%), the body's f0 SD ${o.f0.sdCents.toFixed(3)} cents (bar under 1)`);
+  bar(o.level.sd >= 1.0 && o.level.spread <= 4.0, 'h2', `the same ten transients' level: SD ${o.level.sd.toFixed(2)} dB (bar 1.0), spread ${o.level.spread.toFixed(2)} dB (bar 4.0 at most), mean ${o.level.mean.toFixed(1)} dBFS`);
   bar(Math.abs(o.pan[0]) >= 2 && Math.abs(o.pan[1]) >= 2 && Math.sign(o.pan[0]) !== Math.sign(o.pan[1]), 'i',
     `two pops in a row sit ${o.pan.map((x) => `${x >= 0 ? '+' : ''}${x.toFixed(2)}`).join(' and ')} dB L-R (bar 2 dB each, opposite sides)`);
 }
@@ -408,8 +465,96 @@ async function openMatch(world, query = '') {
 const waitT = (p, dt) => p.evaluate(() => window.__matchState().tClock).then((t0) =>
   p.waitForFunction((x) => window.__matchState().tClock >= x, t0 + dt, { timeout: 900000, polling: 200 }));
 
+// ── THE CENSUS, (l), AND ONE SHAPE ONE VOICE, (r) ──────────────────────────
+// Every uneaten, visible edible: the game's verdict on it (__eatVoiceOf, the
+// classifier capture() uses), the tags it carries, and its SHAPE — per mesh
+// in it, the position count, the index count and the bounding box of the
+// geometry in its own frame, so neither where it stands, how it is turned or
+// what colours it was dealt can split one factory's props apart. Two
+// geometries are one shape only if every mesh in them matches.
+async function censusOf(p, WORLD) {
+  const hooks = await p.evaluate(() => ({ census: typeof window.__voiceCensus, of: typeof window.__eatVoiceOf,
+    edibles: Array.isArray(window.__edibles) }));
+  if (hooks.census !== 'function' || hooks.of !== 'function' || !hooks.edibles)
+    die(`${WORLD}: this build has no __voiceCensus / __eatVoiceOf / __edibles — the census cannot be read`);
+  const census = await p.evaluate(() => window.__voiceCensus());
+  const s = await p.evaluate(() => {
+    const geoSig = new Map();
+    const sigOfGeo = (g) => {
+      const hit = geoSig.get(g); if (hit) return hit;
+      const pa = g.attributes && g.attributes.position; if (!pa) return '-';
+      let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+      for (let i = 0; i < pa.count; i++) {
+        const x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i);
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z;
+      }
+      const sg = `${pa.count}/${g.index ? g.index.count : 0}/${(x1 - x0).toFixed(2)}x${(y1 - y0).toFixed(2)}x${(z1 - z0).toFixed(2)}`;
+      geoSig.set(g, sg); return sg;
+    };
+    const tagsOf = (u, m) => {
+      const t = [];
+      if (u.limbs) t.push('limbs');
+      if (u.qk) t.push(`qk=${u.qk}`);
+      if (u.kind) t.push(`kind=${u.kind}`);
+      if (u.landmark) t.push(`landmark=${u.landmark}`);
+      if (u.balloon) t.push(`balloon=${u.balloon.stage}`);
+      if (u.eatVoice) t.push(`tag=${u.eatVoice}`);
+      const kid = m.children.find((c) => c.userData && c.userData.eatVoice);
+      if (kid) t.push(`child tag=${kid.userData.eatVoice}`);
+      return t.join(' ') || 'untagged';
+    };
+    const why = {};     // voice -> tags -> { n, r0, r1 }
+    const shapes = {};  // shape -> { voice -> { n, tags -> n } }
+    for (const e of window.__edibles) {
+      if (e.eaten || !e.mesh.visible) continue;
+      const v = window.__eatVoiceOf(e) || 'silent';
+      const tags = tagsOf(e.mesh.userData, e.mesh);
+      const w = ((why[v] ??= {})[tags] ??= { n: 0, r0: Infinity, r1: 0 });
+      w.n++; w.r0 = Math.min(w.r0, e.radius); w.r1 = Math.max(w.r1, e.radius);
+      const parts = []; e.mesh.traverse((o) => { if (o.geometry) parts.push(sigOfGeo(o.geometry)); });
+      const sh = parts.join('+') || 'no geometry';
+      const x = ((shapes[sh] ??= {})[v] ??= { n: 0, tags: {} });
+      x.n++; x.tags[tags] = (x.tags[tags] ?? 0) + 1;
+    }
+    return { why, shapes };
+  });
+  console.log(`    (l) voices: ${Object.entries(census.voices).map(([v, n]) => `${v} ${n}`).join('  ')}`);
+  console.log(`        silent ${census.silent}: ${Object.entries(census.silentTags).sort((x, y) => y[1] - x[1]).map(([k, n]) => `${k} ${n}`).join('  ')}`);
+  const rr = (w) => (w.r0 === w.r1 ? `r ${w.r0.toFixed(1)}` : `r ${w.r0.toFixed(1)}-${w.r1.toFixed(1)}`);
+  for (const [v, byTags] of Object.entries(s.why)) {
+    if (v === 'silent') continue;
+    const rows = Object.entries(byTags).sort((x, y) => y[1].n - x[1].n);
+    const shown = rows.slice(0, 6).map(([t, w]) => `${w.n} ${t} (${rr(w)})`);
+    console.log(`        ${v.padEnd(8)} from ${shown.join(' · ')}${rows.length > 6 ? ` · and ${rows.length - 6} more tag sets` : ''}`);
+  }
+  const all = Object.entries(s.shapes);
+  const voiced = all.filter(([, byV]) => Object.keys(byV).some((v) => v !== 'silent'));
+  const split = voiced.filter(([, byV]) => Object.keys(byV).filter((v) => v !== 'silent').length > 1);
+  const half = voiced.filter(([, byV]) => byV.silent && Object.keys(byV).length > 1);
+  const say = ([sh, byV]) => `${Object.entries(byV).map(([v, x]) => `${v} ${x.n} [${Object.entries(x.tags).map(([t, n]) => `${n} ${t}`).join(', ')}]`).join(' vs ')} — shape ${sh.length > 48 ? `${sh.slice(0, 48)}...` : sh}`;
+  for (const x of half.slice(0, 3)) console.log(`        voiced here, silent there (info): ${say(x)}`);
+  if (half.length > 3) console.log(`        ...and ${half.length - 3} more shapes voiced in one place and silent in another`);
+  bar(voiced.length > 0 && !split.length, 'r', split.length
+    ? `${WORLD}: ${split.length} shape(s) speak two voices — ${split.map(say).join('; ')}`
+    : `${WORLD}: ${voiced.length} voiced shapes among ${all.length}, and not one of them speaks two voices${half.length ? ` (${half.length} voiced in one place and silent in another, printed)` : ''}`);
+  return census;
+}
+
+// ══ CENSUS ALONE (--only=census) — every world named, no bites ═════════════
+if (ONLY && ONLY.has('census') && !ONLY.has('live')) {
+  for (const WORLD of WORLDS) {
+    const p = await openMatch(WORLD);
+    await enterMatch(p, WORLD);
+    await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 900000, polling: 250 });
+    console.log(`\n  CENSUS — ${WORLD}`);
+    const census = await censusOf(p, WORLD);
+    console.log(`    ${census.edibles} edibles in the census`);
+    await p.close();
+  }
+}
+
 if (want('live')) {
-  const heardBy = {};
+  const heardBy = {}, offeredBy = {};
   for (const WORLD of WORLDS) {
     const p = await openMatch(WORLD);
     await enterMatch(p, WORLD);
@@ -423,10 +568,9 @@ if (want('live')) {
     const R = 8;
     await p.evaluate((r) => window.__setVoidR(r), R);
     await waitT(p, 1.0);
-    const census = await p.evaluate(() => window.__voiceCensus());
-    console.log(`\n  LIVE — ${WORLD} (audio context ${hooks.ctx}), ${census.edibles} edibles`);
-    console.log(`    (l) voices: ${Object.entries(census.voices).map(([v, n]) => `${v} ${n}`).join('  ')}`);
-    console.log(`        silent ${census.silent}: ${Object.entries(census.silentTags).sort((x, y) => y[1] - x[1]).map(([k, n]) => `${k} ${n}`).join('  ')}`);
+    console.log(`\n  LIVE — ${WORLD} (audio context ${hooks.ctx})`);
+    const census = await censusOf(p, WORLD);
+    console.log(`    ${census.edibles} edibles in the census`);
     const w0 = await p.evaluate(() => performance.now() / 1000);
     const sank = (ids) => p.waitForFunction((xs) => xs.every((id) => (window.__biteLog().find((x) => x.id === id)?.sndT ?? -1) >= 0), ids, { timeout: 900000, polling: 200 });
     const driven = [];
@@ -462,7 +606,7 @@ if (want('live')) {
     const eats = end.calls.filter((c) => c.id.startsWith('eat:'));
     const heard = new Set(eats.map((c) => c.id.slice(4)));
     const offered = Object.keys(census.voices).filter((v) => census.voices[v] > 0);
-    heardBy[WORLD] = heard;
+    heardBy[WORLD] = heard; offeredBy[WORLD] = offered.length;
     console.log(`    heard: ${eats.map((c) => c.id).join(' ') || 'no eat voice at all'}  (bite sounds in the log: ${[...new Set(end.calls.filter((c) => ['pop', 'chomp', 'bigEat'].includes(c.id)).map((c) => c.id))].join(', ')})`);
     // (m) every voice this world offers is heard. HOW MANY it offers is the
     // world's own census, printed above; the spec's six is graded across the
@@ -497,6 +641,11 @@ if (want('live')) {
   // on every world run and graded on the best, because how many a world CAN
   // say is its census, not this file's choice: Maple offers five today (its
   // pond ducks never reach the scene), Skylark six.
+  console.log('');
+  for (const w of WORLDS) {
+    const n = heardBy[w]?.size ?? 0, off = offeredBy[w] ?? 0;
+    console.log(`    ${w.padEnd(8)} heard ${n} distinct voice(s) — ${n >= 6 ? 'six or more on its own' : `SHORT of the spec's six on its own`}; its census offers ${off}`);
+  }
   const best = WORLDS.map((w) => [w, heardBy[w]?.size ?? 0]).sort((x, y) => y[1] - x[1])[0];
   bar(!!best && best[1] >= 6, 'm6', `${WORLDS.map((w) => `${w} ${heardBy[w]?.size ?? 0}`).join(', ')} distinct voices heard — ${best && best[1] >= 6 ? `${best[0]} says six or more` : 'no world says six'} (bar 6)`);
 }

@@ -3540,6 +3540,7 @@ const _dbg = new Proxy(_dbgStore, {
   __eatNearest: (rel: number) => { r: number; R: number } | null;
   __eatVoice: (v: string, n?: number, maxR?: number) => { n: number; r: number[]; ids: number[] };
   __voiceCensus: () => { edibles: number; voices: Record<string, number>; silent: number; silentTags: Record<string, number> };
+  __eatVoiceOf: (e: Edible) => string | null;
   __quality: () => { level: number; pinned: number | null; shadows: boolean; shSize: number; pr: number };
   __warpVoid: (x: number, z: number) => void;
   __inDeepWater3: (x: number, z: number, m: number) => boolean;
@@ -3671,6 +3672,12 @@ _dbg.__voiceCensus = () => {
   }
   return { edibles: n, voices, silent, silentTags };
 };
+/** QA (qa/eatvoice.mjs (r)): the game's own verdict on ONE edible, so the
+ *  probe can hold it against the prop's shape. The census above counts
+ *  voices and cannot see a WRONG one: Skylark's 57 scattered balloon bags
+ *  said 'crumble' while the same mesh dropped through tagBalloon said
+ *  'squeak', and both were counted as healthy voices. */
+_dbg.__eatVoiceOf = (e: Edible) => eatVoiceOf(e);
 _dbg.__fadeStats = () => fadeStats;   // QA: why a prop did or did not get its own material
 // QA: the promise dot 4's card makes, so qa/levels.mjs can require the rule
 // that DECIDES the dot to agree with it without deriving either from the other.
