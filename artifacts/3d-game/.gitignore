@@ -28,6 +28,9 @@ qa/out/faceline/
 # the owner's kill-beat contact sheets (qa/killbeat.mjs) — rendered per build,
 # handed to him, never evidence the repo keeps
 qa/out/killbeat/
+# the burp WAVs qa/burp.mjs renders for the owner's ear — rendered per build,
+# handed to him, never evidence the repo keeps
+qa/out/burp/
 # qa/out/shippedlook/*_look.png was ignored here — the studio's entire
 # canonical evidence pack lived untracked, died with every container restart,
 # and silently reverted to an August 23 snapshot while the committed .src
