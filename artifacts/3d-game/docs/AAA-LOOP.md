@@ -157,6 +157,12 @@ box to itself, and no agent work of any kind overlaps it.
 to itself: studio Jobs 4, 6, 7, 8, the countdown placed, the pictograph and
 picker probes at rest, menuquiet on the game clock.
 
+**Merged to main at e6fb947 (2026-09-24), push gate 73/73 in one run**, the box
+to itself: studio Jobs 9, 10, 11, the moodsheet reframe, Lantern's tight lamp
+bloom (0.2 / 0.1), postpipe's hero disc on his body, shippedlook's settled-aim
+bar. A first run was cut at step 14 by a container restart (13/13 passing to
+that point); the recorded run is the full re-run from the top.
+
 **halocensus v2, and why v1 was retired.** v1 measured the RESULT — pixels
 bloom lifted by 3+ L* more than 16 px from a light — and condemned Lantern's
 lanterns (a lit table's haze reaches ~200 px, all 405 "hot" cells) while
