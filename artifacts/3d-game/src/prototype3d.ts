@@ -256,6 +256,8 @@ function ensureComposer(): EffectComposer {
     1.05,   // threshold: LINEAR — the floor; bloomCut() sets each world's own just below
   );
   bloomPass.threshold = bloomCut();   // per world and hour — see WorldLight.bloomCut
+  bloomPass.strength = LIGHT.bloomStrength ?? 0.5;   // per world — see WorldLight.bloomStrength
+  bloomPass.radius = LIGHT.bloomRadius ?? 0.42;
   setGlowFloor(bloomCut());           // the lamps' floor rides the cut — see PROP_GLOW_MAT (island.ts)
   composer.addPass(bloomPass);
   // Tone map + grade + sRGB encode, exactly once, at the end of the chain.
@@ -1786,6 +1788,24 @@ interface WorldLight {
   // percentile of luminance off the lights) at hour 0; the cut is that plus
   // 6%, never under BLOOM_FLOOR. Absent means the floor already clears it.
   bloomCut?: number;
+  // ── …AND A NIGHT FULL OF LAMPS GLOWS TIGHT, NOT WIDE ─────────────────────
+  // Studio Job 9 put every Lantern lamp over the cut (1 of 4 on the wire had
+  // haloed). At the shipped 0.5 strength and 0.42 radius the haze of forty
+  // lamps then reached the void: at the settled spawn his body lost 0.154
+  // saturation to bloom (main: 0.053), the frame gained 0.133 of glow (main:
+  // 0.036) — measured in-page, the same frame with bloom swept, 2026-09-24.
+  // Swept on main and on this build, the same frame, at both pixel ratios the
+  // probes shoot (DPR 1 is postpipe's, DPR 2 is rung 0 on a phone):
+  //                      DPR 1 loss / glow     DPR 2 loss / glow
+  //   main, 0.5 / 0.42     0.078 / 0.043         0.053 / 0.036
+  //   here, 0.5 / 0.42     0.249 / 0.167         0.154 / 0.133
+  //   here, 0.3 / 0.1      0.110 / 0.101         0.050 / 0.079
+  //   here, 0.2 / 0.1      0.074 / 0.077         (below)
+  // 0.2 / 0.1 is the setting where he is no more washed than on main at
+  // either ratio, and the frame still carries ~1.8x main's glow: every lamp
+  // halos, close to its paper. Absent = 0.5 / 0.42 (qa/lampglow.mjs: 6 of 6).
+  bloomStrength?: number;
+  bloomRadius?: number;
 }
 const WORLD_LIGHT: Record<WorldId, WorldLight> = {
   // ── MAPLE, RE-LIT AGAINST THE REFERENCE ─────────────────────────────────
@@ -1886,7 +1906,8 @@ const WORLD_LIGHT: Record<WorldId, WorldLight> = {
   // incandescence. Blooming lamps are an emissive and albedo problem.
   lantern: { sun: 0xbfd4ff, sunI: 0.55, hemiSky: 0x2c3766, hemiGround: 0x7a5844, hemiI: 1.75,
              off: [-30, 96, 46], dusk: 1.0, normalBias: 0.14, exposure: 1.24,
-             fill: 0x6a8cff, fillI: 0.72, fillOff: [52, 40, -60] },
+             fill: 0x6a8cff, fillI: 0.72, fillOff: [52, 40, -60],
+             bloomStrength: 0.2, bloomRadius: 0.1 },
   // ── POWDER PASS: blue winter dusk, and the SNOW is the fill ─────────────
   // Between lantern's night and the three daylight rigs: a low cold key (the
   // last of the light coming over the west wall) at real strength, because
@@ -2066,7 +2087,11 @@ const hemiNow = (): number => (HEMI_APPLIED.has(pickedWorld) ? LIGHT.hemiI : RIG
 const BLOOM_FLOOR = 1.05;
 const bloomCut = (): number => Math.max(BLOOM_FLOOR, (LIGHT.bloomCut ?? BLOOM_FLOOR) * hourSunK);
 function applyLightRig(): void {
-  if (bloomPass) bloomPass.threshold = bloomCut();
+  if (bloomPass) {
+    bloomPass.threshold = bloomCut();
+    bloomPass.strength = LIGHT.bloomStrength ?? 0.5;
+    bloomPass.radius = LIGHT.bloomRadius ?? 0.42;
+  }
   // every lamp's dimmest face rides the cut, on every rung — see PROP_GLOW_MAT
   // (island.ts). Without a composer there is no halo, and the lift only
   // brightens the tone-mapped core.

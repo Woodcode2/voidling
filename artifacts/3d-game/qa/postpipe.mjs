@@ -48,7 +48,15 @@ await p.evaluate(() => document.querySelectorAll('.show')
   .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
 await enterMatch(p, WORLD);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 900000 });
-await p.waitForTimeout(2000);
+// AT THE SETTLED CAMERA (studio round 4, Job 0). Three match-seconds in, the
+// follow camera is still easing out under the software renderer, so the hero
+// was measured small — 32 px of disc on Lantern where the settled frame gives
+// him 63 — and every halo around him counted for twice its share. __settleCam
+// puts the distance on its aim for a few frames; a build without it is read
+// where it stands.
+await p.evaluate(() => window.__settleCam?.(4));
+{ const t0 = await p.evaluate(() => window.__matchState().t);
+  await p.waitForFunction((t) => (window.__matchState?.().t ?? 0) > t + 0.2, t0, { timeout: 400000 }).catch(() => { }); }
 
 const out = await p.evaluate(() => {
   const ren = window.__renderer, scene = window.__scene, cam = window.__cam;

@@ -275,18 +275,24 @@ console.log(`  void at (${box.cx.toFixed(0)}, ${box.cy.toFixed(0)}) r=${box.pxR.
 console.log(`  disc luma ${dY.toFixed(3)} vs town ${tY.toFixed(3)}  -> hero covers ${(cover * 100).toFixed(1)}% of it`);
 console.log(`  body rgb(${mR.toFixed(0)}, ${mG.toFixed(0)}, ${mB.toFixed(0)}) sat ${sat.toFixed(3)}`
   + (dark.length ? '' : '  (no body pixels to describe)'));
-// THE WIDTH CHECK (Job 0's gate). At the settled camera the hero's width as a
-// share of the frame is (R / aim) / 0.1323 — the studio's derivation from the
-// lens; 0.405 at R 4. A frame more than 5% off it was not shot where a child
-// has the camera, and every judgement made on it inherits the error.
+// THE SETTLED CHECK (Job 0's gate). The question is whether the frame was shot
+// where a child has the camera, so the bar is the camera itself: its distance
+// within 1% of its aim. The studio's width formula — the hero's share of the
+// frame against (R / aim) / 0.1323 — is printed beside it and held to a loose
+// 10% sanity bar only: with the camera EXACTLY on its aim it over-reads by a
+// steady 4.4-5.4% on every world measured (maple 4.7, pirate 4.5, powder 4.4,
+// lantern 4.6, skylark 5.4 — 2026-09-24), because the lens constant ignores
+// the sphere's perspective and the camera's lookahead. Barring that at 5% was
+// barring the formula's bias, and Skylark failed a frame that was settled.
 const wFrac = (2 * box.pxR) / box.vw, wWant = box.aim > 0 ? (box.r / box.aim) / 0.1323 : 0;
 const wOff = wWant > 0 ? Math.abs(wFrac / wWant - 1) : 1;
-console.log(`  hero width ${wFrac.toFixed(3)} of the frame against ${wWant.toFixed(3)} settled (camera at ${box.now.toFixed(1)}, aim ${box.aim.toFixed(1)}; `
-  + `${settled ? 'settled by __settleCam' : 'no __settleCam in this build'}) -> ${(wOff * 100).toFixed(1)}% off`);
-const inFrame = cover >= COVER_MIN, atAim = wOff <= 0.05;
+const camOff = box.aim > 0 ? Math.abs(box.now / box.aim - 1) : 1;
+console.log(`  hero width ${wFrac.toFixed(3)} of the frame against ${wWant.toFixed(3)} by the lens formula (${(wOff * 100).toFixed(1)}% off; sanity bar 10%); `
+  + `camera at ${box.now.toFixed(1)}, aim ${box.aim.toFixed(1)} -> ${(camOff * 100).toFixed(1)}% off (bar 1%; ${settled ? 'settled by __settleCam' : 'no __settleCam in this build'})`);
+const inFrame = cover >= COVER_MIN, atAim = camOff <= 0.01 && wOff <= 0.10;
 if (!inFrame) console.log(`\n  ${(cover * 100).toFixed(1)}% of his own disc is him, against a bar of ${(COVER_MIN * 100).toFixed(0)}%.`
   + '\n  Nothing below that can be a rendering nuance: he is somewhere else, or he is not drawn.');
-if (!atAim) console.log(`\n  the frame is ${(wOff * 100).toFixed(1)}% off the settled width (bar 5%): shot mid-ease, a town closer than a child sees it.`);
+if (!atAim) console.log(`\n  the camera is ${(camOff * 100).toFixed(1)}% off its aim (bar 1%) and the width ${(wOff * 100).toFixed(1)}% off the formula (bar 10%): shot mid-ease, a town closer than a child sees it.`);
 // two literal verdicts for qa/idiomguard.mjs (#2a)
 if (inFrame && atAim) console.log('\n  PASS — the hero is in the frame this pack hands the studio, at the distance a child has the camera');
 else console.log(`\n  FAIL — ${!inFrame ? 'the hero is NOT in the frame' : 'the frame is not at the settled camera'}`);
