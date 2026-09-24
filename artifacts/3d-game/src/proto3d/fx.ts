@@ -73,7 +73,10 @@ export function setReduceMotion(on: boolean) {
 
 interface Ring { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; t: number; dur: number; maxR: number; }
 
-export function createFx(scene: THREE.Scene): Fx {
+/** `now` is the clock the flash governor counts its rolling second on. The game
+ *  passes its own tClock — wall time that hit-stop and slow motion never touch,
+ *  so a freeze cannot stretch the window — and the default is the page's. */
+export function createFx(scene: THREE.Scene, now: () => number = () => performance.now() / 1000): Fx {
   // ── APPLY THE PARENT'S CHOICE BEFORE THE FIRST FRAME ─────────────────────
   // reduceMotion() is lazy — it reads storage and sets `body.calm` on its FIRST
   // call, and until day 10 nothing called it at boot. The only callers were the
@@ -111,6 +114,25 @@ export function createFx(scene: THREE.Scene): Fx {
   document.body.appendChild(flashEl);
   let flashT = 0;
   let flashN = 0;   // QA: background writes (see flashCount)
+  // ── THE FLASH GOVERNOR (research governor G8) ────────────────────────────
+  // flash() wrote the background and the opacity together on every call, so
+  // two calls inside one frame drew only the second — the kill's gold wash was
+  // erased by a violet one before any frame showed it (studio round 4, Job 10,
+  // removed that pair by hand) — and a burst of calls was a strobe: a
+  // full-screen swing per call, which is the vestibular half of the reason
+  // Reduce Motion caps the alpha at all. qa/timebeat.mjs (c) measured five
+  // calls in 200 ms of tClock as five washes on the build before this.
+  //
+  // Two rules now. A call while a wash is still on screen BLENDS into it: the
+  // colour already showing stays, the alpha takes the larger of the two and the
+  // life starts again, and the background is not rewritten — so a pair in one
+  // frame can no longer erase the first colour unseen. And at most FLASH_MAX
+  // washes may START in any rolling FLASH_WIN seconds of `now`; a call past
+  // that with nothing on screen is not drawn. Its event still has every other
+  // channel it always had — the sound, the buzz, the float, the ring.
+  const FLASH_MAX = 2, FLASH_WIN = 1.0;
+  const flashStarts: number[] = [];   // `now` of each wash started, oldest first
+  let flashA = 0;                     // the live wash's alpha, for the blend
 
   let shakeAmt = 0;
   let kickAmt = 0, kickX = 0, kickZ = 0, kickAge = 0;
@@ -127,13 +149,25 @@ export function createFx(scene: THREE.Scene): Fx {
     },
     flashCount() { return flashN; },
     flash(color, alpha = 0.5) {
-      flashEl.style.background = color; flashN++;
       // REDUCE MOTION caps the wash rather than removing it. The flash is a
       // readable signal — "you ate a rival", "you reached the final form" — so
       // silencing it outright would cost information; what makes it a
       // vestibular problem is the 0.55-0.6 alpha full-screen swing, not the
       // cue itself.
-      flashEl.style.opacity = String(reduceMotion() ? Math.min(alpha, 0.15) : alpha);
+      const a = reduceMotion() ? Math.min(alpha, 0.15) : alpha;
+      if (flashT > 0) {
+        // live: blend (see THE FLASH GOVERNOR above) — no new colour, no swing
+        if (a > flashA) { flashA = a; flashEl.style.opacity = String(a); }
+        flashT = 0.12;
+        return;
+      }
+      const t = now();
+      while (flashStarts.length && t - flashStarts[0] >= FLASH_WIN) flashStarts.shift();
+      if (flashStarts.length >= FLASH_MAX) return;
+      flashStarts.push(t);
+      flashEl.style.background = color; flashN++;
+      flashA = a;
+      flashEl.style.opacity = String(a);
       flashT = 0.12;
     },
     // …and camera shake goes entirely. Unlike the flash it carries no
@@ -158,7 +192,7 @@ export function createFx(scene: THREE.Scene): Fx {
         r.mesh.scale.setScalar(rad);
         r.mat.opacity = (1 - k) * 0.8;
       }
-      if (flashT > 0) { flashT -= dt; if (flashT <= 0) flashEl.style.opacity = '0'; }
+      if (flashT > 0) { flashT -= dt; if (flashT <= 0) { flashEl.style.opacity = '0'; flashA = 0; } }
       // decaying shake, in SCREEN terms (see the interface note on camDist):
       // the authored amount is multiplied by how far the camera currently sits
       // from the reference distance the numbers were tuned at, so shake(11)

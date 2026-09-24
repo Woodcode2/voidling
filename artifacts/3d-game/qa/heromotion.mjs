@@ -30,8 +30,9 @@
 // time: under swiftshader the match runs ~14x slower than the wall, and dt is
 // clamped to 0.05 per frame. Each hold lasts HOLD game-seconds; moveAmt closes
 // on its target at rate 6/s, so 0.32 s of rig time reaches 0.85 from rest once
-// the target is 1. The rest is margin for hit-stop: the rig runs on dtw, which
-// a big bite at r 8 holds to 6% for 55-105 ms at a time.
+// the target is 1. The rest is margin for hit-stop: the rig runs on heroDt,
+// which a big bite at r 8 holds to 35% for 55-105 ms at a time (it ran on the
+// world's dtw, held to 6%, until research governor G8).
 // Each size starts from the hand-authored spawn (__warpVoid to __spawn), so both
 // runs start from the same known point rather than wherever the last one ended;
 // the heading is then chosen for ground at THAT size, and the run says so if

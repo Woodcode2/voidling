@@ -137,7 +137,10 @@ const cdF = expr(need(GAME, /const cd = ([\s\S]+?);\n\s*const speed = steerCap\(
 const lawLine = GAME.match(/const steerLawD = (.+?);\n/);
 const lawF = lawLine ? expr(lawLine[1], 'steerLawD') : null;
 // …and the reference the frame loop hands the rig, if it hands one at all.
-const call = need(GAME, /voidling\.update\(dtw, \{([\s\S]+?)\}\);/, 'the frame loop\'s voidling.update() call')[1];
+// (the rig's clock argument is heroDt since G8 — the hero runs at 0.35 of dt
+// through a hit-stop instead of the world's 0.06 — and dtw before it; either
+// is the same call site, and what this reads is the state object after it)
+const call = need(GAME, /voidling\.update\((?:dtw|heroDt), \{([\s\S]+?)\}\);/, 'the frame loop\'s voidling.update() call')[1];
 const passKey = call.match(/vRef: (\w+)/);
 let aimF = null, refF = null;
 if (passKey) {

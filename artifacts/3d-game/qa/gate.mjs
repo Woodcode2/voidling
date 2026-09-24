@@ -833,6 +833,17 @@ const SUITE = [
     cmd: ['node', 'qa/bitetime.mjs', PORT, 'maple'], verdict: pf,
     why: 'every bite is heard within 67 ms of its meal starting to fall — the reward lands when the object drops in, not on contact' },
 
+  // ── RESEARCH GOVERNOR G8: TIME, NOT THE CAMERA, SELLS THE MARQUEE MOMENTS ─
+  // Live and quality only, never push, until the lead has read two greens.
+  // MEASURED: this exact command took 339 s of wall on the fixed build and 334 s
+  // on the build before it, each with another browser probe holding the
+  // machine's other slot — about 100 s for the two lockstep match pages (drawing
+  // stubbed) and about 250 s for the whole 180 s match (drawing off). 1800
+  // leaves over five times that for a machine under load.
+  { id: 'timebeat', tier: 'feel', profiles: ['live', 'quality'], timeout: 1800,
+    cmd: ['node', 'qa/timebeat.mjs', PORT, 'maple'], verdict: pf,
+    why: 'the hero lives through a hit-stop and the world eases out of one; five flashes in 200 ms show two washes; the kill beat is OFF without ?killbeat=1 — and with it the kill freezes 0.14-0.16 s, slows to 0.25, pulses its rays once and leaves her dizzy, halved under reduce motion, never over the whistle, and in a whole match at most 8 freezes that a beat takes past 100 ms' },
+
   { id: 'aftermatch', tier: 'feel', profiles: ['live'], timeout: 420,
     cmd: ['node', 'qa/aftermatch.mjs', PORT], verdict: pf,
     why: 'the menu theme comes home after TIME!, by both ways out' },

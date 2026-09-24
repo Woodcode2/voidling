@@ -76,8 +76,9 @@
 // mouth closed, samples faceState() on every animation frame until the jaw
 // has spent 0.1 s of its hold, and requires a frame below the pre-bite
 // uniformK that comes BEFORE the first frame the jaw is drawn (smile false).
-// It prints whether the bite armed hit-stop: hit-stop runs the rig at 6% of
-// dt for a few frames, which slows the wind-up down and would spread even a
+// It prints whether the bite armed hit-stop: hit-stop runs the rig at 35% of
+// dt for a few frames (heroDt since research governor G8 — it was the world's
+// 6% before), which slows the wind-up down and would spread even a
 // one-frame-late gather over frames ahead of the jaw — so only a run with
 // stop 0 is a test of the frame order at the clamp. dt is clamped to 0.05, so
 // under swiftshader the 60 ms wind-up is one or two frames; that is why it
@@ -339,7 +340,7 @@ if (PORT && !fails.length) {
       const ev0 = window.__stages().ceremonies;
       const ate = window.__eatNearest(0.3);
       if (!ate) { res({ noFood: true }); return; }
-      // did this bite arm hit-stop? (it runs the rig on 6% of dt while it lasts)
+      // did this bite arm hit-stop? (it runs the rig on 35% of dt while it lasts)
       const stop = window.__juiceState().stop;
       const rows = [];
       let hold0 = null;
