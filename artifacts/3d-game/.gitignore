@@ -125,3 +125,10 @@ qa/out/float/
 
 # The goal-chip probe's frames — one per world per dot, regenerated on demand.
 qa/out/hudgoal/
+
+# The mood sheet's frames — qa/moodsheet.mjs writes qa/out/mood/<tag>/, and the
+# gate runs it as moodsheet:maple on every live and quality run. The one set the
+# repo already carries (now/) stays tracked; every other tag is a run, not evidence,
+# and a tracked run churns a fresh set of PNGs into history each time (qa/out/locked/).
+qa/out/mood/*
+!qa/out/mood/now/
