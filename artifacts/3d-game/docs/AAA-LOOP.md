@@ -14,6 +14,34 @@ compacted conversation loses nothing.
 
 ---
 
+## SHIP MODE — the owner, 2026-09-24. This section outranks everything below it.
+
+*"We've used millions of tokens at this point though. Days and months building.
+I feel like we may be over doing it and not going live."* Then, on the plan
+below: *"Ok in everything. … I just don't want to spend weeks."*
+
+**Feature freeze.** Only what launch needs, about two days of dev, then his Mac
+day. The research governor's G11–G29 move to post-launch (docs/POST-LAUNCH.md);
+G11 comes back only if a borrowed older iPhone/iPad stutters, which he will
+check later. Process is lighter: one builder and one review per item, the push
+gate before `main`, no multi-round workflows for small things.
+
+| # | launch item | state |
+|---|---|---|
+| S-1 | Merge G5/G7/G8/G9 to main (push gate) and send him the review pack | in the gate |
+| S-2 | Five menu posters in Maple's floating-island style (Higgsfield credits approved) | generated 2026-09-24 on Maple's recipe (z_image, 3:4); his keep/redo per world, then wired into MENU_ART |
+| S-3 | Skylark, keep the theme and fix it: spread the field (everything sits in the central launch rows), brighter sunrise, more standing balloons, one landmark; his music | he sources the track |
+| S-4 | The hook: a 15-second store clip (the burp after eating the town) and App Store screenshots | |
+| S-5 | His calls on the burp (?burp=1), the kill beat (?killbeat=1), the after-bite squint (flat lines vs ^ ^), the too-big bonk rate | he reviews on Vercel once main moves |
+| S-6 | Mac day: iOS build (Capacitor, `pnpm build:ios`), TestFlight, App Store Connect | owner |
+| S-7 | A short playtest with a few kids, fix what hurts, submit | owner |
+
+He tests on Vercel on an iPhone 17 Pro Max, so the game HAS run on a real iPhone
+GPU through WebKit, the engine the Capacitor app runs in; "nothing has ever run
+on a GPU" below means none of the crew's own measurements.
+
+---
+
 ## How an item moves
 
 1. **Found** — by research, a studio team, a probe, or the owner. Enters as `LEAD`.
