@@ -614,6 +614,35 @@ const SUITE = [
     cmd: ['node', 'qa/halocensus.mjs', PORT, 'pirate'], verdict: pf,
     why: 'no flower, float or painted thing on the bay throws a specular spark past the bloom threshold' },
 
+  // Studio round 4, Job 9 (B7's Lantern half): the other half of the rule —
+  // every light crosses the cut. emitters runs every builder that merges onto
+  // PROP_GLOW_MAT in node and grades each lamp colour's dimmest seen face
+  // against its world's cut at its brightest hour: 20 of 20 colours under
+  // 1.2x before the luminance floor (0.29x-1.10x), all at 1.29x after. Ran in
+  // 3.9 s. pf: it prints its verdicts only at its last lines.
+  { id: 'emitters', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 120,
+    cmd: ['node', 'qa/emitters.mjs'], verdict: pf,
+    why: 'every lamp in every world clears its world\'s bloom cut by 1.2x on the dimmest face the play camera sees, whatever its hue and whatever the hour — a red lantern is a dim number to bloom however bright it looks — and the gain cap holds down no lamp that ships' },
+  // The umbrella's ribs through its paper, its pole off the canopy's axis and
+  // its foot off the ground; the moss rock's moss inside the rock. Built in
+  // node from nightmarket.ts and split by vertex index range: before, 49.0% of
+  // rib vertices outside the paper, the pole 16 of its radii off the apex, the
+  // lowest point 0.059 up, 0.0% of the moss showing; after 0, 0, -0.087 and at
+  // least 93.3%. Exit code, because it prints the umbrella's PASS lines before
+  // it builds a rock.
+  { id: 'propfit', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 60,
+    cmd: ['node', 'qa/propfit.mjs'], verdict: exitCode,
+    why: 'Lantern Night\'s umbrella is one object — ribs under the paper, pole up the canopy\'s axis, foot on the ground — and its moss rock shows its moss and sits on the ground' },
+  // The lamp census in the frame: at least 90% of on-screen lamps with half
+  // their pixels over the cut, and no lamp on a clone of the glow material
+  // (the too-big-to-eat grey cloned lamps and dropped the floor with the
+  // onBeforeCompile). Registered 2026-09-23 WITHOUT having run — no browser was
+  // available to the job that wrote it — so live and quality only, and to push
+  // once a run has been read.
+  ...['lantern', 'powder'].map((w) => ({ id: `lampglow:${w}`, tier: 'art', profiles: ['live', 'quality'], timeout: 1500,
+    cmd: ['node', 'qa/lampglow.mjs', PORT, w], verdict: pf,
+    why: 'the lanterns, windows and hearths light up: nine in ten on-screen lamps feed bloom a halo, and none has been cut off the luminance floor by a material clone' })),
+
   { id: 'roundlod', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/roundlod.mjs'], verdict: pf,
     why: 'no NEW round thing ships under the 14x10 bar island.ts states — the debt is frozen at 153 and visible every run' },

@@ -77,7 +77,9 @@ const GREEN = 0x2f5a3a;      // bamboo, hedges, moss
 const GREEN_L = 0x467a4c;
 const WATER = 0x1a3a52;      // the canal, where a prop has to sit in it
 
-// the glows — unlit, so these are the literal pixels on screen
+// the glows — unlit. These set a lamp's HUE; how bright it shows is island.ts's
+// luminance floor (PROP_GLOW_MAT), the same for every lamp — the red paper was
+// 0.344 on its dimmest seen face against a cut of 1.05 until it had one
 const G_AMBER = 0xffb256;    // the workhorse: most paper lanterns
 const G_WARM = 0xff8a3c;     // deeper orange, the big gate lanterns
 const G_PAPER = 0xfff0d2;    // paper-white, the cooler lanterns in a string
@@ -771,19 +773,44 @@ export function makeSakeBarrels(): THREE.Object3D {
 }
 
 /** An open paper umbrella, leaned against nothing in particular. Two of these
- *  in a frame do more for "this is a spirit market" than twenty crates. */
+ *  in a frame do more for "this is a spirit market" than twenty crates.
+ *
+ *  BUILT UPRIGHT, THEN LEANED ONCE (studio round 4, Job 9). It used to be
+ *  three props that did not meet: the paper tilted about its own centre, the
+ *  pole about its own middle, set off to the side by the tip, and each rib
+ *  with its own Euler angles — whose slope was a turn about world Z after the
+ *  radial turn, so it bent only the ribs lying along X, and the ones along -X
+ *  sloped UP through the paper. Measured by qa/propfit.mjs over 200 builds:
+ *  49.0% of rib vertices outside the paper, reaching 0.58 k past it; the
+ *  pole's line up to 16 of its own radii from the canopy's apex; and the pole
+ *  tilted about its middle lifted its foot, the umbrella's lowest point up to
+ *  0.059 off the ground. Now all three are built in the umbrella's own frame —
+ *  foot at the origin, pole up Y, apex just over the pole's top, each rib
+ *  along its ridge of the cone with its top face pulled 0.01 k under the paper
+ *  (every rib vertex measured 0.006-0.041 k under it) — and one lean,
+ *  Rz(0.7 tip) x Rx(tip) about the foot, turns them together, BEFORE part()
+ *  bakes the skylight, so the colours are keyed to the faces as they finally
+ *  point. About the foot, the foot stays down (lowest point -0.087 at most).
+ *  Math.random draws unchanged: k, tip, the paper colour. */
 export function makeUmbrella(): THREE.Object3D {
   const p: G[] = [];
   const k = rnd(0.85, 1.15), tip = rnd(-0.5, 0.5);
   const col = pick([VERM, VERM_D, PAPER, TILE]);
-  p.push(part(new THREE.ConeGeometry(1.05 * k, 0.62 * k, 12, 1, true), col, 0, 1.72 * k, 0, tip, 0, tip * 0.7));
+  const R = 1.05 * k, H = 0.62 * k, CY = 1.72 * k;     // rim radius, cone height, cone centre
+  const slant = Math.hypot(R, H), slope = Math.atan2(H, R);
+  const lean = new THREE.Matrix4().makeRotationZ(0.7 * tip).multiply(new THREE.Matrix4().makeRotationX(tip));
+  p.push(part(new THREE.ConeGeometry(R, H, 12, 1, true).translate(0, CY, 0).applyMatrix4(lean), col));
+  // a rib at mid-slant, pulled in along the paper's inward normal so its top
+  // face (0.03 deep) sits 0.01 k under it; the ribs follow the cone's twelve
+  // ridges, where the faceted paper is furthest out
+  const D = 0.03, s = slant / 2, under = 0.01 * k + D / 2;
+  const rr = (s * R - under * H) / slant, ry = CY + H / 2 - (s * H + under * R) / slant;
   for (let i = 0; i < 12; i++) {
     const a = (i / 12) * Math.PI * 2;
-    p.push(part(new THREE.BoxGeometry(1.02 * k, 0.03, 0.05), TIMBER_D,
-      Math.cos(a) * 0.5 * k, 1.62 * k, Math.sin(a) * 0.5 * k, tip, -a, tip * 0.7 - 0.28));
+    p.push(part(new THREE.BoxGeometry(1.02 * k, D, 0.05).rotateZ(-slope).rotateY(-a)
+      .translate(Math.cos(a) * rr, ry, Math.sin(a) * rr).applyMatrix4(lean), TIMBER_D));
   }
-  p.push(part(new THREE.CylinderGeometry(0.05, 0.05, 2.1 * k, 6), TIMBER,
-    tip * 1.0 * k, 0.95 * k, tip * 0.7 * k, tip, 0, tip * 0.7));
+  p.push(part(new THREE.CylinderGeometry(0.05, 0.05, 2.1 * k, 6).translate(0, 0.95 * k, 0).applyMatrix4(lean), TIMBER));
   return mergedProp(p);
 }
 
@@ -805,18 +832,38 @@ export function makeSkewerTray(): THREE.Object3D {
 }
 
 /** A mossy boulder. The valley wall is a quarter of the map and it had bamboo
- *  and nothing else; a rim of pure verticals reads as a fence. */
+ *  and nothing else; a rim of pure verticals reads as a fence.
+ *
+ *  THE MOSS WAS INSIDE THE ROCK (studio round 4, Job 9). The cap's top is
+ *  1.11 k; a round dodecahedron of radius k at 0.52 k reaches 1.32-1.52 k
+ *  however it is turned (20,000 random turns), so qa/propfit.mjs measured
+ *  0.0% of the moss's area outside the rock in all 200 builds: a grey
+ *  boulder. The rock is a squashed boulder now, (1.15, 0.62, 1.0) at 0.45 k,
+ *  its top 0.94-1.07 k, and it is turned by the same three draws FIRST and
+ *  squashed after — part() scales before it rotates, so handing it the squash
+ *  and the turn together would give a randomly tipped ellipsoid, some of them
+ *  standing on end. The chunk gets the same, at 0.45 of its own radius.
+ *  Measured: at least 93.3% of the moss outside the rock in every build, no
+ *  rock off the ground. The moss's lowest ring now stands over the rock by up
+ *  to 0.30 of the rock's height (0.16 in the median build) and never past its
+ *  outline — whether that reads as a cushion or a lid is a read of the frame,
+ *  not a number. Math.random draws unchanged, in the same order. */
 export function makeMossRock(): THREE.Object3D {
   const p: G[] = [];
   const k = rnd(0.7, 1.7);
-  p.push(part(new THREE.DodecahedronGeometry(k, 0), STONE_D, 0, k * 0.52, 0,
-    rnd(0, 3), rnd(0, 3), rnd(0, 3)));
+  const rock = new THREE.DodecahedronGeometry(k, 0);
+  rock.rotateX(rnd(0, 3)); rock.rotateY(rnd(0, 3)); rock.rotateZ(rnd(0, 3));
+  p.push(part(rock, STONE_D, 0, k * 0.45, 0, 0, 0, 0, 1.15, 0.62, 1.0));
   // moss on the up-facing side only, which is where moss is
   p.push(part(new THREE.SphereGeometry(k * 0.78, 7, 5, 0, 6.28, 0, 1.0), GREEN,
     rnd(-0.1, 0.1) * k, k * 0.72, rnd(-0.1, 0.1) * k, 0, rnd(0, 3), 0, 1, 0.5, 1));
-  if (Math.random() < 0.35)
-    p.push(part(new THREE.DodecahedronGeometry(k * 0.45, 0), STONE,
-      k * rnd(0.7, 1.1), k * 0.24, k * rnd(-0.6, 0.6), rnd(0, 3), rnd(0, 3), rnd(0, 3)));
+  if (Math.random() < 0.35) {
+    const r2 = k * 0.45;
+    const x = k * rnd(0.7, 1.1), z = k * rnd(-0.6, 0.6);
+    const chunk = new THREE.DodecahedronGeometry(r2, 0);
+    chunk.rotateX(rnd(0, 3)); chunk.rotateY(rnd(0, 3)); chunk.rotateZ(rnd(0, 3));
+    p.push(part(chunk, STONE, x, r2 * 0.45, z, 0, 0, 0, 1.15, 0.62, 1.0));
+  }
   return noFront(mergedProp(p));
 }
 

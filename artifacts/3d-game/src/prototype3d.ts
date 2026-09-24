@@ -27,7 +27,7 @@ import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid, makeVoidBody, applySkinToBody, type Mood } from './proto3d/void3d';
-import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, onIce3, setWorld, setMeshFade, fadeStats, installPropShader, part, mergedProp, qaClaimsNear, qaClaimStats, qaClaimAt, type WorldId } from './proto3d/island';
+import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, onIce3, setWorld, setMeshFade, fadeStats, installPropShader, part, mergedProp, qaClaimsNear, qaClaimStats, qaClaimAt, PROP_GLOW_MAT, setGlowFloor, type WorldId } from './proto3d/island';
 import { groundFootprint } from './proto3d/footprint';
 import { createLife, pickFresh, type Life } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
@@ -2065,6 +2065,10 @@ const BLOOM_FLOOR = 1.05;
 const bloomCut = (): number => Math.max(BLOOM_FLOOR, (LIGHT.bloomCut ?? BLOOM_FLOOR) * hourSunK);
 function applyLightRig(): void {
   if (bloomPass) bloomPass.threshold = bloomCut();
+  // every lamp's dimmest face rides the cut, on every rung — see PROP_GLOW_MAT
+  // (island.ts). Without a composer there is no halo, and the lift only
+  // brightens the tone-mapped core.
+  setGlowFloor(bloomCut());
   sun.intensity = RIG.sunI * hourSunK;
   hemi.intensity = hemiNow();
   // the fill rides the same dimmer as the key, so a world that dims at dusk
@@ -13941,6 +13945,18 @@ function animate() {
       e.mesh.traverse((o) => {
         const mm = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
         if (!mm || !mm.color) return;
+        // ── A LAMP IS NOT GREYED (studio round 4, Job 9) ────────────────────
+        // This walk reached the lit half of a lit() prop too, and did two
+        // things to it. The clone below drops onBeforeCompile, which is where
+        // PROP_GLOW_MAT's luminance floor lives (island.ts) — and un-gating
+        // restores the colour but keeps the clone, so a lantern gated once was
+        // off the floor for the rest of the match. And on a lamp the grey is
+        // only a dimmer: the multiplier it lerps is a neutral 1.75, which comes
+        // out at 1.077/1.077/1.097 (three's Color, as this runs it), 61.6% of
+        // the lamp's luminance — so the gate switched the lights off exactly on
+        // the big lantern stalls round a small void. The solid half of the prop
+        // still wears the grey; its light stays a light.
+        if (mm === (PROP_GLOW_MAT as THREE.Material)) return;
         if (tooBig) {
           if (!o.userData.baseCol) o.userData.baseCol = mm.color.clone();
           // clone the material once per gated mesh, or every prop sharing the
