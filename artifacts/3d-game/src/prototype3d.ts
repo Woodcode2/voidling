@@ -59,6 +59,7 @@ import { allLevels, current as levelCurrent, recordLevelResult, trackLevelStart,
 import { ensurePipDefs, pipRow, pipHead, pip, PIP_WORD,
   PIP_FLIP_MS, PIP_HOP_MS, PIP_REVEAL_STEP_MS } from './proto3d/pips';
 import { recentEvents } from './proto3d/telemetry';
+import { createEvoHold } from './proto3d/evohold';
 import { bumpMatch, deal, type Deal } from './game/matchdeck';
 // the district ids this world's newsroom knows, so a biome from another world
 // can never be handed to it as a key
@@ -3490,7 +3491,7 @@ const _dbg = new Proxy(_dbgStore, {
     band: Record<string, { n: number; rMin: number; rMax: number }> };
   __renderBloom: () => void;
   __composer: () => unknown;
-  __juiceState: () => { fov: number; fovKick: number; stop: number; puffs: number; buzzes: number };
+  __juiceState: () => { fov: number; fovKick: number; stop: number; puffs: number; buzzes: number; stopCd: number; kitCd: number };
   __eatNearest: (rel: number) => { r: number; R: number } | null;
   __quality: () => { level: number; pinned: number | null; shadows: boolean; shSize: number; pr: number };
   __warpVoid: (x: number, z: number) => void;
@@ -3498,7 +3499,7 @@ const _dbg = new Proxy(_dbgStore, {
   __setMood: (m: string | null) => void;
   __faceState: () => { mood: string; maw: number; smile: boolean; biting: boolean;
     hold: number; move: number; lid: number; shut: number; uniformK: number };
-  __stages: () => { cur: number; best: number; ceremonies: number };
+  __stages: () => { cur: number; best: number; ceremonies: number; held: number[]; owed: number };
   __voidSetMenuR: (r: number) => void;
   __dioMark: () => number;
   __bite: (hunter?: boolean) => void;
@@ -3566,6 +3567,11 @@ _dbg.__juiceState = () => ({
   fov: camera.fov, fovKick, stop: stopT,
   puffs: puffLife.reduce((n, l) => n + (l > 0 ? 1 : 0), 0),
   buzzes: buzzN,
+  // the two cooldowns a swallow's hit-stop has to get past — hitStop()'s own
+  // (on dt) and the landmark kit's (on wall time). qa/juice.mjs (a) waits for
+  // both to clear before it forces its bite, so another meal's swallow cannot
+  // have spent them.
+  stopCd, kitCd,
 });
 // QA: force-eat the nearest edible at least `rel` of the void's radius —
 // drives the REAL capture() path (hit-stop, lens punch, kick, particles,
@@ -3742,7 +3748,10 @@ _dbg.__faceState = () => voidling.faceState();
 // QA: how many EVOLVED ceremonies have played, and the two stage counters
 // behind them. A demotion walks curStage back; bestStage does not move, so the
 // ceremony cannot re-fire on the way home. qa/evolveonce.mjs reads this.
-_dbg.__stages = () => ({ cur: curStage, best: bestStage, ceremonies: evolveCeremonies });
+// `held` and `owed` are the evolution hold's: the forms bites in the drain
+// earned, oldest first, and the highest one earned by a meal already down and
+// not yet shown (proto3d/evohold.ts).
+_dbg.__stages = () => ({ cur: curStage, best: bestStage, ceremonies: evolveCeremonies, ...evoHold.state() });
 // QA: take a bite, through the REAL handler rather than a copy of it. A FORM
 // bite is the only thing in the game that walks a form back, and nothing else
 // can reproduce the bug it used to cause. form rides hunter here so existing
@@ -5175,6 +5184,12 @@ rivals.onPlayerBitten = (name, hit) => {
   // bottom of the ladder.
   let demoted = false;
   if (hit.form) {
+    // …and a form a meal in the drain had earned goes with the size. Held,
+    // it would come due on that meal's swallow and promote a child who has
+    // just been knocked down to the bottom of her form — the ceremony
+    // qa/evolveonce.mjs exists to keep off a setback. She gets it, ceremony
+    // and all, when she grows back into it.
+    evoHold.clear();
     const st = stageFor(voidling.radius);
     const down = Math.max(START_R, (FORM_MIN[Math.max(0, st - 1)] || START_R) * 1.02);
     voidling.setRadius(Math.max(START_R, Math.min(voidling.radius * hit.shrink, down)));
@@ -8812,10 +8827,12 @@ const biteLog: BitePay[] = [];
 /** THE FORM WAITS FOR THE MEAL THAT EARNED IT. The growth is booked at capture,
  *  so the frame loop saw the new form on the very next frame and the EVOLVED
  *  ceremony went off while the meal that earned it was still out at the rim.
- *  This is the capture whose growth first crossed a form she had not reached
- *  this match; the ceremony holds until the drain lets go of it. See the
- *  ceremony block in animate() for the three ways the hold lets go early. */
-let evoFor: Edible | null = null;
+ *  capture() writes down the form each bite earned (bite), the drain says when
+ *  the meal is down (down), and the ceremony block asks which form it may show
+ *  (due). The rules, and why the form is written down at the bite rather than
+ *  read off the radius at the swallow, are in proto3d/evohold.ts;
+ *  qa/evohold.mjs steps them. */
+const evoHold = createEvoHold<Edible>();
 // ── POWDER PASS: THE SNOW SHELL ────────────────────────────────────────────
 // Carving through a snowdrift packs a white shell on the void, and while it
 // holds the void eats ONE SIZE CLASS UP (EAT_RATIO 1.11 -> 1.61). This is the
@@ -8878,11 +8895,13 @@ function capture(e: Edible, giveHunger = true) {
     }
   }
   voidling.setRadius(growRadius(voidling.radius, e.radius));   // area-based growth
-  // A form she has not reached this match, earned by this meal: the ceremony
-  // waits for it to be swallowed (see evoFor). Only the FIRST such bite is
-  // held for — were each later one to take the hold over, a void eating every
-  // frame would never be let go of.
-  if (!(evoFor && evoFor.eaten) && stageFor(voidling.radius) > bestStage) evoFor = e;
+  // THE FORM THIS MEAL EARNED, read HERE, on the grown radius: the growth
+  // law's rate limiter sets the radius back to lastR + maxStep at the top of
+  // the next frame, so by the swallow this bump is gone and the radius can no
+  // longer say which form the bite earned. A form above everything shown or
+  // owed waits for this meal's swallow (see evoHold); only the first bite into
+  // a form is held for it, so a spree cannot keep pushing the form back.
+  evoHold.bite(e, stageFor(voidling.radius), curStage, bestStage);
   // (the lunge and the landmark kit — hit-stop, lens, recoil — are paid on the
   // swallow now: biteGulps, below)
   combo++; comboT = 1.6;
@@ -9142,14 +9161,21 @@ function biteSinks(e: Edible, pay: BitePay) {
   // own capture it was told "not the end", and it would play its CHOMP or its
   // crown over the whistle (qa/endbeat.mjs (a)).
   const beat = endBeat();
-  // a building-sized meal says 'yum' as it goes down
-  if (pay.r > 2) audio.voice('yum');
+  // a building-sized meal says 'yum' as it goes down — but not over the
+  // whistle. On the capture frame it could only land a frame before it; on
+  // the sink, with the outro running the drain at 0.3x, it lands inside it.
+  if (pay.r > 2 && !beat) audio.voice('yum');
   floatPos.set(e.mesh.position.x, voidling.radius + 2, e.mesh.position.z);
   if (pay.head && !beat) {
     bubbles.float(floatPos, 'CHOMP!', true); audio.chomp(pay.r, pay.vr, 'prop', pay.combo); buzz(30); pay.snd = 'chomp';
   } else if (pay.head) { audio.chomp(pay.r, pay.vr, 'prop', pay.combo, true); buzz(15); pay.snd = 'plain'; }
   else { audio.pop(pay.combo, pay.r, pay.vr); buzz(pay.r > 2 ? 15 : 8); pay.snd = 'pop'; }
   pay.sndT = tClock;
+  // The pop's pitch is the link THIS bite was (pay.combo), so the ladder now
+  // climbs in the order meals go DOWN, not the order they were taken: a crumb
+  // drains faster than a meal, so a crumb taken just after a meal can sink
+  // first and sound the higher link ahead of the lower one. Left so: the
+  // crown below must name the link the bite was, and one counter serves both.
   // The decimal 'COMBO ×1.5' that stood here is gone: a six-year-old does not
   // read a decimal. The chain is counted in NOMS instead, on the pill, and
   // every tenth link is a crown she can hear — the link THIS bite was, not
@@ -11017,6 +11043,10 @@ function validateWorld() {
     if (started && e.mesh.visible) { spawnPuff(e.mesh.position.x, 0.6, e.mesh.position.z, 5); }
     setShadowInstance((e.mesh.userData.shIdx as number) ?? -1, false);   // and its shadow
     scene.remove(e.mesh);
+    // Taken out of `edibles` mid-drain, a meal is never swallowed: the drain
+    // walks `edibles`. Its growth was booked at capture, so a form it earned
+    // is owed now rather than held until the end beat lets go.
+    if (e.eaten) evoHold.down(e);
     edibles.splice(cull[k], 1);
   }
   if ((moved || cull.length || cleared) && !_validated) console.info(`[world] placement sweep: ${moved} nudged off roads, ${cull.length} retired (${settleStat.inside} inside a solid, ${settleStat.through} through another, ${settleStat.doorstep} on a doorstep; settle ${settleStat.ms}ms over ${settleStat.feet} footprints), ${cleared} cleared from the spawn shot`);
@@ -11191,7 +11221,7 @@ function resetMatch() {
   // matchLen further down, so pass the length it is ABOUT to choose — reading
   // the live one here would scale the new match's joins to the old match's clock.
   rivals.reset(soloFor(soloWanted) ? 120 : MATCH_LEN);
-  curStage = 0; bestStage = 0; evolveCeremonies = 0; evoFor = null;
+  curStage = 0; bestStage = 0; evolveCeremonies = 0; evoHold.clear();
   voidling.setStage(0); voidling.setRadius(START_R);
   // FIXED START, deliberately. A replay review argued for randomising this —
   // every match opening on the same twenty seconds is real repetition — but the
@@ -14417,6 +14447,9 @@ function animate() {
         // stops, the burst, the lunge. Cleared first, so it is paid once.
         const pay = e.pay;
         if (pay) { e.pay = undefined; if (pay.sink < 0) biteSinks(e, pay); biteGulps(e, pay); }
+        // …and a form this meal earned is owed from this frame; the ceremony
+        // block below, later in the same frame, shows it
+        evoHold.down(e);
         // the puff marks where the THING went, not where the void is standing
         spawnPuff(p.x, Math.max(0.2, cy * 0.4), p.z, 6);
         scene.remove(e.mesh); e.eaten = false;
@@ -14831,23 +14864,28 @@ function animate() {
   } else {
   // evolution: form change on growth (with a flash), plus ring/glow via setStage
   const forced = _forceEvolve;
-  const ns = forced ? Math.min(FORMS.length - 1, curStage + 1) : stageFor(voidling.radius);
   if (forced) _forceEvolve = false;
   // ── …WHEN THE MEAL THAT EARNED IT IS DOWN ─────────────────────────────
-  // evoFor is the bite whose growth crossed into a form she had not reached;
-  // this block runs after the drain in the same frame, so the ceremony lands
-  // on the frame that bite is swallowed. The hold lets go early three ways:
-  // __forceEvolve (qa/juice.mjs (b) forces a form through here and gives the
-  // face three frames to answer it — a hold would eat the force); the end beat
-  // (endBeat() — the outro slows the drain to 0.3x and ends the match two
-  // seconds on, and a meal still in the air then would either keep the new
-  // form off the results card or, let go after it, play the ceremony over the
-  // card; in the end beat the form changes at once and evolve() stays silent,
-  // as it did before the hold); and a drain that let go of the meal any
-  // other way (the rematch restore puts it back un-eaten). While the match is
-  // paused the drain is paused too, so the hold simply waits with it.
-  if (evoFor && !evoFor.eaten) evoFor = null;
-  if (ns > curStage && (forced || !evoFor || endBeat())) {
+  // The form is the radius's own, or the form a swallowed bite earned at its
+  // capture, whichever is higher — never above a form whose meal is still in
+  // the drain (proto3d/evohold.ts). The earned form is the one that counts:
+  // the growth law's rate limiter sets the radius back to lastR + maxStep on
+  // the frame after the bite, so reading the radius alone here let go of the
+  // hold with no ceremony at all (qa/evohold.mjs: in each of its ten cases
+  // with the limiter on, the radius was back under the threshold by the
+  // swallow). This block runs after the drain in the
+  // same frame, so the form lands on the frame the meal that earned it is
+  // swallowed. Two things do not wait: __forceEvolve (qa/juice.mjs (b) forces
+  // a form through here and gives the face three frames to answer it), and the
+  // end beat, which owes every held form at once — the outro slows the drain
+  // to 0.3x and ends the match two seconds on, and a meal still in the air
+  // then would either keep the new form off the results card or, let go after
+  // it, play the ceremony over the card; in the end beat the form changes at
+  // once and evolve() stays silent, as it did before the hold. While the match
+  // is paused the drain is paused too, so the hold waits with it.
+  const earned = evoHold.due(stageFor(voidling.radius), curStage, bestStage, endBeat());
+  const ns = forced ? Math.min(FORMS.length - 1, curStage + 1) : earned;
+  if (ns > curStage) {
     curStage = ns;
     // Recovering to a form you have already reached is not an evolution. See
     // bestStage above — everything below this line is ceremony.
