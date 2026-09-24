@@ -667,10 +667,12 @@ const SUITE = [
   // The lamp census in the frame: at least 90% of on-screen lamps with half
   // their pixels over the cut, and no lamp on a clone of the glow material
   // (the too-big-to-eat grey cloned lamps and dropped the floor with the
-  // onBeforeCompile). Registered 2026-09-23 WITHOUT having run — no browser was
-  // available to the job that wrote it — so live and quality only, and to push
-  // once a run has been read.
-  ...['lantern', 'powder'].map((w) => ({ id: `lampglow:${w}`, tier: 'art', profiles: ['live', 'quality'], timeout: 1500,
+  // onBeforeCompile). First run 2026-09-24: Lantern on main FAIL (71 lamps on a
+  // clone), on the branch PASS (6 of 6 on-screen lamps halo, none cloned).
+  // Powder is not registered: its spawn frame holds no lamp of 32 px or more in
+  // daylight, so the probe measured nothing on either build — a spawn with no
+  // lamp in view cannot answer this. Live and quality until a second green.
+  ...['lantern'].map((w) => ({ id: `lampglow:${w}`, tier: 'art', profiles: ['live', 'quality'], timeout: 1500,
     cmd: ['node', 'qa/lampglow.mjs', PORT, w], verdict: pf,
     why: 'the lanterns, windows and hearths light up: nine in ten on-screen lamps feed bloom a halo, and none has been cut off the luminance floor by a material clone' })),
 
