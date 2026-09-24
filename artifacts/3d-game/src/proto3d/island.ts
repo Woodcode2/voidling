@@ -23,6 +23,7 @@ import * as NM from './nightmarket';
 import * as TG from './tailgate';
 import * as LUXE from './luxe';
 import * as MS from './mainstreet';   // MAPLE FALLS prop kit + its seeded RNG
+import { voiced } from './eatvoice';   // what a prop says when it is eaten (G5)
 // QA: the placement hash's own view of the island, for qa/placement.mjs. All
 // six worlds funnel through this one store (mainstreet re-exports bay's), so
 // one pair of hooks answers for every world.
@@ -5177,7 +5178,7 @@ function makeTree(): THREE.Group {
     part(new THREE.SphereGeometry(R0 * 0.62, 12, 9), light, -R0 * 0.5, 5.6, -R0 * 0.25),
     part(new THREE.SphereGeometry(R0 * 0.5, 11, 8), base, 0.2, 6.4, 0.2),
   ], PROP_SMOOTH_MAT));
-  return noFront(grp);
+  return voiced(noFront(grp), 'rustle');
 }
 function makePine(): THREE.Group {
   // 7 segments put a 107-pixel straight edge across the widest tier. 14 halves
@@ -5200,7 +5201,7 @@ function makePine(): THREE.Group {
       TIER[i] === 1 ? PROPS.pine : shade(PROPS.pine, TIER[i]), 0, 3 + i * 2.1, 0));
   }
   const grp = new THREE.Group(); grp.add(mergedProp(parts, PROP_SMOOTH_MAT));
-  return noFront(grp);
+  return voiced(noFront(grp), 'rustle');
 }
 // ══ PIRATE BAY prop kit ═══════════════════════════════════════════════════
 // A tiki bar, a dance speaker stack, a market stall, a treasure chest, a
@@ -5609,7 +5610,7 @@ function makePalm(): THREE.Group {
   for (const a2 of [0.5, 2.6])
     parts.push(part(new THREE.SphereGeometry(0.26, 8, 6), 0x8a6a4a,
       0.6 + Math.cos(a2) * 0.5, 5.8, Math.sin(a2) * 0.5));
-  const grp = new THREE.Group(); grp.add(mergedProp(parts)); return noFront(grp);
+  const grp = new THREE.Group(); grp.add(mergedProp(parts)); return voiced(noFront(grp), 'rustle');
 }
 
 function makeBush(): THREE.Mesh {
@@ -5637,11 +5638,11 @@ function makeBush(): THREE.Mesh {
   const dark = shade(base, 0.76);
   const light = tint(base, 0.20);
   const R = rand(1.4, 2.1);
-  return noFront(mergedProp([
+  return voiced(noFront(mergedProp([
     part(new THREE.SphereGeometry(R * 0.80, 12, 8), base, 0, R * 0.05, 0, 0, 0, 0, 1, 0.78, 1),
     part(new THREE.SphereGeometry(R * 0.58, 10, 7), dark, -R * 0.44, R * 0.02, R * 0.26, 0, 0, 0, 1, 0.72, 1),
     part(new THREE.SphereGeometry(R * 0.52, 10, 7), light, R * 0.42, R * 0.16, -R * 0.22, 0, 0, 0, 1, 0.74, 1),
-  ], PROP_SMOOTH_MAT));
+  ], PROP_SMOOTH_MAT)), 'rustle');
 }
 function makeMailbox(): THREE.Group {
   const g = new THREE.Group();

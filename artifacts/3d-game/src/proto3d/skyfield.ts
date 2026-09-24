@@ -60,6 +60,7 @@
 // ══════════════════════════════════════════════════════════════════════════
 import * as THREE from 'three';
 import { part, mergedProp, PROP_GLOW_MAT } from './island';
+import { voiced } from './eatvoice';
 
 // ── the palette ────────────────────────────────────────────────────────────
 // The field's own colours are cold and drained. Nothing in this block is
@@ -131,14 +132,24 @@ function goreDome(cols: [number, number, number], r: number, h: number, gores = 
 // ── BAGGED — a fridge-sized roll of fabric on the grass, strapped. The lowest
 //    stage, and the one that says "this has not started yet". From above: a
 //    small bright oblong with two dark straps across it.
+//
+//    IT SQUEAKS WHEN EATEN, AND THE FACTORY SAYS SO. Every other envelope
+//    reaches the classifier (prototype3d.ts eatVoiceOf) with island.ts's
+//    `balloon` papers on it. The 57 bags in the arrivals scatter do not: they
+//    go down as plain qk 'big', and 'big' is the building rule, so they
+//    crumbled like a hangar while the same mesh dropped through tagBalloon
+//    squeaked (qa/eatvoice.mjs (r), which reads a prop's shape against its
+//    voice). The papers are not the fix — tagBalloon numbers the envelope and
+//    puts it in the ascension's roll call (life.ts), which is gameplay. The
+//    tag is a userData write after the geometry is built: no draw moves.
 export function skBalloonBagged(cols: [number, number, number] = ENVELOPE[0]): THREE.Object3D {
-  return mergedProp([
+  return voiced(mergedProp([
     part(cyl(0.5, 0.5, 10), cols[0], 0, 0.55, 0, 0, 0, Math.PI / 2, 1.1, 2.4, 1.1),
     part(cyl(0.5, 0.5, 10), cols[1], 0.75, 0.55, 0, 0, 0, Math.PI / 2, 1.05, 0.5, 1.05),
     part(box(), SKIRT_D, 0.35, 0.55, 0, 0, 0, 0, 0.14, 1.18, 1.18),
     part(box(), SKIRT_D, -0.45, 0.55, 0, 0, 0, 0, 0.14, 1.18, 1.18),
     part(box(), WICKER_D, 0, 0.06, 0, 0, 0, 0, 2.5, 0.12, 1.2),
-  ]);
+  ]), 'squeak');
 }
 
 // ── SPILLED — a long flat gore-striped crescent laid out on the grass, two to
@@ -430,9 +441,16 @@ export function skMetHut(): THREE.Object3D {
 }
 
 /** An old touring caravan with its awning out and a whiteboard — the briefing
- *  room, and the only place on the field with a kettle. */
+ *  room, and the only place on the field with a kettle.
+ *
+ *  It meeps when eaten, like the ticket caravan at arrivals: the same build on
+ *  the same two wheels. That one reaches the classifier as kind 'caravan',
+ *  which island.ts writes because life.ts's ticket sellers look it up by kind
+ *  (`byKind('caravan')[0]`); this one had no kind, fell through to qk 'house'
+ *  and crumbled. It is tagged here rather than given the kind, so the sellers'
+ *  lookup still finds exactly one caravan. */
 export function skBriefingCaravan(): THREE.Object3D {
-  return mergedProp([
+  return voiced(mergedProp([
     part(box(), CANVAS_W, 0, 1.05, 0, 0, 0, 0, 3.2, 1.35, 1.7),
     part(box(), 0x9fb6c8, 0, 1.78, 0, 0, 0, 0, 3.0, 0.30, 1.6),
     part(box(), SKIRT_D, 0, 1.95, 0, 0, 0, 0, 3.3, 0.14, 1.85),
@@ -444,7 +462,7 @@ export function skBriefingCaravan(): THREE.Object3D {
     part(box(), CHALK, -1.75, 1.20, 0, 0, 0, 0, 0.08, 0.90, 1.20),
     part(cyl(0.5, 0.5, 10), SKIRT_D, 0.85, 0.34, 0.88, 0, 0, Math.PI / 2, 0.66, 0.22, 0.66),
     part(cyl(0.5, 0.5, 10), SKIRT_D, 0.85, 0.34, -0.88, 0, 0, Math.PI / 2, 0.66, 0.22, 0.66),
-  ]);
+  ]), 'meep');
 }
 
 /** A flagpole with a limp flag, and a windsock hanging straight down. BOTH ARE
@@ -769,7 +787,9 @@ export function skTussock(): THREE.Object3D {
     p.push(part(cone(5), i % 2 ? 0x6f7d5e : GRASS_D, Math.cos(a) * 0.18, 0.28, Math.sin(a) * 0.18,
       Math.cos(a) * 0.25, 0, Math.sin(a) * 0.25, 0.20, 0.62, 0.20));
   }
-  return mergedProp(p);
+  // the field's own greenery rustles when eaten, like a tree does elsewhere —
+  // an airfield has no trees (eatvoice.ts)
+  return voiced(mergedProp(p), 'rustle');
 }
 
 export function skWildflowerClump(): THREE.Object3D {
@@ -780,16 +800,16 @@ export function skWildflowerClump(): THREE.Object3D {
     p.push(part(cyl(0.02, 0.03, 4), 0x6f7d5e, Math.cos(a) * r, 0.22, Math.sin(a) * r, 0, 0, 0, 1, 0.45, 1));
     p.push(part(sph(), petals[i % 3], Math.cos(a) * r, 0.46, Math.sin(a) * r, 0, 0, 0, 0.16, 0.10, 0.16));
   }
-  return mergedProp(p);
+  return voiced(mergedProp(p), 'rustle');
 }
 
 export function skThistle(): THREE.Object3D {
-  return mergedProp([
+  return voiced(mergedProp([
     part(cyl(0.03, 0.05, 5), 0x6f7d5e, 0, 0.34, 0, 0, 0, 0, 1, 0.68, 1),
     part(sph(), 0x8f7fb8, 0, 0.72, 0, 0, 0, 0, 0.22, 0.26, 0.22),
     part(cone(6), 0x6f7d5e, 0, 0.60, 0, 0, 0, 0, 0.22, 0.20, 0.22),
     part(box(), 0x6f7d5e, 0.14, 0.30, 0, 0, 0, 0.7, 0.26, 0.05, 0.10),
-  ]);
+  ]), 'rustle');
 }
 
 /** THE SKYLARK. The world is named after it, so it must be findable and it

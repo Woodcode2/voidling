@@ -21,6 +21,7 @@ import * as PW from './powder';
 import * as AL from './alpine';
 import * as SK from './skylark';
 import * as SKF from './skyfield';
+import { voiced } from './eatvoice';
 // MAPLE FALLS speaks for itself: newsroom_maple exports its townsfolk voices in
 // exactly the shape of the VOICE_AMBIENT / VOICE_PANIC pools below, keyed by
 // the same voice ids the cast carries (politician, protester, gossip, farmer,
@@ -2749,6 +2750,10 @@ function makeAnimal(): THREE.Group {
     }
     const tail = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), mat);
     tail.position.set(-2.5, 1.9, 0); g.add(tail);
+    // the sheep bleats when eaten; the elephant and the lion stay silent — a
+    // lion's roar going into the void is the one reading of this pen that is
+    // not a joke (eatvoice.ts)
+    voiced(g, 'baa');
   }
   return g;
 }
@@ -5982,6 +5987,7 @@ export function createLife(
     head.position.set(0.42, 0.78, 0); duck.add(head);
     const beak = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.26, 6), sharedMat(0xff9a3a, 0.8));
     beak.rotation.z = -Math.PI / 2; beak.position.set(0.68, 0.75, 0); duck.add(beak);
+    voiced(duck, 'quack');   // the town's own duck() voice, when one is eaten (eatvoice.ts)
     const rec = addWanderer(duck, 128.25 + rand(-9, 9), -33.15 + rand(-9, 9), 11, rand(1.5, 2.5), 20, 1.2, 'park');
     if (rec) duckLine.push(rec.mesh);
     if (i > 0 && duckLine.length === i + 1) {

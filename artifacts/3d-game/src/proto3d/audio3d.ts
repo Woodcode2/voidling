@@ -24,6 +24,7 @@ import { worldId } from './island';
 // above the body of the track (measured, qa/trackprofile.mjs), and the old
 // whole-buffer crossfade re-fired that hit every three and a half minutes.
 import MUSIC_MANIFEST from './music-manifest.json';
+import type { EatVoice } from './eatvoice';
 
 type Ctx = AudioContext;
 
@@ -41,6 +42,15 @@ export interface Audio3D {
   hit(): void;                     // took a shot
   alert(): void;                   // danger, and only danger: a charge, the first-run danger teach
   bigEat(): void;                  // crunching a building
+  /** WHAT YOU EAT TALKS BACK (research governor G5). The meal's own voice,
+   *  laid under its pop: a car meeps, a townsperson goes wheee, a goat bleats,
+   *  a house crumbles, a tree rustles, a paper lantern crinkles and pings, a
+   *  balloon squeaks, snow goes poof, a duck quacks. At most one every 0.35 s,
+   *  6 dB or more under the pop it rides with and 0.4x of that once the chain
+   *  passes 8, so the tuned note always stays on top. Returns the voice it
+   *  actually played, or null when the gate held it — the game logs what
+   *  sounded, not what was asked (prototype3d.ts, 'eat:<voice>'). */
+  eatVoice(kind: EatVoice, mealR?: number, voidR?: number, combo?: number): EatVoice | null;
   /** the HEADLINE bite — a CHOMP, or a rival devoured. Keeps the tuned note and
    *  lays a crunch and a gulp over it, all above 250 Hz (see the method).
    *  `plain` keeps only the tuned note, still let past pop()'s 75 ms gate: the
@@ -122,6 +132,53 @@ export interface Audio3D {
     theme: { wanted: boolean; loading: boolean; bad: boolean; cold: boolean; dur: number; gain: number; srcs: number; starts: number };
     menu: { wanted: boolean; loading: boolean; bad: boolean; cold: boolean; dur: number; gain: number; srcs: number; starts: number };
   };
+}
+
+// ── THE EAT'S OWN DICE ──────────────────────────────────────────────────────
+// The pop's transient now varies and the meals' voices vary, and they do it
+// on these dice rather than on Math.random. Not because Math.random is the
+// world's stream — the world's is mulberry32 in mainstreet.ts, and this file
+// never touches it — but because the probes that SEED Math.random to hold a
+// world or a render still (qa/chomp.mjs, the A/B shooters) would see every
+// draw after the first bite move. So a bite draws from Math.random exactly
+// what it drew before (noise()'s buffer offset); the one new draw is the
+// quack's, which is the ambience's own duck() deciding two quacks or three.
+// A xorshift of its own, seeded once per page from the clock, and kept at
+// module scope so every createAudio() on the page shares it: qa/eatvoice.mjs
+// seeds Math.random identically for ten renders of one pop and reads the
+// transient's spread, which is only there if these dice are not reset with it.
+let eatDice = ((Date.now() ^ 0x5bd1e995) >>> 0) || 0x9e3779b9;
+const eatRand = (): number => {
+  eatDice ^= eatDice << 13; eatDice >>>= 0;
+  eatDice ^= eatDice >>> 17;
+  eatDice ^= eatDice << 5; eatDice >>>= 0;
+  return eatDice / 4294967296;
+};
+// ── THE TRANSIENT'S FOUR TAKES, DEALT FROM A BAG ──────────────────────────
+// The spec's "cutoff x 2^(+-70/1200), gain +-1.5 dB", read as written: two
+// cutoffs and two levels, four takes. The first cut drew each factor uniformly
+// from INSIDE those ranges. Its own runs were not kept, so it was put back and
+// run again for the record: three runs of qa/eatvoice.mjs read the transient's
+// centroid SD over ten pops in a row at 2.00%, 3.05% and 2.13% — one pass in
+// three against the spec's own bar of 3% — and its level SD at 0.67, 0.87 and
+// 0.78 dB against (h2)'s 1.0. As they had to: a uniform spread's SD is
+// 1/sqrt(3) of its reach, 40 cents of the 70 and 0.87 dB of the 1.5. At the
+// reach itself every take is 70 cents (4.1%) and 1.5 dB from the centre.
+// DEALT, not rolled, for the same reason and for the ear: rolled, the same take
+// comes up four bites running once in every 64 fours, which is the machine-gun
+// this exists to break. So every four bites use each take once, and a new bag
+// never opens on the take the last one closed with.
+const TAKES: [number, number][] = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+let takeBag: number[] = [];
+let lastTake = -1;
+function nextTake(): [number, number] {
+  if (!takeBag.length) {
+    takeBag = [0, 1, 2, 3];
+    for (let i = 3; i > 0; i--) { const j = Math.floor(eatRand() * (i + 1)); [takeBag[i], takeBag[j]] = [takeBag[j], takeBag[i]]; }
+    if (takeBag[3] === lastTake) [takeBag[3], takeBag[0]] = [takeBag[0], takeBag[3]];
+  }
+  lastTake = takeBag.pop()!;
+  return TAKES[lastTake];
 }
 
 export function createAudio(): Audio3D {
@@ -364,7 +421,7 @@ export function createAudio(): Audio3D {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) unlock(); });
 
   // helpers
-  function tone(freq0: number, freq1: number, dur: number, type: OscillatorType, vol: number, when = 0) {
+  function tone(freq0: number, freq1: number, dur: number, type: OscillatorType, vol: number, when = 0, dest?: AudioNode) {
     const c = ensure(); if (!c || !master) return;
     const t = c.currentTime + when;
     const o = c.createOscillator(), g = c.createGain();
@@ -374,10 +431,10 @@ export function createAudio(): Audio3D {
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(vol, t + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
-    o.connect(g); g.connect(master);
+    o.connect(g); g.connect(dest ?? master);
     o.start(t); o.stop(t + dur + 0.05);
   }
-  function noise(dur: number, vol: number, fc0: number, fc1: number, when = 0) {
+  function noise(dur: number, vol: number, fc0: number, fc1: number, when = 0, dest?: AudioNode) {
     const c = ensure(); if (!c || !master) return;
     const t = c.currentTime + when;
     // ── ONE SHARED BUFFER, NOT ONE PER CALL ────────────────────────────────
@@ -394,7 +451,7 @@ export function createAudio(): Audio3D {
     f.frequency.exponentialRampToValueAtTime(Math.max(60, fc1), t + dur);
     const g = c.createGain(); g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
-    src.connect(f); f.connect(g); g.connect(master);
+    src.connect(f); f.connect(g); g.connect(dest ?? master);
     src.start(t, off, dur + 0.05);
   }
   /** a short bandpassed burst read from the shared white buffer — one grain of
@@ -901,6 +958,256 @@ export function createAudio(): Audio3D {
   // indistinguishable from a synth that makes no sound.)
   let lastPop = -1;
   const voiceCd: Record<string, number> = {};
+
+  // ══ THE BITE HAS A SIDE, AND THE MEAL HAS A VOICE (research governor G5) ══
+  // Two things were identical on every bite of a match: where the bite was,
+  // and what it was. pop() went straight to master, so all two hundred of a
+  // match's bites sat on one point dead centre, and a car, a person, a sheep
+  // and a chalet made the same noise apart from its depth.
+  //
+  // THE SIDE. Each bite takes the other side of the stereo field from the last
+  // one, at +-0.25 — a hoover spree walks left, right, left under the note
+  // instead of stacking on one spot. The panner is equal-power, so at +-0.25
+  // the two channels carry 0.556 and 0.831 of a mono input: 3.5 dB apart, and
+  // together 3 dB under what the destination's own mono up-mix used to put in
+  // them (1 and 1). The sqrt(2) trim in front hands that 3 dB back, so a bite
+  // carries exactly the power it did before it had a side — louder on its own
+  // side by 1.4 dB, 2.1 dB quieter on the other. On a mono render (qa/chomp.mjs
+  // renders one channel) the down-mix of the pair comes back at 0.98 of what it
+  // was. Two panners for the whole session, built on the first bite and left
+  // connected, like fxFor()'s filters: a bite costs no node it did not before.
+  //
+  // THE VOICE rides the same side as the bite it belongs to, through a band
+  // of its own: a high-pass at 300 Hz and a low-pass at 7 kHz, both fixed,
+  // both built once. The first is the owner's veto made structural — nothing a
+  // meal says can put a thud under the note (qa/eatvoice.mjs (e)) — and the
+  // second keeps a rustle or a crinkle out of the octave above 7 kHz, where a
+  // child's ear is at its sharpest (see nomCrown's fold).
+  //
+  // STRAIGHT TO MASTER, NEVER THE SCORE. The spec for this pictured reusing
+  // the ambience's moo, duck and hey — and those live on the district buses
+  // that synthStop() takes down the moment any recording starts, which is every
+  // match of every world that ships a track. A voice routed there would be
+  // silent in the shipped game. These reach master through the side's trim and
+  // panner and cross no node the score does (qa/eatvoice.mjs (g) walks the
+  // graph under a playing recording to prove it).
+  interface EatSide { bite: GainNode; vox: BiquadFilterNode }
+  let eatSides: EatSide[] | null = null;
+  let eatSide = 0;
+  function eatSidesFor(c: AudioContext): EatSide[] {
+    if (eatSides) return eatSides;
+    eatSides = [-0.25, 0.25].map((p) => {
+      // a WebView old enough to lack StereoPannerNode (WebKit before 14.1)
+      // gets the bite centred and untrimmed — exactly as it was before
+      const pan = typeof c.createStereoPanner === 'function' ? c.createStereoPanner() : null;
+      if (pan) { pan.pan.value = p; pan.connect(master!); }
+      const bite = c.createGain(); bite.gain.value = pan ? Math.SQRT2 : 1;
+      bite.connect(pan ?? master!);
+      const vox = c.createBiquadFilter(); vox.type = 'highpass'; vox.frequency.value = 300; vox.Q.value = 0.7;
+      const top = c.createBiquadFilter(); top.type = 'lowpass'; top.frequency.value = 7000; top.Q.value = 0.7;
+      vox.connect(top); top.connect(bite);
+      return { bite, vox };
+    });
+    return eatSides;
+  }
+  /** How big a meal is against the void that ate it, 0 tiny to 1 huge — the
+   *  one grade pop() has always voiced its depth by, shared with the voice so
+   *  the two can never disagree about which bite was the big one. */
+  function mealDepth(mealR: number, voidR: number): number {
+    const mealD = Math.min(1, Math.max(0, mealR / 6));
+    const voidD = Math.min(1, Math.max(0, (voidR - 0.9) / 9));
+    return mealD * 0.7 + voidD * 0.3;
+  }
+  // ── THE VOICE SITS UNDER THE NOTE, AND FOLLOWS IT UP AND DOWN ─────────────
+  // "6 dB under the pop" has to hold at every size, and the pop is not one
+  // level: above 450 Hz — the band a phone plays, qa/chomp.mjs part 1 — it ran
+  // -49.1 dBFS for a cone, -48.2 a car, -46.0 a house and -43.9 a tower on the
+  // build this landed on. That is 1.0, 1.11, 1.43 and 1.82 in amplitude
+  // against depths 0.04, 0.21, 0.54 and 1.0, which 0.96 + 0.86 x depth follows
+  // to within 3%. So the voice scales by the same curve, and each voice's own
+  // EAT_LEVEL below is calibrated once, at a car.
+  const eatSizeK = (depth: number) => 0.96 + 0.86 * depth;
+  // ── …AND STANDS BACK AS THE CHAIN GETS GOING ─────────────────────────────
+  // Full voice to link 4, then down in a straight line to 0.4 at link 8 and
+  // held there. A chain is where the pentatonic ladder is the point — eight
+  // links is one full walk up PENTA — so from there on the meal's voice is
+  // colour under the tune, not a second tune.
+  const eatComboK = (combo: number) => (combo <= 4 ? 1 : combo >= 8 ? 0.4 : 1 - 0.15 * (combo - 4));
+  /** The gate: at most one meal's voice every 0.35 s. A spree lands a bite
+   *  every frame or two at 60 fps; a voice on each would be a crowd shouting
+   *  over the melody. The pop keeps its own 75 ms gate. */
+  const EAT_VOICE_GAP = 0.35;
+  let lastEatVoice = -1;   // in the past, for the same reason as lastPop
+  /** a grain of the shared white buffer through one filter, on the eat's own
+   *  dice — noise() and grain() read Math.random for their offsets */
+  function eatGrain(dest: AudioNode, t: number, type: BiquadFilterType, fc: number, q: number, dur: number, vol: number,
+    fc1 = 0, attack = 0.003) {
+    const c = ctx; if (!c || vol <= 0) return;
+    const src = c.createBufferSource(); src.buffer = white(c);
+    const f = c.createBiquadFilter(); f.type = type; f.Q.value = q;
+    f.frequency.setValueAtTime(fc, t);
+    if (fc1 > 0) f.frequency.exponentialRampToValueAtTime(fc1, t + dur);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + Math.min(attack, dur * 0.5));
+    g.gain.exponentialRampToValueAtTime(0.0005, t + dur);
+    src.connect(f); f.connect(g); g.connect(dest);
+    src.start(t, eatRand() * Math.max(0, 2 - dur - 0.05), dur + 0.03);
+  }
+  /** a voiced sound: one oscillator gliding f0 -> f1, through parallel
+   *  band-pass formants, under one envelope. The shape hey() already uses for
+   *  the crew's shout, with its own pitch and vowel. */
+  function eatVoiced(dest: AudioNode, t: number, dur: number, type: OscillatorType, f0: number, f1: number,
+    formants: [number, number, number][], vol: number, attack: number) {
+    const c = ctx; if (!c) return null;
+    const o = c.createOscillator(); o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.85);
+    const env = c.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.linearRampToValueAtTime(vol, t + attack);
+    env.gain.setValueAtTime(vol, t + dur * 0.6);
+    env.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+    env.connect(dest);
+    for (const [fc, q, lvl] of formants) {
+      const b = c.createBiquadFilter(); b.type = 'bandpass'; b.Q.value = q;
+      // the vowel opens out of a closed one — the 'w' of wheee, the 'm' of meh
+      b.frequency.setValueAtTime(fc * 0.62, t);
+      b.frequency.exponentialRampToValueAtTime(fc, t + 0.06);
+      const g = c.createGain(); g.gain.value = lvl;
+      o.connect(b); b.connect(g); g.connect(env);
+    }
+    o.start(t); o.stop(t + dur + 0.05);
+    return { o, env };
+  }
+  /** a slow wobble on a parameter — a vibrato on detune, a tremolo on gain */
+  function eatWobble(p: AudioParam, t: number, dur: number, rate: number, depth: number) {
+    const c = ctx; if (!c) return;
+    const lfo = c.createOscillator(); lfo.frequency.value = rate;
+    const g = c.createGain(); g.gain.value = depth;
+    lfo.connect(g); g.connect(p);
+    lfo.start(t); lfo.stop(t + dur + 0.05);
+  }
+  // ── THE NINE VOICES ───────────────────────────────────────────────────────
+  // Every one is short — 0.12 s for a rustle, half a second for three quacks
+  // or the lantern's ping ringing out — every one goes through the side's
+  // 300 Hz floor and 7 kHz ceiling, and none of them is a creature in
+  // distress: the person is on a slide, the goat is being a goat, the duck
+  // says what ducks say. 4+ stays 4+.
+  const EAT_SING: Record<EatVoice, (d: AudioNode, t: number, v: number) => void> = {
+    // CARS, VANS AND TRUCKS: a toy horn, meep-meep. Each meep is a dyad, two
+    // 60 ms squares a major third apart (600 and 756 Hz, on the ladder's own
+    // root, 300 Hz — the third is in PENTA), through a 2.5 kHz low-pass so the
+    // square's edge is rounded off into a horn rather than a 1985 beeper.
+    meep: (d, t, v) => {
+      const c = ctx!;
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2500; lp.Q.value = 0.8;
+      lp.connect(d);
+      for (const off of [0, 0.1]) {
+        for (const f of [600, 756]) {
+          const o = c.createOscillator(); o.type = 'square'; o.frequency.value = f;
+          const g = c.createGain();
+          g.gain.setValueAtTime(0.0001, t + off);
+          g.gain.linearRampToValueAtTime(v, t + off + 0.006);
+          g.gain.setValueAtTime(v, t + off + 0.045);
+          g.gain.exponentialRampToValueAtTime(0.0006, t + off + 0.06);
+          o.connect(g); g.connect(lp);
+          o.start(t + off); o.stop(t + off + 0.08);
+        }
+      }
+    },
+    // PEOPLE: wheee — the giggle register on a slide, never a scream. A saw
+    // through 800 Hz and 1.2 kHz formants, gliding up one octave over 0.25 s
+    // from 420 Hz, a lilting 6 Hz vibrato of 30 cents, and each person up to
+    // 2 semitones either side of that. It tops out under 950 Hz, with a soft
+    // attack and no noise in it: what makes a scream a scream is a high,
+    // rough, sustained, loud voice, and this is none of the four.
+    wheee: (d, t, v) => {
+      const f0 = 420 * Math.pow(2, ((eatRand() * 2 - 1) * 2) / 12);
+      const w = eatVoiced(d, t, 0.3, 'sawtooth', f0, f0 * 2, [[800, 5, 1], [1200, 6, 0.7]], v, 0.025);
+      if (w) eatWobble(w.o.detune, t, 0.3, 6, 30);
+    },
+    // FARM ANIMALS: meh-eh-eh. A goat and a sheep bleat the same way — a saw
+    // on an 'eh' vowel (900 Hz and 2.1 kHz), drifting down, with the bleat's
+    // tremble: an 8.5 Hz wobble on both its pitch and its level. There is no
+    // bleat() in the ambience to reuse (the spec thought there was); moo() is
+    // a 168 Hz saw whose fundamental this bus's 300 Hz floor would take away,
+    // and no cow is edible in any world.
+    baa: (d, t, v) => {
+      const w = eatVoiced(d, t, 0.4, 'sawtooth', 470, 420, [[900, 3, 1], [2100, 6, 0.5]], v, 0.03);
+      if (!w) return;
+      eatWobble(w.o.detune, t, 0.4, 8.5, 45);
+      eatWobble(w.env.gain, t, 0.4, 8.5, v * 0.45);
+    },
+    // THE POND DUCKS: the town's own duck() — the quack the Maple ambience
+    // has always made, two or three of them, played here on the eat's bus.
+    quack: (d, t, v) => duck(d, t, v),
+    // HOUSES: a crumble — four loose band-passed grains, lower and wider-spaced
+    // than the CHOMP's crunch, because a house settles as it goes.
+    crumble: (d, t, v) => {
+      [1300, 900, 1700, 1100].forEach((fc, i) =>
+        eatGrain(d, t + i * (0.03 + eatRand() * 0.015), 'bandpass', fc * Math.pow(2, eatRand() * 0.5 - 0.25), 1.3,
+          0.035 + eatRand() * 0.015, v * (1 - i * 0.15)));
+    },
+    // TREES: 120 ms of leaves, all of it between 2.5 and 6 kHz — seven tiny
+    // grains scattered over a soft bed. A band-pass at a fixed Q passes noise
+    // in proportion to its centre, so a grain at 6 kHz carried 2.4x the energy
+    // of one at 2.5 kHz and the rustle's loudness was a roll of the dice; each
+    // grain is levelled by sqrt(2500 / fc) to carry the same.
+    rustle: (d, t, v) => {
+      eatGrain(d, t, 'bandpass', 3800, 0.8, 0.12, v * 0.35, 0, 0.02);
+      for (let i = 0; i < 7; i++) {
+        const fc = 2500 * Math.pow(2.4, eatRand());
+        eatGrain(d, t + eatRand() * 0.1, 'bandpass', fc, 1.5, 0.016, v * Math.sqrt(2500 / fc));
+      }
+    },
+    // PAPER LANTERNS: a crinkle of paper, then a glock ping on 1798 Hz — the
+    // fifth over the ladder's 300 Hz root, two octaves up, so it sits in the
+    // key of whatever the bites around it are playing.
+    crinkle: (d, t, v) => {
+      for (let i = 0; i < 6; i++)
+        eatGrain(d, t + eatRand() * 0.08, 'bandpass', 3000 * Math.pow(2.3, eatRand()), 2, 0.004 + eatRand() * 0.004, v);
+      glock(d, 1798, t + 0.07, 0.45, v * 0.45);
+    },
+    // BALLOONS: a rubber squeak rising 900 -> 1.5 kHz with a fast flutter,
+    // then a small pop.
+    squeak: (d, t, v) => {
+      const c = ctx!;
+      const o = c.createOscillator(); o.type = 'triangle';
+      o.frequency.setValueAtTime(900, t);
+      o.frequency.exponentialRampToValueAtTime(1500, t + 0.08);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(v, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0006, t + 0.09);
+      o.connect(g); g.connect(d); o.start(t); o.stop(t + 0.12);
+      eatWobble(o.detune, t, 0.09, 30, 60);
+      eatGrain(d, t + 0.09, 'bandpass', 2200, 0.6, 0.025, v * 1.2, 0, 0.001);
+      dTone(d, t + 0.09, 0.04, 'sine', v * 0.5, 1600, 800, 0, 0.002);
+    },
+    // SNOW: poof — a soft breath of noise whose band falls 1.8 kHz -> 700 Hz,
+    // with a glint of ice on top.
+    poof: (d, t, v) => {
+      eatGrain(d, t, 'bandpass', 1800, 0.7, 0.24, v, 700, 0.015);
+      eatGrain(d, t + 0.02, 'bandpass', 5200, 2, 0.03, v * 0.25);
+    },
+  };
+  // ── THE LEVELS, CALIBRATED — qa/eatvoice.mjs (c), qa/_eatspread.mjs ──────
+  // Each voice's gain, set on its LOUDEST take: at a car's meal (mealR 1.3 on
+  // a 2.5 void), energy above 450 Hz over one second, the loudest of thirty
+  // renders sits 6.6-7.6 dB under the pop over the same second — the spec's
+  // 6 dB and some margin, on every bite rather than on the average one. The
+  // voices with dice spread wider than that: wheee ran 6.8-10.9 dB under over
+  // its thirty (its pitch moves its harmonics through the formants), quack
+  // 6.6 or 9.0 (three quacks or two), rustle 6.8-9.5, crumble 7.0-9.2.
+  const EAT_LEVEL: Record<EatVoice, number> = {
+    meep: 0.0049, wheee: 0.0158, baa: 0.014, quack: 0.0182, crumble: 0.115,
+    rustle: 0.064, crinkle: 0.0153, squeak: 0.0295, poof: 0.0575,
+  };
+  /** eatSizeK at the meal the table above was calibrated on (mealR 1.3, a
+   *  2.5 void): each voice's envelope is run at this level and scaled after
+   *  it (eatVoice), so at the calibration point nothing has moved. */
+  const EAT_CAL_K = eatSizeK(mealDepth(1.3, 2.5));
   // warm bus: music -> soft lowpass -> (dry + echo) -> master. The gentle
   // feedback echo is what turns bare oscillators into something that sounds
   // PRODUCED instead of 8-bit.
@@ -4341,12 +4648,15 @@ export function createAudio(): Audio3D {
       // and the whole thing is TUNED: consecutive bites walk up a pentatonic
       // ladder, so a hoover spree plays a little melody instead of machine-
       // gunning one sample. That's the difference between noise and delight.
-      const c = ensure(); if (!c) return;
+      const c = ensure(); if (!c || !master) return;
       const now = c.currentTime;
       if (now - lastPop < 0.075) return;
       // a gap in eating resets the melody back to the root
       if (now - lastPop > 1.1) comboStep = 0; else comboStep = (comboStep + 1) % PENTA.length;
       lastPop = now;
+      // this bite takes the other side from the last one (see THE BITE HAS A SIDE)
+      eatSide ^= 1;
+      const out = eatSidesFor(c)[eatSide].bite;
       // ── DEPTH FOLLOWS THE MEAL, NOT THE MOUTH ──────────────────────────
       // This read `voidling.radius` at the call site, so `depth` described how
       // big the PLAYER was and knew nothing about what had just gone down. A
@@ -4358,9 +4668,7 @@ export function createAudio(): Audio3D {
       // The player's own size still gets a third of the vote, because a big
       // void genuinely should sound heavier across the board; it just no
       // longer gets all of it.
-      const mealD = Math.min(1, Math.max(0, mealR / 6));
-      const voidD = Math.min(1, Math.max(0, (voidR - 0.9) / 9));
-      const depth = mealD * 0.7 + voidD * 0.3;               // 0 tiny -> 1 huge
+      const depth = mealDepth(mealR, voidR);                  // 0 tiny -> 1 huge
       const semis = PENTA[comboStep] + Math.min(12, Math.floor(combo / 3) * 2);
       // big voids sing LOWER: a world-ender's nom is a bass note, not a chirp
       const base = 300 * Math.pow(2, semis / 12) * (1 - depth * 0.52);
@@ -4381,23 +4689,67 @@ export function createAudio(): Audio3D {
       // because more material is fracturing at once.
       // 1. bite transient — cutoff RISES with depth. Splintering timber is not
       //    a duller sound than a snapping twig, it is a louder brighter one.
-      noise(0.040 + depth * 0.02, 0.11 + depth * 0.22, 900 + depth * 700, 90);
+      //
+      //    …AND IT IS THE ONLY LAYER THAT VARIES. Two hundred bites a match on
+      //    one byte-identical transient is the machine-gun a round-robin
+      //    exists to break (research governor G5), but the NOTE is the melody
+      //    and never moves. So only the transient does: its cutoff 70 cents
+      //    either way of where depth puts it, its level 1.5 dB either way, one
+      //    of four takes dealt from a bag on the eat's own dice (see TAKES).
+      //    The body, the tail, the harmonic and the sub below are untouched
+      //    (qa/eatvoice.mjs (h): the body's f0 spread under 1 cent).
+      const [cutS, gainS] = nextTake();
+      const cutK = Math.pow(2, (cutS * 70) / 1200);
+      const gainK = Math.pow(10, (gainS * 1.5) / 20);
+      noise(0.040 + depth * 0.02, (0.11 + depth * 0.22) * gainK, (900 + depth * 700) * cutK, 90, 0, out);
       // 2. body — fat sine glide + a triangle underneath for weight
-      tone(base, base * 0.62, 0.13 + depth * 0.05, 'sine', 0.15 + depth * 0.04);
-      tone(base * 0.5, base * 0.34, 0.11, 'triangle', 0.055, 0.006);
+      tone(base, base * 0.62, 0.13 + depth * 0.05, 'sine', 0.15 + depth * 0.04, 0, out);
+      tone(base * 0.5, base * 0.34, 0.11, 'triangle', 0.055, 0.006, out);
       // 3. bright tail — at EVERY depth now. Its old gain term was
       //    0.045*(1-depth*2), which is negative past 0.5, so ungating it alone
       //    would have done nothing: it had to be re-scaled, not just re-enabled.
-      tone(base * 2.02, base * 1.5, 0.05 + depth * 0.03, 'sine', 0.030 + 0.030 * depth, 0.05);
+      tone(base * 2.02, base * 1.5, 0.05 + depth * 0.03, 'sine', 0.030 + 0.030 * depth, 0.05, out);
       // 4. THE PART A PHONE CAN ACTUALLY PLAY. A big meal's fundamental is
       //    down at 144 Hz where a phone speaker has nothing, so give it a
       //    harmonic up where the speaker lives — this is what carries the
       //    weight of a building on the device, rather than the sub below.
-      tone(base * 4.05, base * 2.9, 0.075 + depth * 0.05, 'triangle', 0.022 + 0.130 * depth, 0.02);
+      tone(base * 4.05, base * 2.9, 0.075 + depth * 0.05, 'triangle', 0.022 + 0.130 * depth, 0.02, out);
       // 5. sub thump — still there for a good speaker and for the felt
       //    low end on a tablet; it is no longer the only thing carrying a
       //    building.
-      if (depth > 0.35) tone(52, 30, 0.2, 'sine', depth * 0.14, 0.03);
+      if (depth > 0.35) tone(52, 30, 0.2, 'sine', depth * 0.14, 0.03, out);
+    },
+    eatVoice(kind, mealR = 0.9, voidR = 0.9, combo = 0) {
+      const c = ensure(); if (!c || !master) return null;
+      const sing = EAT_SING[kind]; if (!sing) return null;
+      const now = c.currentTime;
+      if (now - lastEatVoice < EAT_VOICE_GAP) return null;
+      lastEatVoice = now;
+      // the bite's own side: pop() has just flipped it for the bite this
+      // voice belongs to. 20 ms behind the note, so the pop's attack is the
+      // first thing heard and the meal answers it.
+      // ── THE SIZE AND THE FADE ARE ONE MULTIPLY, ON A GAIN OF THEIR OWN ──
+      // They were folded into the `v` each voice's envelope ramps to, and
+      // every envelope here — and the ambience helpers the voices borrow,
+      // duck(), glock() and dTone() — ramps DOWN to an absolute floor
+      // (0.0006, 0.0005) and holds it until its source stops. A floor that
+      // does not move with `v` is a tail that does not: at the chain's 0.4x
+      // meep's tail stood relatively 8 dB louder, and qa/eatvoice.mjs (d)
+      // read the fade as -7.61 dB where one multiply is -7.96. Scaling the
+      // floors instead was tried and measured: a floor a thousandth of `v`
+      // makes every decay steeper, and qa/_eatspread.mjs read the grain
+      // voices quieter at the very point they were calibrated — the median
+      // of thirty renders 0.72 dB for crumble, 0.87 rustle, 1.43 squeak and
+      // 1.62 poof.
+      // So each voice now sings at its CALIBRATED level — the car's meal
+      // EAT_LEVEL was set at, where its envelope is the one that was tuned
+      // and heard — and the meal's size and the chain's fade scale the
+      // finished sound after it, tail and all.
+      const lvl = c.createGain();
+      lvl.gain.value = (eatSizeK(mealDepth(mealR, voidR)) / EAT_CAL_K) * eatComboK(combo);
+      lvl.connect(eatSidesFor(c)[eatSide].vox);
+      sing(lvl, now + 0.02, EAT_LEVEL[kind] * EAT_CAL_K);
+      return kind;
     },
     bigEat() {
       // the crunch itself is shared and untouched. In the bay a squeezebox
