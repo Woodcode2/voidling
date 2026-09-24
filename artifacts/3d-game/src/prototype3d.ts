@@ -3535,7 +3535,12 @@ const _dbg = new Proxy(_dbgStore, {
   __inDeepWater3: (x: number, z: number, m: number) => boolean;
   __setMood: (m: string | null) => void;
   __faceState: () => { mood: string; maw: number; smile: boolean; biting: boolean;
-    hold: number; move: number; lid: number; shut: number; uniformK: number };
+    hold: number; move: number; lid: number; shut: number; uniformK: number;
+    blush: number; blushOpacity: number; scleraY: number; faceX: number; wobble: number };
+  /** the research spec's name for the same read (G9) — an alias, not a second hook */
+  __face: () => { mood: string; maw: number; smile: boolean; biting: boolean;
+    hold: number; move: number; lid: number; shut: number; uniformK: number;
+    blush: number; blushOpacity: number; scleraY: number; faceX: number; wobble: number };
   __stages: () => { cur: number; best: number; ceremonies: number; held: number[]; owed: number };
   __voidSetMenuR: (r: number) => void;
   __dioMark: () => number;
@@ -3784,6 +3789,7 @@ _dbg.__setMood = (m: string | null) => { moodPin = m; if (m) voidling.setMood(m 
 // a world actually SHOWS is to sample it while that world plays.
 // qa/faceparity.mjs polls this across all five worlds.
 _dbg.__faceState = () => voidling.faceState();
+_dbg.__face = _dbg.__faceState;
 // QA: how many EVOLVED ceremonies have played, and the two stage counters
 // behind them. A demotion walks curStage back; bestStage does not move, so the
 // ceremony cannot re-fire on the way home. qa/evolveonce.mjs reads this.

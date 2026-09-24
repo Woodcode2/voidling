@@ -75,9 +75,17 @@ export interface Void3D {
    *  pure size term the evolution pop and the bite's wind-up both write
    *  (qa/mouthwind.mjs). All four are READ from the frame that used them,
    *  never recomputed, so a probe cannot be told a number the render did not
-   *  draw. */
+   *  draw.
+   *  The follow-through after a bite (research governor G9, qa/savour.mjs)
+   *  reads five more, each off the object that drew it: `blush` is the
+   *  cheeks' opacity as the face asked for it and `blushOpacity` what the
+   *  material was handed after the small-size fade; `scleraY` is the first
+   *  eye's sclera.scale.y, which the lid and the blink both squash; `faceX`
+   *  is the face billboard's width over its height; `wobble` is the jelly
+   *  slosh the body shader was handed. */
   faceState(): { mood: Mood; maw: number; smile: boolean; biting: boolean; hold: number;
-    move: number; lid: number; shut: number; uniformK: number };
+    move: number; lid: number; shut: number; uniformK: number;
+    blush: number; blushOpacity: number; scleraY: number; faceX: number; wobble: number };
   /** QA/capture: hold the jaw shut so the face shows its MOOD and nothing else.
    *  The gape is driven by eating, not by mood, so a hero parked anywhere with
    *  food in reach is mid-bite in almost every frame and cannot be
@@ -1761,6 +1769,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // what update() last multiplied the body by, kept only so faceState() can
   // report the frame's own number instead of a probe re-deriving it
   let uniformKNow = 1;
+  // …and the cheeks' opacity as the face asked for it, before the small-size
+  // fade — kept for the same reason (faceState(), qa/savour.mjs)
+  let blushNow = 0.5;
   let stretchT = 0;                // rocket stretch pulse
   let inhaleT = 0;                 // collapse inhale->burst envelope
   let evolveT = 0;                 // evolution celebration pop
@@ -1803,7 +1814,10 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     // boolean sampled at 1-2fps cannot tell those apart. qa/_eatmotion.mjs.
     faceState() {
       return { mood, maw: mp.maw, smile: mouth.visible, biting: mouthT > 0, hold: mouthT,
-        move: moveAmt, lid: mp.lid, shut: mp.shut, uniformK: uniformKNow };
+        move: moveAmt, lid: mp.lid, shut: mp.shut, uniformK: uniformKNow,
+        blush: blushNow, blushOpacity: blushMats.length ? blushMats[0].opacity : 0,
+        scleraY: eyes[0].sclera.scale.y, faceX: face.scale.y ? face.scale.x / face.scale.y : 1,
+        wobble: bodyMat.uniforms.uWobble.value as number };
     },
     pinMouth(shut) { mouthPinShut = shut; if (shut) { mouthT = 0; mouthMax = 0; mouthAge = 0; } },
     pinGape(v) {
@@ -2443,7 +2457,8 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       wrapTo(brows[1], brows[1].position.x, mp.browY, -mp.browAng);
       // blush turns to mud once the cheeks are a few pixels wide — fade it out
       // rather than let it grey down the two brightest parts of the silhouette
-      for (const bm of blushMats) bm.opacity = mp.blush * (1 - small * 0.45);
+      blushNow = mp.blush;
+      for (const bm of blushMats) bm.opacity = blushNow * (1 - small * 0.45);
       (sweat.material as THREE.MeshBasicMaterial).opacity = mp.sweat;
       sweat.position.y = 0.52 + Math.sin(s.t * 9) * 0.045;
       sweat.scale.setScalar(0.9 + Math.sin(s.t * 9) * 0.1);
