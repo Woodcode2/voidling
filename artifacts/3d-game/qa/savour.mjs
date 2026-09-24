@@ -57,10 +57,22 @@
 //     (d) THE SWITCH: with no ?burp=1 there is no burp — no 'burp' audio call
 //         and no burp counted — by 1.5 s after the last swallow
 //     (e) THE HOP: on a goal win (the dot's EAT line crossed with __setScore)
-//         the body squashes to 0.82 or under, stretches to 1.18 or over, and
-//         is back within 1% of rest on every frame from 0.55 s of tClock after
-//         the win — which it could not be if it ran on the outro's 0.3x world
-//         clock (the spec: "a hero clock that runs at full speed")
+//         the body as DRAWN — bob.scale.y over the height the same frame would
+//         have drawn with no hop — squashes to 0.82 or under and stretches to
+//         1.18 or over; group.position.y rises at least 0.30 of his radius over
+//         the height that frame set with no hop (the rise tops out at 0.35 R,
+//         and at the 50 ms frames this renderer draws the nearest frame to the
+//         top is at most 25 ms off it: 0.339 R by the rise's parabola); and
+//         both are back within 1% of rest on every frame from 0.55 s of tClock
+//         after the win — which they could not be if the hop ran on the
+//         outro's 0.3x world clock (the spec: "a hero clock that runs at full
+//         speed").
+//         RETRACTED (GOVERNOR.md rule 3b). As committed in e61abf0 this bar
+//         read faceState().hop, which is hopNow: the factor the rig MEANT to
+//         multiply the body by, not the body. Delete `* hopNow` from the
+//         squash, or the rise from group.position, and it still read 0.80 and
+//         1.20 — and nothing read the rise at all (the G9 review). Both are
+//         now read off the objects that drew them.
 //   PAGE 2 — ?burp=1&g=1
 //     (f) THE BURP: the same three bites earn exactly one burp — counted by the
 //         rig, one 'burp' in the audio call log — and its float is on screen
@@ -72,16 +84,64 @@
 //         still owed. No 'burp' is played from the end beat on, and the rig
 //         counts none. A run where nothing was owed has tested nothing, and
 //         FAILS as such
+//   PAGE 4 — ?burp=1&g=1 with BIG MOTION off (voidMotion=0, as reveal.mjs
+//   seeds it). The four things the G9 review found no bar for.
+//     (i) A TREAT ON ITS OWN: with nothing owed, nothing cooling and nothing
+//         in the streak (__burpState's live count), the tagged landmark, eaten
+//         alone through __eatLandmark, owes a burp on the frame it is
+//         swallowed and not before it — the treat path, not the streak, since
+//         one swallow cannot make a streak of BURP_STREAK (read out of
+//         prototype3d.ts, never copied here). (g) passes on a burp NOT played
+//         and could not tell a landmark that owes nothing.
+//    (j) NEVER ON THE CEREMONY — ON THE POP FRAME EITHER: the burp's pop is
+//         decided inside voidling.update(), which runs BEFORE the drain and the
+//         ceremony block, so a ceremony landing on the pop frame itself was
+//         not seen and both went off together. An in-page watcher calls
+//         __forceEvolve() on the frame faceState().burpLeft reads 0 — the rig
+//         asks for the pop on the very next update() — so the forced
+//         ceremony and the pop fall on the same frame. The burp must still be
+//         heard (the child earned it) and no sooner than EVO_CLEAR (read out
+//         of prototype3d.ts) after that ceremony.
+//     (k) A PAUSE IN THE CHEEK HOLD: voidling.update() keeps running under
+//         the pause sheet, so the 150 ms hold ran out there, the pop was
+//         refused for the pause, and the 20 s cooldown — set when the burp
+//         came due — ran on with no burp played. The watcher takes the pause
+//         (the real button, #btnQuit) on the first frame of a hold; 0.6 s of
+//         tClock later she comes back (#pauseResume). Nothing under the
+//         sheet; the burp once she is back. The hold is owed by __burpOwe(),
+//         which clears the cooldown first: the landmark's burp has just set
+//         20 s of it, which is four and a half minutes of this renderer.
+//     (l) THE HOP UNDER BIG MOTION OFF: the goal-win hop still squashes to
+//         0.82 and stretches to 1.18 (scale stays under reduced motion, as the
+//         eat's does), and the body does not RISE: group.position.y within
+//         0.01 R of the no-hop height on every frame. The rise is the hero
+//         travelling up the screen under a camera that does not follow it,
+//         and travel that only decorates goes under reduced motion (the menu
+//         ladder's pip hop, bubbles.ts's floaters).
+//
+//   node qa/savour.mjs [port] [world] --pages=1,4   runs only those pages (the
+//   gate runs all four)
 import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
 import { enterMatch } from './_enter.mjs';
 
 const POS = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const PORT = POS[0] || '4177', WORLD = POS[1] || 'maple';
+const PAGES = (process.argv.find((a) => a.startsWith('--pages='))?.slice(8) ?? '1,2,3,4').split(',').map(Number);
 const REL = 0.7, GAP = 0.8, R0 = 4;
 
 const die = (m) => { console.log(`FAIL — ${m}`); process.exit(1); };
 process.on('uncaughtException', (e) => die(`threw: ${String((e && e.message) || e).split('\n')[0]}`));
 process.on('unhandledRejection', (e) => die(`rejected: ${String((e && e.message) || e).split('\n')[0]}`));
+
+// ── the burp's own rules, out of prototype3d.ts's line — never copied here ──
+const GAME = readFileSync('src/prototype3d.ts', 'utf8');
+const ruleOf = (name) => {
+  const m = GAME.match(new RegExp(`const BURP_AFTER = [^;]*\\b${name} = ([\\d.]+)`));
+  if (!m) die(`could not find ${name} on the burp's rules line in prototype3d.ts — the line moved; re-point this probe`);
+  return Number(m[1]);
+};
+const EVO_CLEAR = ruleOf('EVO_CLEAR'), BURP_STREAK = ruleOf('BURP_STREAK');
 
 // every wait says what it was waiting for, so a timeout names its stage
 const T_START = Date.now();
@@ -101,8 +161,12 @@ const LOGGER = () => {
         const f = window.__faceState();
         const vf = [];
         for (const e of document.querySelectorAll('.vf.go')) vf.push(e.textContent);
+        const bs = window.__burpState ? window.__burpState() : null;
         L.fr.push({ tc: window.__matchState().tClock, blush: f.blush, op: f.blushOpacity, sy: f.scleraY,
-          fx: f.faceX, wob: f.wobble, hop: f.hop, burpN: f.burpN, mood: f.mood, vf,
+          fx: f.faceX, wob: f.wobble, burpN: f.burpN, mood: f.mood, vf,
+          // the body as drawn, and what the same frame would have drawn with no hop
+          bsy: f.bodySY, bsy0: f.restSY, by: f.bodyY, by0: f.restY, dr: f.dispR,
+          left: f.burpLeft, bw: bs ? bs.wait : null, bst: bs ? bs.streak : null,
           cer: window.__stages ? window.__stages().ceremonies : 0 });
       }
     } catch { /* a frame we could not read is a frame we do not report */ }
@@ -148,15 +212,17 @@ async function quiet(p) {
   return spot;
 }
 
-async function open(q) {
+async function open(q, { calm = false } = {}) {
   const p = await b.newPage({ viewport: { width: 430, height: 932 } });
   p.on('pageerror', (e) => console.log('PAGEERR ' + String(e).slice(0, 140)));
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
-  await p.addInitScript(() => { try {
+  await p.addInitScript((calm) => { try {
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
     localStorage.setItem('voidFirstNom', '1');
     localStorage.setItem('voidDailyLast', new Date().toDateString());
-  } catch { /* private mode */ } });
+    // BIG MOTION off, the way Settings stores it (fx.ts setReduceMotion)
+    localStorage.setItem('voidMotion', calm ? '0' : '1');
+  } catch { /* private mode */ } }, calm);
   await p.addInitScript(LOGGER);
   await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}&g=1${q}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await until(p, 'the page never booted', () => !!window.__voidState);
@@ -173,10 +239,38 @@ async function open(q) {
   for (const k of ['face', 'eat', 'log', 'calls', 'setR']) if (!hooks[k]) die(`this build has no ${k} hook — nothing here can be measured without it`);
   if (!hooks.goal || hooks.goal.n !== 1) die(`?g=1 did not make a dot-1 level match (goal ${JSON.stringify(hooks.goal)})`);
   const f = await p.evaluate(() => window.__faceState());
-  for (const k of ['blush', 'blushOpacity', 'scleraY', 'faceX', 'wobble']) {
-    if (typeof f[k] !== 'number') die(`faceState() does not report ${k}, so the face cannot be read back`);
+  for (const k of ['blush', 'blushOpacity', 'scleraY', 'faceX', 'wobble', 'bodySY', 'restSY', 'bodyY', 'restY', 'dispR', 'burpLeft']) {
+    if (typeof f[k] !== 'number') die(`faceState() does not report ${k}, so the face and the body cannot be read back`);
   }
   return p;
+}
+
+/** THE GOAL-WIN HOP AS THE BODY DREW IT. Per frame after the win: the height
+ *  bob.scale.y was drawn at over the height the same frame would have drawn
+ *  with no hop, and the rise group.position.y was drawn at over the same
+ *  frame's no-hop height, in radii. Prints both series to +0.6 s. */
+function hopRead(hf, tW) {
+  const rows = hf.map((r) => ({ tc: r.tc, h: r.bsy / r.bsy0, rise: (r.by - r.by0) / r.dr }));
+  const moved = (r) => Math.abs(r.h - 1) > 0.01 || Math.abs(r.rise) > 0.01;
+  const lo = Math.min(...rows.map((r) => r.h)), hi = Math.max(...rows.map((r) => r.h));
+  const top = Math.max(...rows.map((r) => Math.abs(r.rise)));
+  const late = rows.filter((r) => r.tc >= tW + 0.55);
+  const off = late.filter(moved);
+  const lastMove = [...rows].reverse().find(moved);
+  const early = rows.filter((r) => r.tc <= tW + 0.6);
+  console.log(`    the goal-win hop, drawn height over the frame's no-hop height: ${early.map((r) => r.h.toFixed(2)).join(' ')}`);
+  console.log(`    …and the drawn rise over the no-hop height, in radii:          ${early.map((r) => r.rise.toFixed(2)).join(' ')}`
+    + `   (last frame off rest at +${lastMove ? (lastMove.tc - tW).toFixed(2) : '—'} s of tClock)`);
+  return { lo, hi, top, late, off };
+}
+/** meet the dot's EAT line, then log every frame of the next 1.2 s of tClock */
+async function winAndLog(p) {
+  await p.evaluate(() => { window.__setMood(null); window.__sv.fr.length = 0; window.__sv.on = true; });
+  const eat = await p.evaluate(() => window.__levelSpec().eat);
+  const tW = await p.evaluate((e) => { window.__setScore(e + 1); return window.__matchState().tClock; }, eat);
+  await until(p, 'the goal was never met', () => window.__goalState()?.met, null, { polling: 100 });
+  await waitTc(p, tW + 1.2);
+  return { tW, hf: (await frames(p)).filter((r) => r.tc > tW) };
 }
 
 /** Pin, size, settle; then three forced bites GAP apart. Resolves with each
@@ -226,7 +320,7 @@ const bar = (ok, id, msg) => { console.log(`  ${ok ? 'ok  ' : 'BAD '} (${id}) ${
 console.log(`\n  HE SAVOURS IT — ${WORLD} on :${PORT}\n`);
 
 // ══ PAGE 1: the shipped default ═════════════════════════════════════════════
-{
+if (PAGES.includes(1)) {
   const p = await open('');
   const bites = await threeBites(p);
   const lastG = Math.max(...bites.map((x) => x.gulp));
@@ -282,31 +376,22 @@ console.log(`\n  HE SAVOURS IT — ${WORLD} on :${PORT}\n`);
     ? `no ?burp=1 and he burped anyway (${bc.length} 'burp' call(s), burpN ${nowN}) — the owner has not heard it yet`
     : `no ?burp=1, no burp (0 calls, burpN ${nowN ?? 'absent'})`);
 
-  // (e) the hop, on the goal-win door
-  await p.evaluate(() => { window.__setMood(null); window.__sv.fr.length = 0; });
-  const eat = await p.evaluate(() => window.__levelSpec().eat);
-  const tW = await p.evaluate((e) => { window.__setScore(e + 1); return window.__matchState().tClock; }, eat);
-  await until(p, 'the goal was never met', () => window.__goalState()?.met, null, { polling: 100 });
-  await waitTc(p, tW + 1.2);
-  const hf = (await frames(p)).filter((r) => r.tc > tW);
+  // (e) the hop, on the goal-win door, read off the body that drew it
+  const { tW, hf } = await winAndLog(p);
   await p.close();
-  if (!hf.length || typeof hf[0].hop !== 'number') {
-    bar(false, 'e', 'faceState() does not report the body\'s hop — this build has no victoryHop()');
+  if (!hf.length) {
+    bar(false, 'e', 'no frame was logged after the goal-win door — the hop was never seen');
   } else {
-    const lo = Math.min(...hf.map((r) => r.hop)), hi = Math.max(...hf.map((r) => r.hop));
-    const late = hf.filter((r) => r.tc >= tW + 0.55);
-    const off = late.filter((r) => Math.abs(r.hop - 1) > 0.01);
-    const lastMove = [...hf].reverse().find((r) => Math.abs(r.hop - 1) > 0.01);
-    console.log(`    the goal-win hop: ${hf.filter((r) => r.tc <= tW + 0.6).map((r) => r.hop.toFixed(2)).join(' ')}   `
-      + `(last frame off rest at +${lastMove ? (lastMove.tc - tW).toFixed(2) : '—'} s of tClock)`);
-    bar(lo <= 0.82 && hi >= 1.18 && late.length > 0 && !off.length, 'e',
-      `the goal-win hop squashes to ${lo.toFixed(2)} (bar 0.82), stretches to ${hi.toFixed(2)} (bar 1.18), `
-      + `and ${off.length ? `is still off rest on ${off.length} frame(s) past +0.55 s — the world's 0.3x clock` : `is at rest from +0.55 s of tClock (${late.length} frames)`}`);
+    const h = hopRead(hf, tW);
+    bar(h.lo <= 0.82 && h.hi >= 1.18 && h.top >= 0.30 && h.late.length > 0 && !h.off.length, 'e',
+      `the goal-win hop, as drawn, squashes to ${h.lo.toFixed(2)} (bar 0.82), stretches to ${h.hi.toFixed(2)} (bar 1.18), `
+      + `rises ${h.top.toFixed(2)} R (bar 0.30), `
+      + `and ${h.off.length ? `is still off rest on ${h.off.length} frame(s) past +0.55 s — the world's 0.3x clock` : `is at rest from +0.55 s of tClock (${h.late.length} frames)`}`);
   }
 }
 
 // ══ PAGE 2: ?burp=1 — one burp, then the cooldown ══════════════════════════
-{
+if (PAGES.includes(2)) {
   const p = await open('&burp=1');
   const ready = async () => {
     const st = await p.evaluate(() => window.__burpState?.());
@@ -342,7 +427,7 @@ console.log(`\n  HE SAVOURS IT — ${WORLD} on :${PORT}\n`);
 }
 
 // ══ PAGE 3: ?burp=1 — the end beat ═════════════════════════════════════════
-{
+if (PAGES.includes(3)) {
   const p = await open('&burp=1');
   const st0 = await p.evaluate(() => window.__burpState?.());
   if (!st0) die('this build has no __burpState — there is no burp machinery to measure');
@@ -420,8 +505,153 @@ console.log(`\n  HE SAVOURS IT — ${WORLD} on :${PORT}\n`);
   }
 }
 
+// ══ PAGE 4: ?burp=1, BIG MOTION off — a treat, the pop frame, a pause, the hop ═
+if (PAGES.includes(4)) {
+  const p = await open('&burp=1', { calm: true });
+  if (!(await p.evaluate(() => document.body.classList.contains('calm')))) {
+    die('voidMotion=0 did not put the body in calm — BIG MOTION is still on, and (l) would measure the wrong setting');
+  }
+  const st0 = await p.evaluate(() => window.__burpState?.());
+  if (!st0) die('this build has no __burpState — there is no burp machinery to measure');
+  if (!st0.on) die('?burp=1 did not switch the burp on');
+  if (await p.evaluate(() => typeof window.__burpOwe !== 'function')) die('this build has no __burpOwe — (k) cannot owe a burp inside the landmark\'s cooldown');
+  if (await p.evaluate(() => typeof window.__forceEvolve !== 'function')) die('this build has no __forceEvolve — (j) cannot land a ceremony on the pop frame');
+  console.log('\n  PAGE 4 — ?burp=1, BIG MOTION off');
+  await quiet(p);
+  await waitTc(p, (await tc(p)) + 1.2);
+  // nothing owed, nothing cooling and nothing in the streak: whatever owes the
+  // next burp is the landmark on its own
+  await until(p, 'the burp never came to rest (owed, cooling, or a live streak)', () => {
+    const s = window.__burpState(); return s.wait < 0 && s.cd <= 0 && s.streak === 0 && window.__faceState().burpLeft < 0; });
+  await p.evaluate(() => { window.__sv.fr.length = 0; window.__sv.on = true; });
+  // (j)'s watcher, armed before the landmark goes in so it meets that burp's
+  // hold: on the frame burpLeft reads 0 the next update() asks for the pop,
+  // and __forceEvolve() is spent by that same frame's ceremony block
+  await p.evaluate(() => {
+    const W = window.__svJ = { at: null };
+    const tick = () => {
+      const f = window.__faceState();
+      if (f.burpLeft === 0) {
+        window.__forceEvolve();
+        W.at = { t: window.__matchState().tClock, cer: window.__stages().ceremonies, n: f.burpN };
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+
+  // (i) the tagged landmark, on its own
+  const lm = await p.evaluate(() => { const x = window.__eatLandmark(); const log = window.__biteLog();
+    return x ? { ...x, id: log[log.length - 1].id } : null; });
+  if (!lm) die(`${WORLD} has no tagged landmark to eat`);
+  await until(p, `the ${lm.name} was never swallowed`, (id) => { const r = window.__biteLog().find((x) => x.id === id); return r && r.gulp >= 0; }, lm.id, { polling: 150 });
+  const gL = await p.evaluate((id) => window.__biteLog().find((x) => x.id === id).gulp, lm.id);
+  await waitTc(p, gL + 0.2);
+  {
+    const fr = await frames(p);
+    const at = fr.find((r) => r.tc >= gL - 1e-6);
+    const before = [...fr].reverse().find((r) => r.tc < gL - 1e-6);
+    // the streak is read on the frame BEFORE the swallow: owing a burp empties
+    // it (oweBurp), so on the swallow's own frame it reads 0 whatever owed it.
+    // With N live there, the landmark's one swallow makes at most N + 1.
+    console.log(`    the ${lm.name} (r ${lm.radius}) swallowed at ${gL.toFixed(2)}; burp wait on that frame ${at?.bw?.toFixed(2) ?? '—'}`
+      + ` (the frame before: ${before?.bw?.toFixed(2) ?? '—'}); landmark-grade swallows in the streak the frame before ${before?.bst ?? '—'}`);
+    const streakOk = !!before && before.bst + 1 < BURP_STREAK;
+    bar(!!at && at.bw >= 0 && !!before && before.bw < 0 && streakOk, 'i',
+      !before ? 'no frame was logged before the swallow — cannot tell what owed the burp'
+        : !(at && at.bw >= 0) ? `the ${lm.name} went down and owed nothing — a treat does not earn a burp on its own`
+          : before.bw >= 0 ? 'a burp was already owed the frame before the swallow, so this frame proves nothing'
+            : !streakOk ? `${before.bst} in the streak the frame before: the swallow could have closed a streak of ${BURP_STREAK}, so this is not the treat path`
+              : `the ${lm.name} alone owes a burp on its swallow (due in ${at.bw.toFixed(2)} s), with ${before.bst} in the streak before it — one swallow cannot make ${BURP_STREAK}`);
+  }
+
+  // (j) the ceremony on the pop frame
+  await until(p, 'the match clock stopped before the landmark\'s burp reached its pop', (t) => !!window.__svJ.at || window.__matchState().tClock >= t, gL + EVO_CLEAR + 2.0, { polling: 100 });
+  const J = await p.evaluate(() => window.__svJ.at);
+  if (!J) {
+    bar(false, 'j', `no burp reached its pop inside ${(EVO_CLEAR + 2).toFixed(1)} s of the ${lm.name}'s swallow — nothing to land a ceremony on`);
+  } else {
+    await until(p, 'the match clock stopped while (j) waited for the burp', (x) => window.__audioCalls().some((c) => c.id === 'burp' && c.t >= x.t - 1e-6)
+      || window.__matchState().tClock >= x.t + x.clear + 1.0, { t: J.t, clear: EVO_CLEAR }, { polling: 100 });
+    await waitTc(p, (await tc(p)) + 0.1);
+    const fr = await frames(p);
+    const cerRow = fr.find((r) => r.tc >= J.t - 1e-6 && r.cer > J.cer);
+    const heard = (await burps(p)).filter((c) => c.t >= J.t - 1e-6);
+    const gap = cerRow && heard.length ? heard[0].t - cerRow.tc : null;
+    console.log(`    the pop was due on the frame after tClock ${J.t.toFixed(2)}; the forced ceremony landed at ${cerRow ? cerRow.tc.toFixed(2) : 'never'}; `
+      + `burp heard at ${heard.map((c) => c.t.toFixed(2)).join(', ') || 'never'}${gap !== null ? ` (+${gap.toFixed(2)} s after the ceremony; EVO_CLEAR ${EVO_CLEAR})` : ''}`);
+    bar(!!cerRow && heard.length === 1 && gap >= EVO_CLEAR - 1e-6, 'j',
+      !cerRow ? '__forceEvolve() on the pop frame played no ceremony — nothing tested'
+        : !heard.length ? 'the ceremony on the pop frame swallowed the burp — the child earned it and never heard it'
+          : gap < 1e-6 ? `the burp went off on the ceremony's own frame (+${gap.toFixed(2)} s): the pop was decided before the ceremony block ran`
+            : gap < EVO_CLEAR - 1e-6 ? `the burp went off +${gap.toFixed(2)} s into the ceremony (bar ${EVO_CLEAR})`
+              : `a ceremony on the pop frame holds the burp back: heard once, +${gap.toFixed(2)} s after it (bar ${EVO_CLEAR})`);
+  }
+
+  // (k) a pause in the cheek hold
+  await until(p, 'the burp never came to rest after (j)', () => window.__burpState().wait < 0 && window.__faceState().burpLeft < 0, null, { polling: 100 });
+  const nK0 = await p.evaluate(() => window.__faceState().burpN);
+  await p.evaluate(() => {
+    const W = window.__svK = { at: null };
+    const tick = () => {
+      const f = window.__faceState();
+      if (f.burpLeft > 0) {
+        document.getElementById('btnQuit').click();
+        W.at = { t: window.__matchState().tClock, left: f.burpLeft, sheet: !!document.getElementById('pause')?.classList.contains('show') };
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  const owed = await p.evaluate(() => ({ wait: window.__burpOwe(), t: window.__matchState().tClock }));
+  if (owed.wait < 0) {
+    bar(false, 'k', '__burpOwe() was refused — no burp to pause in');
+  } else {
+    await until(p, 'the match clock stopped before the owed burp reached its hold', (t) => !!window.__svK.at || window.__matchState().tClock >= t, owed.t + owed.wait + 2.0, { polling: 100 });
+    const K = await p.evaluate(() => window.__svK.at);
+    if (!K || !K.sheet) {
+      bar(false, 'k', K ? 'the pause button did not bring the sheet up inside the hold — nothing tested' : 'the owed burp never started its cheek hold — nothing to pause in');
+      if (K) await p.evaluate(() => document.getElementById('pauseResume').click());
+    } else {
+      await waitTc(p, K.t + 0.6);
+      const under = await p.evaluate((t) => ({ st: window.__burpState(), n: window.__faceState().burpN, left: window.__faceState().burpLeft,
+        calls: window.__audioCalls().filter((c) => c.id === 'burp' && c.t >= t - 1e-6).length,
+        sheet: !!document.getElementById('pause')?.classList.contains('show') }), K.t);
+      const tR = await p.evaluate(() => { document.getElementById('pauseResume').click(); return window.__matchState().tClock; });
+      await until(p, 'the match clock stopped after the pause', (t) => window.__audioCalls().some((c) => c.id === 'burp' && c.t >= t) || window.__matchState().tClock >= t + 2.0, tR, { polling: 100 });
+      const back = (await burps(p)).filter((c) => c.t >= tR);
+      const nK1 = await p.evaluate(() => window.__faceState().burpN);
+      console.log(`    paused at tClock ${K.t.toFixed(2)} with ${K.left.toFixed(2)} s of the hold to run; 0.6 s later, still under the sheet (${under.sheet}): `
+        + `'burp' calls ${under.calls}, owed ${under.st.wait >= 0 ? `again (due in ${under.st.wait.toFixed(2)} s)` : 'NOTHING'}, cooldown ${under.st.cd.toFixed(1)} s; `
+        + `back at ${tR.toFixed(2)}, burp heard at ${back.map((c) => `${c.t.toFixed(2)} (+${(c.t - tR).toFixed(2)} s)`).join(', ') || 'never'}; burpN ${nK0} -> ${nK1}`);
+      bar(!under.calls && under.sheet && back.length === 1 && nK1 === nK0 + 1, 'k',
+        under.calls ? `the burp went off under the pause sheet (${under.calls} call(s))`
+          : !back.length ? `a pause in the cheek hold lost the burp: nothing when she came back, and ${under.st.cd.toFixed(1)} s of cooldown already running for it`
+            : `a pause in the cheek hold keeps the burp: none under the sheet, heard once +${(back[0].t - tR).toFixed(2)} s after she came back`);
+    }
+  }
+
+  // (l) the goal-win hop under BIG MOTION off
+  const { tW, hf } = await winAndLog(p);
+  await p.close();
+  if (!hf.length) {
+    bar(false, 'l', 'no frame was logged after the goal-win door — the hop was never seen');
+  } else {
+    const h = hopRead(hf, tW);
+    bar(h.lo <= 0.82 && h.hi >= 1.18 && h.top <= 0.01 && h.late.length > 0 && !h.off.length, 'l',
+      `under BIG MOTION off the hop squashes to ${h.lo.toFixed(2)} (bar 0.82) and stretches to ${h.hi.toFixed(2)} (bar 1.18), `
+      + `${h.top <= 0.01 ? `and does not rise (${h.top.toFixed(3)} R, bar 0.01)` : `and RISES ${h.top.toFixed(2)} R (bar 0.01) — travel the setting exists to take away`}`
+      + `${h.off.length ? `; still off rest on ${h.off.length} frame(s) past +0.55 s` : ''}`);
+  }
+}
+
 await b.close();
-note('all three pages done');
-if (bad) console.log(`\nFAIL — ${bad} of 8 bar(s)`);
-else console.log('\nPASS — 8 bar(s): he savours a big bite, burps once on ?burp=1 and never over the whistle, and hops when he wins');
+const NBARS = { 1: 5, 2: 2, 3: 1, 4: 4 };
+const nb = PAGES.reduce((n, k) => n + (NBARS[k] ?? 0), 0);
+const which = PAGES.length === 4 ? '' : ` (pages ${PAGES.join(', ')} only)`;
+note(`page(s) ${PAGES.join(', ')} done`);
+if (bad) console.log(`\nFAIL — ${bad} of ${nb} bar(s)${which}`);
+else console.log(`\nPASS — ${nb} bar(s)${which}: he savours a big bite, burps once on ?burp=1 and never over the whistle, a ceremony or a pause, and hops when he wins — without the rise under BIG MOTION off`);
 process.exit(bad ? 1 : 0);

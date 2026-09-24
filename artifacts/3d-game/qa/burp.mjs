@@ -43,8 +43,24 @@
 //       the call (the spec's 0.25 s, the 5 ms scheduling lead every one-shot
 //       in the file takes, and 25 ms for the release to reach its floor).
 //   (c) NO SUB (phone speakers; the owner's rule set): its lowest partial —
-//       the body's end pitch — is at or above 120 Hz, and the energy below
-//       100 Hz is at or under -20 dB of the whole, by FFT.
+//       the body's end pitch — is at or above 120 Hz; the energy below 100 Hz
+//       is at or under -20 dB of the whole; and the energy below 120 Hz, the
+//       band audio3d.ts's rule names, is no greater a share of the whole than
+//       a plain bite's (pop(0, 1.3, 2.5), the sound a child hears on every
+//       meal), each by the same FFT over its own length.
+//       WHY 120 Hz IS NOT HELD TO -20 dB TOO (the G9 review asked). The spec
+//       puts the body's end at tonic/2 a minor third down, 126.1 Hz, and
+//       gives it 130 ms to die: a partial that short is a few hertz wide, and
+//       its own skirt crosses 120 Hz. In the run that set this bar the energy
+//       below 120 Hz read -20.0 dB of the whole — right on a -20 line — and
+//       -21.5 dB of it lay between 115 and 120 Hz, -26.8 between 110 and 115,
+//       -31.2 between 100 and 110 and -38.6 under 100: the 126 Hz partial's
+//       skirt, falling away from it, not a sub under it. A bar on that line
+//       would pass or fail on the rounding. The plain bite read -15.8 dB below
+//       120 Hz (and a scratch pass of the same FFT over the CHOMP's 0.7 s
+//       -8.3, -9.8 under 60 Hz alone), so the burp holds less of itself down
+//       there than either eat sound it follows. The owner's phone, playing
+//       burp-in-context.wav, is the last word.
 //   (d) ON THE TONIC. The tonic is read out of pop()'s own line in audio3d.ts
 //       (`const base = N * Math.pow(`: the ladder's root at step 0, depth 0),
 //       never copied here; a moved line FAILS. The 'b' — a sine pop — within
@@ -181,6 +197,12 @@ const B = burp.d;
 const tEnd = lastAbove(B, 0.001);
 const spB = spectrum(B, 0, 0.3);
 const all = bandDb(spB, 0, RATE / 2), sub100 = bandDb(spB, 0, 100), sub120 = bandDb(spB, 0, 120);
+// the same share for the plain bite, over its own length to -60 dBFS
+const popLen = Math.max(0.3, lastAbove(pop.d, 0.001) + 0.01);
+const spP = spectrum(pop.d, 0, popLen);
+const popSub120 = 10 * Math.log10(bandDb(spP, 0, 120) / bandDb(spP, 0, RATE / 2));
+const burpSub120 = 10 * Math.log10(sub120 / all);
+const skirt = [[100, 110], [110, 115], [115, 120]].map(([lo, hi]) => `${lo}-${hi} Hz ${(10 * Math.log10(bandDb(spB, lo, hi) / all)).toFixed(1)}`).join(', ');
 const bodyStart = pitch(B, 0.005, 0.04, 100, 220);
 const bodyEnd = pitch(B, 0.135, 0.1, 100, 220);
 const bPop = pitch(B, 0.005, 0.04, 240, 420);
@@ -191,7 +213,8 @@ const pkB = peakOf(B), pkPop = peakOf(pop.d), pkChomp = peakOf(chomp.d);
 
 console.log(`    length           under -60 dBFS from ${(tEnd * 1000).toFixed(0)} ms`);
 console.log(`    peak             ${db(pkB).toFixed(1)} dBFS   (plain bite ${db(pkPop).toFixed(1)}, CHOMP ${db(pkChomp).toFixed(1)})`);
-console.log(`    below 100 Hz     ${(10 * Math.log10(sub100 / all)).toFixed(1)} dB of the whole   (below 120 Hz: ${(10 * Math.log10(sub120 / all)).toFixed(1)} dB)`);
+console.log(`    below 100 Hz     ${(10 * Math.log10(sub100 / all)).toFixed(1)} dB of the whole`);
+console.log(`    below 120 Hz     ${burpSub120.toFixed(1)} dB of the whole   (${skirt}; the plain bite: ${popSub120.toFixed(1)} dB over its ${(popLen * 1000).toFixed(0)} ms)`);
 console.log(`    the 'b'          ${bPop.toFixed(1)} Hz   (tonic ${TONIC})`);
 console.log(`    body             ${bodyStart.toFixed(1)} Hz over 5-45 ms -> ${bodyEnd.toFixed(1)} Hz over 135-235 ms`
   + `   (tonic/2 ${(TONIC / 2).toFixed(1)}, a minor third under it ${(TONIC / 2 * third).toFixed(1)})`);
@@ -201,8 +224,9 @@ console.log('');
 let bad = 0;
 const bar = (ok, id, msg) => { console.log(`  ${ok ? 'ok  ' : 'BAD '} (${id}) ${msg}`); if (!ok) bad++; };
 bar(tEnd <= 0.28, 'b', `${tEnd <= 0.28 ? 'done' : 'still sounding'} at ${(tEnd * 1000).toFixed(0)} ms (bar 280: the spec's 0.25 s)`);
-bar(bodyEnd >= 120 && 10 * Math.log10(sub100 / all) <= -20, 'c',
-  `lowest partial ${bodyEnd.toFixed(1)} Hz (bar 120), energy below 100 Hz ${(10 * Math.log10(sub100 / all)).toFixed(1)} dB (bar -20)`);
+bar(bodyEnd >= 120 && 10 * Math.log10(sub100 / all) <= -20 && burpSub120 <= popSub120, 'c',
+  `lowest partial ${bodyEnd.toFixed(1)} Hz (bar 120), energy below 100 Hz ${(10 * Math.log10(sub100 / all)).toFixed(1)} dB (bar -20), `
+  + `below 120 Hz ${burpSub120.toFixed(1)} dB (bar: the plain bite's ${popSub120.toFixed(1)})`);
 const popOk = Math.abs(bPop / TONIC - 1) <= 0.03;
 const startOk = Math.abs(bodyStart / (TONIC / 2) - 1) <= 0.05;
 const endOk = Math.abs(bodyEnd / (TONIC / 2 * third) - 1) <= 0.02;

@@ -84,11 +84,23 @@ export interface Void3D {
    *  is the face billboard's width over its height; `wobble` is the jelly
    *  slosh the body shader was handed. `burpN` counts the burps the face has
    *  popped this session, and `hop` is the victory hop's vertical factor on
-   *  the body this frame (1 at rest). */
+   *  the body this frame (1 at rest).
+   *  `hop` is the number the rig MEANT to use, so it cannot tell a probe
+   *  whether the body was ever moved by it (the G9 review: delete `* hopNow`
+   *  from the squash and `hop` still reads 0.80). So the body is reported as
+   *  it was drawn, next to what this frame would have drawn with no hop:
+   *  `bodySY` is bob.scale.y and `restSY` is dispR times the frame's squash
+   *  before the hop's factor; `bodyY` is group.position.y and `restY` the
+   *  height this frame set before the hop's rise; `dispR` is the radius both
+   *  were built on. bodySY / restSY is the hop on the body; (bodyY - restY) /
+   *  dispR is the rise in radii. `burpLeft` is the seconds of the burp's cheek
+   *  hold still to run before the pop is asked (0: the next update() asks;
+   *  -1: no burp is in its hold). */
   faceState(): { mood: Mood; maw: number; smile: boolean; biting: boolean; hold: number;
     move: number; lid: number; shut: number; uniformK: number;
     blush: number; blushOpacity: number; scleraY: number; faceX: number; wobble: number;
-    burpN: number; hop: number };
+    burpN: number; hop: number; bodySY: number; restSY: number; bodyY: number; restY: number;
+    dispR: number; burpLeft: number };
   /** THE FOLLOW-THROUGH (research governor G9). Call on the SWALLOW of a meal —
    *  the frame the drain lets go of it — with the grade the bite was taken at
    *  (the meal against the void, 0.12..1). The cheeks puff, the body sloshes a
@@ -1849,6 +1861,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // the victory hop: pending until the next update() reads the clock, then
   // timed off s.t (see victoryHop())
   let hopPending = false, hopT0 = -1, hopNow = 1;
+  // what this frame would have drawn with no hop — the body's height and the
+  // group's — kept only so faceState() can report the drawn body against it
+  let restSYNow = 1, restYNow = 0;
   // chomp()'s slosh kick for a bite of grade g — the gulp takes its share of it
   const biteKick = (g: number) => 0.30 + 0.55 * g;
   // ── THE VICTORY HOP — G4's spec, which folded into G9 ───────────────────
@@ -1925,7 +1940,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         move: moveAmt, lid: mp.lid, shut: mp.shut, uniformK: uniformKNow,
         blush: blushNow, blushOpacity: blushMats.length ? blushMats[0].opacity : 0,
         scleraY: eyes[0].sclera.scale.y, faceX: face.scale.y ? face.scale.x / face.scale.y : 1,
-        wobble: bodyMat.uniforms.uWobble.value as number, burpN, hop: hopNow };
+        wobble: bodyMat.uniforms.uWobble.value as number, burpN, hop: hopNow,
+        bodySY: bob.scale.y, restSY: restSYNow, bodyY: group.position.y, restY: restYNow, dispR,
+        burpLeft: burpAge >= 0 ? Math.max(0, BURP_HOLD - burpAge) : -1 };
     },
     afterBite(bite) {
       const g = Math.min(1, Math.max(0, bite));
@@ -2329,6 +2346,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // lift so the orb rests partly sunk into the ground; roll-bob while
       // moving — frenzy/victory add a real happy bounce
       const lift = dispR * (RADIUS_SINK + Math.abs(Math.sin(s.t * (6 + mp.bounce * 3) * slow)) * moveAmt * (0.05 + mp.bounce * 0.055));
+      restYNow = lift + arriveLift;   // faceState(): the height with no hop, for the drawn one to be read against
       group.position.set(s.x, lift + arriveLift + hopLift * dispR, s.z);
 
       // squash/stretch + lean on the bob (body+glow only) — gentle, so the orb
@@ -2423,6 +2441,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // wide, a stretch to 1.2 is 0.91 wide. At rest hopNow is exactly 1 and
       // both lines are what they were.
       const lat = (uniformK - breathe) / Math.sqrt(hopNow);
+      restSYNow = dispR * squash * uniformK;   // faceState(): this frame's height with no hop
       squash *= uniformK * hopNow;
       bob.scale.set(dispR * lat, dispR * squash, dispR * lat);
       hatSquash = squash;   // the hat rides the head's height, rigidly

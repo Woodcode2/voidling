@@ -3537,13 +3537,16 @@ const _dbg = new Proxy(_dbgStore, {
   __faceState: () => { mood: string; maw: number; smile: boolean; biting: boolean;
     hold: number; move: number; lid: number; shut: number; uniformK: number;
     blush: number; blushOpacity: number; scleraY: number; faceX: number; wobble: number;
-    burpN: number; hop: number };
+    burpN: number; hop: number; bodySY: number; restSY: number; bodyY: number; restY: number;
+    dispR: number; burpLeft: number };
   /** the research spec's name for the same read (G9) — an alias, not a second hook */
   __face: () => { mood: string; maw: number; smile: boolean; biting: boolean;
     hold: number; move: number; lid: number; shut: number; uniformK: number;
     blush: number; blushOpacity: number; scleraY: number; faceX: number; wobble: number;
-    burpN: number; hop: number };
+    burpN: number; hop: number; bodySY: number; restSY: number; bodyY: number; restY: number;
+    dispR: number; burpLeft: number };
   __burpState: () => { on: boolean; wait: number; cd: number; streak: number };
+  __burpOwe: () => number;
   __stages: () => { cur: number; best: number; ceremonies: number; held: number[]; owed: number };
   __voidSetMenuR: (r: number) => void;
   __dioMark: () => number;
@@ -3795,8 +3798,19 @@ _dbg.__faceState = () => voidling.faceState();
 _dbg.__face = _dbg.__faceState;
 /** QA (G9, qa/savour.mjs): the burp's machinery — whether ?burp=1 switched it
  *  on, the world seconds until an owed burp starts (-1: none owed), the tClock
- *  seconds of cooldown left, and the landmark-grade swallows in the streak. */
-_dbg.__burpState = () => ({ on: BURP_ON, wait: burpWait, cd: Math.max(0, burpCdUntil - tClock), streak: burpStreak.length });
+ *  seconds of cooldown left, and the landmark-grade swallows in the streak.
+ *  The streak is the LIVE count, the swallows inside BURP_STREAK_WIN of now:
+ *  the array itself is only pruned on the next swallow, so its length can
+ *  carry a spawn feast's entries long after they could close a streak, and a
+ *  probe waiting for "nothing in the streak" would wait for a swallow. */
+_dbg.__burpState = () => ({ on: BURP_ON, wait: burpWait, cd: Math.max(0, burpCdUntil - tClock),
+  streak: burpStreak.filter((t) => tClock - t <= BURP_STREAK_WIN).length });
+/** QA (G9, qa/savour.mjs (k)): owe a burp NOW, as a trigger would, with the
+ *  cooldown cleared first — the 20 s cooldown is 20 s of tClock, which under a
+ *  software renderer is about four and a half minutes of a probe waiting for a
+ *  second burp. Goes through oweBurp(), so ?burp=1, the end beat and the outro
+ *  still refuse it. Returns the world seconds until it starts (-1: refused). */
+_dbg.__burpOwe = () => { burpCdUntil = -99; oweBurp(BURP_AFTER); return burpWait; };
 // QA: how many EVOLVED ceremonies have played, and the two stage counters
 // behind them. A demotion walks curStage back; bestStage does not move, so the
 // ceremony cannot re-fire on the way home. qa/evolveonce.mjs reads this.
