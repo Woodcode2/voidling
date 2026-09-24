@@ -833,6 +833,16 @@ const SUITE = [
     cmd: ['node', 'qa/bitetime.mjs', PORT, 'maple'], verdict: pf,
     why: 'every bite is heard within 67 ms of its meal starting to fall — the reward lands when the object drops in, not on contact' },
 
+  // Research governor G5. Not in push until two greens: the lead promotes it.
+  // Maple and Skylark because Skylark is the world whose census offers six
+  // voices today and Maple is the world a first match is played on. Its
+  // offline half bundles src/ with the esbuild vite ships, so it reads the
+  // source beside the build, as qa/eightbit.mjs does. The timeout is twice the
+  // 884 s the full run took inside its browser slot on the fixed build here.
+  { id: 'eatvoice', tier: 'feel', profiles: ['live', 'quality'], timeout: 1800,
+    cmd: ['node', 'qa/eatvoice.mjs', PORT, 'maple', 'skylark'], verdict: pf,
+    why: 'what she eats says what it was — a car meeps, a townsperson goes wheee — under the tuned note, one voice per 0.35 s at most, off the score\'s bus, never over the whistle; and each bite on its own side' },
+
   { id: 'aftermatch', tier: 'feel', profiles: ['live'], timeout: 420,
     cmd: ['node', 'qa/aftermatch.mjs', PORT], verdict: pf,
     why: 'the menu theme comes home after TIME!, by both ways out' },

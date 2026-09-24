@@ -475,7 +475,15 @@ if (_wantGoal !== null) playingGoal = _wantGoal;
 // child hears together reads `w`; one asking what the game did when reads `t`
 const audioCalls: { t: number; w: number; id: string }[] = [];
 let audioClockReady = false;
-const AUDIO_UNLOGGED = new Set(['musicState', 'musicLog', 'isMuted', 'setZone', 'ensureMusic']);
+const logAudio = (id: string) => {
+  audioCalls.push({ t: audioClockReady ? tClock : -1, w: performance.now() / 1000, id });
+  if (audioCalls.length > 400) audioCalls.shift();
+};
+// eatVoice is written down by its caller instead, as 'eat:<voice>' and only
+// when it SOUNDED: its 0.35 s gate turns most asks in a spree into nothing, and
+// logging every ask would put two entries per bite into a 400-deep ring that
+// qa/nomstream.mjs and qa/endbeat.mjs read crowns and whistles out of.
+const AUDIO_UNLOGGED = new Set(['musicState', 'musicLog', 'isMuted', 'setZone', 'ensureMusic', 'eatVoice']);
 const audio = (() => {
   const a = createAudio();
   const rec = a as unknown as Record<string, unknown>;
@@ -483,8 +491,7 @@ const audio = (() => {
     const f = rec[k];
     if (typeof f !== 'function' || AUDIO_UNLOGGED.has(k)) continue;
     rec[k] = (...args: unknown[]) => {
-      audioCalls.push({ t: audioClockReady ? tClock : -1, w: performance.now() / 1000, id: k });
-      if (audioCalls.length > 400) audioCalls.shift();
+      logAudio(k);
       return (f as (...x: unknown[]) => unknown).apply(a, args);
     };
   }
@@ -3577,7 +3584,7 @@ const _dbg = new Proxy(_dbgStore, {
   __music: () => ReturnType<typeof audio.musicState>;
   __audioLog: () => string[];
   __audioCalls: () => { t: number; w: number; id: string }[];
-  __biteLog: () => { id: number; r: number; cap: number; sink: number; sndT: number; snd: string; gulp: number; vc: string }[];
+  __biteLog: () => { id: number; r: number; cap: number; sink: number; sndT: number; snd: string; gulp: number; vc: string; said: string }[];
   __newsArc: () => {
     log: { t: number; phase: number; tier: number; react: boolean; brand: string; text: string }[];
     arc: { phase: number; cards: number; high: number };
@@ -3720,7 +3727,7 @@ _dbg.__audioCalls = () => audioCalls.slice();
  *  the capture, of the frame the drain crossed T_FALL, of the sound asked for
  *  there, and of the swallow (-1 until each happens). Copies, so a probe cannot
  *  write back into what the drain is about to pay. */
-_dbg.__biteLog = () => biteLog.map((b) => ({ id: b.id, r: b.r, cap: b.cap, sink: b.sink, sndT: b.sndT, snd: b.snd, gulp: b.gulp, vc: b.vc }));
+_dbg.__biteLog = () => biteLog.map((b) => ({ id: b.id, r: b.r, cap: b.cap, sink: b.sink, sndT: b.sndT, snd: b.snd, gulp: b.gulp, vc: b.vc, said: b.said }));
 // QA: put a hat on the live void. Needed to measure OCCLUSION from the play
 // camera — the thing qa/hatsheet.mjs cannot see, because it renders a hat alone
 // in a bare scene from near-horizontal angles while the game looks DOWN at a
@@ -9012,6 +9019,7 @@ interface BitePay {
   head: boolean;   // a CHOMP — decided at capture, because the hat reads its cooldown there
   kx: number; kz: number;   // the pull at capture, for the landmark kit's recoil
   vc: EatVoice | '';   // what this meal says when it goes in — eatVoiceOf(), '' for a silent kind (G5)
+  said: string;    // what it said at the sink: the voice, '-' held by the gate or the end beat, '' not yet
 }
 /** The last 64 bites, oldest first — the same objects the drain pays, so a row
  *  fills in as its bite goes down. QA only (__biteLog); nothing in the game
@@ -9334,7 +9342,7 @@ function capture(e: Edible, giveHunger = true) {
   // and after the frame loop's goal check has had its turn. Everything the
   // sound depends on is written down here, as it stands at the bite.
   const pay: BitePay = { id: e.mesh.id, r: e.radius, cap: tClock, sink: -1, sndT: -1, snd: '', gulp: -1,
-    bite, vr: voidling.radius, combo, head: headline, kx: dx, kz: dz, vc: eatVoiceOf(e) ?? '' };
+    bite, vr: voidling.radius, combo, head: headline, kx: dx, kz: dz, vc: eatVoiceOf(e) ?? '', said: '' };
   e.pay = pay;
   biteLog.push(pay);
   if (biteLog.length > 64) biteLog.shift();
@@ -9364,6 +9372,27 @@ function biteSinks(e: Edible, pay: BitePay) {
   } else if (pay.head) { audio.chomp(pay.r, pay.vr, 'prop', pay.combo, true); buzz(15); pay.snd = 'plain'; }
   else { audio.pop(pay.combo, pay.r, pay.vr); buzz(pay.r > 2 ? 15 : 8); pay.snd = 'pop'; }
   pay.sndT = tClock;
+  // ── …AND THE MEAL SAYS WHAT IT WAS (research governor G5) ───────────────
+  // Under the note, on the note's side, one every 0.35 s at most — the rules
+  // are audio3d's (eatVoice). Not in the end beat: the whistle owns that
+  // moment, and a car meeping over it is a second celebration on one beat
+  // (qa/endbeat.mjs). Nor once the match is over: the eat loop stops at
+  // `ended` today, and saying so here, where the voice is asked, means no
+  // later caller of biteSinks can put a meep on the results card.
+  //
+  // IT RIDES A CHOMP TOO, and that was decided by level. The rule is 6 dB
+  // under the NOTE, and a CHOMP's note is a pop — chomp() plays one, then
+  // lays its crunch and its gulp over it. Rendered at a house-sized CHOMP
+  // (qa/eatvoice.mjs (k)), every voice sits 13.0 dB or more under the whole
+  // CHOMP and adds 0.22 dB to it at the most: it cannot take the headline, and
+  // the biggest bites of a match — the car that was bigger than you — still
+  // say what they were. A rival devoured never comes through here: it is the
+  // family, not a meal, and chomp(..., 'rival') carries its own arpeggio.
+  if (pay.vc && !beat && !ended) {
+    const said = audio.eatVoice(pay.vc, pay.r, pay.vr, pay.combo);
+    pay.said = said ?? '-';
+    if (said) logAudio(`eat:${said}`);
+  } else if (pay.vc) pay.said = '-';
   // The pop's pitch is the link THIS bite was (pay.combo), so the ladder now
   // climbs in the order meals go DOWN, not the order they were taken: a crumb
   // drains faster than a meal, so a crumb taken just after a meal can sink
