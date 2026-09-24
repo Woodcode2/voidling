@@ -9456,8 +9456,9 @@ function biteGulps(e: Edible, pay: BitePay) {
       // six this rung's and none a beat's: the ceiling was counting the bite.
       // With ?killbeat=1 an anonymous meal holds the world no longer than the
       // ladder's own named-meal freeze — a sticker found, the hero landmark,
-      // 0.10 s — so no house outlasts a sticker, and every freeze over the line
-      // is a beat's. The trim is 0-5 ms, on meals of 0.9 of his radius or more.
+      // 0.10 s — so at full motion no house outlasts a sticker (under Reduce
+      // Motion the sticker's freeze halves to 0.05 s and this cap does not),
+      // and every freeze over the line is a beat's. The trim is 0-5 ms, on meals of 0.9 of his radius or more.
       // With the switch off, as the game ships, the rung is untouched.
       const stopFor = 0.055 + 0.05 * pay.bite;
       hitStop(KILL_BEAT ? Math.min(stopFor, BEAT_TIME.landmark.stop) : stopFor);

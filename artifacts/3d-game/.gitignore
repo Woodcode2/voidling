@@ -25,6 +25,9 @@ qa/out/shippedlook/maple_leaves.png
 qa/out/person/
 # 54 frames, ~61 MB, rebuilt by `node qa/faceline.mjs 4177 maple` (the I-3 line-up)
 qa/out/faceline/
+# the owner's kill-beat contact sheets (qa/killbeat.mjs) — rendered per build,
+# handed to him, never evidence the repo keeps
+qa/out/killbeat/
 # qa/out/shippedlook/*_look.png was ignored here — the studio's entire
 # canonical evidence pack lived untracked, died with every container restart,
 # and silently reverted to an August 23 snapshot while the committed .src

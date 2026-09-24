@@ -681,8 +681,22 @@ if (['a', 'e', 'f'].some(want)) {
           else {
             const after = await rows(p, 10, K.placed.name);
             const all = [K.at, ...after];
-            if (K.at.stops > K.before.stops) bad.push(`the kill armed a new ${fmt(K.at.stop)} s freeze inside the outro`);
-            else if (K.at.stop > K.before.stop + EPS) bad.push(`the kill lengthened the freeze to ${fmt(K.at.stop)} s inside the outro`);
+            // Judged by what only a beat can do. A raw freeze count is not
+            // this bar: the first kill grows him into a big meal (r 2.4), and
+            // that meal's own bite hit-stop (0.055 + 0.05 x bite, ~0.092 s —
+            // older than G8, and the end beat never blocked it) gulps within a
+            // frame of the outro kill. A review run caught it landing ON the
+            // kill frame, freezes 4 -> 5 with no beat armed, and failed the
+            // right code; two instrumented re-runs showed the same meal
+            // gulping one frame early (stop 0.093 / 0.091 s, freezes 3 -> 3).
+            // So: no marquee beat may be armed, and no freeze may run longer
+            // than the bite's own ladder can make (0.105 s) — a beat's
+            // shortest stop that could land here, the rival's, is 0.14 s.
+            const B0 = K.before.beats, B1 = all[all.length - 1].beats;
+            const armed = B0 && B1 ? Object.keys(B1).filter((k) => B1[k] > (B0[k] || 0)) : null;
+            if (armed === null) bad.push('this build keeps no count of its marquee beats (no beats in __juiceState)');
+            else if (armed.length) bad.push(`the kill armed a marquee beat inside the outro (${armed.map((k) => `${k} +${B1[k] - (B0[k] || 0)}`).join(', ')})`);
+            if (all.some((r) => r.stop > 0.105 + EPS)) bad.push(`a ${fmt(Math.max(...all.map((r) => r.stop)))} s freeze ran inside the outro (over the bite's own 0.105 s)`);
             const slow = all.map((r) => r.slow).filter((x) => x !== null && x < 1 - EPS);
             if (slow.length) bad.push(`slow motion ran at ${slow[0]} after a kill inside the outro`);
             const kp = (all[all.length - 1].kp ?? 0) - (K.before.kp ?? 0);
