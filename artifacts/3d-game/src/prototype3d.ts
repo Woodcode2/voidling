@@ -3557,6 +3557,9 @@ const _dbg = new Proxy(_dbgStore, {
   __calm: () => void;
   /** how many times the shore answered a push this match — qa reads this */
   __wallCues: () => number;
+  /** G7: outgrown cues played / un-gate waves seen this match (qa/nowfood.mjs) */
+  __outgrownN: () => number;
+  __ungateWaveN: () => number;
   __faceWrap: (v: number) => void;
   __groundSurf: (road: number, grass: number, debug?: number) => void;
   __pickFresh: <T>(arr: T[]) => T;
@@ -3877,6 +3880,14 @@ _dbg.__calm = () => voidling.calm();
 // read. qa/edgespeed.mjs drives into the shore for 900 frames; >0 proves the
 // cue fires, and a count near the frame count would prove the throttle broke.
 _dbg.__wallCues = () => wallCueN;
+// QA (G7): the two moments "now I can eat that" is about, counted where the
+// game decides them — a sibling the player has just outgrown (the cue that
+// answered its halo turning green), and an un-gate pass that turned a wave of
+// greyed props back to colour. qa/nowfood.mjs reads both against what it can
+// see for itself: the rivals' radii, the props' own gated flags, the floats
+// and the audio call log.
+_dbg.__outgrownN = () => outgrownN;
+_dbg.__ungateWaveN = () => ungateWaveN;
 // How far the face is seated onto the sphere, 0..0.9. A look knob — see
 // FACE_WRAP in void3d.ts. Exposed so qa/facewrap.mjs can render the same
 // frame at several values and the choice can be made from pictures.
@@ -5441,6 +5452,36 @@ rivals.onSurge = (name, x, z, color) => {
   // smaller than the player (green ring) and turns red ~1 s later as it grows
   // (0.55/s toward 1.26x); measured 2026-09-02 (refute-cards) red-and-on-screen
   // 2.8% of a 23 s surge. The onSurge ring in the rival's colour is the whole cue.
+};
+// ── NOW I CAN EAT THAT: A SIBLING BECOMES FOOD (research governor G7) ─────
+// The other half of the owner's back-and-forth (decision 2, 2026-08-26: "if
+// they're larger you go and consume and come back"). The surge above tells a
+// child a sibling got bigger; nothing ever told her she had got bigger BACK —
+// the sibling's halo turned green and that was all, for NIBBLES stuffed after
+// her hunt, for a surged sibling sagging back, for a cousin she outgrew in the
+// first minute. rivals.ts fires this on the green-halo edge (confirmed for
+// 0.5 s, re-armed after 1.4 s back over the line — see OUT_RISE there), once
+// per sibling per match, and plays the sibling's own half itself: the startled
+// stare it already makes running from you, and "uh oh..." in its bubble. This
+// is the player's half: one float over HIM, clear of his face and of the NOMS
+// pill (bubbles.headFloat), audio.outgrow() and a 20 ms buzz.
+//
+// No ring (owner item 4, "rings pop up behind you... annoying", stands), no
+// flash, no shake, no card. Ten seconds between two of these, whoever they are
+// about — in the first minute several siblings can cross in a row, and a
+// float every few seconds would be a nag. A declined edge is not lost:
+// returning false keeps it pending in rivals.ts, and it is offered again every
+// frame while that sibling is still edible, so the cooldown DELAYS the second
+// sibling's news rather than dropping it. Nothing here while the whistle owns
+// the end (endBeat, the outro), in the intro, or with the sheet up.
+let outgrowCd = 0;
+rivals.onOutgrown = (name) => {
+  if (!started || ended || paused || introT > 0 || outroT > 0 || endBeat() || tClock < outgrowCd) return false;
+  outgrowCd = tClock + 10;
+  outgrownN++;
+  bubbles.headFloat(`YOU'RE BIGGER THAN ${name}!`, { color: NOW_FOOD_GREEN });
+  audio.outgrow(); buzz(20);
+  return true;
 };
 rivals.onNearMiss = (name, x, z) => {
   rivalEv.nearMiss++;
@@ -7244,6 +7285,177 @@ function showNews() {
 
 const GATE_GREY = new THREE.Color(0x6b6b7a);
 let gateT = 0;      // throttle for the too-big-to-eat tint
+// QA (research governor G7, qa/nowfood.mjs): how many times this match a
+// sibling's "you're bigger than me" edge was answered, and how many un-gate
+// passes were big enough to count as a WAVE. Read-only counters; see
+// __outgrownN and __ungateWaveN.
+let outgrownN = 0, ungateWaveN = 0;
+/** THE TINT ITSELF, on one prop: greyed toward slate when it is too big, its
+ *  own colour back when it is not. Lifted out of the gate pass unchanged so
+ *  the rolling un-gate (ungateWave) can hand a prop its colour back on a
+ *  later frame than the one that decided it. */
+function tintGate(e: Edible, tooBig: boolean): void {
+  e.mesh.traverse((o) => {
+    const mm = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+    if (!mm || !mm.color) return;
+    // ── A LAMP IS NOT GREYED (studio round 4, Job 9) ────────────────────
+    // This walk reached the lit half of a lit() prop too, and did two
+    // things to it. The clone below drops onBeforeCompile, which is where
+    // PROP_GLOW_MAT's luminance floor lives (island.ts) — and un-gating
+    // restores the colour but keeps the clone, so a lantern gated once was
+    // off the floor for the rest of the match. And on a lamp the grey is
+    // only a dimmer: the multiplier it lerps is a neutral 1.75, which comes
+    // out at 1.077/1.077/1.097 (three's Color, as this runs it), 61.6% of
+    // the lamp's luminance — so the gate switched the lights off exactly on
+    // the big lantern stalls round a small void. The solid half of the prop
+    // still wears the grey; its light stays a light.
+    if (mm === (PROP_GLOW_MAT as THREE.Material)) return;
+    if (tooBig) {
+      if (!o.userData.baseCol) o.userData.baseCol = mm.color.clone();
+      // clone the material once per gated mesh, or every prop sharing the
+      // merged-prop material would grey out together
+      // ── AND A CLONE IS NOT A COPY OF THE SHADER ──────────────────────
+      // three's Material.clone() (r185, verified) does NOT copy
+      // onBeforeCompile, and it DOES copy userData by value. So a cloned
+      // prop material comes out carrying the STOCK standard shader plus a
+      // dead JSON snapshot of the original's `shader` object. The occlusion
+      // fade hook then writes 0.62 into that snapshot every frame, a probe
+      // asking whether the material is hooked reads true, and nothing on
+      // the GPU has ever heard of uFade. Measured with the town hall over
+      // the void: fade 0.62, uFade 0.62, and 0 of 20,121 pixels of the
+      // hero's silhouette showing through it.
+      // Gating fires on exactly the props too big to eat, which is exactly
+      // the set big enough to hide the hero — so the feature written to
+      // stop the hero disappearing was switched off for every prop that
+      // could ever hide him, by a line about the colour grey.
+      // The gloss pass went the same way: a gated prop was rendering
+      // without the roughness and metalness terms every other prop on the
+      // island gets. The eight "THREE.Texture: Unable to serialize Texture"
+      // warnings in the console are this clone, JSON-ing a compiled
+      // shader's uniforms.
+      if (!o.userData.gateMat) {
+        const gm = mm.clone();
+        gm.userData = {};             // drop the dead snapshot; let it compile its own
+        installPropShader(gm);
+        o.userData.gateMat = gm;
+        (o as THREE.Mesh).material = gm;
+      }
+      ((o as THREE.Mesh).material as THREE.MeshStandardMaterial).color
+        .copy(o.userData.baseCol).lerp(GATE_GREY, 0.42);
+    } else if (o.userData.baseCol && o.userData.gateMat) {
+      ((o as THREE.Mesh).material as THREE.MeshStandardMaterial).color.copy(o.userData.baseCol);
+    }
+  });
+}
+// ── NOW I CAN EAT THAT: THE WORLD LIGHTS UP (research governor G7) ──────────
+// The gate pass has always handed a greyed prop its colour back the tick the
+// player grew past it, and done it in silence and all at once: a whole class
+// of the town — every car on the island, every stall in the market — flipped
+// on one 0.4 s tick with nothing to say it had happened. A pre-reader cannot
+// use the guide lines; that flip IS the size rule, shown, and nothing pointed
+// at it.
+//
+// So an un-gate big enough to be news is a WAVE: eight or more props in one
+// tick, or any prop over r 2 that is not a walker (every adult on the island
+// is an edible of r 2.4, and one person un-greying is not a class of the town
+// becoming food). Measured on the unmodified build, a natural 40 s Maple
+// drive (scratch g7natural): 12 un-gate ticks, 8 of them waves by this rule,
+// at t 4.1, 7.9, 24.8, 26.5, 29.0, 31.0, 33.7 and 40.6 — so a wave is an
+// event of the match, not of the frame. A wave:
+//   · ROLLS OUTWARD. Each prop's colour comes back d/60 s after the tick,
+//     d its distance from the void then: the town lights up from under her
+//     at 60 units a second instead of blinking.
+//   · SPARKLES, once in any three seconds (audio.sparkle): three glock notes,
+//     no louder than a bite (qa/nowfoodsound.mjs (s1): peak -26.5 dBFS
+//     against the loudest pop's -25.6).
+//   · NAMES ITSELF, once a match: "CARS ARE FOOD NOW!" over the void, the
+//     dominant KIND among the flipped props (waveWord).
+// Neither sound nor name in the intro, the outro or the end beat — the whistle
+// owns the end — nor within 1.5 s of an EVOLVED card, nor while a form a meal
+// has earned is still waiting for that meal to go down (proto3d/evohold.ts):
+// that card lands on the swallow, 345-625 ms after the bite by the drain's own
+// arithmetic (BitePay), and would land on top of it. Waves under those
+// rules still roll; they only keep quiet, and the once-a-match name waits for
+// the next wave rather than being spent on one nobody heard.
+const ungateTick: Edible[] = [];
+const ungateQ: { e: Edible; at: number }[] = [];
+let evoCardAt = -99, sparkleCd = 0, classSaid = false;
+/** Plural nouns for the kinds this island tags (`qk`), in a pre-reader's
+ *  words. `null` is a kind with no good word — landmark-class, "small" stuff,
+ *  roadworks, the prize goat (the finale's star, not a class of anything), the
+ *  gritter — which gets the generic line. House and car are not here: they
+ *  take the world's own word from LEVEL_SPEC, so the float and the dot-2 chip
+ *  say STALLS at the market and TRUCKS on game day in the same voice.
+ *  A tag with NO entry goes to the generic line too, silently, which is how
+ *  the avalanche's rolling snowballs (life.ts tags them 'snowball', where
+ *  Powder's static piles are 'snowballs') were missed by the first cut:
+ *  qa/nowfood.mjs (k1) now reads every tag the source writes against this
+ *  table, so a new kind cannot fall to "BIGGER THINGS" without a decision. */
+const KIND_WORD: Record<string, string | null> = {
+  rv: 'MOTORHOMES', chalet: 'CHALETS', lodge: 'LODGES', hut: 'HUTS',
+  pine: 'TREES', snowman: 'SNOWMEN', drift: 'SNOWDRIFTS', lift: 'SKI LIFTS',
+  sign: 'SIGNS', snowballs: 'SNOWBALLS', snowball: 'SNOWBALLS', bridge: 'BRIDGES',
+  big: null, small: null, roadworks: null, goat: null, gritter: null,
+};
+/** a word, `null` (a kind with no good word), or `undefined` (not a kind) */
+function kindWord(e: Edible): string | null | undefined {
+  const u = e.mesh.userData, qk = u.qk as string | undefined;
+  // a child on a sled is tagged for the quest board, and is never a class of
+  // thing that is FOOD NOW — the newsroom's rule, no line says a person is eaten
+  if (qk === 'sledkid') return undefined;
+  if (qk === 'house' || qk === 'car') {
+    return LEVEL_SPEC[pickedWorld].set.find((x) => x.kind === qk)?.label ?? (qk === 'house' ? 'HOUSES' : 'CARS');
+  }
+  if (qk) return qk in KIND_WORD ? KIND_WORD[qk] : null;
+  if (u.mover) return undefined;   // an untagged walker is a person or an animal
+  if (u.afloat) return 'BOATS';
+  return undefined;
+}
+/** THE DOMINANT KIND AMONG THE FLIPPED — among props that HAVE a kind. On the
+ *  unmodified build 8,427 of Maple's 8,593 edibles carry no `qk` at all, and
+ *  Pirate Bay tags 7 of its 4,430 (a scratch census of all six worlds; only
+ *  Skylark tags most of its island, and mostly as 'small', which has no word).
+ *  Counting the untagged as a kind of their own would name nothing on nearly
+ *  every wave — measured on Maple, the first two waves of a natural drive were
+ *  all untagged, at t 4.1 and 7.9 — and spend the match's one name in its
+ *  first ten seconds. A wave with no tagged prop names nothing and does not
+ *  spend it; the first to carry a kind names it (the same drive's first was
+ *  17 cars among 100 props at t 33.7). */
+function waveWord(list: Edible[]): string | null {
+  const n = new Map<string, number>();
+  for (const e of list) {
+    const w = kindWord(e);
+    if (w === undefined) continue;
+    const k = w ?? '';
+    n.set(k, (n.get(k) ?? 0) + 1);
+  }
+  if (!n.size) return null;
+  let best = '', bn = -1;
+  for (const [k, v] of n) if (v > bn) { bn = v; best = k; }
+  return best || 'BIGGER THINGS';
+}
+function ungateWave(list: Edible[]): void {
+  let big = false;
+  for (const e of list) if (e.radius > 2 && !e.mesh.userData.mover) { big = true; break; }
+  if (list.length < 8 && !big) { for (const e of list) tintGate(e, false); return; }
+  ungateWaveN++;
+  for (const e of list) {
+    const d = Math.hypot(e.mesh.position.x - voidState.x, e.mesh.position.z - voidState.z);
+    ungateQ.push({ e, at: tClock + d / 60 });
+  }
+  ungateQ.sort((a, b) => a.at - b.at);
+  if (!started || ended || paused || introT > 0 || outroT > 0 || endBeat()) return;
+  if (tClock - evoCardAt < 1.5 || evoHold.state().held.length > 0) return;
+  if (tClock >= sparkleCd) { sparkleCd = tClock + 3; audio.sparkle(); }
+  if (!classSaid) {
+    const word = waveWord(list);
+    if (word) { classSaid = true; bubbles.headFloat(`${word} ARE FOOD NOW!`, { color: NOW_FOOD_GREEN }); }
+  }
+}
+/** the green the halo turns when a sibling becomes food, and the green of a
+ *  big float (.vf.big): the colour this game already spends on "that is yours
+ *  to eat" */
+const NOW_FOOD_GREEN = '#7ef2a0';
 // Maple's biome ids to the newsroom's district ids. Written to cover BOTH the
 // old zoning and the re-zone that is landing separately, so a headline never
 // falls back to "general" just because a cell got renamed.
@@ -7303,6 +7515,7 @@ let stallT = 0;     // seconds spent driving into something that will not move
 let wasAtWall = false;
 let wallCueCd = 0;
 let wallCueN = 0;   // QA: read via __wallCues — a feel cue still needs a number
+let touchCd = 0;    // tClock before which a bump into a too-big prop stays quiet (G7, the eat loop)
 
 let prevRank = 0;   // 0 = unset; rank-change drama needs a baseline first
 // ── PAINT CACHES ────────────────────────────────────────────────────────────
@@ -11446,6 +11659,7 @@ function resetMatch() {
     // is not paid in this one, retired or not: the drain carries on with any
     // edible left eaten, and it would sound on the new match's clock.
     e.pay = undefined;
+    e.mesh.userData.touch = false;   // the rematch's first bump is a first contact (G7)
     if (e.mesh.userData.retired) { e.mesh.visible = false; if (e.mesh.parent) scene.remove(e.mesh); continue; }
     e.eaten = false; e.t = 0;
     e.mesh.userData.eaten = false;
@@ -11508,6 +11722,13 @@ function resetMatch() {
   // opens with a stale crown to lose and a stale announcedRank to suppress
   crownLive = false; everBehind = false; shownRank = 0; announcedRank = 0; rankHold = 0;
   feastR = 0;     // the ceiling a rival bought you does not carry into the next match
+  outgrownN = 0; ungateWaveN = 0;   // QA counters are per match (G7)
+  // …and so is the rest of "now I can eat that": the wave's name is once a
+  // match, the cooldowns start clean, and any colour a wave still owed is paid
+  // now rather than on the new match's clock
+  classSaid = false; outgrowCd = 0; sparkleCd = 0; evoCardAt = -99; touchCd = 0;
+  for (const q of ungateQ) if (!q.e.mesh.userData.gated) tintGate(q.e, false);
+  ungateQ.length = 0;
   for (const k in moments) (moments as Record<string, boolean>)[k] = false;
   countTick = 0;
   renderQuests();
@@ -14295,6 +14516,7 @@ function animate() {
   if (armed && gateT <= 0) {   // armed: what is edible must read before the first touch, not after
     gateT = 0.4;
     const Rg = voidling.radius, reach = Rg * 26 + 40;
+    ungateTick.length = 0;
     for (const e of edibles) {
       if (e.eaten || !e.mesh.visible) continue;
       const tooBig = e.radius > Rg * eatRatioNow();
@@ -14316,59 +14538,23 @@ function animate() {
         const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
         if (dx * dx + dz * dz > reach * reach) continue;   // too far to be worth telling them about
       }
+      const wasGated = e.mesh.userData.gated === true;
       e.mesh.userData.gated = tooBig;
-      e.mesh.traverse((o) => {
-        const mm = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
-        if (!mm || !mm.color) return;
-        // ── A LAMP IS NOT GREYED (studio round 4, Job 9) ────────────────────
-        // This walk reached the lit half of a lit() prop too, and did two
-        // things to it. The clone below drops onBeforeCompile, which is where
-        // PROP_GLOW_MAT's luminance floor lives (island.ts) — and un-gating
-        // restores the colour but keeps the clone, so a lantern gated once was
-        // off the floor for the rest of the match. And on a lamp the grey is
-        // only a dimmer: the multiplier it lerps is a neutral 1.75, which comes
-        // out at 1.077/1.077/1.097 (three's Color, as this runs it), 61.6% of
-        // the lamp's luminance — so the gate switched the lights off exactly on
-        // the big lantern stalls round a small void. The solid half of the prop
-        // still wears the grey; its light stays a light.
-        if (mm === (PROP_GLOW_MAT as THREE.Material)) return;
-        if (tooBig) {
-          if (!o.userData.baseCol) o.userData.baseCol = mm.color.clone();
-          // clone the material once per gated mesh, or every prop sharing the
-          // merged-prop material would grey out together
-          // ── AND A CLONE IS NOT A COPY OF THE SHADER ──────────────────────
-          // three's Material.clone() (r185, verified) does NOT copy
-          // onBeforeCompile, and it DOES copy userData by value. So a cloned
-          // prop material comes out carrying the STOCK standard shader plus a
-          // dead JSON snapshot of the original's `shader` object. The occlusion
-          // fade hook then writes 0.62 into that snapshot every frame, a probe
-          // asking whether the material is hooked reads true, and nothing on
-          // the GPU has ever heard of uFade. Measured with the town hall over
-          // the void: fade 0.62, uFade 0.62, and 0 of 20,121 pixels of the
-          // hero's silhouette showing through it.
-          // Gating fires on exactly the props too big to eat, which is exactly
-          // the set big enough to hide the hero — so the feature written to
-          // stop the hero disappearing was switched off for every prop that
-          // could ever hide him, by a line about the colour grey.
-          // The gloss pass went the same way: a gated prop was rendering
-          // without the roughness and metalness terms every other prop on the
-          // island gets. The eight "THREE.Texture: Unable to serialize Texture"
-          // warnings in the console are this clone, JSON-ing a compiled
-          // shader's uniforms.
-          if (!o.userData.gateMat) {
-            const gm = mm.clone();
-            gm.userData = {};             // drop the dead snapshot; let it compile its own
-            installPropShader(gm);
-            o.userData.gateMat = gm;
-            (o as THREE.Mesh).material = gm;
-          }
-          ((o as THREE.Mesh).material as THREE.MeshStandardMaterial).color
-            .copy(o.userData.baseCol).lerp(GATE_GREY, 0.42);
-        } else if (o.userData.baseCol && o.userData.gateMat) {
-          ((o as THREE.Mesh).material as THREE.MeshStandardMaterial).color.copy(o.userData.baseCol);
-        }
-      });
+      if (tooBig) tintGate(e, true);
+      // a prop that was never grey (undefined -> false, the first pass over it)
+      // has no colour owed; one that WAS grey goes to the wave below
+      else if (wasGated) ungateTick.push(e);
     }
+    if (ungateTick.length) ungateWave(ungateTick);
+  }
+  // …AND THE ROLL. A wave's props get their colour back on their own beat,
+  // nearest first (ungateWave). Checked every frame rather than on the 0.4 s
+  // tick, or the roll would arrive in 0.4 s steps; the queue is empty except
+  // for the few seconds after a wave. A prop that went back over the line
+  // while it waited (a form bite shrank her) keeps its grey.
+  while (ungateQ.length && ungateQ[0].at <= tClock) {
+    const q = ungateQ.shift()!;
+    if (!q.e.mesh.userData.gated) tintGate(q.e, false);
   }
 
   // powers are PLAYER decisions — auto-fire only exists for the headless demo
@@ -14734,9 +14920,35 @@ function animate() {
     }
     if (e.radius > R * eatRatioNow()) {
       // too big to eat yet — 2D rule: you pass through, it SHAKES (no weird block)
-      if (d < R + e.radius * 0.7 && !(e.mesh.userData.shakeT > 0)) e.mesh.userData.shakeT = 0.45;
+      const touching = d < R + e.radius * 0.7;
+      if (touching && !(e.mesh.userData.shakeT > 0)) e.mesh.userData.shakeT = 0.45;
+      // ── …AND IT SAYS "NOT YET" (research governor G7) ────────────────────
+      // The shake was the whole answer, and it made no sound: the size rule a
+      // pre-reader meets from her very first bump was silent. The answer is
+      // bonk(), the game's one sound for "you can't have that (yet)" (the wall,
+      // a locked dot, a locked world card — Job 10), softer and pitched down
+      // for a bigger prop (audio3d.ts, bonk).
+      //
+      // ON FIRST CONTACT, NOT ON THE SHAKE. The shake re-arms every 0.45 s
+      // for as long as she overlaps the prop, and passing through a building
+      // is exactly what the 2D rule has her do — so a bonk on the shake edge
+      // would bonk about twice a second all the way through a town hall. The
+      // wall learnt this first ("the wall speaks once, on arrival"). `touch` is
+      // the per-prop contact flag, written only when it changes; 0.5 s between
+      // any two bonks, so a cluster of big props bonks once. Static props
+      // only: a walker who strolls into a small void is not her bumping into
+      // anything, and a crowd would bonk her all the way down a street.
+      if (touching !== !!e.mesh.userData.touch) {
+        e.mesh.userData.touch = touching;
+        if (touching && !e.mesh.userData.mover && tClock >= touchCd
+          && introT <= 0 && outroT <= 0 && !endBeat()) {
+          touchCd = tClock + 0.5;
+          audio.bonk(e.radius / (R * eatRatioNow()));
+        }
+      }
       continue;
     }
+    if (e.mesh.userData.touch) e.mesh.userData.touch = false;   // it fits now: the next overlap is a meal, not a bump
     if (d < R + e.radius * 0.7) {
       capture(e);
     } else if (inWell) {
@@ -15192,6 +15404,7 @@ function animate() {
       if (curStage >= 3) questEvent('devourer');
       if (guideStep === 2) { guideStep = 3; showGuide('you <b>EVOLVED</b>! bigger void, bigger meals 🏠', 5); }
       evolveEl.classList.remove('show'); void (evolveEl as HTMLElement).offsetWidth; evolveEl.classList.add('show');
+      evoCardAt = tClock;   // a wave's sparkle and name keep 1.5 s clear of this card (ungateWave)
       // …and the screen goes warm for a beat. fx.flash is the same call a hit
       // uses, in the opposite colour: a bite washes red, a form washes gold.
       fx.flash('rgba(255,214,120,0.34)', 0.5);

@@ -63,6 +63,14 @@ export interface Rivals {
    *  for this must stay quieter than onCharge's — it is "be on your toes",
    *  not "dodge NOW". See rivals.onSurge in prototype3d.ts. */
   onSurge?: (name: string, x: number, z: number, color: number) => void;
+  /** NOW I CAN EAT THAT (research governor G7): the player has just grown past
+   *  this sibling's swallow line — the frame its halo went green, confirmed
+   *  (see OUT_RISE). Return TRUE if the cue played; anything else leaves the
+   *  edge pending, and it is offered again every frame while the sibling is
+   *  still edible, so a cue the caller had to hold back (a cooldown, the end
+   *  beat) is delayed rather than lost. Once per sibling per match. See
+   *  rivals.onOutgrown in prototype3d.ts. */
+  onOutgrown?: (name: string, x: number, z: number) => boolean | void;
   reset(matchLen?: number): void;                        // instant rematch
 }
 
@@ -446,7 +454,34 @@ export function createRivals(
     // HOARDER: the district it has decided is its
     campX: number; campZ: number; campT: number;
     roll: THREE.Quaternion;
+    // ── NOW I CAN EAT THAT (research governor G7) ────────────────────────
+    // og: the player is past this one's swallow line (`pr > rv.r * 1.2`, the
+    // line its halo turns green on), as a LATCH with time hysteresis — ogT is
+    // how long the raw test has disagreed with it. ogPend: the rising edge
+    // happened and has not been answered yet. ogSaid: it has been answered
+    // this match. scareT: seconds left on the startled stare that answers it.
+    og: boolean; ogT: number; ogPend: boolean; ogSaid: boolean; scareT: number;
   }
+  // ── THE LATCH'S TWO TIMES ─────────────────────────────────────────────────
+  // FALLING (re-arm), 1.4 s: the research governor's number. A sibling that
+  // walked in smaller is latched outgrown at its join and must spend 1.4 s
+  // continuously back over the line before the player can "outgrow" it again,
+  // so a sibling hovering at the line cannot be re-announced by growth jitter.
+  //
+  // RISING (announce), 0.5 s, NOT 1.4 and not zero. Zero was measured to lie:
+  // on the unmodified build (a natural 40 s Maple drive, scratch g7natural)
+  // NIBBLES crossed under the player's 1.2x line at t 24.53 WHILE HUNTING and
+  // was back over it at t 24.58 — one frame. The player's radius had jumped
+  // (0.92 after a form bite at t 18.6, 1.91 at t 24.53) and she eases toward
+  // 1.5x the player at 0.9/s, so she lags any jump for a moment. An instant edge would have told
+  // a child "you're BIGGER than NIBBLES!" one frame before she became the
+  // bigger one again. By that same easing, catching up from half the player's
+  // size to the line takes ln(1/0.667)/0.9 = 0.45 s (arithmetic on the want
+  // and the rate below, not a run), so 0.5 s rejects every lag the hunt can
+  // produce. 1.4 s would put the cue a second and a half behind the green
+  // halo it exists to explain, and the moment it is announcing is "the
+  // instant a threat becomes food".
+  const OUT_RISE = 0.5, OUT_FALL = 1.4;
   let grazeN = 0;   // QA: larder bites this match (see api.grazeCount)
   let bandSum = 0, bandMax = 0, bandPinned = 0, bandN = 0;   // QA: see bandStat
   // THE SURGE's clock: seconds until the next surge MAY start. It only counts
@@ -618,6 +653,7 @@ export function createRivals(
       surgeR: 0, surgeT: 0,
       campX: Math.cos(ang) * 130, campZ: Math.sin(ang) * 130, campT: 0,
       roll: new THREE.Quaternion(),
+      og: false, ogT: 0, ogPend: false, ogSaid: false, scareT: 0,
       // HOME TURF: each family member forages their OWN corner of the island.
       // Without this they orbited the player all match ("they hover around
       // you"), which is clingy, not alive.
@@ -833,6 +869,7 @@ export function createRivals(
         rv.eye = 0; rv.eyeCd = rand(4, 12);
         rv.missPend = false; rv.missCd = 0; rv.stolen = 0; rv.stuffedSaid = false; rv.stuffCap = 0;
         rv.surgeR = 0; rv.surgeT = 0; rv.surge = false;
+        rv.og = false; rv.ogT = 0; rv.ogPend = false; rv.ogSaid = false; rv.scareT = 0;
         rv.lockR = 0; rv.tgt = null; rv.dry = 0; rv.full = false;
         rv.speakCd = rand(4, 10); rv.ph = rand(0, 6);
         rv.roll.identity(); rv.body.quaternion.identity();
@@ -1107,6 +1144,10 @@ export function createRivals(
               [rv.x, rv.z] = placeOnLand(rv.hx, rv.hz, rv.r);
             }
             rv.campX = rv.x; rv.campZ = rv.z; rv.campT = 0;
+            // A SIBLING WHO WALKS IN SMALLER IS NOT NEWS. The latch starts where
+            // the player already is, so only a real crossing after the join —
+            // she grows past it, or it grew past her first — can announce it.
+            rv.og = pr > rv.r * 1.2; rv.ogT = 0; rv.ogPend = false;
             rv.group.visible = rv.halo.visible = true;
             api.onJoin?.(rv.name, rv.color, rv.x, rv.z, rv.arch);
             api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch), rv.name);
@@ -1193,6 +1234,26 @@ export function createRivals(
             const rr = rand(45, 80);   // near the player — a grumpy tiny rival re-entering IS a story
             [rv.x, rv.z] = placeOnLand(px + Math.cos(a2) * rr, pz + Math.sin(a2) * rr, rv.r);
             rv.group.visible = rv.halo.visible = true; rv.pulse = 1;
+            // A SIBLING WHO COMES BACK SMALLER IS NOT NEWS EITHER. A respawn is
+            // an arrival, so the outgrown latch starts where the player already
+            // is, exactly as at the join. Clearing what the latch owed when she
+            // was eaten was the first cut, and it did not hold: the eat test
+            // above is the latch's own test plus contact, it runs FIRST and
+            // `continue`s, and so do the dying and respawn branches — so a
+            // sibling swallowed on the frame the player crosses her line (the
+            // likeliest way NIBBLES is eaten: the gold halo shows from 1.05x
+            // and she does not run until 1.25x, when she can already be
+            // swallowed) was never seen crossing at all, and owed nothing. She
+            // came back at START_R, the player far past her line, the latch
+            // rose half a second later with nothing said yet, and the child was
+            // told "you're BIGGER than NIBBLES!" about a sibling she ate seven
+            // seconds earlier. Measured on the build before this (Maple,
+            // qa/nowfood.mjs (a5)): eaten at tClock 4.25, back on the island
+            // at 10.94 at r 0.90 against the player's 4.28, announced at
+            // 11.44: one cue, its float and its outgrow().
+            // Re-reading it here covers every way into the pit, and a stare
+            // still running goes with it.
+            rv.og = pr > rv.r * 1.2; rv.ogT = 0; rv.ogPend = false; rv.scareT = 0;
             api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].respawn), rv.name);
           } else continue;
         }
@@ -1672,6 +1733,9 @@ export function createRivals(
           if (marquee) { rv.score -= looted; rv.stolen = 0; }
           else if (rv.stolen > 0) { rv.score = Math.max(0, rv.score - rv.stolen); rv.stolen = 0; }
           rv.surgeR = 0; rv.surgeT = 0;   // a devoured rival respawns small, never mid-surge
+          // (no outgrown-latch bookkeeping here: the latch is re-read when she
+          // comes back, and the respawn branch above says why clearing it on
+          // this frame was not enough)
           api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].eaten), rv.name);
           rv.halo.visible = false;
           rv.dyingT = 0.55; rv.visiting = false; rv.tgt = null; rv.cst = 0;
@@ -2018,9 +2082,42 @@ export function createRivals(
           rv.body.quaternion.copy(rv.roll);
         }
         rv.eyes.quaternion.copy(camera.quaternion);
+        // ── NOW I CAN EAT THAT (research governor G7) ───────────────────────
+        // The halo below has always turned green on this exact test and said
+        // nothing else: no callback, no float, no sound. The latch (OUT_RISE /
+        // OUT_FALL above) turns the test into an EDGE the game can answer —
+        // once per sibling per match — and the answer that belongs to the
+        // sibling itself is played here: the startled stare it already makes
+        // when it runs from you, and an "uh oh..." in its own bubble. The
+        // bubble takes the family's ordinary lane (prototype3d.ts, onSpeak,
+        // and bubbles.say), so it is not said by a sibling 55 or more units
+        // away, and it yields to a family bubble already on screen where it
+        // would land — its own last line included. That is by design: the
+        // stare always plays, and the player's half (the float over HIM, the
+        // sound, the buzz) is the cue that is always heard and seen.
+        {
+          const out = pr > rv.r * 1.2;
+          if (out === rv.og) rv.ogT = 0;
+          else {
+            rv.ogT += dt;
+            if (rv.ogT >= (out ? OUT_RISE : OUT_FALL)) {
+              rv.og = out; rv.ogT = 0;
+              rv.ogPend = out && !rv.ogSaid;
+            }
+          }
+          if (rv.ogPend && out && api.onOutgrown?.(rv.name, rv.x, rv.z) === true) {
+            rv.ogPend = false; rv.ogSaid = true;
+            rv.scareT = 1.6;
+            api.onSpeak?.(rv.x, rv.z, 'uh oh...', rv.name);
+            rv.speakCd = Math.max(rv.speakCd, 4);   // its next line does not talk over this one
+          }
+          rv.scareT = Math.max(0, rv.scareT - dt);
+        }
         // look toward travel dir
         const aimX = dp < 30 ? (rv.x - px) / (dp || 1) * -1 : mx / md;   // it SAW you
-        const wide = fleeing ? 1.28 : rv.cst === 1 ? 1.2 : 1;
+        // the startled stare is the SAME stare it makes running from you — no
+        // new face, and it is the family's existing fear look, not a new one
+        const wide = fleeing || rv.scareT > 0 ? 1.28 : rv.cst === 1 ? 1.2 : 1;
         rv.eyes.children.forEach((c, ci) => {
           if (ci >= 4) return;   // accessory shades stay put
           c.position.x = (c.position.x < 0 ? -0.32 : 0.32) + THREE.MathUtils.clamp(aimX * 0.06, -0.06, 0.06);

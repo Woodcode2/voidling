@@ -802,6 +802,27 @@ const SUITE = [
     cmd: ['node', 'qa/endbeat.mjs', PORT], verdict: pf,
     why: 'the whistle owns the end: no crown on the bite that wins, a pause holds the outro, and leaving from inside it lands on the menu with no results card and no fanfare' },
 
+  // G7 (research governor, P1): "now I can eat that!" is heard and seen — a
+  // sibling she outgrows is announced once (a float over her, clear of her
+  // face and the NOMS pill, and outgrow()), a wave of greyed props rolls back
+  // to colour outward from her with one sparkle and one class float a match,
+  // and a bump into a prop still too big says bonk() once, on first contact.
+  // Its sound half, qa/nowfoodsound.mjs, needs a vite DEV server and is not a
+  // gate step (qa/chomp.mjs is not either, for the same reason). Measured on
+  // the build before the fix: 9 of 13 bars BAD — no cue, float or sound for
+  // NIBBLES outgrown, 0 of 3 waves counted, no class float, no sparkle, every
+  // colour back on one frame, no bonk on contact. On the fix all 13 green in
+  // 800 s of wall time on this box. Review then added three bars — (a5) a
+  // sibling eaten on the frame she is outgrown must not be announced when she
+  // respawns tiny, (a6) the float clears the form-name callout's whole path,
+  // (k1) every kind tag has a word — and a second page for (a5): 3 of 16 BAD
+  // on the first fix (938 s), all 16 green on the second in 1469 s with the
+  // other browser slot busy. The timeout is about two and a half times that.
+  // Quality + live until a second green reading promotes it.
+  { id: 'nowfood', tier: 'feel', profiles: ['live', 'quality'], timeout: 3600,
+    cmd: ['node', 'qa/nowfood.mjs', PORT, 'maple'], verdict: pf,
+    why: 'the moment something too big becomes food is announced — the sibling she outgrows once (and never one she already ate), a wave of the town once and rolling outward, a bump once on contact — and none of it lands on her face, the NOMS pill, the form-name callout or an EVOLVED card' },
+
   { id: 'questable', tier: 'money', profiles: ['live'], timeout: 1600,
     cmd: ['node', 'qa/questable.mjs', PORT, ...WORLDS], verdict: pf,
     why: 'over a year of draws, no world can show a daily chip a child cannot clear' },
