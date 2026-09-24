@@ -6435,7 +6435,8 @@ const HOUSE_LIKE = ['house', 'rv', 'chalet', 'lodge', 'hut'];
 // Powder's gritter and Skylark's vans, trailers and caravans; a farm animal is
 // the prize goat and Skylark's sheep. Only what no field could say is tagged at
 // its factory (eatvoice.ts's `voiced`): trees, bushes, bamboo and grasses,
-// paper lanterns, snow, the zoo's sheep, Maple's tractor, and the pond ducks
+// paper lanterns, snow, the zoo's sheep, Maple's tractor, Skylark's balloon
+// bag and its briefing caravan (see 'big' below), and the pond ducks
 // — which are tagged and never heard, because none of the four reaches the
 // scene: addWanderer's spawn tests turn their pond-side spawn points down
 // (a scene traverse finds no object tagged 'quack'; qa/eatvoice.mjs's Maple
@@ -6450,6 +6451,19 @@ const HOUSE_LIKE = ['house', 'rv', 'chalet', 'lodge', 'hut'];
 // smaller kits must not speak as one of its lanterns. Anything that fits none
 // of this stays silent, and that is allowed: a silent kind is better than a
 // wrong one. qa/eatvoice.mjs prints the census, world by world.
+//
+// qk 'big' IS A CLAIM THAT A PROP IS A BUILDING, and one world broke it. 'big'
+// is the quest board's LANDMARK kind, so every world that writes it means a
+// building by it — the stadium, the bathhouse, the hangars — except Skylark,
+// whose envelopes all go down as 'big'. Those that carry island.ts's balloon
+// papers squeak above; the 57 bags the arrivals scatter drops bare crumbled
+// like a hangar, and the first review of this found it, not a probe. The bag's
+// factory now says 'squeak' itself (skyfield.ts), which outranks the rule
+// below. No guard is written into the rule: it would need a list of which
+// 'big' things are buildings, and that list is the guess this function exists
+// not to make. qa/eatvoice.mjs (r) is the guard instead — the same shape may
+// not speak two voices — so an envelope dropped bare anywhere is caught the
+// day it lands, as long as one of its kind is dropped with papers.
 function eatVoiceOf(e: Edible): EatVoice | null {
   const u = e.mesh.userData as Record<string, unknown>;
   const qk = u.qk as string | undefined, kind = u.kind as string | undefined;

@@ -157,11 +157,13 @@ const eatRand = (): number => {
 // ── THE TRANSIENT'S FOUR TAKES, DEALT FROM A BAG ──────────────────────────
 // The spec's "cutoff x 2^(+-70/1200), gain +-1.5 dB", read as written: two
 // cutoffs and two levels, four takes. The first cut drew each factor uniformly
-// from INSIDE those ranges, and three runs of qa/eatvoice.mjs (h) read a
-// transient-centroid spread of 2.25%, 2.60% and 2.82% over ten pops in a row,
-// against the spec's own bar of 3% — as they had to: a uniform spread's SD is
-// 1/sqrt(3) of its reach, 40 cents of the 70. At the reach itself every take
-// is 70 cents (4.1%) from the centre.
+// from INSIDE those ranges. Its own runs were not kept, so it was put back and
+// run again for the record: three runs of qa/eatvoice.mjs read the transient's
+// centroid SD over ten pops in a row at 2.00%, 3.05% and 2.13% — one pass in
+// three against the spec's own bar of 3% — and its level SD at 0.67, 0.87 and
+// 0.78 dB against (h2)'s 1.0. As they had to: a uniform spread's SD is
+// 1/sqrt(3) of its reach, 40 cents of the 70 and 0.87 dB of the 1.5. At the
+// reach itself every take is 70 cents (4.1%) and 1.5 dB from the centre.
 // DEALT, not rolled, for the same reason and for the ear: rolled, the same take
 // comes up four bites running once in every 64 fours, which is the machine-gun
 // this exists to break. So every four bites use each take once, and a new bag
@@ -1202,6 +1204,10 @@ export function createAudio(): Audio3D {
     meep: 0.0049, wheee: 0.0158, baa: 0.014, quack: 0.0182, crumble: 0.115,
     rustle: 0.064, crinkle: 0.0153, squeak: 0.0295, poof: 0.0575,
   };
+  /** eatSizeK at the meal the table above was calibrated on (mealR 1.3, a
+   *  2.5 void): each voice's envelope is run at this level and scaled after
+   *  it (eatVoice), so at the calibration point nothing has moved. */
+  const EAT_CAL_K = eatSizeK(mealDepth(1.3, 2.5));
   // warm bus: music -> soft lowpass -> (dry + echo) -> master. The gentle
   // feedback echo is what turns bare oscillators into something that sounds
   // PRODUCED instead of 8-bit.
@@ -4722,8 +4728,27 @@ export function createAudio(): Audio3D {
       // the bite's own side: pop() has just flipped it for the bite this
       // voice belongs to. 20 ms behind the note, so the pop's attack is the
       // first thing heard and the meal answers it.
-      sing(eatSidesFor(c)[eatSide].vox, now + 0.02,
-        EAT_LEVEL[kind] * eatSizeK(mealDepth(mealR, voidR)) * eatComboK(combo));
+      // ── THE SIZE AND THE FADE ARE ONE MULTIPLY, ON A GAIN OF THEIR OWN ──
+      // They were folded into the `v` each voice's envelope ramps to, and
+      // every envelope here — and the ambience helpers the voices borrow,
+      // duck(), glock() and dTone() — ramps DOWN to an absolute floor
+      // (0.0006, 0.0005) and holds it until its source stops. A floor that
+      // does not move with `v` is a tail that does not: at the chain's 0.4x
+      // meep's tail stood relatively 8 dB louder, and qa/eatvoice.mjs (d)
+      // read the fade as -7.61 dB where one multiply is -7.96. Scaling the
+      // floors instead was tried and measured: a floor a thousandth of `v`
+      // makes every decay steeper, and qa/_eatspread.mjs read the grain
+      // voices quieter at the very point they were calibrated — the median
+      // of thirty renders 0.72 dB for crumble, 0.87 rustle, 1.43 squeak and
+      // 1.62 poof.
+      // So each voice now sings at its CALIBRATED level — the car's meal
+      // EAT_LEVEL was set at, where its envelope is the one that was tuned
+      // and heard — and the meal's size and the chain's fade scale the
+      // finished sound after it, tail and all.
+      const lvl = c.createGain();
+      lvl.gain.value = (eatSizeK(mealDepth(mealR, voidR)) / EAT_CAL_K) * eatComboK(combo);
+      lvl.connect(eatSidesFor(c)[eatSide].vox);
+      sing(lvl, now + 0.02, EAT_LEVEL[kind] * EAT_CAL_K);
       return kind;
     },
     bigEat() {

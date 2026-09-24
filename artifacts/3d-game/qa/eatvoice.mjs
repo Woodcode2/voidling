@@ -107,8 +107,9 @@
 //   (o) no two 'eat:' entries within 0.35 s on the wall clock — the clock
 //       sounds play on (qa/endparty.mjs (g) reads it the same way). WHAT IT
 //       DOES NOT STRESS: the driven bites are half a match-second apart or
-//       more, and the closest pair it has read is 1.7 s, so the 0.35 s rule
-//       itself is proven offline by (f) and inside one frame by (p). (o)
+//       more, and the closest pair any recorded run has read is 593 ms
+//       (Maple, 10e0288's own run), so the 0.35 s rule itself is proven
+//       offline by (f) and inside one frame by (p). (o)
 //       says that live play, the void eating on its own at r 8, never
 //       brought two voices closer than the gate allows
 //   (m) and (n) count ids and cannot tell a right voice from a wrong one:
@@ -138,7 +139,17 @@
 //
 // THE BUILD BEFORE THIS ONE has the classifier and the hooks and no voice:
 // (a)-(g) find no eatVoice, (h) and (i) read 0.0% and 0.0 dB, and (m) hears
-// nothing but pops.
+// nothing but pops. Its synth, run through this file's offline half, reads
+// (h2) at 0.00 dB.
+//
+// THE REVIEW'S ROUND (the build after the voices, 10e0288, with only this
+// file's round-2 bars and the __eatVoiceOf hook added): FAIL 2 of 24. (r) on
+// Skylark — "squeak 24 [24 qk=big balloon=0] vs crumble 54 [54 qk=big] —
+// shape 348/0/2.50x1.18x1.20", the bag; --only=census, before the void has
+// eaten any, fails Skylark on the same shape (57 crumble against 25 squeak)
+// and passes (r) on the other five worlds. (d) — meep -7.61, baa
+// -7.79 dB against -7.96. The fix commit after it: PASS 24 of 24, meep and
+// baa -7.96, and (r) clean on all six worlds.
 import { chromium } from 'playwright';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
