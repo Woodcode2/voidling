@@ -812,11 +812,16 @@ const SUITE = [
   // the build before the fix: 9 of 13 bars BAD — no cue, float or sound for
   // NIBBLES outgrown, 0 of 3 waves counted, no class float, no sparkle, every
   // colour back on one frame, no bonk on contact. On the fix all 13 green in
-  // 800 s of wall time on this box; the timeout is three times that. Quality +
-  // live until a second green reading promotes it.
-  { id: 'nowfood', tier: 'feel', profiles: ['live', 'quality'], timeout: 2400,
+  // 800 s of wall time on this box. Review then added three bars — (a5) a
+  // sibling eaten on the frame she is outgrown must not be announced when she
+  // respawns tiny, (a6) the float clears the form-name callout's whole path,
+  // (k1) every kind tag has a word — and a second page for (a5): 3 of 16 BAD
+  // on the first fix (938 s), all 16 green on the second in 1469 s with the
+  // other browser slot busy. The timeout is about two and a half times that.
+  // Quality + live until a second green reading promotes it.
+  { id: 'nowfood', tier: 'feel', profiles: ['live', 'quality'], timeout: 3600,
     cmd: ['node', 'qa/nowfood.mjs', PORT, 'maple'], verdict: pf,
-    why: 'the moment something too big becomes food is announced — the sibling she outgrows once, a wave of the town once and rolling outward, a bump once on contact — and none of it lands on her face, the NOMS pill or an EVOLVED card' },
+    why: 'the moment something too big becomes food is announced — the sibling she outgrows once (and never one she already ate), a wave of the town once and rolling outward, a bump once on contact — and none of it lands on her face, the NOMS pill, the form-name callout or an EVOLVED card' },
 
   { id: 'questable', tier: 'money', profiles: ['live'], timeout: 1600,
     cmd: ['node', 'qa/questable.mjs', PORT, ...WORLDS], verdict: pf,

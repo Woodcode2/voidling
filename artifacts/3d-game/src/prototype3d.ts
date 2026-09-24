@@ -7282,11 +7282,16 @@ let evoCardAt = -99, sparkleCd = 0, classSaid = false;
  *  roadworks, the prize goat (the finale's star, not a class of anything), the
  *  gritter — which gets the generic line. House and car are not here: they
  *  take the world's own word from LEVEL_SPEC, so the float and the dot-2 chip
- *  say STALLS at the market and TRUCKS on game day in the same voice. */
+ *  say STALLS at the market and TRUCKS on game day in the same voice.
+ *  A tag with NO entry goes to the generic line too, silently, which is how
+ *  the avalanche's rolling snowballs (life.ts tags them 'snowball', where
+ *  Powder's static piles are 'snowballs') were missed by the first cut:
+ *  qa/nowfood.mjs (k1) now reads every tag the source writes against this
+ *  table, so a new kind cannot fall to "BIGGER THINGS" without a decision. */
 const KIND_WORD: Record<string, string | null> = {
   rv: 'MOTORHOMES', chalet: 'CHALETS', lodge: 'LODGES', hut: 'HUTS',
   pine: 'TREES', snowman: 'SNOWMEN', drift: 'SNOWDRIFTS', lift: 'SKI LIFTS',
-  sign: 'SIGNS', snowballs: 'SNOWBALLS', bridge: 'BRIDGES',
+  sign: 'SIGNS', snowballs: 'SNOWBALLS', snowball: 'SNOWBALLS', bridge: 'BRIDGES',
   big: null, small: null, roadworks: null, goat: null, gritter: null,
 };
 /** a word, `null` (a kind with no good word), or `undefined` (not a kind) */

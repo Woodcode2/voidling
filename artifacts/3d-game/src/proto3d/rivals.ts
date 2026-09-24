@@ -1234,6 +1234,26 @@ export function createRivals(
             const rr = rand(45, 80);   // near the player — a grumpy tiny rival re-entering IS a story
             [rv.x, rv.z] = placeOnLand(px + Math.cos(a2) * rr, pz + Math.sin(a2) * rr, rv.r);
             rv.group.visible = rv.halo.visible = true; rv.pulse = 1;
+            // A SIBLING WHO COMES BACK SMALLER IS NOT NEWS EITHER. A respawn is
+            // an arrival, so the outgrown latch starts where the player already
+            // is, exactly as at the join. Clearing what the latch owed when she
+            // was eaten was the first cut, and it did not hold: the eat test
+            // above is the latch's own test plus contact, it runs FIRST and
+            // `continue`s, and so do the dying and respawn branches — so a
+            // sibling swallowed on the frame the player crosses her line (the
+            // likeliest way NIBBLES is eaten: the gold halo shows from 1.05x
+            // and she does not run until 1.25x, when she can already be
+            // swallowed) was never seen crossing at all, and owed nothing. She
+            // came back at START_R, the player far past her line, the latch
+            // rose half a second later with nothing said yet, and the child was
+            // told "you're BIGGER than NIBBLES!" about a sibling she ate seven
+            // seconds earlier. Measured on the build before this (Maple,
+            // qa/nowfood.mjs (a5)): eaten at tClock 4.25, back on the island
+            // at 10.94 at r 0.90 against the player's 4.28, announced at
+            // 11.44: one cue, its float and its outgrow().
+            // Re-reading it here covers every way into the pit, and a stare
+            // still running goes with it.
+            rv.og = pr > rv.r * 1.2; rv.ogT = 0; rv.ogPend = false; rv.scareT = 0;
             api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].respawn), rv.name);
           } else continue;
         }
@@ -1713,9 +1733,9 @@ export function createRivals(
           if (marquee) { rv.score -= looted; rv.stolen = 0; }
           else if (rv.stolen > 0) { rv.score = Math.max(0, rv.score - rv.stolen); rv.stolen = 0; }
           rv.surgeR = 0; rv.surgeT = 0;   // a devoured rival respawns small, never mid-surge
-          // …and a meal in the spiral is not news: an outgrown cue still owed
-          // would otherwise land on the tiny respawn six seconds later
-          rv.ogPend = false; rv.scareT = 0;
+          // (no outgrown-latch bookkeeping here: the latch is re-read when she
+          // comes back, and the respawn branch above says why clearing it on
+          // this frame was not enough)
           api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].eaten), rv.name);
           rv.halo.visible = false;
           rv.dyingT = 0.55; rv.visiting = false; rv.tgt = null; rv.cst = 0;
@@ -2068,7 +2088,13 @@ export function createRivals(
         // OUT_FALL above) turns the test into an EDGE the game can answer —
         // once per sibling per match — and the answer that belongs to the
         // sibling itself is played here: the startled stare it already makes
-        // when it runs from you, and an "uh oh..." in its own bubble.
+        // when it runs from you, and an "uh oh..." in its own bubble. The
+        // bubble takes the family's ordinary lane (prototype3d.ts, onSpeak,
+        // and bubbles.say), so it is not said by a sibling 55 or more units
+        // away, and it yields to a family bubble already on screen where it
+        // would land — its own last line included. That is by design: the
+        // stare always plays, and the player's half (the float over HIM, the
+        // sound, the buzz) is the cue that is always heard and seen.
         {
           const out = pr > rv.r * 1.2;
           if (out === rv.og) rv.ogT = 0;

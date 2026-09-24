@@ -32,7 +32,9 @@ export interface Bubbles {
    *  every bubble here dodges — its lowest edge at any point of the rise sits
    *  above the face box's top — and clamped to stay on screen. A second one
    *  raised while the first is still up stacks above it, and both clear the
-   *  form-name callout when that is up. Same pooled node, same rise. */
+   *  form-name callout's whole path when that is up (see placeHead for how,
+   *  and for where the screen-edge clamps stop any of this being a promise).
+   *  Same pooled node, same rise. */
   headFloat(text: string, opts?: { scale?: number; color?: string }): void;
   /** THE NUMBER GOES INTO THE BAR. The owner, on hole.io: "when you eat like
    *  points are going into the bar". Same pooled node as float(), but instead
@@ -317,10 +319,29 @@ const style = document.createElement('style');
    *  (prototype3d.ts, paintNoms), which is below the face box's top, so a box
    *  that never comes down past that top cannot reach it either.
    *
+   *  THE FORM-NAME CALLOUT, WHEN IT IS UP, IS CLEARED ALONG ITS WHOLE PATH:
+   *  the float's lowest edge goes 6 px over formY(1) less the callout's
+   *  height — the highest the callout's top ever gets — and not over where it
+   *  is this frame. The callout rises on the bubbles' clock and this float on
+   *  the wall clock (vfRise), so no pose of one can be paired with a pose of
+   *  the other; only the path is a safe edge. The first cut reserved just the
+   *  callout's height over his head, and the callout's own rise (0.3 of a
+   *  radius) and its crown floor (1.3 radii up, where his head is 1.0) both
+   *  carry it past that. Measured on the build before this (Maple,
+   *  qa/nowfood.mjs (a6), the callout raised on the frame the player passes
+   *  NIBBLES's line): 63 of the float's 108 visible poses on the callout's path.
+   *
    *  Clamped on screen sideways at the 1.12 peak scale, and under the HUD
    *  strip at the top; a float that would have to go under the strip to clear
    *  his face waits there instead, which only happens while the lens is still
-   *  travelling (the same failure formPlace() chooses for the callout). */
+   *  travelling (the same failure formPlace() chooses for the callout). The
+   *  pill has clamps of its own — its centre is held at least 220 px from the
+   *  top and 190 px from the bottom — so once a clamp here or one of the pill's
+   *  binds, clearing the pill is no longer guaranteed either: a lens that has
+   *  put him up under the strip, or low enough that the pill is held above
+   *  his centre, can bring the two together, and nothing moves one off the
+   *  other. The face, pill and callout bars (qa/nowfood.mjs (a4), (a6), (b6))
+   *  grade one framing, 430x932, on the lens those drives leave him on. */
   function placeHead(f: Slot): void {
     if (!heroBox.on) {
       if (f.lx < 0) f.el.style.visibility = 'hidden';   // never a frame at the corner
@@ -330,7 +351,8 @@ const style = document.createElement('style');
     const halfW = Math.min(f.w * 0.56 + 8, W / 2);
     const x = Math.min(W - halfW, Math.max(halfW, heroBox.cx));
     let floor = Math.min(heroBox.top, heroBox.cy - heroBox.ry) - 4;
-    if (formUntil >= 0) floor -= formH + 6;   // over the form-name callout too, when it is up
+    // over the form-name callout's whole path too, when it is up (see above)
+    if (formUntil >= 0) floor = Math.min(floor, formY(1, heroBox, formH) - formH - 6);
     const y = Math.max(HUD_TOP, floor - 0.5 * f.h - (f.head ?? 0) * (f.h + 6));
     if (f.el.style.visibility) f.el.style.visibility = '';
     if (Math.abs(x - f.lx) > 0.5 || Math.abs(y - f.ly) > 0.5) {
@@ -353,6 +375,19 @@ const style = document.createElement('style');
     // of a 360px screen on every frame where he was off centre.
     if (!formEl) formEl = document.getElementById('form');
     const W = window.innerWidth;
+    const halfW = Math.min((formEl ? formEl.offsetWidth : 120) / 2 + 8, W / 2);
+    return {
+      x: Math.min(W - halfW, Math.max(halfW, box.cx)),
+      y: formY(a, box, formEl ? formEl.offsetHeight : 32),
+      o: a < 0.14 ? a / 0.14 : a > 0.66 ? (1 - a) / 0.34 : 1,
+      s: a < 0.16 ? 0.74 + 1.625 * a : 1,
+    };
+  }
+  /** The callout's BOTTOM edge at point `a` of its life, for a callout `h` px
+   *  tall — formPlace()'s vertical half, split out so a head float can clear
+   *  the callout's whole path (placeHead) from the height formCall() already
+   *  read, without a layout read of its own in the write phase of update(). */
+  function formY(a: number, box: typeof heroBox, h: number): number {
     // TWO FLOORS, AND WHICH ONE BINDS CHANGES ACROSS THE LADDER. box.top is
     // the face box every other thing on screen already dodges. `crown` is the
     // top of the SWOLLEN silhouette: celebrate() overshoots the drawn radius by
@@ -367,7 +402,6 @@ const style = document.createElement('style');
     // smaller than the camera's own settle drift, so it would read as sinking.
     const rise = Math.max(10, box.rx * 0.30);
     const ease = 1 - (1 - a) * (1 - a);
-    const halfW = Math.min((formEl ? formEl.offsetWidth : 120) / 2 + 8, W / 2);
     // …AND A CEILING, so it cannot leave the top of the screen. The camera law
     // holds him at a roughly constant fraction of the frame — camDist grows
     // with his radius — so on a settled lens there is always room above his
@@ -377,14 +411,8 @@ const style = document.createElement('style');
     // 780px screen and sent the callout 313px above the viewport. Clamping to
     // the edge is the right failure: a sticker pinned under the clock is
     // legible, and one off the top is not there at all.
-    const h = formEl ? formEl.offsetHeight : 32;
     const ceil = 60 + h;
-    return {
-      x: Math.min(W - halfW, Math.max(halfW, box.cx)),
-      y: Math.max(ceil, yMax - rise * ease),
-      o: a < 0.14 ? a / 0.14 : a > 0.66 ? (1 - a) / 0.34 : 1,
-      s: a < 0.16 ? 0.74 + 1.625 * a : 1,
-    };
+    return Math.max(ceil, yMax - rise * ease);
   }
   function formPaint(a: number): void {
     const f = formPlace(a);
