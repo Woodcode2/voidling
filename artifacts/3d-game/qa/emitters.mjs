@@ -279,8 +279,12 @@ const mergedProp = (parts, mat) => {
   if (mat === GLOW && sink) for (const g of parts) sink.push(g);
   return new THREE.Mesh(new THREE.BufferGeometry(), mat);
 };
+// voiced (proto3d/eatvoice.ts, research governor G5) only writes the meal's eat
+// voice onto userData — a sound tag, nothing a material or a glow sink sees —
+// so it passes the prop straight through here as it does in the game.
 const STUBS = { THREE, part, mergedProp, PROP_GLOW_MAT: GLOW, PROP_SMOOTH_MAT: new THREE.MeshStandardMaterial(),
-  PROP_SHARED_MAT: new THREE.MeshStandardMaterial(), registerGloss: () => {}, glossOf: () => 0 };
+  PROP_SHARED_MAT: new THREE.MeshStandardMaterial(), registerGloss: () => {}, glossOf: () => 0,
+  voiced: (m, v) => { m.userData.eatVoice = v; return m; } };
 
 // every module that imports PROP_GLOW_MAT from island.ts, and in each, the
 // functions that can reach it: those that name it, then their callers, to a
