@@ -22,13 +22,17 @@
 // each tap played.
 //
 // PART 2, a match (?len=60, which starts a goal-free harness match — no goal
-// can end it on a score — and scales the family's join times to a third, so
-// the first sibling walks in inside two match-seconds). An init script wraps
-// __fx.flash (the same object the game calls) and, on every animation frame,
-// mirrors __audioCalls() (the game's own log, stamped with tClock, capped at
-// 400 entries, hence the mirror) and records each danger event off
-// __matchState().ev and the guide: a charge, a bite on the player, the
-// first-run BIGGER teach. It also records joins, crowns and lost leads.
+// can end it on a score — and scales the family's join times to a third:
+// rivals.ts reroll() seats NIBBLES at rand(7, 13) x 1/3 = 2.3-4.3 s and the
+// next seat at rand(9, 15) x 1/3 = 3-5 s, and the first slot's rand(2, 5) is
+// never used, because NIBBLES always holds seat 0 — so the first sibling
+// walks in inside about four and a half match-seconds, the second by 5).
+// An init script wraps __fx.flash (the same object the game calls) and, on
+// every animation frame, mirrors __audioCalls() (the game's own log, stamped
+// with tClock, capped at 400 entries, hence the mirror) and records each
+// danger event off __matchState().ev and the guide: a charge, a bite on the
+// player, the first-run BIGGER teach. It also records joins, crowns and lost
+// leads.
 // Then, keyed on the game's clocks only:
 //   · the natural opening, until at least two siblings have joined and 6
 //     match-seconds have passed;
@@ -48,10 +52,13 @@
 //       noted, not graded — see below. Needs at least one sibling joined in the
 //       natural opening, or it is a PASS on no data and reads FAIL. Fails on
 //       the build before Job 10 at the first join, which rings alert().
-//   (b) ONE FLASH A FRAME. No animation frame carries two flash() calls — the
-//       second erases the first before it is drawn (fx.ts writes background
-//       and opacity together). Fails before Job 10 on the forced form bite
-//       (violet, then red) and on any rival eaten (gold, then violet).
+//   (b) ONE FLASH A FRAME. No animation frame of this run carries two
+//       flash() calls — the second erases the first before it is drawn (fx.ts
+//       writes background and opacity together). Fails before Job 10 on the
+//       forced form bite (violet, then red) and on any rival eaten in the run
+//       (gold, then violet). It is not a game-wide bar: the last form's
+//       evolution still calls flash() twice (gold, then white), and this run
+//       steers nothing and sets only scores, so it never evolves her there.
 //   (c) THE CHARGE STILL ALARMS, FROM HER SIDE. __charge() rings alert(),
 //       fires exactly one flash, and that flash is a linear-gradient whose
 //       angle is __wayAim(her x, 0, her z).bear within 1°, clear (alpha 0) at
@@ -62,8 +69,11 @@
 //       red flash. Before Job 10 there is no counter, so this reads FAIL on
 //       the missing count; bar (a) is the one that fails there on the alarm
 //       itself if the crown and the loss happen.
-//   (e) A PADLOCK IS CURIOSITY. Each locked tap in part 1 plays pop() and no
-//       alert(). Fails before Job 10 on both taps.
+//   (e) A PADLOCK IS CURIOSITY. Each locked tap in part 1 plays bonk(), the
+//       wall's soft "you can't have that", and neither pop() (the eat, the
+//       game's reward) nor alert(). Fails before Job 10 on both taps (alert),
+//       and on c79d36b, the job's first cut, on both (pop). qa/padlock.mjs
+//       reads the same two handlers and bonk()'s graph in node.
 //
 // NOT GRADED HERE: the beat palette. Beat washes are world colours, and a
 // season repaints every one of them for its fortnight (events.ts), so whether
@@ -354,11 +364,11 @@ else {
 }
 
 // (e)
-const padOk = (ids) => ids.includes('pop') && !ids.includes('alert');
+const padOk = (ids) => ids.includes('bonk') && !ids.includes('pop') && !ids.includes('alert');
 bar(padOk(tapDot) && padOk(tapCard.ids), 'e', padOk(tapDot) && padOk(tapCard.ids)
-  ? 'a locked level dot and a locked world card each play a soft pop() and no alert()'
-  : `locked taps played dot [${tapDot.join(', ') || 'nothing'}], card [${tapCard.ids.join(', ') || 'nothing'}] — each wants pop() and no alert()`);
+  ? 'a locked level dot and a locked world card each play bonk(), and neither pop() nor alert()'
+  : `locked taps played dot [${tapDot.join(', ') || 'nothing'}], card [${tapCard.ids.join(', ') || 'nothing'}] — each wants bonk(), and neither pop() (the eat) nor alert()`);
 
 if (bad) { console.log(`\nFAIL — the danger channel carries non-danger (${bad} of 5 bars)`); process.exit(1); }
-console.log('\nPASS — alert() and the red wash answer only a charge, a bite or the teach; one flash a frame; the charge washes from her side; a lost lead and a padlock are not alarms');
+console.log('\nPASS — alert() and the red wash answer only a charge, a bite or the teach; one flash a frame; the charge washes from her side; a lost lead is not an alarm and a padlock is neither an alarm nor a meal');
 process.exit(0);

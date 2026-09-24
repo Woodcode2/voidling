@@ -77,7 +77,10 @@ export interface Audio3D {
    *  at its top (research governor G4). */
   tick(i: number, n: number): void;
   /** the wall. A soft bonk — it used to be a pop(), an eat, on a thing she
-   *  could not eat. */
+   *  could not eat. One meaning, "you can't have that (yet)": it also answers
+   *  a tapped locked level dot and a tapped locked world card, which played
+   *  alert() and, in Job 10's first cut, pop(0) (studio round 4, Job 10;
+   *  qa/padlock.mjs reads both handlers and this cue's graph). */
   bonk(): void;
   startMusic(): void;              // the match loop — tempo + layers ride the stage
   setMusicStage(n: number): void;
@@ -3650,7 +3653,8 @@ export function createAudio(): Audio3D {
     // was the gong at t + 2.0 and the clappers at t + 2.1. qa/lnalert.mjs read
     // the first voice at 2.000 s after the call. A charge winds up for 0.85 s
     // (rivals.ts, rv.ctim), so the warning landed after the lunge it warned
-    // about, and every match world ships a recording. So under one: the
+    // about, and Lantern ships a recording (public/assets/music/lantern.mp3),
+    // so this is the alarm a child hears. So under one: the
     // clappers on the call and the gong 80 ms behind them, no drum — the
     // probe's first voice reads 0.000 s, and the fallback's drum tower is
     // untouched.
@@ -4564,8 +4568,9 @@ export function createAudio(): Audio3D {
       // world card. A pre-reader learns an alarm that rings for everything
       // means "something happened", so by the time NIBBLES winds up it no
       // longer means "move". Joins play ready() now, a lost lead is a card with
-      // no sting, and a padlock is a soft pop(); what is left here is the
-      // charge and the danger teach (qa/dangerchannel.mjs holds that).
+      // no sting, and a padlock is the wall's bonk() — not pop(), which is the
+      // eat; what is left here is the charge and the danger teach
+      // (qa/dangerchannel.mjs holds that, qa/padlock.mjs the padlock).
       if (isPirate()) {
         // a friendly two-tone boat horn, a major third apart. It was written to
         // announce a guest at the resort; since Job 10 no join rings it, and on

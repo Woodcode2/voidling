@@ -16,20 +16,36 @@
 // NONE OF THE SYNTH IS COPIED. src/proto3d/audio3d.ts and the island module it
 // takes worldId() from are bundled by the esbuild vite already ships (the
 // qa/mouthwind.mjs route) and run as they are. The only things standing in are
-// the platform: the AudioContext (below), fetch (every URL answers 200 with
-// eight bytes, and decodeAudioData hands back a silent 200 s buffer), and inert
-// window/document stubs for the listeners createAudio() registers at build.
+// the platform: the AudioContext (below), fetch (a URL answers 200 with eight
+// bytes when public/ holds that file and 404 when it does not, as the dev
+// server would, and decodeAudioData hands back a silent 200 s buffer), and
+// inert window/document stubs for the listeners createAudio() registers at
+// build.
 //
 // WHAT THIS CANNOT TELL YOU: anything about loudness or spectrum. Nothing is
 // rendered. A bar about how a cue SOUNDS belongs in qa/chomp.mjs, on the
 // browser's own renderer.
 import { createRequire } from 'node:module';
-import { writeFileSync, unlinkSync } from 'node:fs';
+import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const fail = (msg) => { console.log(`FAIL — ${msg}`); process.exit(1); };
+// Every abort prints a FAIL line: a throw from the synth itself, or from a
+// module the probe imports after this one (qa/worlds.mjs throws on a WorldId
+// union it cannot read), would otherwise end in a bare stack trace.
+process.on('uncaughtException', (e) => fail(`threw: ${String((e && e.message) || e).split('\n')[0]}`));
+process.on('unhandledRejection', (e) => fail(`rejected: ${String((e && e.message) || e).split('\n')[0]}`));
+
+/** the file under public/ that a root-relative asset URL is served from */
+const publicFile = (url) => join(process.cwd(), 'public', decodeURIComponent(String(url).split(/[?#]/)[0]));
+/** Does the build ship this world's match track? startMusic() asks for
+ *  /assets/music/<world>.mp3 (theme.mp3 first only behind Maple's opt-in
+ *  flag, which this harness never sets). A world without one plays its
+ *  fallback score, and a `recording: true` rig on it fails, because the fetch
+ *  below answers 404. */
+export const shipsTrack = (world) => existsSync(publicFile(`/assets/music/${world}.mp3`));
 
 /** Bundle and import the real audio3d.ts + island.ts. */
 export async function loadSynth() {
@@ -59,8 +75,11 @@ export async function loadSynth() {
     hidden: false, body: { classList: { toggle: noop, add: noop, remove: noop } } };
   globalThis.window = globalThis;
   globalThis.addEventListener = noop;
-  // every track and sample "downloads": the decode below is what decides
-  globalThis.fetch = async () => ({ ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(8) });
+  // a track or sample downloads when public/ ships it and 404s when it does
+  // not, so a world with no track file is read on its fallback score
+  globalThis.fetch = async (u) => (existsSync(publicFile(u))
+    ? { ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(8) }
+    : { ok: false, status: 404, arrayBuffer: async () => new ArrayBuffer(0) });
   globalThis.AudioBuffer = AudioBufferRec;   // sample() tests `instanceof AudioBuffer`
   // a file, not a data: URL, so a throw inside the synth names a readable line
   const file = join(tmpdir(), `synthgraph-${process.pid}.mjs`);
@@ -109,8 +128,9 @@ class Src extends Node {
     super(ctx, 'buf'); this.buffer = null; this.loop = false; this.loopStart = 0; this.loopEnd = 0;
     this.playbackRate = new Param(1); this.detune = new Param(0); this.startT = null; this.stopT = null; this.onended = null;
   }
-  start(t = 0) { this.startT = t; }
-  stop(t = 0) { this.stopT = t; }
+  // start(when, offset, duration): a duration ends the source as stop() would
+  start(t = 0, _off = 0, dur) { this.startT = t; if (dur !== undefined) this.stopT = t + dur; }
+  stop(t = 0) { this.stopT = this.stopT === null ? t : Math.min(this.stopT, t); }
 }
 class AudioBufferRec {
   constructor(ch, len, sr) { this.numberOfChannels = ch; this.length = len; this.sampleRate = sr; this.duration = len / sr; this._d = []; }
@@ -189,6 +209,8 @@ export async function rig(mod, world, { recording = false } = {}) {
   const a = mod.createAudio();
   a.setMuted?.(false);
   if (recording) {
+    if (!shipsTrack(world)) fail(`${world}: public/assets/music/${world}.mp3 does not ship, so this world has no recording to read `
+      + '(check shipsTrack() before asking for one)');
     a.startMusic();
     for (let i = 0; i < 200 && !(a.musicState().theme.srcs > 0); i++) await new Promise((r) => setImmediate(r));
     const s = a.musicState();
@@ -213,8 +235,14 @@ export async function rig(mod, world, { recording = false } = {}) {
           type: n.kind === 'osc' ? n.type : 'buffer',
           everSquare: n.kind === 'osc' && n.types.includes('square'),
           start: n.startT === null ? null : n.startT - t0,
+          stop: n.stopT === null ? null : n.stopT - t0,
           toMaster: down.has(master),
-          filters: [...down].filter((x) => x.kind === 'biquad').map((x) => ({ type: x.type, f: x.frequency.value })),
+          // a filter's cutoff is its scheduled values when it has any (a
+          // setValueAtTime() leaves .value at the default) — fMin/fMax span them
+          filters: [...down].filter((x) => x.kind === 'biquad').map((x) => {
+            const ff = freqs(x);
+            return { type: x.type, f: x.frequency.value, fMin: Math.min(...ff), fMax: Math.max(...ff) };
+          }),
           fMin: fs.length ? Math.min(...fs) : null,
           fMax: fs.length ? Math.max(...fs) : null,
           fFirst: fs.length ? fs[0] : null,

@@ -9,9 +9,12 @@
 // correctly, and leaves only the gong and the clappers — two seconds late.
 // A charge winds up for 0.85 s (rivals.ts, `rv.ctim = 0.85`), so the warning
 // landed after the lunge it was warning about, and a tapped padlock on the
-// Lantern menu shook, then rang two seconds later. All five match worlds ship
-// a recording, so the late alarm is the one a child hears; the drum tower only
-// ever plays on the missing-file fallback.
+// Lantern menu shook, then rang two seconds later (a padlock plays bonk()
+// now, qa/padlock.mjs). Lantern ships a recording
+// (public/assets/music/lantern.mp3), so the late alarm is the one a child
+// hears; the drum tower only plays on the missing-file fallback. (Five of the
+// six worlds ship one; Skylark has no skylark.mp3 and plays its fallback
+// score.)
 //
 // ── WHAT IT DOES ───────────────────────────────────────────────────────────
 // Runs the REAL createAudio() on Lantern (qa/_synthgraph.mjs: audio3d.ts

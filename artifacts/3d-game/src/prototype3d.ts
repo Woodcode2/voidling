@@ -5147,7 +5147,11 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   // wash of being nibbled (onPlayerBitten, rgba(154,92,255,0.3)), and gold is
   // the wash of growing and of taking the crown — "a bite washes red, a form
   // washes gold" — so the kill keeps the gold, at its authored 0.3.
-  // qa/dangerchannel.mjs holds every frame to one flash() call.
+  // qa/dangerchannel.mjs fails a frame of its run that carries two flash()
+  // calls. That is not every frame of the game: the probe steers nothing and
+  // sets only scores (curStage follows the radius), so it never drives her to
+  // the last form, whose evolution still calls flash() twice in one pass —
+  // the gold wash, then the last rung's white.
   fx.shake(9); fx.flash('rgba(255,224,138,0.4)', 0.3);
   camPunch(6); fx.kick(rx - voidState.x, rz - voidState.z, 9);
   floatPos.set(rx, rr + 5, rz);
@@ -5256,9 +5260,9 @@ rivals.onPlayerBitten = (name, hit) => {
   // ONE CALL. A form bite used to flash violet and then red on consecutive
   // lines; fx.flash() writes background and opacity together, so the red
   // replaced the violet before a frame drew it. Choosing first draws exactly
-  // what was drawn before, and keeps every frame to one flash()
-  // (qa/dangerchannel.mjs): red for the bite that costs a form, violet for a
-  // nibble.
+  // what was drawn before, and keeps the bite's frame to one flash()
+  // (qa/dangerchannel.mjs (b) forces a form bite and reads it): red for the
+  // bite that costs a form, violet for a nibble.
   audio.hit();
   if (hit.form) fx.flash('rgba(255,43,60,0.4)', 0.5);
   else fx.flash('rgba(154,92,255,0.3)', 0.4);
@@ -8030,10 +8034,17 @@ function paintMenuLadder(): void {
             gl.textContent = `FINISH LEVEL ${cur} FIRST`;
             ladderLater(() => paintMenuLadder(), 1800);
           }
-          // a soft pop, not the alarm (studio round 4, Job 10): tapping a
-          // padlock is curiosity, and this was audio.alert() — the sound of a
-          // charge. The shake and the sentence already answer her.
-          audio.pop(0); buzz(30);
+          // "not yet", not the alarm and not a meal (studio round 4, Job 10):
+          // tapping a padlock is curiosity, and this was audio.alert() — the
+          // sound of a charge. pop() is no answer either: it is the EAT, the
+          // game's reward, and the channel tick() and bonk() were both moved
+          // off for carrying things that were not meals. bonk() is the wall's
+          // "you can't have that": a sine falling 520 -> 330 Hz, a triangle
+          // 1040 -> 700 Hz and a noise grain bandpassed at 900 Hz; no square,
+          // no oscillator under 330 Hz, no low-passed thump, every voice ended
+          // by 0.14 s (qa/padlock.mjs). The shake and the sentence already
+          // answer her.
+          audio.bonk(); buzz(30);
           return;
         }
         track('level_tap', { world: pickedWorld, goal: g, from: cur });
@@ -10227,9 +10238,10 @@ const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) 
         c.classList.remove('shake', 'why'); void (c as HTMLElement).offsetWidth;
         c.classList.add('shake', 'why');
         setTimeout(() => c.classList.remove('why'), 1600);
-        // a soft pop, not the alarm — the same answer the locked level dots
-        // give (studio round 4, Job 10); this was audio.alert()
-        audio.pop(0); buzz(30);
+        // the wall's bonk(), not the alarm and not the eat — the same "not
+        // yet" the locked level dots give (studio round 4, Job 10; see there
+        // and qa/padlock.mjs); this was audio.alert()
+        audio.bonk(); buzz(30);
         return;
       }
       const dot = levelCurrent(id);

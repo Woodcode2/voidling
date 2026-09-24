@@ -24,7 +24,11 @@
 // in node on a context that records every node it is handed, and renders
 // nothing) and calls hit() and alert() on every world — with no recording, and
 // again with the world's track playing, because Lantern's alert() takes a
-// different branch under a recording (see qa/lnalert.mjs).
+// different branch under a recording (see qa/lnalert.mjs). The second read is
+// made only on a world that ships public/assets/music/<world>.mp3: the
+// harness's fetch 404s a file public/ does not hold, as the dev server does,
+// so a world with no track (Skylark, today) is read on its fallback score
+// alone and its row says so.
 //
 //   (a) NO SQUARE. No oscillator either cue builds is ever set to 'square'.
 //   (b) THE BITE GOES UP. Every voice hit() builds is an oscillator — no noise
@@ -39,13 +43,13 @@
 // Loudness and spectrum are NOT graded here — nothing is rendered. They belong
 // to qa/chomp.mjs on the browser's own renderer.
 import { readFileSync } from 'node:fs';
-import { loadSynth, rig } from './_synthgraph.mjs';
+import { loadSynth, rig, shipsTrack } from './_synthgraph.mjs';
 import { ALL_WORLDS } from './worlds.mjs';
 
 const mod = await loadSynth();
 const rows = [];
 for (const w of ALL_WORLDS) {
-  for (const recording of [false, true]) {
+  for (const recording of shipsTrack(w) ? [false, true] : [false]) {
     const r1 = await rig(mod, w, { recording });
     const hit = r1.run(() => r1.a.hit());
     const r2 = await rig(mod, w, { recording });
@@ -59,13 +63,16 @@ console.log('  squares built per cue (fallback score / recording playing)');
 console.log('    world       hit()    alert()   alert() voices to master');
 for (const w of ALL_WORLDS) {
   const [f, r] = [rows.find((x) => x.w === w && !x.recording), rows.find((x) => x.w === w && x.recording)];
-  console.log(`    ${w.padEnd(10)}  ${String(sq(f.hit)).padStart(2)} / ${sq(r.hit)}   ${String(sq(f.alert)).padStart(2)} / ${sq(r.alert)}     `
-    + `${f.alert.filter((v) => v.toMaster).length} / ${r.alert.filter((v) => v.toMaster).length}`);
+  const rr = (fn) => (r ? String(fn(r)) : '-');
+  console.log(`    ${w.padEnd(10)}  ${String(sq(f.hit)).padStart(2)} / ${rr((x) => sq(x.hit))}   ${String(sq(f.alert)).padStart(2)} / ${rr((x) => sq(x.alert))}     `
+    + `${f.alert.filter((v) => v.toMaster).length} / ${rr((x) => x.alert.filter((v) => v.toMaster).length)}`
+    + `${r ? '' : '   (no track file ships: fallback score only)'}`);
 }
 const total = (rec) => rows.filter((x) => x.recording === rec).reduce((s, x) => s + sq(x.hit) + sq(x.alert), 0);
 const fallbackTotal = total(false), recTotal = total(true);
+const nRec = rows.filter((x) => x.recording).length;
 console.log(`  hit() + alert() once each on ${ALL_WORLDS.length} worlds: ${fallbackTotal} square oscillator(s) with no recording, `
-  + `${recTotal} with the world's track playing`);
+  + `${recTotal} with the world's track playing (${nRec} world(s) ship one)`);
 
 const fails = [];
 // (a)
