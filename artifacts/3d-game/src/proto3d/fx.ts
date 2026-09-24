@@ -4,7 +4,10 @@ import * as THREE from 'three';
 
 export interface Fx {
   ring(x: number, z: number, color: number, maxR: number, dur?: number): void;
-  flash(color: string, alpha?: number): void;
+  /** A full-screen wash. `opts.danger` marks a WARNING — the family biting
+   *  her, a charge coming — which the flash governor never blends away or
+   *  drops (see THE FLASH GOVERNOR in createFx). */
+  flash(color: string, alpha?: number, opts?: { danger?: boolean }): void;
   shake(amt: number): void;
   /** DIRECTED shake — a recoil along the impact vector rather than white
    *  noise. (dx, dz) is the world-space direction the hit came FROM (the
@@ -21,6 +24,18 @@ export interface Fx {
    *  and literally sub-pixel on a colossus. Scaled here, once, so every call
    *  site keeps its authored number and means the same thing at both ends. */
   update(dt: number, camDist?: number): THREE.Vector3;   // returns a camera-shake offset to add
+  /** QA: how many times flash() has written the overlay's BACKGROUND since
+   *  boot — the number of washes a child was actually shown a colour of.
+   *  Calls are not washes: two calls in one frame are one wash on screen,
+   *  because the second write replaces the first before anything draws it.
+   *  qa/timebeat.mjs (c) reads this through __juiceState().flashes. */
+  flashCount(): number;
+  /** QA: what the overlay is painting right now — its inline background (the
+   *  colour a child is shown, as the browser normalised it) and its opacity
+   *  (0 when no wash is up). Read-only; qa/timebeat.mjs (c2) and (c3) read it
+   *  to see WHICH colour a burst of calls left on screen, not just how many
+   *  washes began. */
+  flashShown(): { bg: string; op: number };
 }
 
 // ── REDUCE MOTION ───────────────────────────────────────────────────────────
@@ -67,7 +82,10 @@ export function setReduceMotion(on: boolean) {
 
 interface Ring { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; t: number; dur: number; maxR: number; }
 
-export function createFx(scene: THREE.Scene): Fx {
+/** `now` is the clock the flash governor counts its rolling second on. The game
+ *  passes its own tClock — wall time that hit-stop and slow motion never touch,
+ *  so a freeze cannot stretch the window — and the default is the page's. */
+export function createFx(scene: THREE.Scene, now: () => number = () => performance.now() / 1000): Fx {
   // ── APPLY THE PARENT'S CHOICE BEFORE THE FIRST FRAME ─────────────────────
   // reduceMotion() is lazy — it reads storage and sets `body.calm` on its FIRST
   // call, and until day 10 nothing called it at boot. The only callers were the
@@ -104,6 +122,47 @@ export function createFx(scene: THREE.Scene): Fx {
   flashEl.style.cssText = 'position:fixed;inset:0;z-index:4;pointer-events:none;opacity:0;transition:opacity 0.05s linear;';
   document.body.appendChild(flashEl);
   let flashT = 0;
+  let flashN = 0;   // QA: background writes (see flashCount)
+  // ── THE FLASH GOVERNOR (research governor G8) ────────────────────────────
+  // flash() wrote the background and the opacity together on every call, so
+  // two calls inside one frame drew only the second — the kill's gold wash was
+  // erased by a violet one before any frame showed it (studio round 4, Job 10,
+  // removed that pair by hand) — and a burst of calls was a strobe: a
+  // full-screen swing per call, which is the vestibular half of the reason
+  // Reduce Motion caps the alpha at all. qa/timebeat.mjs (c) measured five
+  // calls in 200 ms of tClock as five washes on the build before this.
+  //
+  // Two rules now. A call while a wash is still on screen BLENDS into it: the
+  // colour already showing stays, the alpha takes the larger of the two and the
+  // life starts again, and the background is not rewritten — so a pair in one
+  // frame can no longer erase the first colour unseen. And at most FLASH_MAX
+  // washes may START in any rolling FLASH_WIN seconds of `now`; a call past
+  // that with nothing on screen is not drawn. Its event still has every other
+  // channel it always had — the sound, the buzz, the float, the ring.
+  //
+  // …EXCEPT A WARNING (the G8 review). Both rules were written for the
+  // celebrations, and applied to every call they could hide or drop the washes
+  // studio Job 10 gave ONE meaning: red is danger — the form bite's red and a
+  // charge's red edge — and violet is being nibbled. A form bite landing inside
+  // a live gold wash showed gold, the colour of a reward, for the game's single
+  // biggest setback, and a nibble as the third wash of a second was not drawn
+  // at all. qa/timebeat.mjs read both on the G8 build: (c2) the form bite left
+  // hue 42 at alpha 0.50 on screen, the gold it landed in; (c3) two washes of
+  // its own 150 ms apart, a third not drawn, and then the nibble not drawn
+  // either — two washes shown, nothing up. So a call marked `danger` always
+  // paints: its own colour at its own alpha, over whatever is up, whatever
+  // the rolling second holds. It still counts as a
+  // start, so a celebration right behind it is the one the cap turns away, and
+  // an ordinary call while a warning is up changes nothing — not the colour,
+  // not the alpha, not its life: the warning is shown as authored and ends on
+  // time. Warnings are rare by construction — a form bite buys 6 s of mercy
+  // and a nibble 2.5 (onPlayerBitten's biteMercy), and a hunter winds up her
+  // next charge 21-34 s after her last lunge ends (rivals.ts, ctim) — so this
+  // cannot become the strobe the cap is for.
+  const FLASH_MAX = 2, FLASH_WIN = 1.0;
+  const flashStarts: number[] = [];   // `now` of each wash started, oldest first
+  let flashA = 0;                     // the live wash's alpha, for the blend
+  let flashDanger = false;            // …and whether the live wash is a warning
 
   let shakeAmt = 0;
   let kickAmt = 0, kickX = 0, kickZ = 0, kickAge = 0;
@@ -118,14 +177,31 @@ export function createFx(scene: THREE.Scene): Fx {
       r.mesh.visible = true; r.mesh.position.set(x, 0.15, z);
       r.mat.color.set(color); r.t = 0; r.dur = dur; r.maxR = maxR;
     },
-    flash(color, alpha = 0.5) {
-      flashEl.style.background = color;
+    flashCount() { return flashN; },
+    flashShown() { return { bg: flashEl.style.background, op: Number(flashEl.style.opacity) || 0 }; },
+    flash(color, alpha = 0.5, opts) {
       // REDUCE MOTION caps the wash rather than removing it. The flash is a
       // readable signal — "you ate a rival", "you reached the final form" — so
       // silencing it outright would cost information; what makes it a
       // vestibular problem is the 0.55-0.6 alpha full-screen swing, not the
       // cue itself.
-      flashEl.style.opacity = String(reduceMotion() ? Math.min(alpha, 0.15) : alpha);
+      const a = reduceMotion() ? Math.min(alpha, 0.15) : alpha;
+      const danger = !!opts?.danger;
+      if (flashT > 0 && !danger) {
+        // live: blend (see THE FLASH GOVERNOR above) — no new colour, no
+        // swing; and inside a warning, nothing at all
+        if (flashDanger) return;
+        if (a > flashA) { flashA = a; flashEl.style.opacity = String(a); }
+        flashT = 0.12;
+        return;
+      }
+      const t = now();
+      while (flashStarts.length && t - flashStarts[0] >= FLASH_WIN) flashStarts.shift();
+      if (flashStarts.length >= FLASH_MAX && !danger) return;
+      flashStarts.push(t);
+      flashEl.style.background = color; flashN++;
+      flashA = a; flashDanger = danger;
+      flashEl.style.opacity = String(a);
       flashT = 0.12;
     },
     // …and camera shake goes entirely. Unlike the flash it carries no
@@ -150,7 +226,7 @@ export function createFx(scene: THREE.Scene): Fx {
         r.mesh.scale.setScalar(rad);
         r.mat.opacity = (1 - k) * 0.8;
       }
-      if (flashT > 0) { flashT -= dt; if (flashT <= 0) flashEl.style.opacity = '0'; }
+      if (flashT > 0) { flashT -= dt; if (flashT <= 0) { flashEl.style.opacity = '0'; flashA = 0; flashDanger = false; } }
       // decaying shake, in SCREEN terms (see the interface note on camDist):
       // the authored amount is multiplied by how far the camera currently sits
       // from the reference distance the numbers were tuned at, so shake(11)

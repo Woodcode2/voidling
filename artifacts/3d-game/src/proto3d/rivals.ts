@@ -71,6 +71,19 @@ export interface Rivals {
    *  beat) is delayed rather than lost. Once per sibling per match. See
    *  rivals.onOutgrown in prototype3d.ts. */
   onOutgrown?: (name: string, x: number, z: number) => boolean | void;
+  /** DIZZY (research governor G8, behind ?killbeat=1). The game calls this from
+   *  onRivalEaten for the sibling it has just swallowed, and only when the kill
+   *  beat is on and the whistle does not own the moment: for the rest of her
+   *  gulp her pupils circle inside their whites, the two eyes turning opposite
+   *  ways, and her face is kept turned to the camera so it can be seen. Nothing
+   *  in here decides WHETHER she is dizzy — that is the switch's, and the end
+   *  beat's, and both live in prototype3d.ts. */
+  dizzy(name: string): void;
+  /** …and the whistle stops it (the G8 review): every dizzy sibling's pupils
+   *  go back on their whites, for the rest of her gulp. prototype3d.ts's
+   *  whistleTakesTime() calls it on the frame either whistle blows, so a kill
+   *  a moment before the end does not go on seeing stars under the outro. */
+  stopDizzy(): void;
   reset(matchLen?: number): void;                        // instant rematch
 }
 
@@ -461,6 +474,9 @@ export function createRivals(
     // happened and has not been answered yet. ogSaid: it has been answered
     // this match. scareT: seconds left on the startled stare that answers it.
     og: boolean; ogT: number; ogPend: boolean; ogSaid: boolean; scareT: number;
+    // G8: her pupils circle through THIS gulp (see api.dizzy). Cleared when the
+    // gulp ends and at a rematch, with the pupils put back on their whites.
+    dizzyOn: boolean;
   }
   // ── THE LATCH'S TWO TIMES ─────────────────────────────────────────────────
   // FALLING (re-arm), 1.4 s: the research governor's number. A sibling that
@@ -652,7 +668,7 @@ export function createRivals(
       stolen: 0, stuffedSaid: false, stuffCap: 0, lockR: 0,
       surgeR: 0, surgeT: 0,
       campX: Math.cos(ang) * 130, campZ: Math.sin(ang) * 130, campT: 0,
-      roll: new THREE.Quaternion(),
+      roll: new THREE.Quaternion(), dizzyOn: false,
       og: false, ogT: 0, ogPend: false, ogSaid: false, scareT: 0,
       // HOME TURF: each family member forages their OWN corner of the island.
       // Without this they orbited the player all match ("they hover around
@@ -846,8 +862,31 @@ export function createRivals(
   const anyVisiting = () => rivals.some((r) => r.visiting);
   const tmp = new THREE.Vector3();
   const rollQ = new THREE.Quaternion();   // scratch: the rolling-ball delta
+  // ── DIZZY (G8) ───────────────────────────────────────────────────────────
+  // rv.eyes holds white, pupil, white, pupil (makeRivalMesh), so the pupils are
+  // children 1 and 3 and each one's centre is the white before it — which the
+  // look loop slides sideways with her aim, so the orbit is taken about the
+  // white where it is, not about a literal. 0.07 of orbit keeps the 0.11 pupil
+  // inside the 0.2 white (0.18) at the white's smallest scale. 24 rad/s of
+  // WORLD time is about two turns over the 0.55 s gulp: it freezes with the
+  // world in the kill's hit-stop and crawls through its slow motion, which is
+  // the point — the world holds its breath and she is still seeing stars.
+  const DIZZY_R = 0.07, DIZZY_W = 24;
+  const restPupils = (rv: R) => {
+    for (const ci of [1, 3]) {
+      const w = rv.eyes.children[ci - 1].position;
+      rv.eyes.children[ci].position.set(w.x, w.y, rv.eyes.children[ci].position.z);
+    }
+  };
   const api: Rivals = {
     list: rivals,
+    dizzy(name) {
+      const rv = rivals.find((r) => r.name === name);
+      if (rv && rv.dyingT > 0) rv.dizzyOn = true;
+    },
+    stopDizzy() {
+      for (const rv of rivals) if (rv.dizzyOn) { rv.dizzyOn = false; restPupils(rv); }
+    },
     grazeCount: () => grazeN,
     bandStat: () => ({ mean: bandN ? bandSum / bandN : 0, max: bandMax,
       pinnedPct: bandN ? bandPinned / bandN * 100 : 0, n: bandN }),
@@ -875,6 +914,7 @@ export function createRivals(
         rv.roll.identity(); rv.body.quaternion.identity();
         rv.group.visible = rv.halo.visible = false;
         rv.group.rotation.y = 0;
+        if (rv.dizzyOn) { rv.dizzyOn = false; restPupils(rv); }
         // a different corner of the island to forage — and to camp in — each time
         rv.hx = Math.cos(ang) * rand(105, 155); rv.hz = Math.sin(ang) * rand(105, 155);
         rv.campX = rv.hx; rv.campZ = rv.hz; rv.campT = 0;
@@ -1220,9 +1260,23 @@ export function createRivals(
           rv.group.position.set(rv.x + Math.cos(swirl) * 1.6 * k, Math.max(0.2, rv.r * k * 0.9), rv.z + Math.sin(swirl) * 1.6 * k);
           rv.group.scale.setScalar(Math.max(0.05, rv.r * k));
           rv.group.rotation.y += dt * 10;
+          if (rv.dizzyOn) {
+            // the face stays on the camera while the body spins under it — the
+            // group's own turn is taken back off the billboard — and the
+            // pupils circle, mirror images of each other, so the two eyes turn
+            // opposite ways and start crossed (see DIZZY_R above)
+            rv.eyes.quaternion.copy(rv.group.quaternion).invert().multiply(camera.quaternion);
+            const ph = (0.55 - Math.max(0, rv.dyingT)) * DIZZY_W;
+            for (const [ci, dir] of [[1, 1], [3, -1]]) {
+              const w = rv.eyes.children[ci - 1].position;
+              rv.eyes.children[ci].position.x = w.x + Math.cos(ph) * DIZZY_R * dir;
+              rv.eyes.children[ci].position.y = w.y + Math.sin(ph) * DIZZY_R;
+            }
+          }
           if (rv.dyingT <= 0) {
             rv.group.visible = false; rv.group.rotation.y = 0;
             rv.respawnT = 6; rv.r = START_R; rv.vx = rv.vz = 0;
+            if (rv.dizzyOn) { rv.dizzyOn = false; restPupils(rv); }
           }
           continue;
         }

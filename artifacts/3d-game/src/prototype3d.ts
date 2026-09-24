@@ -3536,7 +3536,12 @@ const _dbg = new Proxy(_dbgStore, {
     band: Record<string, { n: number; rMin: number; rMax: number }> };
   __renderBloom: () => void;
   __composer: () => unknown;
-  __juiceState: () => { fov: number; fovKick: number; stop: number; puffs: number; buzzes: number; stopCd: number; kitCd: number };
+  __juiceState: () => { fov: number; fovKick: number; stop: number; puffs: number; buzzes: number; stopCd: number; kitCd: number;
+    worldK: number; flashes: number; stops: number; longStops: number;
+    slow: number; killPulses: number; beats: Record<string, number>; longBeats: number };
+  __hitStop: (sec: number) => number;
+  __rivalBeside: (name?: string, dist?: number, rel?: number) => Record<string, unknown> | null;
+  __rivalFace: (name: string) => { dyingT: number; visible: boolean; pupils: { x: number; y: number }[] } | null;
   __eatNearest: (rel: number) => { r: number; R: number } | null;
   __eatVoice: (v: string, n?: number, maxR?: number) => { n: number; r: number[]; ids: number[] };
   __voiceCensus: () => { edibles: number; voices: Record<string, number>; silent: number; silentTags: Record<string, number> };
@@ -3625,7 +3630,73 @@ _dbg.__juiceState = () => ({
   // both to clear before it forces its bite, so another meal's swallow cannot
   // have spent them.
   stopCd, kitCd,
+  // ── WHAT TIME THE WORLD IS ON (research governor G8, qa/timebeat.mjs) ──
+  // worldK is the share of the frame's dt the WORLD was handed — dtw / dt on
+  // the last frame animate() ran, read off the two numbers the loop actually
+  // used, not off any constant: 0.06 inside a hit-stop, 0.3 in the outro, 1
+  // in ordinary play. flashes is fx's own count of washes shown (not calls).
+  // stops counts every freeze that began; longStops those that ran past 100
+  // ms, a freeze being counted once at whatever length the ladder took it to.
+  worldK: lastWorldK, flashes: fx.flashCount(), stops: stopN, longStops: longStopN,
+  // …and G8's own: the slow-motion factor on the last frame (1 when none runs;
+  // the armed scale through its hold, the eased value on the way back), the
+  // ray pulses fired, how many of each marquee beat have armed, and how many
+  // freezes a beat armed or lengthened past 100 ms (longBeatN, above armStop)
+  slow: lastSlowK, killPulses: killN, beats: { ...beatN }, longBeats: longBeatN,
 });
+// QA: arm a hit-stop through the REAL hitStop() — its own cooldown gate
+// included, so a probe must wait for stopCd to read clear or be told 0.
+// Returns the freeze now armed (stopT). qa/timebeat.mjs (b) freezes the world
+// with it and reads the hero's own clock off faceState().hold while it lasts.
+_dbg.__hitStop = (sec: number) => { hitStop(sec); return stopT; };
+// QA: put a member of the family BESIDE the void, small enough to swallow by
+// the family's own rule (`pr > rv.r * 1.2 && dp < pr * 0.95`, rivals.ts), so
+// the next rivals.update() devours it through the real hole-vs-hole branch:
+// dyingT, onRivalEaten, the points, the rings, the flash and the sound are all
+// the ones a real kill fires. Nothing here calls onRivalEaten itself.
+//
+// A rival who has not walked in yet is walked in the way __setRivalScores does
+// it — joinAt into the past, so the next update() runs the real arrival — and
+// the call returns null; call again on a later frame. `dist` is the gap from
+// the void's centre in multiples of HIS radius (0.5 is inside the 0.95 eat
+// line, 1.6 is outside it — a probe can walk one in over several frames) and
+// `rel` her radius as a share of his (under 1/1.2 or she cannot be eaten).
+// She is put on the camera's right of him, so both are in the play frame.
+// A name picks her; with none, the first joined sibling who is not the
+// hunter, then the hunter. A rival mid-gulp or waiting to respawn is skipped.
+_dbg.__rivalBeside = (name?: string, dist = 0.5, rel = 0.6) => {
+  type Priv = { joinAt: number; dyingT: number; respawnT: number; arch: string; joined: boolean;
+    r: number; x: number; z: number; vx: number; vz: number; hunting?: boolean; name: string };
+  const all = rivals.list as unknown as Priv[];
+  const free = (r: Priv) => !(r.dyingT > 0) && !(r.respawnT > 0);
+  const pick = name ? all.find((r) => r.name === name)
+    : (all.find((r) => r.joined && free(r) && r.arch !== 'BULLY') ?? all.find((r) => r.joined && free(r))
+      ?? all.find((r) => !r.joined));
+  if (!pick) return null;
+  if (!pick.joined) { pick.joinAt = -1; return null; }
+  if (!free(pick)) return null;
+  const R = voidling.radius;
+  // camera right on the ground: camOffset points from the void back to the
+  // lens, so (camOffset.z, -camOffset.x) is the screen's right, flattened
+  const fl = Math.hypot(camOffset.x, camOffset.z) || 1;
+  const ax = camOffset.z / fl, az = -camOffset.x / fl;
+  pick.r = R * rel;
+  pick.x = voidState.x + ax * R * dist; pick.z = voidState.z + az * R * dist;
+  pick.vx = pick.vz = 0;
+  return { name: pick.name, arch: pick.arch, r: pick.r, R, x: pick.x, z: pick.z, dist,
+    marquee: pick.arch === 'BULLY' && !pick.hunting };
+};
+// QA: a sibling's face, read off the meshes — her gulp clock and where each
+// pupil sits on her billboarded eye group (children 1 and 3 of rv.eyes: each
+// eye is a white then its pupil, rivals.ts makeRivalMesh). The rest pose of a
+// pupil is its eye's centre, (+-0.32, 0.08).
+_dbg.__rivalFace = (name: string) => {
+  const rv = (rivals.list as unknown as { name: string; dyingT: number; eyes: THREE.Group; group: THREE.Group }[])
+    .find((r) => r.name === name);
+  if (!rv) return null;
+  const pu = [rv.eyes.children[1], rv.eyes.children[3]].map((c) => ({ x: c.position.x, y: c.position.y }));
+  return { dyingT: rv.dyingT, visible: rv.group.visible, pupils: pu };
+};
 // QA: force-eat the nearest edible at least `rel` of the void's radius —
 // drives the REAL capture() path (hit-stop, lens punch, kick, particles,
 // audio, haptics), not a simulation of it.
@@ -5137,7 +5208,9 @@ _dbg.__moverStats = (gate: number) => life.moverStats(gate);
 // read it as support for a change it does not support.
 await bootStage('Waking the void family…', 58);
 const rivals = createRivals(scene, camera, edibles, island.biomeAt, 3 + Math.floor(Math.random() * 3));
-const fx = createFx(scene);
+// the flash governor's rolling second is counted on tClock (see fx.ts): wall
+// time, which a hit-stop or a slow stretch never slows
+const fx = createFx(scene, () => tClock);
 /** QA: the juice kit itself, so a harness can fire a shake or a ring on demand
  *  and measure what the camera does with it — the shake-residue probe uses this
  *  to prove the follow spring never keeps a kick (see camFollow). Assigned HERE
@@ -5237,7 +5310,10 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   // off you plus half her score, so it has to land like the ending it is
   // No card: bubbles.float() at the kill site already says the name, the title
   // and the points where the child is actually looking, under two rings, a
-  // gold flash, a camera punch, audio.chomp(..., "rival") and an 80ms buzz.
+  // gold flash, audio.chomp(..., "rival") and an 80ms buzz — and, with
+  // ?killbeat=1, a freeze, a slow stretch, a ray pulse and her dizzy pupils.
+  // (This list used to include "a camera punch". camPunch() had been a no-op
+  // since the owner's zero-shake order, so it never did.)
   // …and the town notices a second hole vanishing, without ever learning that
   // it had a name. COPY.rivalGoneNews was one string per world; this is a pool,
   // through the same cooldown as every other reaction, so a marquee kill and a
@@ -5260,12 +5336,24 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   // the wash of growing and of taking the crown — "a bite washes red, a form
   // washes gold" — so the kill keeps the gold, at its authored 0.3.
   // qa/dangerchannel.mjs fails a frame of its run that carries two flash()
-  // calls. That is not every frame of the game: the probe steers nothing and
-  // sets only scores (curStage follows the radius), so it never drives her to
-  // the last form, whose evolution still calls flash() twice in one pass —
-  // the gold wash, then the last rung's white.
-  fx.shake(9); fx.flash('rgba(255,224,138,0.4)', 0.3);
-  camPunch(6); fx.kick(rx - voidState.x, rz - voidState.z, 9);
+  // calls. (The last form's evolution called flash() twice in one pass — the
+  // gold wash, then the last rung's white — until G8 gave the last rung its
+  // white alone; see the ceremony block.)
+  //
+  // …AND NOTHING ON THE CAMERA (research governor G8). fx.shake(9), camPunch(6)
+  // and fx.kick(…, 9) sat on these two lines: three calls that have been
+  // no-ops since the owner's zero-shake order ("I don't want any shake. 0."),
+  // spending the marquee play's whole budget on nothing. They are gone; what
+  // sells the kill now is time — the freeze and the slow stretch, the ray
+  // pulse in her colour and her dizzy pupils — all behind ?killbeat=1 until
+  // the owner has seen qa/killbeat.mjs's sheet, and none of it inside the end
+  // beat, where the whistle owns the moment. qa/timebeat.mjs (s) reads this
+  // handler and fails on any of the three.
+  fx.flash('rgba(255,224,138,0.4)', 0.3);
+  if (!beat && marqueeBeat(marquee ? 'marquee' : 'rival')) {
+    killRays(rx, rz, rr, FAMILY_INK[name] ?? 0xffffff);
+    rivals.dizzy(name);
+  }
   floatPos.set(rx, rr + 5, rz);
   bubbles.float(floatPos, `${FAMILY_TITLE[name] ?? ''} ${name} DEVOURED! +${pts}`, true);
   // inside the end beat the rival goes down with a plain bite: the whistle owns
@@ -5381,9 +5469,14 @@ rivals.onPlayerBitten = (name, hit) => {
   // what was drawn before, and keeps the bite's frame to one flash()
   // (qa/dangerchannel.mjs (b) forces a form bite and reads it): red for the
   // bite that costs a form, violet for a nibble.
+  //
+  // …and both are WARNINGS to the flash governor (fx.ts, the G8 review): a
+  // bite landing inside a live gold or green wash paints its own colour over
+  // it instead of blending into the reward's, and the two-a-second cap never
+  // turns it away. qa/timebeat.mjs (c2) and (c3) drive this handler.
   audio.hit();
-  if (hit.form) fx.flash('rgba(255,43,60,0.4)', 0.5);
-  else fx.flash('rgba(154,92,255,0.3)', 0.4);
+  if (hit.form) fx.flash('rgba(255,43,60,0.4)', 0.5, { danger: true });
+  else fx.flash('rgba(154,92,255,0.3)', 0.4, { danger: true });
   buzz(hit.form ? 90 : 50);
   track(hit.form ? 'caught' : 'nibbled', {
     name, sec: elapsed(), form: curStage, stolen: Math.round(hit.steal),
@@ -5414,11 +5507,13 @@ rivals.onCharge = (name, x, z) => {
   // the half of the screen away from her and rising to 0.55 on the edge she is
   // on (0.19 after the flash's 0.35). A CSS gradient angle and the chevron's
   // `ang` share a convention: 0deg is up, clockwise, so the bearing drops in
-  // as it is. With no viewport to aim in, the old flat wash stands.
+  // as it is. With no viewport to aim in, the old flat wash stands. A WARNING
+  // to the flash governor (fx.ts): it paints over a live celebration and the
+  // two-a-second cap never drops it.
   _chargeV.set(x, 0, z);
   const aim = wayAim(_chargeV);
   fx.flash(aim ? `linear-gradient(${aim.bear.toFixed(1)}deg, rgba(255,43,60,0) 50%, rgba(255,43,60,0.55) 100%)`
-    : 'rgba(255,43,60,0.16)', 0.35);
+    : 'rgba(255,43,60,0.16)', 0.35, { danger: true });
   audio.alert(); audio.voice('scared'); buzz(35);
 };
 // ── A BIG ONE HAS NOTICED YOU ──────────────────────────────────────────────
@@ -9254,6 +9349,11 @@ interface BitePay {
   kx: number; kz: number;   // the pull at capture, for the landmark kit's recoil
   vc: EatVoice | '';   // what this meal says when it goes in — eatVoiceOf(), '' for a silent kind (G5)
   said: string;    // what it said at the sink: the voice, '-' held by the gate or the end beat, '' not yet
+  /** G8: a named thing — the hero landmark or dot 3's, or a sticker found —
+   *  whose marquee beat the swallow owes ('' for an ordinary meal). Decided at
+   *  capture, where the sticker is collected; paid on the swallow, where the
+   *  thing actually goes in (Job 11). */
+  beat: '' | 'landmark' | 'sticker';
 }
 /** The last 64 bites, oldest first — the same objects the drain pays, so a row
  *  fills in as its bite goes down. QA only (__biteLog); nothing in the game
@@ -9418,9 +9518,11 @@ function capture(e: Edible, giveHunger = true) {
   // ── A FIND ────────────────────────────────────────────────────────────
   // Loud, and immediately: this is the only thing in the game a child keeps.
   const sid = e.mesh.userData.sticker as string | undefined;
+  let payBeat: BitePay['beat'] = '';   // G8: see BitePay.beat
   if (sid) {
     const got = collectInRun(sid);
     if (got) {
+      payBeat = 'sticker';
       playerScore += TIER_POINTS[got.tier];
       announceBeat('⭐', 'STICKER FOUND!', got.name.toUpperCase(), 1);
       audio.voice('yum');
@@ -9575,8 +9677,12 @@ function capture(e: Edible, giveHunger = true) {
   // biteSinks at the moment the sound actually plays, frames after the tallies
   // and after the frame loop's goal check has had its turn. Everything the
   // sound depends on is written down here, as it stands at the bite.
+  // the hero landmark (a world's authored finale, COPY.heroGone) and the one
+  // dot 3 names (userData.landmark) are the named buildings; a sticker found
+  // outranks neither and is outranked by neither — they share one duration
+  if (!payBeat && (e.mesh.userData.landmark || (e === heroProp && COPY.heroGone))) payBeat = 'landmark';
   const pay: BitePay = { id: e.mesh.id, r: e.radius, cap: tClock, sink: -1, sndT: -1, snd: '', gulp: -1,
-    bite, vr: voidling.radius, combo, head: headline, kx: dx, kz: dz, vc: eatVoiceOf(e) ?? '', said: '' };
+    bite, vr: voidling.radius, combo, head: headline, kx: dx, kz: dz, vc: eatVoiceOf(e) ?? '', said: '', beat: payBeat };
   e.pay = pay;
   biteLog.push(pay);
   if (biteLog.length > 64) biteLog.shift();
@@ -9650,6 +9756,11 @@ function biteGulps(e: Edible, pay: BitePay) {
   const p = e.mesh.position;
   // …and the blob LUNGES past its new size rather than easing to it
   voidling.impulse(Math.min(2.2, pay.r * 0.9));
+  // a named thing goes in: the world holds for it (G8, behind ?killbeat=1;
+  // the ladder is at marqueeBeat). Asked on the swallow, like the sound is
+  // asked on the sink: a landmark that meets dot 3's goal has handed the
+  // moment to the whistle by now, and endBeat() says so.
+  if (pay.beat && !endBeat()) marqueeBeat(pay.beat);
   // THE WORLD STOPS for a big one. Gated at 0.55 so it is a landmark event,
   // never a hoover spree, and hitStop() carries its own cooldown as well.
   // MEASURED, NOT ASSUMED (qa/_kickrate.mjs, child driver, 60s of play):
@@ -9676,7 +9787,20 @@ function biteGulps(e: Edible, pay: BitePay) {
   if (pay.bite > 0.55 && pay.r > 1.1) {
     if (kitCd <= 0) {
       kitCd = 1.6;
-      hitStop(0.055 + 0.05 * pay.bite);
+      // …HELD TO THE LADDER WHILE THE MARQUEE BEATS ARE ON (the G8 review).
+      // bite is clamped to 1, so this rung runs 0.055-0.105 s, and its top
+      // sits across the 100 ms line of the lead's whole-match ceiling (at most
+      // 8 freezes over 100 ms, qa/timebeat.mjs (d)). On the G8 build, switch
+      // on, a whole Maple match read 6 of its 40 freezes over the line, all
+      // six this rung's and none a beat's: the ceiling was counting the bite.
+      // With ?killbeat=1 an anonymous meal holds the world no longer than the
+      // ladder's own named-meal freeze — a sticker found, the hero landmark,
+      // 0.10 s — so at full motion no house outlasts a sticker (under Reduce
+      // Motion the sticker's freeze halves to 0.05 s and this cap does not),
+      // and every freeze over the line is a beat's. The trim is 0-5 ms, on meals of 0.9 of his radius or more.
+      // With the switch off, as the game ships, the rung is untouched.
+      const stopFor = 0.055 + 0.05 * pay.bite;
+      hitStop(KILL_BEAT ? Math.min(stopFor, BEAT_TIME.landmark.stop) : stopFor);
       camPunch(1.2 + 1.8 * pay.bite);
       fx.kick(pay.kx, pay.kz, 2.5 + 3.5 * pay.bite);
       _dbg.__kickN = (_dbg.__kickN ?? 0) + 1;   // instrumentation: qa/_kickrate.mjs
@@ -13692,20 +13816,314 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { beginMatch(); }
 // discontinuity anywhere in the one thing the product is about.
 //
 // A big bite now stops the world for 55-105ms. Everything that is part of the
-// SIMULATION freezes — the hero, the drain spiral, the crowd, the family, the
-// particles — while everything that would read as a hitch if it froze keeps
-// running on real dt: tClock and its cooldowns, the camera lerp, the HUD, and
-// the audio, which is already scheduled ahead on its own clock.
+// SIMULATION freezes — the drain spiral, the crowd, the family, the particles —
+// while everything that would read as a hitch if it froze keeps running on
+// real dt: tClock and its cooldowns, the camera lerp, the HUD, and the audio,
+// which is already scheduled ahead on its own clock.
 //
 // The world time-scale to do it with was already in this file and driving
 // exactly one line. `dtw` existed for the outro's slow-motion push-in and
 // nothing else ever read it.
+//
+// ── THE HERO IS NOT THE WORLD (research governor G8) ──────────────────────
+// The list above used to start with "the hero": voidling.update() ran on dtw,
+// so for the length of every stop his jaw, his blink, his wobble and his
+// growth spring ran at 6% with the town — the one moment the bite was meant
+// to land, the face that is biting went still. qa/timebeat.mjs (b) read his
+// jaw clock at 0.06 of tClock on a frozen frame. He runs on heroDt now:
+// HERO_K of dt inside a freeze (the spec's 0.35), so the snap of the jaw and
+// the eyes stay alive while everything he is eating holds its breath. His
+// POSITION was never frozen and is not now — see "THE WORLD MAY STOP. THE
+// THUMB MAY NOT." in the input block — and slow motion (below) never touches
+// him at all: it is world time only.
+//
+// ── AND THE WORLD EASES BACK (G8) ─────────────────────────────────────────
+// A stop ended by snapping from 0.06 to 1 in one frame — a lurch at the tail
+// of every freeze, the same fault as the camera kicks it replaced, pointed at
+// time instead of space. It ramps back over STOP_EASE of dt now, ease-out, and
+// the hero ramps with it from HERO_K.
 let stopT = 0;         // seconds of freeze left
 let stopCd = 0;        // …and the gate that stops a hoover spree stuttering
-function hitStop(sec: number) {
-  if (stopCd > 0) return;
+const STOP_K = 0.06;   // the world's share of dt inside a freeze
+const HERO_K = 0.35;   // …and the hero's
+const STOP_EASE = 0.06;   // seconds of dt from STOP_K back to 1 after a freeze
+let stopEase = 0;         // …of that ease still to run
+// QA (qa/timebeat.mjs, __juiceState): every freeze that begins, and every one
+// that runs past 100 ms — counted once, at whatever length the freeze reached
+// (tClock since it began plus what is left of it), because a freeze extended
+// while it is running is still ONE stop on the screen. lastWorldK is dtw / dt
+// of the frame animate() last ran.
+//
+// …and WHO took it past 100 ms (longBeatN): a freeze a marquee beat armed, or
+// one it lengthened over the line, is the beat's; one the bite hit-stop took
+// over by itself is the bite's. The split exists because the bite's own top
+// rung sits on the line — hitStop(0.055 + 0.05 * bite), bite clamped to 1, is
+// 0.100-0.105 s for any meal of 0.9 of his radius or more — and in a whole
+// Maple match with no beat in it (the build before G8, qa/timebeat.mjs (d))
+// 9 of its 47 freezes crossed 100 ms. A ceiling on the beats has to be able to
+// tell those apart from its own. (Since the G8 review the ceiling counts every
+// freeze again, as the lead set it, and with ?killbeat=1 the bite's rung is
+// held to 0.10 s — see biteGulps — so the split is printed, not judged.)
+let stopN = 0, longStopN = 0, longBeatN = 0, freezeAt = 0, freezeLong = false, lastWorldK = 1;
+function countFreeze(beat: boolean) {
+  if (!freezeLong && tClock - freezeAt + stopT > 0.1 + 1e-9) { freezeLong = true; longStopN++; if (beat) longBeatN++; }
+}
+/** Arm a freeze of `sec`, the MAX with whatever is running, never the sum.
+ *  `beat`: a marquee beat is arming it (QA: see longBeatN). */
+function armStop(sec: number, beat = false) {
+  if (!(stopT > 0)) { stopN++; freezeAt = tClock; freezeLong = false; }
   stopT = Math.max(stopT, sec);
+  stopEase = 0;   // a freeze that lands inside the ease starts it again when it ends
+  countFreeze(beat);
+}
+function hitStop(sec: number) {
+  // …and never inside a marquee beat's slow stretch (G8): a bite freezing a
+  // world already running at a quarter speed does not read as a second beat,
+  // it reads as the frame rate dropping. Without the switch no slow stretch
+  // ever runs, so this is the old gate exactly.
+  if (stopCd > 0 || slowHold > 0 || slowEaseT > 0) return;
+  armStop(sec);
   stopCd = 0.35;
+}
+
+// ── SLOW MOTION (G8, behind ?killbeat=1) ──────────────────────────────────
+// slowMo(scale, sec): after any freeze has run out, the world runs at `scale`
+// for `sec` of dt and then eases back to 1 over SLOW_EASE of dt. It slows
+// WORLD time and nothing else, and here is exactly what that is, because the
+// match clock is a promise to a child:
+//   SLOWED    everything animate() hands dtw — the crowd (life.update), the
+//             family (rivals.update: their movement, their eating, the gulp of
+//             the one being eaten), the drain carrying meals in, the particles,
+//             the rings and the flash's fade (fx.update), and the MATCH TIMER
+//             (matchClock counts down on dtw, and the last-ten countdown reads
+//             matchClock, so it waits too). By arithmetic, a stretch of 0.25 s
+//             at 0.25 leaves the timer 0.1875 s behind the wall, plus what the
+//             ease back takes — the child loses no clock to a beat, the same
+//             bargain the hit-stop has always made.
+//   NOT SLOWED  the steering and the void's position (dt, not dtw), the hero's
+//             own rig (heroDt: a freeze slows him to HERO_K, slow motion does
+//             not slow him at all), the camera, tClock and every cooldown and
+//             HUD timer on it, the audio, and the ray pulse at a kill (it runs
+//             on dt, so it plays while the world holds).
+// Two calls take the deeper scale and the longer hold — the max, never a sum.
+// "Deeper" is against the scale actually SHOWING: inside the ease back that is
+// the eased value (lastSlowK), not the hold's old scale, which the ease has
+// already left behind — so an evolution that lands while a kill's stretch is
+// easing out dips to its own 0.35 and holds there, instead of dropping the
+// world back to the kill's 0.25 for 0.4 s it never asked for.
+const SLOW_EASE = 0.15;
+let slowScale = 1, slowHold = 0, slowEaseT = 0, slowEaseLen = SLOW_EASE, lastSlowK = 1;
+function slowMo(scale: number, sec: number) {
+  const showing = slowHold > 0 ? slowScale : slowEaseT > 0 ? lastSlowK : 1;
+  slowScale = Math.min(showing, scale);
+  slowHold = Math.max(slowHold, sec);
+  slowEaseT = 0;
+  slowEaseLen = SLOW_EASE * (reduceMotion() ? 0.5 : 1);
+}
+/** ease-out: fast at first, settling into 1 */
+const easeOut = (p: number) => 1 - (1 - p) * (1 - p);
+/** ── HOW MUCH TIME THE WORLD AND THE HERO GET THIS FRAME ─────────────────
+ *  Advances the freeze, its ease and the slow motion by `dt` and returns the
+ *  world's and the hero's share of it. Integrated in 5 ms slices rather than
+ *  sampled once, so a freeze that ends a quarter of the way into a clamped
+ *  0.05 s frame gives the other three quarters to the ease, and the beat is the
+ *  same length at 20 Hz as at 60 to within a slice. On an ordinary frame —
+ *  nothing running — it is four comparisons and returns 1, 1. */
+const _share = { world: 1, hero: 1 };
+function timeShare(dt: number): { world: number; hero: number } {
+  if (!(dt > 0) || (!(stopT > 0) && !(stopEase > 0) && !(slowHold > 0) && !(slowEaseT > 0))) {
+    _share.world = 1; _share.hero = 1; lastSlowK = 1;
+    return _share;
+  }
+  const n = Math.max(1, Math.ceil(dt / 0.005)), h = dt / n;
+  let w = 0, hr = 0, lk = 1;
+  for (let i = 0; i < n; i++) {
+    let sk = 1;
+    const frozen = stopT > 0;
+    if (frozen) {
+      sk = STOP_K;
+      stopT = Math.max(0, stopT - h);
+      if (stopT <= 0) stopEase = STOP_EASE;
+    } else if (stopEase > 0) {
+      sk = STOP_K + (1 - STOP_K) * easeOut(Math.min(1, (STOP_EASE - stopEase + h * 0.5) / STOP_EASE));
+      stopEase = Math.max(0, stopEase - h);
+    }
+    lk = 1;
+    if (slowHold > 0) {
+      lk = slowScale;
+      // the hold waits out the freeze: a freeze and then a slow stretch
+      if (!frozen) { slowHold = Math.max(0, slowHold - h); if (slowHold <= 0) slowEaseT = slowEaseLen; }
+    } else if (slowEaseT > 0) {
+      lk = slowScale + (1 - slowScale) * easeOut(Math.min(1, (slowEaseLen - slowEaseT + h * 0.5) / slowEaseLen));
+      slowEaseT = Math.max(0, slowEaseT - h);
+      if (slowEaseT <= 0) slowScale = 1;
+    }
+    w += h * Math.min(sk, lk);
+    hr += h * Math.max(HERO_K, sk);
+  }
+  _share.world = w / dt; _share.hero = hr / dt; lastSlowK = lk;
+  return _share;
+}
+
+// ── THE MARQUEE BEATS (G8) — ONE SWITCH, OFF UNTIL THE OWNER HAS SEEN THEM ──
+// Hit-stop had one call site, gated so hard (a big bite of something big, one
+// in 1.6 s) that it missed every moment that matters: eating a sibling, the
+// marquee play of the whole game, got no pause at all; neither did a form, a
+// sticker, the hero landmark or the goal itself. Its budget went instead to
+// three calls that the owner had already made no-ops.
+//
+// The ladder, one duration per moment, and a moment that lands on another
+// takes the longer of the two (armStop's max), never their sum:
+//     marquee    the stuffed hunter        0.16 s, then 0.25 s at 0.25
+//     rival      any other sibling         0.14 s, then 0.25 s at 0.25
+//     landmark   the hero landmark / dot 3's  0.10 s, then 0.30 s at 0.40
+//     sticker    a sticker found           0.10 s, then 0.30 s at 0.40
+//     evolve     a form ceremony           0.08 s, then 0.40 s at 0.35
+//     goal       the bite that meets the goal  0.12 s (the outro's own 0.3x
+//                                          push-in is the slow part)
+// Reduce Motion halves every one of these durations, and the slow stretch's
+// ease with them. A beat ignores the bite stop's 0.35 s cooldown — it is a
+// marquee moment, one to five a match — and arms that cooldown itself, so a
+// bite landing just after cannot stutter a second freeze onto its tail.
+//
+// OWNER GATE. The research governor ruled that the owner sees the kill beat
+// before it ships, because of his history with the camera (141 kicks a minute,
+// then "I don't want any shake. 0."). Every beat below, the ray pulse at a kill
+// and the sibling's dizzy pupils are OFF unless the page is opened with
+// ?killbeat=1 — read the way ?dio=1 is. qa/killbeat.mjs photographs the kill
+// with and without it for him. What ships ON regardless is invisible as a
+// feature: the hero's own clock, the ease out of a stop, the flash governor,
+// and the no-op calls gone from the kill.
+//
+// THE WHISTLE OWNS THE END. Every caller asks endBeat() first and fires
+// nothing inside it — except 'goal', which is armed BY the block that blows
+// the whistle, on the frame it blows: it is the whistle's own freeze, not a
+// celebration talking over it.
+const KILL_BEAT = (() => { try { return new URLSearchParams(location.search).get('killbeat') === '1'; } catch { return false; } })();
+type BeatKind = 'marquee' | 'rival' | 'landmark' | 'sticker' | 'evolve' | 'goal';
+const BEAT_TIME: Record<BeatKind, { stop: number; slow?: [number, number] }> = {
+  marquee: { stop: 0.16, slow: [0.25, 0.25] },
+  rival: { stop: 0.14, slow: [0.25, 0.25] },
+  landmark: { stop: 0.10, slow: [0.4, 0.3] },
+  sticker: { stop: 0.10, slow: [0.4, 0.3] },
+  evolve: { stop: 0.08, slow: [0.35, 0.4] },
+  goal: { stop: 0.12 },
+};
+const beatN: Record<BeatKind, number> = { marquee: 0, rival: 0, landmark: 0, sticker: 0, evolve: 0, goal: 0 };   // QA
+function marqueeBeat(kind: BeatKind): boolean {
+  if (!KILL_BEAT) return false;
+  const m = reduceMotion() ? 0.5 : 1;
+  const bt = BEAT_TIME[kind];
+  // ONE BEAT AT A TIME. A moment that lands inside another's slow stretch
+  // joins it — the deeper scale, the longer hold — instead of freezing the
+  // world a second time. Measured before this rule (qa/timebeat.mjs (a) on the
+  // first G8 build): a kill whose feast finished a form froze 0.14 s, slowed,
+  // and 0.25 s later froze again for the evolution, world 1.00 0.06 0.06 0.09
+  // 0.25 0.06 0.12 0.25 frame by frame — two hitches, not one beat. Inside a
+  // freeze the freeze is simply extended (armStop's max).
+  //
+  // …EXCEPT THE WHISTLE (the G8 review). 'goal' has no slow part to join a
+  // stretch with, so under this rule alone a goal met inside a kill's or a
+  // sticker's stretch armed nothing at all, and the end of the match went by
+  // with no freeze. The goal is not a moment landing on another one: it ends
+  // them. The block that blows the whistle cuts the stretch first
+  // (whistleTakesTime), and the goal's freeze is armed whatever was running.
+  const inSlow = slowHold > 0 || slowEaseT > 0;
+  if (!inSlow || stopT > 0 || kind === 'goal') armStop(bt.stop * m, true);
+  stopCd = Math.max(stopCd, 0.35);
+  if (bt.slow) slowMo(bt.slow[0], bt.slow[1] * m);
+  beatN[kind]++;
+  return true;
+}
+
+// ── THE RAY PULSE AT A KILL (G8, behind ?killbeat=1) ──────────────────────
+// Sixteen soft rays in the eaten sibling's own colour, centred on the point
+// she was eaten at and re-projected every frame so they stay on it as the
+// camera follows him: one pulse, alpha rising to KILL_ALPHA and falling back
+// over KILL_LEN of dt. It is the only NEW thing a kill puts on screen, and it
+// is deliberately small beside the wash — local, soft-edged, under the HUD.
+// One DOM node, built on the first kill that needs it, so a page with the
+// switch off never makes it; no draw call, no material, nothing in the scene.
+// Reduce Motion halves the pulse and holds the rays at one size: they fade
+// in and out where they are instead of flying outward.
+//
+// The WASH stays gold (studio round 4, Job 10: "a bite washes red, a form
+// washes gold", and violet is the wash of being nibbled). The spec asked for a
+// wash in the sibling's colour; her colour is here instead, on the rays, where
+// it says WHO without repainting the whole screen in a colour that already
+// means something else.
+const KILL_LEN = 0.5, KILL_ALPHA = 0.35;
+let killEl: HTMLDivElement | null = null;
+let killAge = -1, killLen = KILL_LEN, killCalm = false, killN = 0;
+const killAt = new THREE.Vector3(), _killV = new THREE.Vector3();
+let killPx = 200;
+function killRays(x: number, z: number, r: number, color: number) {
+  if (!killEl) {
+    killEl = document.createElement('div');
+    killEl.id = 'kill';
+    killEl.style.cssText = 'position:fixed;left:0;top:0;pointer-events:none;z-index:4;display:none;opacity:0;'
+      + 'border-radius:50%;will-change:transform,opacity;';
+    document.body.appendChild(killEl);
+  }
+  const c = `#${color.toString(16).padStart(6, '0')}`;
+  // 16 rays: a 7-degree spoke every 22.5, soft at the root and the tip
+  killEl.style.background = `repeating-conic-gradient(from 0deg, ${c} 0deg 7deg, transparent 7deg 22.5deg)`;
+  const mask = 'radial-gradient(circle, transparent 0 26%, #000 34%, #000 50%, transparent 66%)';
+  killEl.style.setProperty('mask-image', mask);
+  killEl.style.setProperty('-webkit-mask-image', mask);
+  killAt.set(x, r * 0.88, z);   // her centre: rivals.ts stands her body at 0.88 r
+  // sized off her radius on screen at the moment she went, and not re-sized
+  // after it — the rays mark the event, not her shrinking body. The mask fades
+  // the spokes in from 26% to 34% of the gradient's farthest-corner radius and
+  // out from 50% to 66% — that radius is 0.707 of the square's side — so at a
+  // side of six of her radii they rise just outside her skin (1.1 r) and are
+  // gone by 2.8 r: a ring of rays around her, never across her face.
+  const dist = Math.max(1, camera.position.distanceTo(killAt));
+  const pxPerU = window.innerHeight / (2 * dist * Math.tan((camera.fov * Math.PI) / 360));
+  killPx = THREE.MathUtils.clamp(r * pxPerU * 6, 120, Math.min(window.innerWidth, window.innerHeight) * 0.75);
+  killEl.style.width = killEl.style.height = `${killPx.toFixed(0)}px`;
+  killCalm = reduceMotion();
+  killLen = KILL_LEN * (killCalm ? 0.5 : 1);
+  killAge = 0;
+  killN++;
+}
+/** One frame of the pulse, on dt — it plays through the freeze it sits in. */
+function killRaysFrame(dt: number) {
+  if (killAge < 0 || !killEl) return;
+  killAge += dt;
+  const p = killAge / killLen;
+  if (p >= 1 || ended || menuMode) { killRaysOff(); return; }
+  camera.updateMatrixWorld();
+  _killV.copy(killAt).project(camera);
+  const sx = (_killV.x * 0.5 + 0.5) * window.innerWidth, sy = (-_killV.y * 0.5 + 0.5) * window.innerHeight;
+  const s = killCalm ? 1 : 0.7 + 0.5 * easeOut(p);
+  killEl.style.display = 'block';
+  killEl.style.opacity = (KILL_ALPHA * Math.sin(Math.PI * p)).toFixed(3);
+  killEl.style.transform = `translate(${(sx - killPx / 2).toFixed(1)}px, ${(sy - killPx / 2).toFixed(1)}px) scale(${s.toFixed(3)})`;
+}
+/** the pulse out, now: its element hidden and its clock stopped */
+function killRaysOff() {
+  killAge = -1;
+  if (killEl) { killEl.style.display = 'none'; killEl.style.opacity = '0'; }
+}
+/** ── THE WHISTLE TAKES THE TIME (the G8 review) ───────────────────────────
+ *  Both whistles — a goal met and the clock run out — call this on the frame
+ *  they blow. A beat armed a moment before the whistle ran on into the outro:
+ *  a kill's slow stretch under the outro's own 0.3x push-in (the two multiply),
+ *  the ray pulse in her colour over the whistle's rings, her pupils still
+ *  circling. qa/timebeat.mjs (f) met the goal 200 ms of tClock after a kill
+ *  on the G8 build: slow read 0.25 0.25 0.25 0.32 0.71 0.94 1.00 on the frames
+ *  after the whistle, the rays were up on 5 of the 11 frames from it on, and
+ *  her pupils moved on 9 of 10 — and the goal-met frame itself froze 0.000 s
+ *  (see EXCEPT THE WHISTLE in marqueeBeat). The whistle owns the end, so it
+ *  ends them: the stretch stops dead (the outro's push-in is the slow part
+ *  now), the rays go out and the dizzy stops. A freeze already running is
+ *  left to run; the goal's own is armed with it, the max (marqueeBeat).
+ *  Without ?killbeat=1 none of the three ever runs, and this changes nothing. */
+function whistleTakesTime() {
+  slowHold = 0; slowEaseT = 0; slowScale = 1;
+  killRaysOff();
+  rivals.stopDizzy();
 }
 function animate() {
   tickFrame();
@@ -13725,7 +14143,15 @@ function animate() {
   // finale, the cheer and the confetti behind a modal (verify pass, logic-1)
   if (outroT > 0 && !paused) { outroT -= dt; if (outroT <= 0) endMatch(goal?.result ?? null); else dtw = dt * 0.3; }
   stopCd = Math.max(0, stopCd - dt);
-  if (stopT > 0) { stopT = Math.max(0, stopT - dt); dtw *= 0.06; }
+  // ── WORLD TIME AND HERO TIME (G8) ─────────────────────────────────────────
+  // the freeze, its ease and any slow motion, integrated over this frame (see
+  // timeShare). The hero is handed dtw BEFORE the world's share is taken: the
+  // outro's 0.3x push-in reaches him as it always has, a freeze slows him only
+  // to HERO_K, and slow motion does not slow him at all.
+  const share = timeShare(dt);
+  const heroDt = dtw * share.hero;
+  dtw *= share.world;
+  lastWorldK = dt > 0 ? dtw / dt : 1;   // QA: __juiceState().worldK
   tClock += dt;
   if (_revalQueue.length && tClock >= _revalQueue[0]) { _revalQueue.shift(); validateWorld(); bakeContactShadows(); }
   island.update(dt, tClock, camera);
@@ -14010,6 +14436,12 @@ function animate() {
     if (goal && !goal.met && !ended && outroT <= 0 && goalMet()) {
       goal.met = true; goal.result = 'win';
       outroT = 2.0;
+      // the whistle's own freeze (G8, behind ?killbeat=1): armed here, by the
+      // block that blows it, on the frame it blows — the one beat allowed in
+      // the end beat, because it IS the end beat. The outro's 0.3x push-in
+      // is the slow stretch after it, so any beat still running ends first.
+      whistleTakesTime();
+      marqueeBeat('goal');
       fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 5, 1);
       fx.ring(voidState.x, voidState.z, 0xb875ff, voidling.radius * 3.4, 0.8);
       // the END sounds like the end — not evolve(), the form-up fanfare she
@@ -14031,6 +14463,7 @@ function animate() {
         goal.met = won; goal.result = won ? 'win' : 'time';
       }
       outroT = 2.0;   // slow-mo push-in beat before the results panel
+      whistleTakesTime();   // …and any beat still running ends here (G8 review)
       fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 5, 1);
       fx.ring(voidState.x, voidState.z, 0xb875ff, voidling.radius * 3.4, 0.8);
       audio.whistle(); partyBurst();   // full time, in this world's own voice (G4)
@@ -14654,7 +15087,9 @@ function animate() {
   // steering, so they move this too.
   const heroAim = camAim > 0 ? camAim : steerLawD;
   const heroVRef = steerCap(introT > 0 ? Math.min(heroAim, steerLawD) : heroAim);
-  voidling.update(dtw, { t: tClock, x: voidState.x, z: voidState.z, vx, vz,
+  // heroDt, not dtw: his jaw and his eyes live through a hit-stop (G8; see
+  // THE HERO IS NOT THE WORLD, above hitStop)
+  voidling.update(heroDt, { t: tClock, x: voidState.x, z: voidState.z, vx, vz,
     lookX: THREE.MathUtils.clamp(gX, -1, 1), lookY: gYUse, vRef: heroVRef });
   // ── HOW FAR THE CROWD MATTERS ──────────────────────────────────────────
   // Everything past this runs on a stagger rather than every frame (see the
@@ -15407,7 +15842,11 @@ function animate() {
       evoCardAt = tClock;   // a wave's sparkle and name keep 1.5 s clear of this card (ungateWave)
       // …and the screen goes warm for a beat. fx.flash is the same call a hit
       // uses, in the opposite colour: a bite washes red, a form washes gold.
-      fx.flash('rgba(255,214,120,0.34)', 0.5);
+      // Not on the LAST rung, which washes white below: flash() now blends a
+      // second call into a wash that is still on screen instead of repainting
+      // it (the G8 governor, fx.ts), so gold-then-white in one pass would show
+      // gold at the white's alpha and the finale's own white would be lost.
+      if (curStage !== FORMS.length - 1) fx.flash('rgba(255,214,120,0.34)', 0.5);
       // this card owns the screen while it plays — and that now means BOTH
       // directions: pull down anything already up, and hold the next one off
       // until the 1.8s `ev` animation has finished with a beat to spare.
@@ -15418,6 +15857,11 @@ function animate() {
     // qa/endparty.mjs (e): "whistle … evolve" inside 0.6 s. The end owns that
     // moment; the form still changes, silently (research governor G4).
     if (!endBeat()) audio.evolve();
+    // …and the world holds for it (G8, behind ?killbeat=1): 80 ms, then 0.4 s
+    // at 0.35. HERE, on the ceremony, and so on the swallow of the meal that
+    // earned the form (evoHold, Job 11) — never on the bite — and, like the
+    // fanfare, never over the whistle.
+    if (!endBeat()) marqueeBeat('evolve');
     // the LENS marks the evolution too: a punch plus a 7% distance pop that
     // the follow lerp eases home over the next second — the world exhales.
     // The final-form moment used to be ~8x weaker than a rival bite; this
@@ -15779,6 +16223,9 @@ function animate() {
   // written it (camFollow owns the smoothed state), so the kick never persists.
   const shakeOff = fx.update(dtw, camDist);
   camera.position.add(shakeOff);
+  // the ray pulse at a kill (G8), on dt so it plays through the freeze it sits
+  // in, placed off the camera this frame will be drawn from
+  killRaysFrame(dt);
   // GOLDEN HOUR IS OUT. Dimming the sky and sun over the last 45s read as the
   // world randomly "turning to night" — confusing mid-match, and a kids' game
   // should look identical from the first second to the last. Maple Isle is
