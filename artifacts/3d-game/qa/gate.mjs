@@ -836,13 +836,14 @@ const SUITE = [
   // G9 (research governor, P1, HERO): the follow-through after a bite, the
   // BURP OF CHAMPIONS behind ?burp=1 until the owner has heard it, and G4's
   // victoryHop. Live + quality only until a second green promotes them.
-  // savour plays three pages the way endbeat does, so it starts at endbeat's
-  // 3000 until a run on the fix measures it; burp renders offline in a blank
-  // page (no match, no server) and needs a fraction of its 300.
-  { id: 'savour', tier: 'feel', profiles: ['live', 'quality'], timeout: 3000,
+  // Measured on the fix (dist built from the G9 commit's source): savour, three
+  // pages of play, 649 s and 641 s on two runs with one other browser on the
+  // machine, so 2000; burp renders offline in a blank page (no match, no
+  // server) and took 2 s, so 120.
+  { id: 'savour', tier: 'feel', profiles: ['live', 'quality'], timeout: 2000,
     cmd: ['node', 'qa/savour.mjs', PORT, 'maple'], verdict: pf,
     why: 'a big swallow puffs his cheeks, squints his eyes and sloshes him a second time; the burp is off without ?burp=1, comes once per 20 s with it, and never plays over the whistle; a goal win hops him on a clock the 0.3x outro cannot slow' },
-  { id: 'burp', tier: 'feel', profiles: ['live', 'quality'], timeout: 300,
+  { id: 'burp', tier: 'feel', profiles: ['live', 'quality'], timeout: 120,
     cmd: ['node', 'qa/burp.mjs', PORT, 'maple'], verdict: pf,
     why: 'the burp exists, sits on the eat sounds\' own tonic, lasts 0.25 s, carries nothing under 100 Hz, and is heard on a phone under the bite, never over the CHOMP' },
 

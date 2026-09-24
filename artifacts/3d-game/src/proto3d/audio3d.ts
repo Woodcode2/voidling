@@ -82,6 +82,12 @@ export interface Audio3D {
    *  alert() and, in Job 10's first cut, pop(0) (studio round 4, Job 10;
    *  qa/padlock.mjs reads both handlers and this cue's graph). */
   bonk(): void;
+  /** THE BURP OF CHAMPIONS (research governor G9) — the joke all six worlds'
+   *  win titles promise. A falling triangle an octave under the eat sounds'
+   *  tonic, a sine 'b' on the tonic and a puff of air: 0.25 s, nothing under
+   *  120 Hz. Plays only under ?burp=1 until the owner has heard it
+   *  (qa/burp.mjs writes it to qa/out/burp/ for him). */
+  burp(): void;
   startMusic(): void;              // the match loop — tempo + layers ride the stage
   setMusicStage(n: number): void;
   stopMusic(): void;
@@ -4688,6 +4694,68 @@ export function createAudio(): Audio3D {
       dTone(master, t, 0.11, 'sine', 0.09, 520, 330, 0, 0.003);
       dTone(master, t, 0.06, 'triangle', 0.035, 1040, 700, 0, 0.002);
       grain(900, 1.4, 0.03, 0.04);
+    },
+    // ── THE BURP OF CHAMPIONS ────────────────────────────────────────────
+    // Research governor G9. Every world's win titles have promised one since
+    // they were written, and there was no burp anywhere in this file. Three
+    // layers, the spec's, through one bus at the spec's gain of 0.12:
+    //   1. the BODY — a triangle an octave under the TONIC, gliding down a
+    //      minor third over 0.12 s (150 -> 126.1 Hz) and gone by 0.25 s
+    //   2. the 'b' — a 45 ms sine pop on the tonic, which is the lips
+    //   3. the AIR — 60 ms of the shared white noise, bandpassed at 700 Hz
+    // THE TONIC is pop()'s own root: `const base = 300 * Math.pow(2, semis / 12)`
+    // at step 0 and depth 0 is where every bite's melody starts, so the burp
+    // lands in the key the child has been eating in all match. qa/burp.mjs
+    // reads pop()'s line and fails if the two ever part.
+    // NOTHING UNDER 120 Hz (phone speakers; the owner's rule set). The body
+    // ends at 126.1 Hz, just over it, and its own decay skirts a few hertz
+    // either side of every partial, so the bus runs through a 120 Hz
+    // Butterworth high-pass: the rule held by construction, not by luck.
+    // It is still a low sound FALLING — the shape the owner called an "8-bit
+    // thud" on bigEat() (160 Hz, down). That is why it ships switched off and
+    // he hears it first: a burp is low and falling or it is not a burp.
+    burp() {
+      const c = ensure(); if (!c || !master) return;
+      logEv('burp');
+      const t = c.currentTime + 0.005;
+      const TONIC = 300;
+      const lo = TONIC / 2, lo3 = lo * Math.pow(2, -3 / 12);
+      const bus = c.createGain(); bus.gain.value = 0.12;
+      const hp = c.createBiquadFilter(); hp.type = 'highpass';
+      hp.frequency.value = 120; hp.Q.value = Math.SQRT1_2;
+      bus.connect(hp); hp.connect(master);
+      // 1. the body: up over 20 ms, full through the glide, gone by 0.25 s
+      const o = c.createOscillator(); o.type = 'triangle';
+      o.frequency.setValueAtTime(lo, t);
+      o.frequency.exponentialRampToValueAtTime(lo3, t + 0.12);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(1, t + 0.02);
+      g.gain.setValueAtTime(1, t + 0.12);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      o.connect(g); g.connect(bus);
+      o.start(t); o.stop(t + 0.26);
+      // 2. the 'b'
+      const s = c.createOscillator(); s.type = 'sine';
+      s.frequency.setValueAtTime(TONIC, t);
+      const sg = c.createGain();
+      sg.gain.setValueAtTime(0.0001, t);
+      sg.gain.linearRampToValueAtTime(0.6, t + 0.004);
+      sg.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+      s.connect(sg); sg.connect(bus);
+      s.start(t); s.stop(t + 0.06);
+      // 3. the air — Math.random picks where in the shared buffer it reads
+      // from, as every noise voice here does; it is audio's own randomness,
+      // never the world's seeded stream
+      const n = c.createBufferSource(); n.buffer = white(c);
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = 700; bp.Q.value = 1.2;
+      const ng = c.createGain();
+      ng.gain.setValueAtTime(0.0001, t);
+      ng.gain.exponentialRampToValueAtTime(0.9, t + 0.004);
+      ng.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+      n.connect(bp); bp.connect(ng); ng.connect(bus);
+      n.start(t, Math.random() * 1.9, 0.07);
     },
     finale(cheer) {
       const c = ensure(); if (!c || !master) return;

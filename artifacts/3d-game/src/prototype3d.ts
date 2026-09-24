@@ -3536,11 +3536,14 @@ const _dbg = new Proxy(_dbgStore, {
   __setMood: (m: string | null) => void;
   __faceState: () => { mood: string; maw: number; smile: boolean; biting: boolean;
     hold: number; move: number; lid: number; shut: number; uniformK: number;
-    blush: number; blushOpacity: number; scleraY: number; faceX: number; wobble: number };
+    blush: number; blushOpacity: number; scleraY: number; faceX: number; wobble: number;
+    burpN: number; hop: number };
   /** the research spec's name for the same read (G9) — an alias, not a second hook */
   __face: () => { mood: string; maw: number; smile: boolean; biting: boolean;
     hold: number; move: number; lid: number; shut: number; uniformK: number;
-    blush: number; blushOpacity: number; scleraY: number; faceX: number; wobble: number };
+    blush: number; blushOpacity: number; scleraY: number; faceX: number; wobble: number;
+    burpN: number; hop: number };
+  __burpState: () => { on: boolean; wait: number; cd: number; streak: number };
   __stages: () => { cur: number; best: number; ceremonies: number; held: number[]; owed: number };
   __voidSetMenuR: (r: number) => void;
   __dioMark: () => number;
@@ -3790,6 +3793,10 @@ _dbg.__setMood = (m: string | null) => { moodPin = m; if (m) voidling.setMood(m 
 // qa/faceparity.mjs polls this across all five worlds.
 _dbg.__faceState = () => voidling.faceState();
 _dbg.__face = _dbg.__faceState;
+/** QA (G9, qa/savour.mjs): the burp's machinery — whether ?burp=1 switched it
+ *  on, the world seconds until an owed burp starts (-1: none owed), the tClock
+ *  seconds of cooldown left, and the landmark-grade swallows in the streak. */
+_dbg.__burpState = () => ({ on: BURP_ON, wait: burpWait, cd: Math.max(0, burpCdUntil - tClock), streak: burpStreak.length });
 // QA: how many EVOLVED ceremonies have played, and the two stage counters
 // behind them. A demotion walks curStage back; bestStage does not move, so the
 // ceremony cannot re-fire on the way home. qa/evolveonce.mjs reads this.
@@ -5189,6 +5196,10 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   // real PAYOFF: the rival spirals in (rivals.ts), the void gapes wide, and a
   // shockwave stack fires at BOTH ends of the meal — the marquee play LANDS
   voidling.animGulp();
+  // …and a sibling is a burp's worth (G9). Its swallow is the gulp's jaw
+  // closing, so the burp is owed from then: the hold animGulp() just set, read
+  // back off the rig rather than copied, plus BURP_AFTER.
+  oweBurp(voidling.faceState().hold + BURP_AFTER);
   fx.ring(rx, rz, 0xffffff, rr * 5 + 8, 0.8);        // where the family member was…
   // (the second ring at the corpse and the second at the player are gone. Four
   // rings for one kill, inside a stack that already has a screen flash, a
@@ -5653,6 +5664,25 @@ function spawnPuff(x: number, y: number, z: number, n: number, col?: THREE.Color
     puffVel[i].set(Math.cos(a) * rand(3, 9), up, Math.sin(a) * rand(3, 9));
     puffLife[i] = rand(0.35, 0.7);
   }
+  (puffGeo.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
+}
+/** THE BURP'S ONE BUBBLE (G9): a single white particle out of the same pool
+ *  the bite's puffs come from — no new draw call, no new material — let go at
+ *  his mouth (the camera's side of him, a little under his middle) and rising.
+ *  The pool's own gravity (14 u/s²) turns it over; launched at 3.2 + 1.4 R it
+ *  is still climbing for 0.63 s at r 4, most of its 0.7 s life. */
+const _bubDir = new THREE.Vector3();
+function spawnBurpBubble() {
+  const i = puffHead; puffHead = (puffHead + 1) % PUFF;
+  const R = voidling.radius;
+  _bubDir.set(camera.position.x - voidState.x, 0, camera.position.z - voidState.z);
+  if (_bubDir.lengthSq() < 1e-6) _bubDir.set(0, 0, 1); else _bubDir.normalize();
+  puffPos[i * 3] = voidState.x + _bubDir.x * R * 0.9;
+  puffPos[i * 3 + 1] = voidling.group.position.y - R * 0.1;
+  puffPos[i * 3 + 2] = voidState.z + _bubDir.z * R * 0.9;
+  for (let k = 0; k < 3; k++) { puffCol[i * 3 + k] = 1; puffBase[i * 3 + k] = 1; }
+  puffVel[i].set(0, 3.2 + 1.4 * R, 0);
+  puffLife[i] = 0.7;
   (puffGeo.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
 }
 
@@ -8942,6 +8972,61 @@ interface BitePay {
   combo: number;   // this bite's link in the chain: the pop's pitch, and a crown at every tenth
   head: boolean;   // a CHOMP — decided at capture, because the hat reads its cooldown there
   kx: number; kz: number;   // the pull at capture, for the landmark kit's recoil
+  treat: boolean;  // a burp's worth on its own (G9): a sticker found, the hero landmark, the tagged landmark
+}
+// ── THE BURP OF CHAMPIONS (research governor G9) ───────────────────────────
+// All six worlds' win titles promise one and until G9 the game had none. The
+// governor ruled that the owner hears it before it ships, so it plays only
+// under ?burp=1 (read the way ?dio=1 is); everything else G9 adds — the cheeks,
+// the gulp, the squint — ships on. qa/burp.mjs writes the sound to
+// qa/out/burp/ for him; qa/savour.mjs holds the rules below.
+//
+// WHAT EARNS ONE: the hero landmark (heroProp, the world's finale building),
+// the tagged landmark (dot 3's), a sticker found, a rival eaten, or three
+// landmark-grade bites inside five seconds — "landmark-grade" being exactly
+// the swallow kit's own gate in biteGulps (a big bite of something big), so
+// the two can never disagree about what a big bite is.
+// WHEN: BURP_AFTER after the swallow, on the world's clock (dtw) the face runs
+// on. Then one at a time, and BURP_CD of tClock before the next can even be
+// owed: a trigger while one is owed or cooling down is dropped, not queued. A
+// burp is rare or it is not a joke.
+// NEVER OVER THE WHISTLE: nothing is owed from inside the end beat, a burp that
+// comes due in it is dropped, and one already in its cheek hold is refused at
+// the pop (the rig asks). The end belongs to the whistle (endBeat()).
+// AND NEVER ON THE CEREMONY: a burp coming due inside EVO_CLEAR of an EVOLVED
+// ceremony, or while a meal that earned a form is still in the drain (its
+// swallow is a ceremony on its way), WAITS it out rather than being skipped —
+// the child earned it. EVO_CLEAR is the `ev` card's length, the same 1.8 s
+// the ceremony's smug face spends on it.
+const BURP_ON = (() => { try { return new URLSearchParams(location.search).get('burp') === '1'; } catch { return false; } })();
+const BURP_AFTER = 0.45, BURP_CD = 20, BURP_STREAK = 3, BURP_STREAK_WIN = 5, EVO_CLEAR = 1.8;
+/** world seconds until the owed burp starts; -1 when none is owed */
+let burpWait = -1;
+/** tClock before which no burp may be owed */
+let burpCdUntil = -99;
+/** tClock of the last EVOLVED ceremony */
+let lastCeremonyAt = -99;
+/** tClock of each recent landmark-grade swallow, oldest first */
+const burpStreak: number[] = [];
+function oweBurp(wait: number) {
+  if (!BURP_ON || burpWait >= 0 || tClock < burpCdUntil || outroT > 0 || endBeat()) return;
+  burpWait = wait;
+  burpStreak.length = 0;
+}
+/** asked by the rig at the end of its 150 ms cheek hold: is the moment still
+ *  free? If it is, this is where the burp is heard and seen. */
+function burpPop(): boolean {
+  if (!started || ended || paused || outroT > 0 || endBeat()) return false;
+  if (tClock - lastCeremonyAt < EVO_CLEAR) {
+    // a ceremony landed inside the hold: owe it again, after the ceremony
+    burpCdUntil = -99; burpWait = lastCeremonyAt + EVO_CLEAR - tClock;
+    return false;
+  }
+  audio.burp();
+  spawnBurpBubble();
+  // sentence case at the glass (bubbles.ts): this reads "Burp!" on screen
+  bubbles.float(floatPos.set(voidState.x, voidling.radius + 3, voidState.z), 'burp!');
+  return true;
 }
 /** The last 64 bites, oldest first — the same objects the drain pays, so a row
  *  fills in as its bite goes down. QA only (__biteLog); nothing in the game
@@ -9106,9 +9191,11 @@ function capture(e: Edible, giveHunger = true) {
   // ── A FIND ────────────────────────────────────────────────────────────
   // Loud, and immediately: this is the only thing in the game a child keeps.
   const sid = e.mesh.userData.sticker as string | undefined;
+  let found = false;   // a burp's worth on its own (G9, BitePay.treat)
   if (sid) {
     const got = collectInRun(sid);
     if (got) {
+      found = true;
       playerScore += TIER_POINTS[got.tier];
       announceBeat('⭐', 'STICKER FOUND!', got.name.toUpperCase(), 1);
       audio.voice('yum');
@@ -9264,7 +9351,8 @@ function capture(e: Edible, giveHunger = true) {
   // and after the frame loop's goal check has had its turn. Everything the
   // sound depends on is written down here, as it stands at the bite.
   const pay: BitePay = { id: e.mesh.id, r: e.radius, cap: tClock, sink: -1, sndT: -1, snd: '', gulp: -1,
-    bite, vr: voidling.radius, combo, head: headline, kx: dx, kz: dz };
+    bite, vr: voidling.radius, combo, head: headline, kx: dx, kz: dz,
+    treat: found || e === heroProp || !!e.mesh.userData.landmark };
   e.pay = pay;
   biteLog.push(pay);
   if (biteLog.length > 64) biteLog.shift();
@@ -9341,6 +9429,9 @@ function biteGulps(e: Edible, pay: BitePay) {
   // `bite` is the grade AT CAPTURE (pay.bite): by the swallow the void has
   // already grown on this meal, and every later one.
   if (pay.bite > 0.55 && pay.r > 1.1) {
+    // a landmark-grade swallow, by the kit's own gate — the burp's streak
+    // counts these (G9, BURP_STREAK)
+    burpStreak.push(tClock);
     if (kitCd <= 0) {
       kitCd = 1.6;
       hitStop(0.055 + 0.05 * pay.bite);
@@ -9368,6 +9459,16 @@ function biteGulps(e: Edible, pay: BitePay) {
   // by the bite — and it does not outlive the moment by half a second on the
   // floor behind a moving player.
   if (pay.r > 2) spawnPuff(p.x, 0.5, p.z, pay.r > 4 ? 10 : 6, tint);
+  // ── HE SAVOURS IT (research governor G9) ────────────────────────────────
+  // The follow-through, on the frame the meal goes in: the cheeks puff, the
+  // body sloshes again as it goes down, a big one squints him happy
+  // (void3d.ts, AFTER_BITE). Not in the end beat — the whistle owns the face
+  // there too, and the outro plays 'victory' and the hop.
+  if (!endBeat()) {
+    voidling.afterBite(pay.bite);
+    while (burpStreak.length && tClock - burpStreak[0] > BURP_STREAK_WIN) burpStreak.shift();
+    if (pay.treat || burpStreak.length >= BURP_STREAK) oweBurp(BURP_AFTER);
+  }
 }
 
 // converging suck streaks — sells the "vacuum" on GULP / COLLAPSE
@@ -9652,6 +9753,7 @@ function beginMatch(solo = false) {
   // the hero is whatever the biggest thing on this world is — resolved per
   // match, so a re-rolled or re-scaled landmark needs no second list
   heroCued = false; heroAte = false; heroProp = null; goalCued = false;
+  burpWait = -1; burpCdUntil = -99; lastCeremonyAt = -99; burpStreak.length = 0;   // G9: a burp is owed by THIS match or not at all
   for (const k of Object.keys(kindTally)) delete kindTally[k];   // QA day 2: per-MATCH counts
   // GATED ON THE CUE, NOT ON `hero`. `hero` is a camera waypoint — the fly-by
   // coordinates for the intro — and Maple deliberately has none, which also
@@ -13674,6 +13776,9 @@ function animate() {
       // the END sounds like the end — not evolve(), the form-up fanfare she
       // hears forty times a match (research governor G4; qa/endparty.mjs)
       audio.whistle(); partyBurst();
+      // …and he HOPS: G4's victoryHop, landed with G9 (void3d.ts). A goal met
+      // is a win at any rank, so every door through here is one.
+      voidling.victoryHop();
     }
     if (matchClock <= 0 && !ended && outroT <= 0) {
       // RIVALS is the one dot the clock itself decides: the rank is only true
@@ -13693,6 +13798,7 @@ function animate() {
       fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 5, 1);
       fx.ring(voidState.x, voidState.z, 0xb875ff, voidling.radius * 3.4, 0.8);
       audio.whistle(); partyBurst();   // full time, in this world's own voice (G4)
+      if (goal?.result === 'win') voidling.victoryHop();   // dot 4 won at the buzzer
     }
     // the 2D GROWTH LAW: radius can never outrun the clock (disabled for ?r= debug)
     if (!bigStart) {
@@ -15030,6 +15136,7 @@ function animate() {
     if (ns > bestStage) {
     bestStage = ns;
     evolveCeremonies++;
+    lastCeremonyAt = tClock;   // a burp coming due now waits it out (G9, EVO_CLEAR)
     // THE BODY REACTS HERE, and only here. It used to ride setStage's
     // `n > stage`, which is a DRESSING change — and VISUAL_STAGE collapses
     // seven forms onto five, so the finale evolution never triggered it.
@@ -15124,6 +15231,20 @@ function animate() {
   // NEVER downgrade: the growth-law clamp can pull radius back under a form
   // threshold the frame after evolving — re-announcing the same form forever
   voidling.setStage(VISUAL_STAGE[curStage] ?? 4);
+  }
+
+  // ── THE BURP COMES DUE (G9; the rules are at BURP_ON) ───────────────────
+  // After the ceremony block, so a ceremony on this very frame is already
+  // known. On dtw, the clock the face runs on. Dropped in the end beat;
+  // WAITS out a ceremony just played, or one still on its way down the drain.
+  if (burpWait >= 0 && started && !ended && !paused) {
+    burpWait -= dtw;
+    if (burpWait < 0) {
+      if (outroT > 0 || endBeat()) burpWait = -1;
+      else if (tClock - lastCeremonyAt < EVO_CLEAR) burpWait = lastCeremonyAt + EVO_CLEAR - tClock;
+      else if (evoHold.state().held.length) burpWait = 0.1;
+      else { burpCdUntil = tClock + BURP_CD; voidling.burp(burpPop); }
+    }
   }
 
   // the soundtrack follows you: standing on the dance floor brings in the kick,
