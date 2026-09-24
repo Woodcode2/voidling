@@ -2858,7 +2858,7 @@ let wayOn = false, wayLX = -1, wayLY = -1, wayLA = 999;
  *  targets in a single frame — this box renders about one frame per two
  *  seconds, so any probe that has to GROW to the landmark radius to see the
  *  arrow at all would take longer than the gate it belongs to. */
-function wayAim(target: THREE.Vector3): { x: number; y: number; ang: number; onScreen: boolean; inFront: boolean } | null {
+function wayAim(target: THREE.Vector3): { x: number; y: number; ang: number; bear: number; onScreen: boolean; inFront: boolean } | null {
   const w = window.innerWidth, h = window.innerHeight;
   const L = WAY_PAD, R = w - WAY_PAD, T = WAY_TOP, B = h - WAY_BOT;
   if (R <= L || B <= T) return null;                  // a viewport too small to aim in
@@ -2887,14 +2887,18 @@ function wayAim(target: THREE.Vector3): { x: number; y: number; ang: number; onS
     onScreen = px >= L && px <= R && py >= T && py <= B;
   }
   let x: number, y: number, dx: number, dy: number;
+  // the direction from the void to the target, on screen or off it. The
+  // chevron below overrides it for a target in shot; `bear` keeps it, for the
+  // charge's red edge (rivals.onCharge), which wants the side she is on even
+  // when she is in frame.
+  let bx = inFront ? px - ox : _wayC.x, by = inFront ? py - oy : -_wayC.y;
+  const bm = Math.hypot(bx, by) || 1; bx /= bm; by /= bm;
   if (onScreen) {
     // it is in shot: sit above it and point DOWN at it, so the arrow marks the
     // building rather than sending her away from something she can already see
     x = px; y = Math.max(T, py - WAY_LIFT); dx = 0; dy = 1;
   } else {
-    dx = inFront ? px - ox : _wayC.x;
-    dy = inFront ? py - oy : -_wayC.y;
-    const m = Math.hypot(dx, dy) || 1; dx /= m; dy /= m;
+    dx = bx; dy = by;
     // the ray leaves the void and stops at the safe rect; clamp the origin
     // into the rect first so a void pushed off the edge still yields a hit
     const cx = Math.min(R, Math.max(L, ox)), cy = Math.min(B, Math.max(T, oy));
@@ -2904,8 +2908,11 @@ function wayAim(target: THREE.Vector3): { x: number; y: number; ang: number; onS
     x = cx + dx * t; y = cy + dy * t;
   }
   // the chevron's own art points UP, so a direction of (0,-1) is zero rotation
-  return { x, y, ang: Math.atan2(dy, dx) * 180 / Math.PI + 90, onScreen, inFront };
+  return { x, y, ang: Math.atan2(dy, dx) * 180 / Math.PI + 90,
+    bear: Math.atan2(by, bx) * 180 / Math.PI + 90, onScreen, inFront };
 }
+/** scratch for the charge's red edge — never _wayV, which wayAim() writes */
+const _chargeV = new THREE.Vector3();
 function paintWayfinder(): void {
   const sp = LEVEL_SPEC[pickedWorld];
   const want = !!goal && goal.n === 3 && !!goalProp && !goalProp.eaten
@@ -3412,7 +3419,7 @@ const _dbg = new Proxy(_dbgStore, {
   __formSweep: (a: number, box?: { top: number; bottom: number; left: number; right: number; cx: number; cy: number; rx: number; ry: number; on: boolean }) => { x: number; y: number; o: number; s: number } | null;
   __formBox: () => { top: number; bottom: number; left: number; right: number; cx: number; cy: number; rx: number; ry: number; on: boolean };
   __formCall: (t: string) => void;
-  __wayAim: (x: number, y: number, z: number) => { x: number; y: number; ang: number; onScreen: boolean; inFront: boolean } | null;
+  __wayAim: (x: number, y: number, z: number) => { x: number; y: number; ang: number; bear: number; onScreen: boolean; inFront: boolean } | null;
   __wayState: () => { on: boolean; x: number; y: number; ang: number; cued: boolean; chip: string; goalN: number; haveProp: boolean; r: number; need: number; pad: number; top: number; bot: number };
   __claimsNear: (x: number, y: number, r: number) => { x: number; y: number; r: number; f?: unknown }[];
   __goalLine: (w: string, n: number) => string;
@@ -3504,6 +3511,7 @@ const _dbg = new Proxy(_dbgStore, {
   __voidSetMenuR: (r: number) => void;
   __dioMark: () => number;
   __bite: (hunter?: boolean) => void;
+  __charge: (name?: string) => { name: string; x: number; z: number } | null;
   __pinMouth: (shut: boolean) => void;
   __pinGape: (v: number) => void;
   __calm: () => void;
@@ -3545,7 +3553,8 @@ const _dbg = new Proxy(_dbgStore, {
   };
 };
 // QA counters: what the family actually DID to the player over a match
-const rivalEv = { bites: 0, hunterBites: 0, stolen: 0, charges: 0, nearMiss: 0, eaten: 0, marquee: 0, notices: 0, surges: 0, dems: 0 };
+const rivalEv = { bites: 0, hunterBites: 0, stolen: 0, charges: 0, nearMiss: 0, eaten: 0, marquee: 0, notices: 0, surges: 0, dems: 0,
+  crowns: 0, leadLost: 0 };
 _dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE; _dbg.__renderer = renderer;
 /** QA: draw one frame THROUGH the bloom composer, synchronously.
  *  Without this a probe has to re-enable the game's own rAF and hope to read
@@ -3745,6 +3754,19 @@ _dbg.__stages = () => ({ cur: curStage, best: bestStage, ceremonies: evolveCerem
 // __bite(false) is the legacy percentage nibble.
 _dbg.__bite = (hunter = true) =>
   rivals.onPlayerBitten?.('QA', { shrink: hunter ? 0.85 : 0.90, steal: 0, hunter, form: hunter });
+// QA: a charge's telegraph, through the REAL handler (studio round 4, Job 10).
+// A natural charge needs the hunt window, a joined hunter and a wind-up in
+// range, which a probe would wait minutes of match clock for. This calls
+// rivals.onCharge with a joined rival's own name and position — the arguments
+// rivals.ts passes — so the ring, the red edge, the sting and the rumble are
+// the ones a real charge fires. Returns who it fired for, or null when nobody
+// has joined yet.
+_dbg.__charge = (name?: string) => {
+  const rv = rivals.list.find((r) => r.joined && (!name || r.name === name));
+  if (!rv) return null;
+  rivals.onCharge?.(rv.name, rv.x, rv.z);
+  return { name: rv.name, x: rv.x, z: rv.z };
+};
 // QA/capture: hold the jaw shut so a framed shot shows the hero's MOOD rather
 // than whatever he happened to be swallowing. See void3d.ts pinMouth().
 _dbg.__pinMouth = (shut: boolean) => voidling.pinMouth(shut);
@@ -5027,7 +5049,7 @@ rivals.onJoin = (name, color, x, z, arch) => {
   // NO CARD ON A JOIN (owner, 2026-08-29: the HUD "gets so cluttered it's
   // distracting… do we remove the void window — when they talk it's just chat
   // bubbles?"). The void walks into the world wearing its own colour with a
-  // ground halo under it and audio.alert() on top; the card's extra payload
+  // ground halo under it and a chime on top; the card's extra payload
   // was the archetype line, which is a TEACH, not news. And the card actively
   // gagged the channel he is keeping: while a banner is up, bubbles.say()
   // DISCARDS every crowd and event bubble rather than queueing it, and the
@@ -5040,7 +5062,16 @@ rivals.onJoin = (name, color, x, z, arch) => {
   // off and usually nowhere near the screen, while the banner and the alert
   // that actually tell the player were on it. A ring nobody sees still costs a
   // slot in a twelve-ring pool.)
-  audio.alert();
+  //
+  // A CHIME, NOT THE ALARM (studio round 4, Job 10). This was audio.alert(),
+  // the sting a charge plays, and it rang for every arrival — 3-5 a match,
+  // harmless GRUMPS included, the first of them seconds into every match. A
+  // child who hears the alarm for a cousin walking in has learned it means
+  // "something happened" long before NIBBLES winds up. ready() is the chime
+  // the game already plays for news — a headline, a near miss, passing a
+  // rival — and its first job, a power charged, sits behind POWERS_ON = false.
+  // qa/dangerchannel.mjs fails a match whose first join rings the alarm.
+  audio.ready();
 };
 // the family SPEAKS — and the player actually hears it now. A bubble at the
 // rival's WORLD position is invisible whenever the rival is out of frame,
@@ -5098,8 +5129,8 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   // the stuffed hunter is the MARQUEE meal: it hands back everything she bit
   // off you plus half her score, so it has to land like the ending it is
   // No card: bubbles.float() at the kill site already says the name, the title
-  // and the points where the child is actually looking, under two rings, two
-  // flashes, a camera punch, audio.chomp(..., "rival") and an 80ms buzz.
+  // and the points where the child is actually looking, under two rings, a
+  // gold flash, a camera punch, audio.chomp(..., "rival") and an 80ms buzz.
   // …and the town notices a second hole vanishing, without ever learning that
   // it had a name. COPY.rivalGoneNews was one string per world; this is a pool,
   // through the same cooldown as every other reaction, so a marquee kill and a
@@ -5110,11 +5141,23 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   voidling.animGulp();
   fx.ring(rx, rz, 0xffffff, rr * 5 + 8, 0.8);        // where the family member was…
   // (the second ring at the corpse and the second at the player are gone. Four
-  // rings for one kill, inside a stack that already has two screen flashes, a
+  // rings for one kill, inside a stack that already has a screen flash, a
   // camera punch, a full-screen card, a float, two sounds and an 80ms buzz. One
   // at each end keeps "where it was, where it went" at half the spectacle.)
   fx.ring(voidState.x, voidState.z, 0xffffff, voidling.radius * 4.2, 0.9);   // …and where it went
-  fx.shake(9); fx.flash('rgba(255,224,138,0.4)', 0.3); fx.flash('rgba(184,117,255,0.35)', 0.6);
+  // ONE FLASH, AND IT IS THE GOLD ONE (studio round 4, Job 10). This line fired
+  // gold and then violet, and fx.flash() writes the background and the opacity
+  // together (fx.ts), so the violet replaced the gold before any frame drew it:
+  // what a child got was rgba(184,117,255,0.35) at 0.6. Violet is already the
+  // wash of being nibbled (onPlayerBitten, rgba(154,92,255,0.3)), and gold is
+  // the wash of growing and of taking the crown — "a bite washes red, a form
+  // washes gold" — so the kill keeps the gold, at its authored 0.3.
+  // qa/dangerchannel.mjs fails a frame of its run that carries two flash()
+  // calls. That is not every frame of the game: the probe steers nothing and
+  // sets only scores (curStage follows the radius), so it never drives her to
+  // the last form, whose evolution still calls flash() twice in one pass —
+  // the gold wash, then the last rung's white.
+  fx.shake(9); fx.flash('rgba(255,224,138,0.4)', 0.3);
   camPunch(6); fx.kick(rx - voidState.x, rz - voidState.z, 9);
   floatPos.set(rx, rr + 5, rz);
   bubbles.float(floatPos, `${FAMILY_TITLE[name] ?? ''} ${name} DEVOURED! +${pts}`, true);
@@ -5214,12 +5257,20 @@ rivals.onPlayerBitten = (name, hit) => {
     growthEl.classList.add('pop', 'down');
     setTimeout(() => growthEl.classList.remove('pop', 'down'), 420);
   }
-  audio.hit(); fx.flash('rgba(154,92,255,0.3)', 0.4);
   // …and none here either. A form bite is frequent once the family turns on
   // you, so it was the other half of the periodic shaking. The red wash and
   // the 90ms buzz already say "you are being attacked" without moving the
   // camera the player is steering by.
+  //
+  // ONE CALL. A form bite used to flash violet and then red on consecutive
+  // lines; fx.flash() writes background and opacity together, so the red
+  // replaced the violet before a frame drew it. Choosing first draws exactly
+  // what was drawn before, and keeps the bite's frame to one flash()
+  // (qa/dangerchannel.mjs (b) forces a form bite and reads it): red for the
+  // bite that costs a form, violet for a nibble.
+  audio.hit();
   if (hit.form) fx.flash('rgba(255,43,60,0.4)', 0.5);
+  else fx.flash('rgba(154,92,255,0.3)', 0.4);
   buzz(hit.form ? 90 : 50);
   track(hit.form ? 'caught' : 'nibbled', {
     name, sec: elapsed(), form: curStage, stolen: Math.round(hit.steal),
@@ -5235,7 +5286,26 @@ rivals.onCharge = (name, x, z) => {
   // her, a red pulse on the screen edge, an alert sting and a rumble say
   // "something is coming at you" without a banner — and the banner was firing
   // often enough to read as the game shouting the same sentence all match.
-  fx.ring(x, z, 0xff2b3c, 26, 0.6); fx.flash('rgba(255,43,60,0.16)', 0.35);
+  fx.ring(x, z, 0xff2b3c, 26, 0.6);
+  // ── THE RED PULSE IS ON THE EDGE SHE IS COMING FROM ────────────────────────
+  // The sentence above promised "a red pulse on the screen edge" and the code
+  // drew fx.flash('rgba(255,43,60,0.16)', 0.35): one flat fill over the whole
+  // screen, 0.16 x 0.35 = 0.056 of red everywhere, with no side to it. The
+  // ring is drawn where she is, and a charge can begin anywhere inside 95 u
+  // of the void (rivals.ts, `dp < 95`), which can be outside the frame; the
+  // wash is on screen whatever happens, and it could not say where to look.
+  //
+  // Same element, no new node: the wash is a gradient laid along the bearing
+  // wayAim() gives from the void to her — the one the landmark chevron is
+  // built on, correct behind the lens as well as in front of it — clear over
+  // the half of the screen away from her and rising to 0.55 on the edge she is
+  // on (0.19 after the flash's 0.35). A CSS gradient angle and the chevron's
+  // `ang` share a convention: 0deg is up, clockwise, so the bearing drops in
+  // as it is. With no viewport to aim in, the old flat wash stands.
+  _chargeV.set(x, 0, z);
+  const aim = wayAim(_chargeV);
+  fx.flash(aim ? `linear-gradient(${aim.bear.toFixed(1)}deg, rgba(255,43,60,0) 50%, rgba(255,43,60,0.55) 100%)`
+    : 'rgba(255,43,60,0.16)', 0.35);
   audio.alert(); audio.voice('scared'); buzz(35);
 };
 // ── A BIG ONE HAS NOTICED YOU ──────────────────────────────────────────────
@@ -7132,6 +7202,7 @@ function refreshHud() {
   if (started && !ended && settled && shownRank === 1 && !crownLive && everBehind
       && tClock - lastLeadBrag > 6) {
     lastLeadBrag = tClock; announcedRank = shownRank; crownLive = true;
+    rivalEv.crowns++;   // QA: qa/dangerchannel.mjs waits on this before it takes the lead away
     const chased = (rows[1]?.name ?? 'the family');
     announceHtml(`<div class="bCard"><span class="bIco">👑</span><span class="bTx">`
       + `YOU ARE IN FRONT!<span class="bSub">${esc(chased)} is behind you</span></span></div>`);
@@ -7150,11 +7221,17 @@ function refreshHud() {
   if (!ledJust && started && !ended && settled && shownRank > 1 && crownLive
       && tClock - lastLeadBrag > 6) {
     lastLeadBrag = tClock; announcedRank = shownRank; crownLive = false;
+    rivalEv.leadLost++;   // QA: qa/dangerchannel.mjs reads the mirror's firing here
     const taker = (rows[0]?.name ?? 'the family');
     announceHtml(`<div class="bCard"><span class="bIco">👑</span><span class="bTx">`
       + `${esc(taker)} TOOK THE LEAD!<span class="bSub">get it back!</span></span></div>`);
-    fx.flash('rgba(255,82,64,0.20)', 0.35);
-    audio.alert(); buzz(60);
+    // NO RED, NO ALARM (studio round 4, Job 10). This carried
+    // fx.flash('rgba(255,82,64,0.20)', 0.35) and audio.alert() — the charge's
+    // own colour and its own sting, for news: nothing is coming at her, and
+    // there is nothing to dodge. Red and the alarm mean "move now" and belong
+    // to the charge, the bite and the danger teach; the card names the taker
+    // and says what to do, and the buzz stays.
+    buzz(60);
     ledJust = true;
   }
   // …and the SAME cooldown as its mirror branch below, which had one all along.
@@ -7962,7 +8039,17 @@ function paintMenuLadder(): void {
             gl.textContent = `FINISH LEVEL ${cur} FIRST`;
             ladderLater(() => paintMenuLadder(), 1800);
           }
-          audio.alert(); buzz(30);
+          // "not yet", not the alarm and not a meal (studio round 4, Job 10):
+          // tapping a padlock is curiosity, and this was audio.alert() — the
+          // sound of a charge. pop() is no answer either: it is the EAT, the
+          // game's reward, and the channel tick() and bonk() were both moved
+          // off for carrying things that were not meals. bonk() is the wall's
+          // "you can't have that": a sine falling 520 -> 330 Hz, a triangle
+          // 1040 -> 700 Hz and a noise grain bandpassed at 900 Hz; no square,
+          // no oscillator under 330 Hz, no low-passed thump, every voice ended
+          // by 0.14 s (qa/padlock.mjs). The shake and the sentence already
+          // answer her.
+          audio.bonk(); buzz(30);
           return;
         }
         track('level_tap', { world: pickedWorld, goal: g, from: cur });
@@ -10156,7 +10243,10 @@ const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) 
         c.classList.remove('shake', 'why'); void (c as HTMLElement).offsetWidth;
         c.classList.add('shake', 'why');
         setTimeout(() => c.classList.remove('why'), 1600);
-        audio.alert(); buzz(30);
+        // the wall's bonk(), not the alarm and not the eat — the same "not
+        // yet" the locked level dots give (studio round 4, Job 10; see there
+        // and qa/padlock.mjs); this was audio.alert()
+        audio.bonk(); buzz(30);
         return;
       }
       const dot = levelCurrent(id);

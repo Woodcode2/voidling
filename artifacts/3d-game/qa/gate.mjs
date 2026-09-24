@@ -844,6 +844,43 @@ const SUITE = [
     cmd: ['node', 'qa/countdown.mjs', PORT, 'maple'], verdict: pf,
     why: 'the final-ten numeral carries a contour of at least 4px and covers under 10% of the hero\'s face box at ?len=15, clock 7, on 430x932, 390x844 and 360x780' },
 
+  // ── STUDIO ROUND 4, JOB 10: THE ALARM MEANS DANGER AND ONLY DANGER ────────
+  // eightbit and lnalert are node probes: the real audio3d.ts bundled by vite's
+  // esbuild and run on a context that records every node, connect() and
+  // start() and renders nothing (qa/_synthgraph.mjs). Both were run on the
+  // build before the job and after it, about 0.3 s each on this box:
+  //   eightbit  FAIL, 15 square oscillators across hit() and alert() on six
+  //             worlds and a hit() falling 140 -> 60 Hz over a noise burst
+  //             -> PASS, 0 squares, hit() a triangle 330 -> 520 Hz + a sine
+  //   lnalert   FAIL, Lantern's alert() first heard 2.000 s after the call
+  //             under a recording -> PASS, 0.000 s, the fallback's drum
+  //             tower still at 0.000 s
+  //   padlock   FAIL on 26a7de8, both locked taps call audio.alert(); FAIL on
+  //             c79d36b (the job's first cut), both call audio.pop(), the eat
+  //             -> PASS, both call audio.bonk(): 520 -> 330 Hz, nothing under
+  //             250 Hz, no square, no low-passed thump, ended by 0.140 s on
+  //             11 reads, where pop(0) fails on all 11 (a 96 Hz triangle, a
+  //             noise burst behind a 90 Hz lowpass)
+  // Since c79d36b the harness's fetch 404s a file public/ does not ship, so
+  // Skylark (no skylark.mp3) is read on its fallback score only.
+  // dangerchannel plays a real menu and a real match and has NOT been run
+  // (written while the lead held the browser), so it is live + quality only,
+  // and its timeout is sized from the source rather than measured: two page
+  // boots, then about 20 match-seconds at the ~50 s of wall per match-second
+  // qa/navtap.mjs traced (the countdown block above).
+  { id: 'eightbit', tier: 'feel', profiles: ['push', 'live', 'quality'], timeout: 60,
+    cmd: ['node', 'qa/eightbit.mjs'], verdict: pf,
+    why: 'being bitten and the alarm carry no square wave on any world, and the bite rises from 200 Hz up instead of dropping to a thud' },
+  { id: 'lnalert', tier: 'feel', profiles: ['push', 'live', 'quality'], timeout: 60,
+    cmd: ['node', 'qa/lnalert.mjs'], verdict: pf,
+    why: 'on Lantern the alarm is heard on the call under a recording, not two seconds into the charge it warns about' },
+  { id: 'padlock', tier: 'feel', profiles: ['push', 'live', 'quality'], timeout: 60,
+    cmd: ['node', 'qa/padlock.mjs'], verdict: pf,
+    why: 'a tapped locked level dot or world card plays bonk(), a soft tap above 250 Hz with no thump, and not pop() (the eat) or alert() (the charge)' },
+  { id: 'dangerchannel', tier: 'feel', profiles: ['live', 'quality'], timeout: 3000,
+    cmd: ['node', 'qa/dangerchannel.mjs', PORT, 'maple'], verdict: pf,
+    why: 'alert() and the red wash answer only a charge, a bite or the danger teach — not a sibling joining, a lost lead or a tapped padlock, which plays bonk() — one flash a frame, and the charge washes red from her side of the screen' },
+
   // ── THREE PUSH PROBES THAT JOB 7'S modalIn MAY HAVE BLINDED ───────────────
   // pictograph, pickerfit and lockedcards open #worlds (and pictograph #shop
   // and #profile too) and read them after a fixed wait. Job 7 made those
