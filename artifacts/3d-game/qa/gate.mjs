@@ -839,7 +839,11 @@ const SUITE = [
   // on the build before it, each with another browser probe holding the
   // machine's other slot — about 100 s for the two lockstep match pages (drawing
   // stubbed) and about 250 s for the whole 180 s match (drawing off). 1800
-  // leaves over five times that for a machine under load.
+  // leaves over five times that for a machine under load. With the G8
+  // review's bars ((c2), (c3), and (f) met inside a kill's stretch) it took
+  // 340 s on the fixed build and 343 s on the build before it, the other slot
+  // held by another agent's probe throughout: the new bars cost frames, not
+  // minutes, and the timeout stands.
   { id: 'timebeat', tier: 'feel', profiles: ['live', 'quality'], timeout: 1800,
     cmd: ['node', 'qa/timebeat.mjs', PORT, 'maple'], verdict: pf,
     why: 'the hero lives through a hit-stop and the world eases out of one; five flashes in 200 ms show at most two washes, a third wash in a second is not drawn but a warning always is, and a warning paints over a live wash; the kill beat is OFF without ?killbeat=1 — and with it the kill freezes 0.14-0.16 s, slows to 0.25, pulses its rays once and leaves her dizzy, halved under reduce motion; the whistle freezes 0.12 s even inside a slow stretch and ends the stretch, the rays and the dizzy; nothing new fires in the outro; and in a whole match at most 8 freezes over 100 ms and at most 20 beats' },

@@ -115,7 +115,8 @@
 //       many there are. 20 is the spec's own "one to five times a match" for
 //       each of the four sites a level-free Maple match can fire (a sibling
 //       eaten, the hero landmark, a sticker found, a form reached; the goal
-//       needs a level). The G8 review's run armed 11 (rival 2, sticker 4,
+//       needs a level). The G8 build's whole match for the review armed 7
+//       (sticker 2, evolve 5) and the fixed build's 10 (landmark 1, sticker 4,
 //       evolve 5); a beat hung on anything frequent — every bite, every near
 //       miss — arms hundreds.
 //
@@ -141,17 +142,20 @@
 // review found the swap worse than the fault it fixed: longBeats can count only
 // a rival, the marquee or the goal (a sticker's and the landmark's freeze are
 // exactly 0.10 s, a form's 0.08), so it was "at most 8 sibling kills a match"
-// and could not see the stutter it was written for. The review's own runs:
-// the G8 build, switch on, "37 freeze(s), 10 over 100 ms (2 armed or pushed
-// over by a marquee beat, 8 by the bite hit-stop alone)". So (d) is the lead's
-// bar again, every freeze counted, and the game — WITH ?killbeat=1 ONLY —
-// holds the bite's hit-stop to 0.100 s (biteGulps: the ladder's sticker and
-// landmark freeze, so no anonymous meal outlasts a named one's). That trims 0 to
-// 5 ms off meals of 0.9 of his radius or more and leaves every freeze the bar
-// counts a beat's; the game as it ships, switch off, keeps its rung to the
-// millisecond. (d2) is the half the review asked for that (d) cannot be: a
-// ceiling on the beats that are 100 ms or under. The retraction stays above
-// because it is still true of what it measured.
+// and could not see the stutter it was written for; and the whole-match total
+// it set aside is the bite's, not the beats' — on the G8 build, switch on, this
+// probe read "40 freeze(s), 6 over 100 ms (0 armed or pushed over by a marquee
+// beat, 6 by the bite hit-stop alone)" in the run the review's fix was proved
+// against. So (d) is the lead's bar again, every freeze counted, and the game
+// — WITH ?killbeat=1 ONLY — holds the bite's hit-stop to 0.100 s (biteGulps:
+// the ladder's sticker and landmark freeze, so no anonymous meal outlasts a
+// named one's). That trims 0 to 5 ms off meals of 0.9 of his radius or more
+// and leaves every freeze the bar counts a beat's; the game as it ships,
+// switch off, keeps its rung to the millisecond. (d2) is the half the review
+// asked for that (d) cannot be: a ceiling on the beats of 100 ms or under.
+// (d) is a ceiling, not a detector: a match whose child driver happens to
+// take few big bites passes it on either build — the run above did, at 6.
+// The retraction stays above because it is still true of what it measured.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';

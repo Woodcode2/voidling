@@ -71,6 +71,11 @@ export interface Rivals {
    *  in here decides WHETHER she is dizzy — that is the switch's, and the end
    *  beat's, and both live in prototype3d.ts. */
   dizzy(name: string): void;
+  /** …and the whistle stops it (the G8 review): every dizzy sibling's pupils
+   *  go back on their whites, for the rest of her gulp. prototype3d.ts's
+   *  whistleTakesTime() calls it on the frame either whistle blows, so a kill
+   *  a moment before the end does not go on seeing stars under the outro. */
+  stopDizzy(): void;
   reset(matchLen?: number): void;                        // instant rematch
 }
 
@@ -842,6 +847,9 @@ export function createRivals(
     dizzy(name) {
       const rv = rivals.find((r) => r.name === name);
       if (rv && rv.dyingT > 0) rv.dizzyOn = true;
+    },
+    stopDizzy() {
+      for (const rv of rivals) if (rv.dizzyOn) { rv.dizzyOn = false; restPupils(rv); }
     },
     grazeCount: () => grazeN,
     bandStat: () => ({ mean: bandN ? bandSum / bandN : 0, max: bandMax,

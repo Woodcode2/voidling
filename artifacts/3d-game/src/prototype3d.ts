@@ -5406,9 +5406,14 @@ rivals.onPlayerBitten = (name, hit) => {
   // what was drawn before, and keeps the bite's frame to one flash()
   // (qa/dangerchannel.mjs (b) forces a form bite and reads it): red for the
   // bite that costs a form, violet for a nibble.
+  //
+  // …and both are WARNINGS to the flash governor (fx.ts, the G8 review): a
+  // bite landing inside a live gold or green wash paints its own colour over
+  // it instead of blending into the reward's, and the two-a-second cap never
+  // turns it away. qa/timebeat.mjs (c2) and (c3) drive this handler.
   audio.hit();
-  if (hit.form) fx.flash('rgba(255,43,60,0.4)', 0.5);
-  else fx.flash('rgba(154,92,255,0.3)', 0.4);
+  if (hit.form) fx.flash('rgba(255,43,60,0.4)', 0.5, { danger: true });
+  else fx.flash('rgba(154,92,255,0.3)', 0.4, { danger: true });
   buzz(hit.form ? 90 : 50);
   track(hit.form ? 'caught' : 'nibbled', {
     name, sec: elapsed(), form: curStage, stolen: Math.round(hit.steal),
@@ -5439,11 +5444,13 @@ rivals.onCharge = (name, x, z) => {
   // the half of the screen away from her and rising to 0.55 on the edge she is
   // on (0.19 after the flash's 0.35). A CSS gradient angle and the chevron's
   // `ang` share a convention: 0deg is up, clockwise, so the bearing drops in
-  // as it is. With no viewport to aim in, the old flat wash stands.
+  // as it is. With no viewport to aim in, the old flat wash stands. A WARNING
+  // to the flash governor (fx.ts): it paints over a live celebration and the
+  // two-a-second cap never drops it.
   _chargeV.set(x, 0, z);
   const aim = wayAim(_chargeV);
   fx.flash(aim ? `linear-gradient(${aim.bear.toFixed(1)}deg, rgba(255,43,60,0) 50%, rgba(255,43,60,0.55) 100%)`
-    : 'rgba(255,43,60,0.16)', 0.35);
+    : 'rgba(255,43,60,0.16)', 0.35, { danger: true });
   audio.alert(); audio.voice('scared'); buzz(35);
 };
 // ── A BIG ONE HAS NOTICED YOU ──────────────────────────────────────────────
@@ -9441,7 +9448,19 @@ function biteGulps(e: Edible, pay: BitePay) {
   if (pay.bite > 0.55 && pay.r > 1.1) {
     if (kitCd <= 0) {
       kitCd = 1.6;
-      hitStop(0.055 + 0.05 * pay.bite);
+      // …HELD TO THE LADDER WHILE THE MARQUEE BEATS ARE ON (the G8 review).
+      // bite is clamped to 1, so this rung runs 0.055-0.105 s, and its top
+      // sits across the 100 ms line of the lead's whole-match ceiling (at most
+      // 8 freezes over 100 ms, qa/timebeat.mjs (d)). On the G8 build, switch
+      // on, a whole Maple match read 6 of its 40 freezes over the line, all
+      // six this rung's and none a beat's: the ceiling was counting the bite.
+      // With ?killbeat=1 an anonymous meal holds the world no longer than the
+      // ladder's own named-meal freeze — a sticker found, the hero landmark,
+      // 0.10 s — so no house outlasts a sticker, and every freeze over the line
+      // is a beat's. The trim is 0-5 ms, on meals of 0.9 of his radius or more.
+      // With the switch off, as the game ships, the rung is untouched.
+      const stopFor = 0.055 + 0.05 * pay.bite;
+      hitStop(KILL_BEAT ? Math.min(stopFor, BEAT_TIME.landmark.stop) : stopFor);
       camPunch(1.2 + 1.8 * pay.bite);
       fx.kick(pay.kx, pay.kz, 2.5 + 3.5 * pay.bite);
       _dbg.__kickN = (_dbg.__kickN ?? 0) + 1;   // instrumentation: qa/_kickrate.mjs
@@ -13494,7 +13513,9 @@ let stopEase = 0;         // …of that ease still to run
 // 0.100-0.105 s for any meal of 0.9 of his radius or more — and in a whole
 // Maple match with no beat in it (the build before G8, qa/timebeat.mjs (d))
 // 9 of its 47 freezes crossed 100 ms. A ceiling on the beats has to be able to
-// tell those apart from its own.
+// tell those apart from its own. (Since the G8 review the ceiling counts every
+// freeze again, as the lead set it, and with ?killbeat=1 the bite's rung is
+// held to 0.10 s — see biteGulps — so the split is printed, not judged.)
 let stopN = 0, longStopN = 0, longBeatN = 0, freezeAt = 0, freezeLong = false, lastWorldK = 1;
 function countFreeze(beat: boolean) {
   if (!freezeLong && tClock - freezeAt + stopT > 0.1 + 1e-9) { freezeLong = true; longStopN++; if (beat) longBeatN++; }
@@ -13652,8 +13673,15 @@ function marqueeBeat(kind: BeatKind): boolean {
   // and 0.25 s later froze again for the evolution, world 1.00 0.06 0.06 0.09
   // 0.25 0.06 0.12 0.25 frame by frame — two hitches, not one beat. Inside a
   // freeze the freeze is simply extended (armStop's max).
+  //
+  // …EXCEPT THE WHISTLE (the G8 review). 'goal' has no slow part to join a
+  // stretch with, so under this rule alone a goal met inside a kill's or a
+  // sticker's stretch armed nothing at all, and the end of the match went by
+  // with no freeze. The goal is not a moment landing on another one: it ends
+  // them. The block that blows the whistle cuts the stretch first
+  // (whistleTakesTime), and the goal's freeze is armed whatever was running.
   const inSlow = slowHold > 0 || slowEaseT > 0;
-  if (!inSlow || stopT > 0) armStop(bt.stop * m, true);
+  if (!inSlow || stopT > 0 || kind === 'goal') armStop(bt.stop * m, true);
   stopCd = Math.max(stopCd, 0.35);
   if (bt.slow) slowMo(bt.slow[0], bt.slow[1] * m);
   beatN[kind]++;
@@ -13716,10 +13744,7 @@ function killRaysFrame(dt: number) {
   if (killAge < 0 || !killEl) return;
   killAge += dt;
   const p = killAge / killLen;
-  if (p >= 1 || ended || menuMode) {
-    killAge = -1; killEl.style.display = 'none'; killEl.style.opacity = '0';
-    return;
-  }
+  if (p >= 1 || ended || menuMode) { killRaysOff(); return; }
   camera.updateMatrixWorld();
   _killV.copy(killAt).project(camera);
   const sx = (_killV.x * 0.5 + 0.5) * window.innerWidth, sy = (-_killV.y * 0.5 + 0.5) * window.innerHeight;
@@ -13727,6 +13752,30 @@ function killRaysFrame(dt: number) {
   killEl.style.display = 'block';
   killEl.style.opacity = (KILL_ALPHA * Math.sin(Math.PI * p)).toFixed(3);
   killEl.style.transform = `translate(${(sx - killPx / 2).toFixed(1)}px, ${(sy - killPx / 2).toFixed(1)}px) scale(${s.toFixed(3)})`;
+}
+/** the pulse out, now: its element hidden and its clock stopped */
+function killRaysOff() {
+  killAge = -1;
+  if (killEl) { killEl.style.display = 'none'; killEl.style.opacity = '0'; }
+}
+/** ── THE WHISTLE TAKES THE TIME (the G8 review) ───────────────────────────
+ *  Both whistles — a goal met and the clock run out — call this on the frame
+ *  they blow. A beat armed a moment before the whistle ran on into the outro:
+ *  a kill's slow stretch under the outro's own 0.3x push-in (the two multiply),
+ *  the ray pulse in her colour over the whistle's rings, her pupils still
+ *  circling. qa/timebeat.mjs (f) met the goal 200 ms of tClock after a kill
+ *  on the G8 build: slow read 0.25 0.25 0.25 0.32 0.71 0.94 1.00 on the frames
+ *  after the whistle, the rays were up on 5 of the 11 frames from it on, and
+ *  her pupils moved on 9 of 10 — and the goal-met frame itself froze 0.000 s
+ *  (see EXCEPT THE WHISTLE in marqueeBeat). The whistle owns the end, so it
+ *  ends them: the stretch stops dead (the outro's push-in is the slow part
+ *  now), the rays go out and the dizzy stops. A freeze already running is
+ *  left to run; the goal's own is armed with it, the max (marqueeBeat).
+ *  Without ?killbeat=1 none of the three ever runs, and this changes nothing. */
+function whistleTakesTime() {
+  slowHold = 0; slowEaseT = 0; slowScale = 1;
+  killRaysOff();
+  rivals.stopDizzy();
 }
 function animate() {
   tickFrame();
@@ -14042,7 +14091,8 @@ function animate() {
       // the whistle's own freeze (G8, behind ?killbeat=1): armed here, by the
       // block that blows it, on the frame it blows — the one beat allowed in
       // the end beat, because it IS the end beat. The outro's 0.3x push-in
-      // is the slow stretch after it.
+      // is the slow stretch after it, so any beat still running ends first.
+      whistleTakesTime();
       marqueeBeat('goal');
       fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 5, 1);
       fx.ring(voidState.x, voidState.z, 0xb875ff, voidling.radius * 3.4, 0.8);
@@ -14065,6 +14115,7 @@ function animate() {
         goal.met = won; goal.result = won ? 'win' : 'time';
       }
       outroT = 2.0;   // slow-mo push-in beat before the results panel
+      whistleTakesTime();   // …and any beat still running ends here (G8 review)
       fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 5, 1);
       fx.ring(voidState.x, voidState.z, 0xb875ff, voidling.radius * 3.4, 0.8);
       audio.whistle(); partyBurst();   // full time, in this world's own voice (G4)
