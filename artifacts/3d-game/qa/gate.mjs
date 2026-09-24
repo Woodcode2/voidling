@@ -152,6 +152,18 @@ const SUITE = [
     cmd: ['node', 'qa/evolvepop.mjs'], verdict: pf,
     why: 'evolving reads as getting BIGGER — the pop dominates the wind-up and lands with the sound' },
 
+  // THE FORM WAITS FOR THE MEAL THAT EARNED IT (studio round 4, Job 11, and its
+  // review's blocker). Node only: src/proto3d/evohold.ts stepped through a
+  // frame loop in animate()'s order on prototype3d.ts's own FORM_MIN,
+  // growRadius, rate limiter and drain rate, plus a check that the source calls
+  // the hold where that loop assumes. The first hold re-read the form off the
+  // radius on the swallow, after the rate limiter had pulled the bite back:
+  // with the module mutated back to that rule, bar (1) fails every form with the
+  // limiter on; with a just-swallowed form not counted, bar (2) fails.
+  { id: 'evohold', tier: 'feel', profiles: ['push', 'live'], timeout: 60,
+    cmd: ['node', 'qa/evohold.mjs'], verdict: pf,
+    why: 'every evolution lands on the swallow of the meal that earned it, in a real match as well as at a frozen radius, once per form' },
+
   // THE VOID IS ALIVE AT SPAWN (studio round 4, Job 8). Three node probes, same
   // reasoning as evolvepop: motionlaw and moodrule are pure functions of
   // numbers the source already writes down, and mouthwind also steps the real
@@ -792,9 +804,32 @@ const SUITE = [
     cmd: ['node', 'qa/questable.mjs', PORT, ...WORLDS], verdict: pf,
     why: 'over a year of draws, no world can show a daily chip a child cannot clear' },
 
-  { id: 'juice', tier: 'feel', profiles: ['live', 'art'], timeout: 420,
+  // Studio round 4, Job 11: (a) now follows the bite from its capture to its
+  // swallow and credits nothing on the capture frame, so it waits out the
+  // feast __setVoidR(4) sets off (1.0 s of tClock, 20 frames at dt 0.05) and
+  // then one drain (up to 13 frames by the drain's rate) that it did not wait
+  // for before — about 33 frames, or some 80 s at the frame cost qa/navtap.mjs
+  // traced. 420 became 600 on that arithmetic, not on a run. The Job 11 review
+  // then tied each channel to the forced bite and lets another meal spoil an
+  // attempt; up to two more attempts, each a quiet wait of at most 1.0 s of
+  // tClock and one drain (about 33 frames, some 80 s each at that cost), make
+  // 600 into 900. Arithmetic again, not a run; it comes down to its first run.
+  { id: 'juice', tier: 'feel', profiles: ['live', 'art'], timeout: 900,
     cmd: ['node', 'qa/juice.mjs', PORT], verdict: pf,
-    why: 'a bite is answered on at least three channels, not one — and the face answers an evolution within three frames' },
+    why: 'a bite is answered on at least three channels as it goes in, not on contact — and the face answers an evolution within three frames' },
+
+  // ── STUDIO ROUND 4, JOB 11: THE BITE IS HEARD WHEN IT GOES IN — NOT YET RUN
+  // I-10, written before the fix and not run on either side of it: no browser
+  // may run on the machine it was written on. Live and quality only, never
+  // push, until a run has read its FAIL on 26a7de8 (the sound in capture(),
+  // ahead of a fall the drain holds back until e.t crosses T_FALL) and its PASS
+  // on the fix. The timeout is NOT measured: boot and t > 3 as juice does,
+  // then six drains of 7-13 frames each at dt 0.05, at the frame cost
+  // qa/navtap.mjs traced (about one frame per 2.5 s). It comes down to its
+  // first run.
+  { id: 'bitetime', tier: 'feel', profiles: ['live', 'quality'], timeout: 1200,
+    cmd: ['node', 'qa/bitetime.mjs', PORT, 'maple'], verdict: pf,
+    why: 'every bite is heard within 67 ms of its meal starting to fall — the reward lands when the object drops in, not on contact' },
 
   { id: 'aftermatch', tier: 'feel', profiles: ['live'], timeout: 420,
     cmd: ['node', 'qa/aftermatch.mjs', PORT], verdict: pf,

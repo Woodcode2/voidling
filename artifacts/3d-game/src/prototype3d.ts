@@ -59,6 +59,7 @@ import { allLevels, current as levelCurrent, recordLevelResult, trackLevelStart,
 import { ensurePipDefs, pipRow, pipHead, pip, PIP_WORD,
   PIP_FLIP_MS, PIP_HOP_MS, PIP_REVEAL_STEP_MS } from './proto3d/pips';
 import { recentEvents } from './proto3d/telemetry';
+import { createEvoHold } from './proto3d/evohold';
 import { bumpMatch, deal, type Deal } from './game/matchdeck';
 // the district ids this world's newsroom knows, so a biome from another world
 // can never be handed to it as a key
@@ -2432,6 +2433,9 @@ interface Edible { mesh: THREE.Object3D; radius: number; eaten: boolean; t: numb
    *  would be ~11,000 objects allocated at load for state that 99% of them
    *  never read. Every reader guards on `keel` being there. */
   keel?: THREE.Vector3; rest?: THREE.Quaternion; keelA?: number; dropY?: number;
+  /** what the bite still owes a child — the sound at the sink, the gulp at the
+   *  swallow. Written by capture(), paid and cleared by the drain; see BitePay. */
+  pay?: BitePay;
   /** the objects that actually carry a fade uniform — see addEdible */
   fadeTo?: THREE.Object3D[];
   /** the MESHES of a prop too small to read at the diorama camera — see
@@ -3499,7 +3503,7 @@ const _dbg = new Proxy(_dbgStore, {
     band: Record<string, { n: number; rMin: number; rMax: number }> };
   __renderBloom: () => void;
   __composer: () => unknown;
-  __juiceState: () => { fov: number; fovKick: number; stop: number; puffs: number; buzzes: number };
+  __juiceState: () => { fov: number; fovKick: number; stop: number; puffs: number; buzzes: number; stopCd: number; kitCd: number };
   __eatNearest: (rel: number) => { r: number; R: number } | null;
   __quality: () => { level: number; pinned: number | null; shadows: boolean; shSize: number; pr: number };
   __warpVoid: (x: number, z: number) => void;
@@ -3507,7 +3511,7 @@ const _dbg = new Proxy(_dbgStore, {
   __setMood: (m: string | null) => void;
   __faceState: () => { mood: string; maw: number; smile: boolean; biting: boolean;
     hold: number; move: number; lid: number; shut: number; uniformK: number };
-  __stages: () => { cur: number; best: number; ceremonies: number };
+  __stages: () => { cur: number; best: number; ceremonies: number; held: number[]; owed: number };
   __voidSetMenuR: (r: number) => void;
   __dioMark: () => number;
   __bite: (hunter?: boolean) => void;
@@ -3545,6 +3549,7 @@ const _dbg = new Proxy(_dbgStore, {
   __music: () => ReturnType<typeof audio.musicState>;
   __audioLog: () => string[];
   __audioCalls: () => { t: number; w: number; id: string }[];
+  __biteLog: () => { id: number; r: number; cap: number; sink: number; sndT: number; snd: string; gulp: number }[];
   __newsArc: () => {
     log: { t: number; phase: number; tier: number; react: boolean; brand: string; text: string }[];
     arc: { phase: number; cards: number; high: number };
@@ -3576,6 +3581,11 @@ _dbg.__juiceState = () => ({
   fov: camera.fov, fovKick, stop: stopT,
   puffs: puffLife.reduce((n, l) => n + (l > 0 ? 1 : 0), 0),
   buzzes: buzzN,
+  // the two cooldowns a swallow's hit-stop has to get past — hitStop()'s own
+  // (on dt) and the landmark kit's (on wall time). qa/juice.mjs (a) waits for
+  // both to clear before it forces its bite, so another meal's swallow cannot
+  // have spent them.
+  stopCd, kitCd,
 });
 // QA: force-eat the nearest edible at least `rel` of the void's radius —
 // drives the REAL capture() path (hit-stop, lens punch, kick, particles,
@@ -3642,6 +3652,12 @@ _dbg.__music = () => audio.musicState();
 _dbg.__audioLog = () => audio.musicLog();
 /** QA: every public audio call as {t: tClock, w: wall s, id}, oldest first (see its wrapper). */
 _dbg.__audioCalls = () => audioCalls.slice();
+/** QA: THE BITE'S OWN CLOCK (studio round 4, I-10; qa/bitetime.mjs). One row
+ *  per capture(), the last 64, oldest first: the mesh it took, and the tClock of
+ *  the capture, of the frame the drain crossed T_FALL, of the sound asked for
+ *  there, and of the swallow (-1 until each happens). Copies, so a probe cannot
+ *  write back into what the drain is about to pay. */
+_dbg.__biteLog = () => biteLog.map((b) => ({ id: b.id, r: b.r, cap: b.cap, sink: b.sink, sndT: b.sndT, snd: b.snd, gulp: b.gulp }));
 // QA: put a hat on the live void. Needed to measure OCCLUSION from the play
 // camera — the thing qa/hatsheet.mjs cannot see, because it renders a hat alone
 // in a bare scene from near-horizontal angles while the game looks DOWN at a
@@ -3746,7 +3762,10 @@ _dbg.__faceState = () => voidling.faceState();
 // QA: how many EVOLVED ceremonies have played, and the two stage counters
 // behind them. A demotion walks curStage back; bestStage does not move, so the
 // ceremony cannot re-fire on the way home. qa/evolveonce.mjs reads this.
-_dbg.__stages = () => ({ cur: curStage, best: bestStage, ceremonies: evolveCeremonies });
+// `held` and `owed` are the evolution hold's: the forms bites in the drain
+// earned, oldest first, and the highest one earned by a meal already down and
+// not yet shown (proto3d/evohold.ts).
+_dbg.__stages = () => ({ cur: curStage, best: bestStage, ceremonies: evolveCeremonies, ...evoHold.state() });
 // QA: take a bite, through the REAL handler rather than a copy of it. A FORM
 // bite is the only thing in the game that walks a form back, and nothing else
 // can reproduce the bug it used to cause. form rides hunter here so existing
@@ -5213,6 +5232,12 @@ rivals.onPlayerBitten = (name, hit) => {
   // bottom of the ladder.
   let demoted = false;
   if (hit.form) {
+    // …and a form a meal in the drain had earned goes with the size. Held,
+    // it would come due on that meal's swallow and promote a child who has
+    // just been knocked down to the bottom of her form — the ceremony
+    // qa/evolveonce.mjs exists to keep off a setback. She gets it, ceremony
+    // and all, when she grows back into it.
+    evoHold.clear();
     const st = stageFor(voidling.radius);
     const down = Math.max(START_R, (FORM_MIN[Math.max(0, st - 1)] || START_R) * 1.02);
     voidling.setRadius(Math.max(START_R, Math.min(voidling.radius * hit.shrink, down)));
@@ -8854,6 +8879,52 @@ function paintNoms(): void {
  *  frame of the game. tClock is wall time since page load, which is why
  *  beginMatch resets it to -99 rather than to tClock. */
 let lastEatAt = -99;
+// ── THE BITE PAYS OFF ON THE SWALLOW ───────────────────────────────────────
+// Studio round 4, Job 11. Donut County's third point is that the reward lands
+// when the object drops in, and ours landed on contact: capture() played the
+// sound, the voice and the buzz, stopped the world, burst the particles and
+// shoved the blob on the frame the prop was TAKEN — and the drain then held the
+// prop at the height it was taken from until e.t crossed T_FALL. By the drain's
+// own arithmetic (e.t gains 2.9 - 1.3 x mass a world-second, T_FALL is 0.46)
+// the fall begins 159 ms after the bite at mass 0 and 288 ms after it at mass
+// 1, a meal as big as the void, and the swallow lands at 345 and 625 ms (under
+// reduced motion T_FALL is 0.30: 103 and 188 ms). Everything a child could
+// hear or feel had been spent before she saw the meal go in.
+//
+// So capture() keeps the BOOKKEEPING — the score, the chain, the tallies a goal
+// reads, the growth, the jaw — and writes down what the bite owes. The drain
+// pays it at the two moments the meal is seen to go: the sound, the voice, the
+// buzz and the chain's crown when e.t crosses T_FALL (biteSinks), and the
+// hit-stop, the burst and the lunge on the frame it is swallowed (biteGulps).
+// qa/bitetime.mjs measures the first; qa/juice.mjs (a) counts the channels over
+// the whole payoff and no longer credits the capture frame.
+interface BitePay {
+  id: number;      // the mesh's own id — the key __biteLog is read by
+  r: number;       // the meal's radius
+  cap: number;     // tClock at capture
+  sink: number;    // tClock of the frame e.t crossed T_FALL, -1 until then
+  sndT: number;    // tClock the bite's sound was asked for, -1 until then
+  snd: string;     // what it asked for: 'chomp', 'plain' (a CHOMP in the end beat) or 'pop'
+  gulp: number;    // tClock of the swallow, -1 until then
+  bite: number;    // the meal against the void at capture — the grade every cue rides on
+  vr: number;      // the void's radius as capture() left it, which the sound was always pitched against
+  combo: number;   // this bite's link in the chain: the pop's pitch, and a crown at every tenth
+  head: boolean;   // a CHOMP — decided at capture, because the hat reads its cooldown there
+  kx: number; kz: number;   // the pull at capture, for the landmark kit's recoil
+}
+/** The last 64 bites, oldest first — the same objects the drain pays, so a row
+ *  fills in as its bite goes down. QA only (__biteLog); nothing in the game
+ *  reads it back. */
+const biteLog: BitePay[] = [];
+/** THE FORM WAITS FOR THE MEAL THAT EARNED IT. The growth is booked at capture,
+ *  so the frame loop saw the new form on the very next frame and the EVOLVED
+ *  ceremony went off while the meal that earned it was still out at the rim.
+ *  capture() writes down the form each bite earned (bite), the drain says when
+ *  the meal is down (down), and the ceremony block asks which form it may show
+ *  (due). The rules, and why the form is written down at the bite rather than
+ *  read off the radius at the swallow, are in proto3d/evohold.ts;
+ *  qa/evohold.mjs steps them. */
+const evoHold = createEvoHold<Edible>();
 // ── POWDER PASS: THE SNOW SHELL ────────────────────────────────────────────
 // Carving through a snowdrift packs a white shell on the void, and while it
 // holds the void eats ONE SIZE CLASS UP (EAT_RATIO 1.11 -> 1.61). This is the
@@ -8916,38 +8987,15 @@ function capture(e: Edible, giveHunger = true) {
     }
   }
   voidling.setRadius(growRadius(voidling.radius, e.radius));   // area-based growth
-  // …and the blob LUNGES past its new size rather than easing to it
-  voidling.impulse(Math.min(2.2, e.radius * 0.9));
-  // THE WORLD STOPS for a big one. Gated at 0.55 so it is a landmark event,
-  // never a hoover spree, and hitStop() carries its own cooldown as well.
-  // MEASURED, NOT ASSUMED (qa/_kickrate.mjs, child driver, 60s of play):
-  // the ratio gate alone fired this kit 141 times/min on Lantern — 2.3
-  // shakes a SECOND, the owner's "screen is shaking a ton" — because at
-  // small radius in the densest market half of everything is bite > 0.55.
-  // Maple ran 33/min, which is why nobody reported it there first. Landmark
-  // now means all three of: a big RELATIVE bite, a big ABSOLUTE meal (a
-  // stall, a person — never a soup bowl at toddler size), and at least 0.9s
-  // of wall time since the last one. hitStop rides the same gate: its own
-  // 0.35s cooldown still allowed a rubber-band stutter at hoover pace.
-  // ROUND TWO OF THE DIAL (owner: "the shake is still happening for every
-  // level... it's bad"): the first pass cut the RATE 141→19/min on Lantern
-  // and the owner still felt it — so amplitude and cadence both halve. A
-  // landmark is now a big bite of something genuinely large (absolute floor
-  // 1.1), at most every 1.6 seconds, at half the old punch. The lens
-  // (camPunch) counts as shake too: rapid FOV pumping reads as wobble even
-  // with the camera still. A qualifying bite during the refractory refreshes
-  // it — the landmark is the START of a feast, never every course of it.
-  if (bite > 0.55 && e.radius > 1.1) {
-    if (kitCd <= 0) {
-      kitCd = 1.6;
-      hitStop(0.055 + 0.05 * bite);
-      camPunch(1.2 + 1.8 * bite);
-      fx.kick(dx, dz, 2.5 + 3.5 * bite);
-      _dbg.__kickN = (_dbg.__kickN ?? 0) + 1;   // instrumentation: qa/_kickrate.mjs
-    } else {
-      kitCd = Math.max(kitCd, 0.6);
-    }
-  }
+  // THE FORM THIS MEAL EARNED, read HERE, on the grown radius: the growth
+  // law's rate limiter sets the radius back to lastR + maxStep at the top of
+  // the next frame, so by the swallow this bump is gone and the radius can no
+  // longer say which form the bite earned. A form above everything shown or
+  // owed waits for this meal's swallow (see evoHold); only the first bite into
+  // a form is held for it, so a spree cannot keep pushing the form back.
+  evoHold.bite(e, stageFor(voidling.radius), curStage, bestStage);
+  // (the lunge and the landmark kit — hit-stop, lens, recoil — are paid on the
+  // swallow now: biteGulps, below)
   combo++; comboT = 1.6;
   lastEatAt = tClock;   // the floor is gated on this — see FLOOR_FED
   if (combo > (stats.combo ?? 0)) { stats.combo = combo; saveStats(); }
@@ -9059,26 +9107,9 @@ function capture(e: Edible, giveHunger = true) {
   // remember the last meal so the news can report on it BY NAME
   lastMeal = MEAL_NAME[(e.mesh.userData.qk as string) ?? ''] ?? mealOf(e);
   if (giveHunger) hunger = Math.min(1, hunger + 0.03);
-  // THE BURST IS MADE OF WHAT WENT IN, and there is more of it for a bigger
-  // meal. Three particles was the same amount of spectacle for a traffic cone
-  // and a house; the count now rides the radius the way every other cue in the
-  // game does. Small things still fizz rather than explode — 4 at r0.5, 12 at
-  // the top of the range.
-  const tint = propTint(e.mesh);
-  spawnPuff(e.mesh.position.x, voidling.group.position.y, e.mesh.position.z,
-    Math.round(3 + Math.min(9, e.radius * 2.2)), tint);
-  // a building-sized bite lands with a ground shockwave + dust — seismic,
-  // but deliberately NO camera shake (kids found the shake unpleasant)
-  if (e.radius > 2) {
-    audio.voice('yum');
-    // …and the shockwave ring takes the prop's colour too, instead of the
-    // house violet it used whatever it had just flattened
-    // …and the ring that was here went with it: 39.2 a minute, 94% of them away
-    // from the void. The dust IS the shockwave — tinted with what went in, sized
-    // by the bite — and it does not outlive the moment by half a second on the
-    // floor behind a moving player.
-    spawnPuff(e.mesh.position.x, 0.5, e.mesh.position.z, e.radius > 4 ? 10 : 6, tint);
-  }
+  // (the burst, the dust and the 'yum' a building-sized bite gets are paid by
+  // the drain now — the voice as the meal starts to fall, the burst and the
+  // dust on the swallow: biteSinks and biteGulps, below)
   // graded by how big that was relative to us — and held open for longer than
   // the drain loop needs to carry it in. eatSeconds() is the inverse of the
   // rate at prototype3d's drain branch; the two must not drift apart.
@@ -9131,7 +9162,8 @@ function capture(e: Edible, giveHunger = true) {
   // above their staple food size, so the bar is "bigger than YOU" + a long
   // cooldown — a couple of CHOMPs a match, each one earned.
   // The cooldown is taken HERE, where the hat below reads it; the sound and
-  // the callout wait for the end of capture (see THE BITE'S SOUND, LAST).
+  // the callout wait for the meal to start falling (see THE BITE IS HEARD
+  // WHEN IT GOES IN, at the end of capture, and biteSinks).
   const headline = e.radius > voidling.radius && tClock > chompCd;
   if (headline) chompCd = tClock + 7;
   // ── THE HAT HAS OPINIONS ────────────────────────────────────────────────
@@ -9192,26 +9224,119 @@ function capture(e: Edible, giveHunger = true) {
   // no COPY row for this one: 'rv' is tagged on RV Row and nowhere else, so it
   // can only ever fire on GAME DAY. It should still sound like the booth.
   if (qk === 'rv' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🚐 A WHOLE MOTORHOME! Gone.'); breakingNews('A whole MOTORHOME, Bill. Somebody was living in that until Sunday.'); }
-  // ── THE BITE'S SOUND, LAST ──────────────────────────────────────────────
-  // After byPlayer and the tallies above, because those are what goalMet()
-  // reads for a SET or a LANDMARK: asked any earlier, the bite that meets the
-  // goal did not know it yet, played its crown, and the whistle landed a frame
-  // later on top of it. In the end beat the headline bite is a plain one —
-  // heard, not announced — and there is no crown (review logic-2).
+  // ── THE BITE IS HEARD WHEN IT GOES IN ───────────────────────────────────
+  // It used to be heard HERE, last in capture(), after byPlayer and the
+  // tallies above so that endBeat() — which reads them through goalMet() for a
+  // SET or a LANDMARK — already knew about the bite that meets the goal. It
+  // still has to know, and it still does: the question is now asked by
+  // biteSinks at the moment the sound actually plays, frames after the tallies
+  // and after the frame loop's goal check has had its turn. Everything the
+  // sound depends on is written down here, as it stands at the bite.
+  const pay: BitePay = { id: e.mesh.id, r: e.radius, cap: tClock, sink: -1, sndT: -1, snd: '', gulp: -1,
+    bite, vr: voidling.radius, combo, head: headline, kx: dx, kz: dz };
+  e.pay = pay;
+  biteLog.push(pay);
+  if (biteLog.length > 64) biteLog.shift();
+}
+
+/** THE SINK: the frame e.t crosses T_FALL and the meal starts to go down.
+ *  Called by the drain, once per bite; the swallow calls it first if a bite
+ *  ever reaches it unpaid. */
+function biteSinks(e: Edible, pay: BitePay) {
+  pay.sink = tClock;
+  // ── THE END BEAT IS ASKED NOW, NOT AT THE BITE ────────────────────────
+  // In the end beat the headline bite is a plain one — heard, not announced —
+  // and there is no crown (review logic-2): the whistle owns that moment. The
+  // question is asked HERE because this is when the sound plays. A meal taken
+  // a few frames before the bite that meets the goal is still up at the rim
+  // when the whistle blows and starts falling inside the outro; asked at its
+  // own capture it was told "not the end", and it would play its CHOMP or its
+  // crown over the whistle (qa/endbeat.mjs (a)).
   const beat = endBeat();
+  // a building-sized meal says 'yum' as it goes down — but not over the
+  // whistle. On the capture frame it could only land a frame before it; on
+  // the sink, with the outro running the drain at 0.3x, it lands inside it.
+  if (pay.r > 2 && !beat) audio.voice('yum');
   floatPos.set(e.mesh.position.x, voidling.radius + 2, e.mesh.position.z);
-  if (headline && !beat) {
-    bubbles.float(floatPos, 'CHOMP!', true); audio.chomp(e.radius, voidling.radius, 'prop', combo); buzz(30);
-  } else if (headline) { audio.chomp(e.radius, voidling.radius, 'prop', combo, true); buzz(15); }
-  else { audio.pop(combo, e.radius, voidling.radius); buzz(e.radius > 2 ? 15 : 8); }
+  if (pay.head && !beat) {
+    bubbles.float(floatPos, 'CHOMP!', true); audio.chomp(pay.r, pay.vr, 'prop', pay.combo); buzz(30); pay.snd = 'chomp';
+  } else if (pay.head) { audio.chomp(pay.r, pay.vr, 'prop', pay.combo, true); buzz(15); pay.snd = 'plain'; }
+  else { audio.pop(pay.combo, pay.r, pay.vr); buzz(pay.r > 2 ? 15 : 8); pay.snd = 'pop'; }
+  pay.sndT = tClock;
+  // The pop's pitch is the link THIS bite was (pay.combo), so the ladder now
+  // climbs in the order meals go DOWN, not the order they were taken: a crumb
+  // drains faster than a meal, so a crumb taken just after a meal can sink
+  // first and sound the higher link ahead of the lower one. Left so: the
+  // crown below must name the link the bite was, and one counter serves both.
   // The decimal 'COMBO ×1.5' that stood here is gone: a six-year-old does not
   // read a decimal. The chain is counted in NOMS instead, on the pill, and
-  // every tenth link is a crown she can hear.
-  if (combo % 10 === 0 && !beat) {
+  // every tenth link is a crown she can hear — the link THIS bite was, not
+  // wherever the chain has got to by the time it falls.
+  if (pay.combo % 10 === 0 && !beat) {
     nomAt.set(voidState.x, voidling.radius + 3.6, voidState.z);
-    bubbles.float(nomAt, `${combo} NOMS!`, true, true);
-    audio.nomCrown(combo); buzz(25);
+    bubbles.float(nomAt, `${pay.combo} NOMS!`, true, true);
+    audio.nomCrown(pay.combo); buzz(25);
   }
+}
+
+/** THE SWALLOW: the frame the drain lets go of the meal. The world stops for a
+ *  big one, the burst comes out of the mouth, and the blob lunges. */
+function biteGulps(e: Edible, pay: BitePay) {
+  pay.gulp = tClock;
+  const p = e.mesh.position;
+  // …and the blob LUNGES past its new size rather than easing to it
+  voidling.impulse(Math.min(2.2, pay.r * 0.9));
+  // THE WORLD STOPS for a big one. Gated at 0.55 so it is a landmark event,
+  // never a hoover spree, and hitStop() carries its own cooldown as well.
+  // MEASURED, NOT ASSUMED (qa/_kickrate.mjs, child driver, 60s of play):
+  // the ratio gate alone fired this kit 141 times/min on Lantern — 2.3
+  // shakes a SECOND, the owner's "screen is shaking a ton" — because at
+  // small radius in the densest market half of everything is bite > 0.55.
+  // Maple ran 33/min, which is why nobody reported it there first. Landmark
+  // now means all three of: a big RELATIVE bite, a big ABSOLUTE meal (a
+  // stall, a person — never a soup bowl at toddler size), and at least 0.9s
+  // of wall time since the last one. hitStop rides the same gate: its own
+  // 0.35s cooldown still allowed a rubber-band stutter at hoover pace.
+  // ROUND TWO OF THE DIAL (owner: "the shake is still happening for every
+  // level... it's bad"): the first pass cut the RATE 141→19/min on Lantern
+  // and the owner still felt it — so amplitude and cadence both halve. A
+  // landmark is now a big bite of something genuinely large (absolute floor
+  // 1.1), at most every 1.6 seconds, at half the old punch. The lens
+  // (camPunch) counts as shake too: rapid FOV pumping reads as wobble even
+  // with the camera still. A qualifying bite during the refractory refreshes
+  // it — the landmark is the START of a feast, never every course of it.
+  // Those rates were taken with the kit on the capture frame; the gate and
+  // the cooldown are unchanged, and the kit now fires on the swallow instead.
+  // `bite` is the grade AT CAPTURE (pay.bite): by the swallow the void has
+  // already grown on this meal, and every later one.
+  if (pay.bite > 0.55 && pay.r > 1.1) {
+    if (kitCd <= 0) {
+      kitCd = 1.6;
+      hitStop(0.055 + 0.05 * pay.bite);
+      camPunch(1.2 + 1.8 * pay.bite);
+      fx.kick(pay.kx, pay.kz, 2.5 + 3.5 * pay.bite);
+      _dbg.__kickN = (_dbg.__kickN ?? 0) + 1;   // instrumentation: qa/_kickrate.mjs
+    } else {
+      kitCd = Math.max(kitCd, 0.6);
+    }
+  }
+  // THE BURST IS MADE OF WHAT WENT IN, and there is more of it for a bigger
+  // meal. Three particles was the same amount of spectacle for a traffic cone
+  // and a house; the count now rides the radius the way every other cue in the
+  // game does. Small things still fizz rather than explode — 4 at r0.5, 12 at
+  // the top of the range. It rises from where the meal went, which on the
+  // swallow is the mouth.
+  const tint = propTint(e.mesh);
+  spawnPuff(p.x, voidling.group.position.y, p.z, Math.round(3 + Math.min(9, pay.r * 2.2)), tint);
+  // a building-sized bite lands with a ground shockwave + dust — seismic,
+  // but deliberately NO camera shake (kids found the shake unpleasant)
+  // …and the shockwave ring takes the prop's colour too, instead of the
+  // house violet it used whatever it had just flattened
+  // …and the ring that was here went with it: 39.2 a minute, 94% of them away
+  // from the void. The dust IS the shockwave — tinted with what went in, sized
+  // by the bite — and it does not outlive the moment by half a second on the
+  // floor behind a moving player.
+  if (pay.r > 2) spawnPuff(p.x, 0.5, p.z, pay.r > 4 ? 10 : 6, tint);
 }
 
 // converging suck streaks — sells the "vacuum" on GULP / COLLAPSE
@@ -11013,6 +11138,10 @@ function validateWorld() {
     if (started && e.mesh.visible) { spawnPuff(e.mesh.position.x, 0.6, e.mesh.position.z, 5); }
     setShadowInstance((e.mesh.userData.shIdx as number) ?? -1, false);   // and its shadow
     scene.remove(e.mesh);
+    // Taken out of `edibles` mid-drain, a meal is never swallowed: the drain
+    // walks `edibles`. Its growth was booked at capture, so a form it earned
+    // is owed now rather than held until the end beat lets go.
+    if (e.eaten) evoHold.down(e);
     edibles.splice(cull[k], 1);
   }
   if ((moved || cull.length || cleared) && !_validated) console.info(`[world] placement sweep: ${moved} nudged off roads, ${cull.length} retired (${settleStat.inside} inside a solid, ${settleStat.through} through another, ${settleStat.doorstep} on a doorstep; settle ${settleStat.ms}ms over ${settleStat.feet} footprints), ${cleared} cleared from the spawn shot`);
@@ -11162,6 +11291,10 @@ function resetMatch() {
     // survived every single-match playtest — on the world the store screenshots
     // are shot from. Rivals eat by the same rule with no mover exclusion, so it
     // did not even need the player to be near the rail.
+    // A bite still owed from the last match — a meal in the air when it ended —
+    // is not paid in this one, retired or not: the drain carries on with any
+    // edible left eaten, and it would sound on the new match's clock.
+    e.pay = undefined;
     if (e.mesh.userData.retired) { e.mesh.visible = false; if (e.mesh.parent) scene.remove(e.mesh); continue; }
     e.eaten = false; e.t = 0;
     e.mesh.userData.eaten = false;
@@ -11183,7 +11316,7 @@ function resetMatch() {
   // matchLen further down, so pass the length it is ABOUT to choose — reading
   // the live one here would scale the new match's joins to the old match's clock.
   rivals.reset(soloFor(soloWanted) ? 120 : MATCH_LEN);
-  curStage = 0; bestStage = 0; evolveCeremonies = 0;
+  curStage = 0; bestStage = 0; evolveCeremonies = 0; evoHold.clear();
   voidling.setStage(0); voidling.setRadius(START_R);
   // FIXED START, deliberately. A replay review argued for randomising this —
   // every match opening on the same twenty seconds is real repetition — but the
@@ -14375,6 +14508,12 @@ function animate() {
       const y0 = e.dropY ?? p.y;
       const f = e.t <= T_FALL ? 0 : (e.t - T_FALL) / (1 - T_FALL);
       p.y = y0 + (-R * 0.55 - y0) * f * f;
+      // …and THAT is when the bite is heard. The first frame f is above zero is
+      // the first frame this line moves the meal off the height it was taken
+      // from, so the sound, the voice, the buzz and the crown land on the frame
+      // a child first sees it drop, and not 159-288 ms of world time before it
+      // (the arithmetic is at BitePay; qa/bitetime.mjs reads it off the mesh).
+      if (e.pay && e.pay.sink < 0 && f > 0) biteSinks(e, e.pay);
       // ── AND THE SWITCH REACHES THE EAT AT LAST ───────────────────────────
       // reduceMotion() is honoured in seven places in this file and NOT ONE of
       // them is between capture() and the end of this loop — so a child whose
@@ -14411,6 +14550,13 @@ function animate() {
       const k = e.t < T_DROP ? 1 : Math.max(0, 1 - (e.t - T_DROP) / (1 - T_DROP));
       e.mesh.scale.set(e.homeScale.x * k, e.homeScale.y * k, e.homeScale.z * k);
       if (e.t >= 1) {
+        // THE SWALLOW PAYS the rest of what capture() wrote down: the world
+        // stops, the burst, the lunge. Cleared first, so it is paid once.
+        const pay = e.pay;
+        if (pay) { e.pay = undefined; if (pay.sink < 0) biteSinks(e, pay); biteGulps(e, pay); }
+        // …and a form this meal earned is owed from this frame; the ceremony
+        // block below, later in the same frame, shows it
+        evoHold.down(e);
         // the puff marks where the THING went, not where the void is standing
         spawnPuff(p.x, Math.max(0.2, cy * 0.4), p.z, 6);
         scene.remove(e.mesh); e.eaten = false;
@@ -14477,9 +14623,15 @@ function animate() {
   }
 
   const pa = puffGeo.attributes.position as THREE.BufferAttribute;
+  // ON WORLD TIME. hitStop()'s own comment lists the particles among what the
+  // freeze holds, and this loop ran on dt, so they never held: now that the
+  // freeze lands on the swallow, on the very frame the burst comes out of the
+  // mouth, a burst that kept flying through it would be the one thing in the
+  // world not stopped. On dtw it holds with everything else, and it slows with
+  // the outro's 0.3x push-in the way the rest of the world does.
   for (let i = 0; i < PUFF; i++) if (puffLife[i] > 0) {
-    puffLife[i] -= dt; puffVel[i].y -= dt * 14;
-    puffPos[i * 3] += puffVel[i].x * dt; puffPos[i * 3 + 1] += puffVel[i].y * dt; puffPos[i * 3 + 2] += puffVel[i].z * dt;
+    puffLife[i] -= dtw; puffVel[i].y -= dtw * 14;
+    puffPos[i * 3] += puffVel[i].x * dtw; puffPos[i * 3 + 1] += puffVel[i].y * dtw; puffPos[i * 3 + 2] += puffVel[i].z * dtw;
     // fade the last 180ms to black — under additive blending that is an alpha
     // fade, so no spark ever blinks out at full brightness again
     const f = Math.min(1, puffLife[i] / 0.18);
@@ -14818,8 +14970,28 @@ function animate() {
     audio.setMusicStage(MENU_VSTAGE);
   } else {
   // evolution: form change on growth (with a flash), plus ring/glow via setStage
-  const ns = _forceEvolve ? Math.min(FORMS.length - 1, curStage + 1) : stageFor(voidling.radius);
-  if (_forceEvolve) _forceEvolve = false;
+  const forced = _forceEvolve;
+  if (forced) _forceEvolve = false;
+  // ── …WHEN THE MEAL THAT EARNED IT IS DOWN ─────────────────────────────
+  // The form is the radius's own, or the form a swallowed bite earned at its
+  // capture, whichever is higher — never above a form whose meal is still in
+  // the drain (proto3d/evohold.ts). The earned form is the one that counts:
+  // the growth law's rate limiter sets the radius back to lastR + maxStep on
+  // the frame after the bite, so reading the radius alone here let go of the
+  // hold with no ceremony at all (qa/evohold.mjs: in each of its ten cases
+  // with the limiter on, the radius was back under the threshold by the
+  // swallow). This block runs after the drain in the
+  // same frame, so the form lands on the frame the meal that earned it is
+  // swallowed. Two things do not wait: __forceEvolve (qa/juice.mjs (b) forces
+  // a form through here and gives the face three frames to answer it), and the
+  // end beat, which owes every held form at once — the outro slows the drain
+  // to 0.3x and ends the match two seconds on, and a meal still in the air
+  // then would either keep the new form off the results card or, let go after
+  // it, play the ceremony over the card; in the end beat the form changes at
+  // once and evolve() stays silent, as it did before the hold. While the match
+  // is paused the drain is paused too, so the hold waits with it.
+  const earned = evoHold.due(stageFor(voidling.radius), curStage, bestStage, endBeat());
+  const ns = forced ? Math.min(FORMS.length - 1, curStage + 1) : earned;
   if (ns > curStage) {
     curStage = ns;
     // Recovering to a form you have already reached is not an evolution. See
