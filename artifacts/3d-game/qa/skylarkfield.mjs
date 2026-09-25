@@ -1,4 +1,5 @@
-// SKYLARK FIELD — IS THERE SOMETHING TO EAT EVERYWHERE, OR ONLY IN THE MIDDLE?
+// BELLCLOUD HEIGHTS (world 6, internal id 'skylark') — IS THERE SOMETHING TO
+// EAT EVERYWHERE, DOES THE GROUND READ AS CLOUD, AND IS THE GREAT BELL THE HERO?
 //
 // The owner, 2026-09-24: "Skylark needs work. Item placement is like all just
 // in the middle." He was reading the island the way a child crosses it, and no
@@ -8,18 +9,24 @@
 // three runway arms, the perimeter and the rough asked for grass and got grass.
 // Asked-against-placed is green on a level whose food is all in one place.
 //
+// Then, 2026-09-25, the re-theme (docs/BELLCLOUD.md): "What if we did something
+// like ... a cloud level, like there's clouds or something on the ground as
+// texture. And then there's like some old style castles ... And the center
+// could be like a giant bell." The airfield became a kingdom on the clouds.
+//
 // So this reads the LIVE page's edibles (after the boot sweep, the world a
 // child plays) and lays a grid over the island's own coast, loaded through
 // vite's SSR transform as qa/skyland.mjs does, so the regions and the strips
 // are the game's own functions and not a copy of them. For every land cell it
-// asks: is there something to eat near here, at each size?
+// asks: is there something to eat near here, at each size? And it measures its
+// own play frames for the cloud ground and the light (BELLCLOUD §4).
 //
 //   node qa/skylarkfield.mjs <port> [--out=dir] [--tag=name] [--world=skylark]
 //   node qa/skylarkfield.mjs --from=<out>/<tag>.json      re-grade a saved run
 //
 // --world=maple photographs Maple's spawn with the same camera and measures the
-// frame the same way — the daylight reference the sunrise is compared against.
-// It skips the coverage bars, which are Skylark's.
+// frame the same way — the daylight reference the light is compared against.
+// It skips the coverage bars, which are this world's.
 //
 // "NEAR" IS THE PLAY FRAME, MEASURED. The settled camera at r 4 is projected
 // onto y = 0 on every run (the frame's four corners), and a prop is near a
@@ -30,9 +37,52 @@
 // prop off the top of the screen "in frame". Equal area is the one radius that
 // is neither, and it moves with the camera if the camera ever moves.
 //
-// THE CELL IS 60 WORLD UNITS (3 scene units). The live runway and the launch
-// circle are not graded: the strip is the level's sightline and is kept clear
-// by design, and the circle is the whale's authored precinct.
+// THE CELL IS 60 WORLD UNITS (3 scene units). The live strip (the Grand
+// Avenue) and the circle (the Bell Plaza) are not graded: the avenue is the
+// level's sightline and is kept clear by design, and the plaza is the Great
+// Bell's authored precinct.
+//
+// ── RETRACTIONS (GOVERNOR rule 3b), 2026-09-25 ─────────────────────────────
+// Two of the first version's bars and one of its metrics measured the airfield
+// the owner has now replaced, and on the kingdom they would move for the wrong
+// reason. They are retired here, in writing, with what they measured:
+//
+//   A — "an ENVELOPE within the frame radius from 60% of each part, 80% of the
+//       island". It measured whether a balloon was in sight, because on the
+//       airfield balloons were the only big meal. On the kingdom the gardens
+//       hold cottages, turrets and bell shrines, and the balloons have gone to
+//       the edge on purpose (visitors docking). An island full of castles would
+//       FAIL A while being exactly what the owner asked for. A' asks the
+//       question A was standing in for: is a BIG MEAL (eat radius >= 2.5 — a
+//       cottage, a turret, the Keep, a gate, a wall, a balloon) in frame from
+//       everywhere?
+//   C — "standing envelopes are at least a quarter of ALL envelopes". It
+//       measured whether the launch field read as a balloon meet. The field is
+//       gardens now; C' asks whether the balloons that remain are where the
+//       poster puts them (docked along the edge and at the Balloon Dock) and
+//       whether a quarter of those stand.
+//   the GRASS statistics (share, saturation and luma of green-dominant pixels)
+//       — on a white-lilac cloud ground "green-dominant" selects the mint
+//       garden tint and the cloud trees, not the ground. They are replaced by
+//       the CLOUD metric: HSV saturation <= 0.20 and luma >= 0.60.
+//
+// ── THE BARS (BELLCLOUD §4 and §10.1) ──────────────────────────────────────
+//   A' a big meal (r >= 2.5) within the frame radius of >= 60% of each part's
+//      cells and >= 80% of the island's.
+//   B  a mid-size meal (1 <= r < 3) within it of >= 50% per part, 70% island.
+//   C' >= 24 flyable balloons (stage 1-3: spilled, cold, standing) on the
+//      island; >= 60% of them in the Balloon Dock ('arrivals') or within 1,200
+//      world units of the coast; >= 25% of them standing.
+//   D  on this probe's own four play frames: L1 the spawn frame's mean luma
+//      0.60-0.72 (Maple's recorded 0.553 plus 0.05-0.17: brighter than a green
+//      town, short of the white stone merging into the ground); L2 the cloud
+//      pixels' median luma 0.74-0.86 in every frame; L3 no frame with more than
+//      2% of its pixels at any channel >= 250 (white must not blow out); and
+//      cloud pixels >= 45% of every frame (the ground reads as cloud).
+//   E  exactly one static edible tagged landmark 'great bell', within 60 world
+//      units of the plaza centre (6107, 4349), with an eat radius >= every
+//      other static edible's — so beginMatch's heroProp (the largest radius)
+//      resolves to it.
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 
 const argv = process.argv.slice(2);
@@ -46,14 +96,20 @@ const SEED = process.env.SEED ? Number(process.env.SEED) : 7;   // pinned, as qa
 
 // ── THE VIEWS. Fixed world points, one per part of the island the owner said
 // was empty, plus the spawn. Chosen off skylark.ts's geometry, not off any
-// build: every one is on grass, clear of 03/21 and the perimeter, so the same
-// four frames can be shot on any layout.
+// build: every one is on open ground, clear of the Grand Avenue (03/21) and the
+// Rainbow Ring, so the same four frames can be shot on any layout — which is
+// what lets the owner's sheet put the airfield and the kingdom side by side.
 const VIEWS = WORLD === 'skylark' ? [
-  ['spawn', null],                // the arrivals hardstanding — the first frame
-  ['northarm', [6000, 3000]],     // between the 03 and 15 thresholds, inside the track
-  ['westshoulder', [3500, 6500]], // west of 03/21, north of the 21 threshold
-  ['southwestarm', [3200, 7700]], // the 21 arm, beside the live strip
+  ['spawn', null],                // the Balloon Dock — the first frame
+  ['northarm', [6000, 3000]],     // between the 03 and 15 ends, inside the ring
+  ['westshoulder', [3500, 6500]], // west of the Grand Avenue, north of its 21 end
+  ['southwestarm', [3200, 7700]], // the 21 arm, beside the avenue
 ] : [['spawn', null]];
+
+/** one frame's measurements on one line, for the shoot and the grade alike */
+const frameLine = (f) => f.cloudShare === undefined
+  ? `luma ${f.luma.toFixed(3)}  sat ${f.sat.toFixed(3)}  (saved before the cloud metric existed; re-shoot it)`
+  : `luma ${f.luma.toFixed(3)}  sat ${f.sat.toFixed(3)}  cloud ${(f.cloudShare * 100).toFixed(1)}% of frame, median luma ${f.cloudLuma.toFixed(3)}  blown ${(f.blownShare * 100).toFixed(2)}%`;
 
 const raw = FROM ? JSON.parse(readFileSync(FROM, 'utf8')) : await shoot();
 if (raw.world !== 'skylark') process.exit(0);
@@ -92,7 +148,7 @@ async function shoot() {
     .map((e) => {
       const u = e.mesh.userData;
       return { x: +e.mesh.position.x.toFixed(3), z: +e.mesh.position.z.toFixed(3), r: e.radius,
-        stage: u.balloon ? u.balloon.stage : -1, kind: u.kind || '', qk: u.qk || '' };
+        stage: u.balloon ? u.balloon.stage : -1, kind: u.kind || '', qk: u.qk || '', lm: u.landmark || '' };
     }));
   const movers = await p.evaluate(() => window.__edibles.filter((e) => e.mesh && e.mesh.userData.mover).length);
   console.log(`${WORLD.toUpperCase()} — ${props.length} static edibles and ${movers} movers on the page after the boot sweep (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
@@ -175,20 +231,25 @@ async function shoot() {
     const path = `${OUT}/${TAG}_${name}.png`;
     await p.screenshot({ path });
     const img = PNG.sync.read(readFileSync(path));
-    // mean Rec.709 luma over the frame, mean HSV saturation over the frame,
-    // and the same over GRASS — the pixels whose largest channel is green —
-    // which is the ground this whole item is about
-    let n = 0, Y = 0, S = 0, gn = 0, gS = 0, gY = 0;
+    // mean Rec.709 luma and HSV saturation over the frame; the CLOUD pixels
+    // (saturation <= 0.20 and luma >= 0.60, BELLCLOUD L2), their share of the
+    // frame and their median luma; and the BLOWN pixels, any channel >= 250 (L3)
+    let n = 0, Y = 0, S = 0, blown = 0;
+    const cloudY = [];
     for (let i = 0; i < img.data.length; i += 4) {
-      const r = img.data[i] / 255, g = img.data[i + 1] / 255, bl = img.data[i + 2] / 255;
+      const R8 = img.data[i], G8 = img.data[i + 1], B8 = img.data[i + 2];
+      const r = R8 / 255, g = G8 / 255, bl = B8 / 255;
       const mx = Math.max(r, g, bl), mn = Math.min(r, g, bl), s = mx > 0 ? (mx - mn) / mx : 0;
       const y = 0.2126 * r + 0.7152 * g + 0.0722 * bl;
       n++; Y += y; S += s;
-      if (g >= r && g >= bl && mx > 0.08) { gn++; gS += s; gY += y; }
+      if (s <= 0.20 && y >= 0.60) cloudY.push(y);
+      if (R8 >= 250 || G8 >= 250 || B8 >= 250) blown++;
     }
-    const f = { view: name, luma: Y / n, sat: S / n, grassShare: gn / n, grassSat: gn ? gS / gn : 0, grassLuma: gn ? gY / gn : 0 };
+    cloudY.sort((a, c) => a - c);
+    const f = { view: name, luma: Y / n, sat: S / n, cloudShare: cloudY.length / n,
+      cloudLuma: cloudY.length ? cloudY[Math.floor(cloudY.length / 2)] : 0, blownShare: blown / n };
     frames.push(f);
-    console.log(`  frame ${name.padEnd(13)} luma ${f.luma.toFixed(3)}  sat ${f.sat.toFixed(3)}  grass ${(f.grassShare * 100).toFixed(1)}% of frame, sat ${f.grassSat.toFixed(3)}, luma ${f.grassLuma.toFixed(3)}`);
+    console.log(`  frame ${name.padEnd(13)} ${frameLine(f)}`);
   }
   await b.close();
   console.log(`  play frame shows ${fp.across?.toFixed(0)} world units across, ${fp.along?.toFixed(0)} along, ${(fp.area / 1e6).toFixed(3)}M square units (settled, r 4)`);
@@ -205,9 +266,9 @@ async function grade(raw) {
   const W = raw.props.map((q) => ({ ...q, wx: q.x / 0.05 + 6000, wy: q.z / 0.05 + 6000 }));
 
   /** which part of the island a point is in. The districts are skRegionAt's
-   *  own; the strips and the track are split off the rough by distance,
-   *  because the owner's complaint was the arms and the ring, and those are
-   *  lines, not polygons. The disused slabs count as shoulder. */
+   *  own; the strips and the ring are split off the meadows by distance,
+   *  because the owner's first complaint was the arms and the ring, and those
+   *  are lines, not polygons. The Old Stone Ways count as shoulder. */
   const partOf = (x, y) => {
     const d = SK.skRegionAt(x, y);
     if (!d) return null;
@@ -222,7 +283,8 @@ async function grade(raw) {
     ['any', () => true],
     ['small r<1', (q) => q.r < 1],
     ['mid 1-3', (q) => q.r >= 1 && q.r < 3],
-    ['balloon', (q) => q.stage >= 0 && q.stage <= 3],
+    ['big r>=2.5', (q) => q.r >= 2.5],
+    ['balloon', (q) => q.stage >= 1 && q.stage <= 3],
     ['standing', (q) => q.stage === 3],
   ];
   // a bucket hash so 20,000 cells x 5,000 props is not 10^8 distance tests
@@ -248,10 +310,10 @@ async function grade(raw) {
     }
   }
   const fp = raw.footprint;
-  console.log(`\nSKYLARK FIELD — ${raw.tag}, SEED ${raw.seed}, ${raw.props.length} static edibles, ${raw.movers ?? '?'} movers`);
+  console.log(`\nBELLCLOUD HEIGHTS (skylark) — ${raw.tag}, SEED ${raw.seed}, ${raw.props.length} static edibles, ${raw.movers ?? '?'} movers`);
   console.log(`\nCOVERAGE — share of ${CELL}-unit land cells with an edible of that class within ${R} world units`);
   console.log(`  (${R} = the equal-area radius of the settled r-4 play frame: ${fp.across.toFixed(0)} across x ${fp.along.toFixed(0)} along, ${(fp.area / 1e6).toFixed(3)}M sq units;`);
-  console.log('   the live runway and the launch circle are kept clear by design and not graded)');
+  console.log('   the Grand Avenue and the Bell Plaza are kept clear by design and not graded)');
   console.log(`  ${'part'.padEnd(12)} ${'cells'.padStart(6)}  ${CLASSES.map(([n]) => n.padStart(11)).join('')}`);
   for (const k of [...PARTS, 'ALL']) {
     const c = cov[k];
@@ -268,7 +330,7 @@ async function grade(raw) {
     if (q.r < 1) row.small++; else if (q.r < 3) row.mid++; else row.big++;
     if (q.stage >= 0) row.st[q.stage]++;
   }
-  console.log('\nEDIBLES BY PART — size class by eat radius (small <1, mid 1-3, big >=3), and the envelopes by stage');
+  console.log('\nEDIBLES BY PART — size class by eat radius (small <1, mid 1-3, big >=3), and the balloons by stage');
   console.log(`  ${'part'.padEnd(12)} ${'all'.padStart(5)} ${'small'.padStart(6)} ${'mid'.padStart(5)} ${'big'.padStart(5)}   ${STAGES.map((s2) => s2.padStart(9)).join('')}`);
   const tot = { all: 0, small: 0, mid: 0, big: 0, st: [0, 0, 0, 0, 0] };
   for (const k of [...PARTS, 'runway', 'circle', 'off']) {
@@ -277,42 +339,57 @@ async function grade(raw) {
     console.log(`  ${k.padEnd(12)} ${String(r.all).padStart(5)} ${String(r.small).padStart(6)} ${String(r.mid).padStart(5)} ${String(r.big).padStart(5)}   ${r.st.map((v) => String(v).padStart(9)).join('')}`);
   }
   console.log(`  ${'TOTAL'.padEnd(12)} ${String(tot.all).padStart(5)} ${String(tot.small).padStart(6)} ${String(tot.mid).padStart(5)} ${String(tot.big).padStart(5)}   ${tot.st.map((v) => String(v).padStart(9)).join('')}`);
-  const nb = tot.st[0] + tot.st[1] + tot.st[2] + tot.st[3];
-  const ratio = tot.st.slice(0, 4).map((v) => (14 * v / Math.max(1, nb)).toFixed(1)).join(' : ');
-  console.log(`  stage ratio bagged : spilled : cold : standing, per 14 = ${ratio}  (${nb} envelopes)`);
-  for (const f of raw.frames) console.log(`  frame ${f.view.padEnd(13)} luma ${f.luma.toFixed(3)}  sat ${f.sat.toFixed(3)}  grass ${(f.grassShare * 100).toFixed(1)}% of frame, sat ${f.grassSat.toFixed(3)}, luma ${f.grassLuma.toFixed(3)}`);
 
-  // ══ THE BARS ═══════════════════════════════════════════════════════════
-  // Set from the complaint, on the build that has it, each with its reason:
-  //   A. A BALLOON IN FRAME FROM EVERYWHERE. Every graded part has an
-  //      envelope within the frame radius from at least 60% of its cells, and
-  //      the island from 80%. 60 is "most of it", with room left for the track
-  //      and the coast, which are ground a crew does not rig on.
-  //   B. SOMETHING MID-SIZED IN REACH EVERYWHERE — a bag, a trailer, a car
-  //      (eat radius 1-3) — at the same radius, 50% per part and 70% for the
-  //      island. The owner's "every size" is the whole ladder: an r-2 void
-  //      cannot eat an envelope and has outgrown a tussock. Lower than A
-  //      because mid-size things are furniture, and furniture clusters.
-  //   C. THE FIELD READS AS A BALLOON MEET: standing envelopes are at least a
-  //      quarter of all envelopes on the island.
+  // ── the flyable balloons (stage 1-3) and where they are ──────────────
+  const fly = W.filter((q) => q.stage >= 1 && q.stage <= 3 && SK.onSkylarkLand(q.wx, q.wy));
+  const edge = fly.filter((q) => SK.skRegionAt(q.wx, q.wy) === 'arrivals' || SK.distToEdge(q.wx, q.wy) <= 1200);
+  const standFly = fly.filter((q) => q.stage === 3);
+  const edgeShare = 100 * edge.length / Math.max(1, fly.length), standShare = 100 * standFly.length / Math.max(1, fly.length);
+  console.log(`  flyable balloons ${fly.length}: ${edge.length} (${edgeShare.toFixed(1)}%) at the Balloon Dock or within 1,200 of the coast, ${standFly.length} (${standShare.toFixed(1)}%) standing`);
+
+  // ── the landmark ──────────────────────────────────────────────────────
+  const bells = W.filter((q) => q.lm === 'great bell');
+  const others = W.filter((q) => q.lm !== 'great bell');
+  const biggest = others.reduce((m, q) => (q.r > m.r ? q : m), { r: 0, kind: '', lm: '' });
+  for (const q of bells) console.log(`  the Great Bell: r ${q.r} at (${q.wx.toFixed(0)}, ${q.wy.toFixed(0)}), ${Math.hypot(q.wx - 6107, q.wy - 4349).toFixed(1)} from the plaza centre`);
+  console.log(`  the largest other static edible: r ${biggest.r} (${biggest.lm || biggest.kind || biggest.qk || '?'})`);
+  for (const f of raw.frames) console.log(`  frame ${f.view.padEnd(13)} ${frameLine(f)}`);
+
+  // ══ THE BARS — see the header for each one's reason ════════════════════
   const fails = [];
   const pct = (k, i) => 100 * cov[k].hit[i] / Math.max(1, cov[k].cells);
-  const bi = CLASSES.findIndex(([n]) => n === 'balloon'), mi = CLASSES.findIndex(([n]) => n === 'mid 1-3');
+  const gi = CLASSES.findIndex(([n]) => n === 'big r>=2.5'), mi = CLASSES.findIndex(([n]) => n === 'mid 1-3');
   for (const k of PARTS) {
     if (!cov[k].cells) continue;
-    if (pct(k, bi) < 60) fails.push(`A ${k}: an envelope within ${R} of ${pct(k, bi).toFixed(1)}% of its cells (bar 60)`);
+    if (pct(k, gi) < 60) fails.push(`A' ${k}: a big meal (r >= 2.5) within ${R} of ${pct(k, gi).toFixed(1)}% of its cells (bar 60)`);
     if (pct(k, mi) < 50) fails.push(`B ${k}: a mid-size edible within ${R} of ${pct(k, mi).toFixed(1)}% of its cells (bar 50)`);
   }
-  if (pct('ALL', bi) < 80) fails.push(`A island: an envelope within ${R} of ${pct('ALL', bi).toFixed(1)}% of cells (bar 80)`);
+  if (pct('ALL', gi) < 80) fails.push(`A' island: a big meal within ${R} of ${pct('ALL', gi).toFixed(1)}% of cells (bar 80)`);
   if (pct('ALL', mi) < 70) fails.push(`B island: a mid-size edible within ${R} of ${pct('ALL', mi).toFixed(1)}% of cells (bar 70)`);
-  const standShare = 100 * tot.st[3] / Math.max(1, nb);
-  if (standShare < 25) fails.push(`C standing envelopes are ${standShare.toFixed(1)}% of ${nb} (bar 25)`);
+  if (fly.length < 24) fails.push(`C' ${fly.length} flyable balloons on the island (bar 24)`);
+  if (edgeShare < 60) fails.push(`C' ${edgeShare.toFixed(1)}% of the flyable balloons are at the Balloon Dock or within 1,200 of the coast (bar 60)`);
+  if (standShare < 25) fails.push(`C' ${standShare.toFixed(1)}% of the flyable balloons are standing (bar 25)`);
+  const spawn = raw.frames.find((f) => f.view === 'spawn');
+  if (!spawn || spawn.luma < 0.60 || spawn.luma > 0.72) fails.push(`D L1 spawn frame mean luma ${spawn?.luma.toFixed(3)} (bar 0.60-0.72)`);
+  for (const f of raw.frames) {
+    if (f.cloudShare === undefined) { fails.push(`D ${f.view}: no cloud metric in this run (re-shoot it)`); continue; }
+    if (f.cloudShare < 0.45) fails.push(`D ${f.view}: cloud pixels ${(f.cloudShare * 100).toFixed(1)}% of the frame (bar 45%)`);
+    if (f.cloudLuma < 0.74 || f.cloudLuma > 0.86) fails.push(`D L2 ${f.view}: cloud median luma ${f.cloudLuma.toFixed(3)} (bar 0.74-0.86)`);
+    if (f.blownShare > 0.02) fails.push(`D L3 ${f.view}: ${(f.blownShare * 100).toFixed(2)}% of pixels at a channel >= 250 (bar 2%)`);
+  }
+  if (bells.length !== 1) fails.push(`E ${bells.length} static edibles tagged 'great bell' (bar exactly 1)`);
+  else {
+    const q = bells[0], d = Math.hypot(q.wx - 6107, q.wy - 4349);
+    if (d > 60) fails.push(`E the Great Bell is ${d.toFixed(0)} from the plaza centre (bar 60)`);
+    if (q.r < biggest.r) fails.push(`E the Great Bell's r ${q.r} is under the largest other edible's r ${biggest.r} (${biggest.kind || biggest.qk}) — heroProp would not be the bell`);
+  }
 
   writeFileSync(FROM ? FROM.replace(/\.json$/, '.graded.json') : `${OUT}/${raw.tag}.graded.json`,
-    JSON.stringify({ R, coverage: cov, classes: CLASSES.map(([n]) => n), byPart, total: tot, standShare, fails }, null, 1));
+    JSON.stringify({ R, coverage: cov, classes: CLASSES.map(([n]) => n), byPart, total: tot,
+      flyable: fly.length, edgeShare, standShare, bells: bells.length, fails }, null, 1));
   console.log('');
   for (const f of fails) console.log(`  FAIL  ${f}`);
   console.log(fails.length ? `FAIL — skylarkfield: ${fails.length} bar(s) missed`
-    : 'PASS — skylarkfield: an envelope and a mid-size meal in frame from every part of the island, and a quarter of the envelopes standing');
+    : 'PASS — skylarkfield: a big and a mid-size meal in frame from every part of the kingdom, the balloons docked at the edge, a cloud ground in a bright day, and the Great Bell is the hero');
   return fails.length ? 1 : 0;
 }
