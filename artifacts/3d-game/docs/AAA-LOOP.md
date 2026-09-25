@@ -28,8 +28,8 @@ gate before `main`, no multi-round workflows for small things.
 
 | # | launch item | state |
 |---|---|---|
-| S-1 | Merge G5/G7/G8/G9 to main (push gate) and send him the review pack | in the gate |
-| S-2 | Five menu posters in Maple's floating-island style (Higgsfield credits approved) | generated 2026-09-24 on Maple's recipe (z_image, 3:4); his keep/redo per world, then wired into MENU_ART |
+| S-1 | Merge G5/G7/G8/G9 to main (push gate) and send him the review pack | merged 8f489ee; pack sent |
+| S-2 | Five menu posters in Maple's floating-island style (Higgsfield credits approved) | generated 2026-09-24 on Maple's recipe (z_image, 3:4); all five APPROVED by the owner (\"Images look great!\"); wiring into MENU_ART |
 | S-3 | Skylark, keep the theme and fix it: spread the field (everything sits in the central launch rows), brighter sunrise, more standing balloons, one landmark; his music | he sources the track |
 | S-4 | The hook: a 15-second store clip (the burp after eating the town) and App Store screenshots | |
 | S-5 | His calls on the burp (?burp=1), the kill beat (?killbeat=1), the after-bite squint (flat lines vs ^ ^), the too-big bonk rate | he reviews on Vercel once main moves |
@@ -191,6 +191,17 @@ bloom (0.2 / 0.1), postpipe's hero disc on his body, shippedlook's settled-aim
 bar. A first run was cut at step 14 by a container restart (13/13 passing to
 that point); the recorded run is the full re-run from the top.
 
+**Merged to main at 8f489ee (2026-09-25): research G5, G7, G8, G9.** Push gate
+72/73 in one run with the box to itself; the one miss, emitters, aborted on a
+missing stub for G5's voiced() tag in the world files (probe harness, not
+game). Stub added, and emitters re-run through the gate alone: PASS. No src
+changed between the gated commit (6c4feb6) and main. Before the gate, 15
+browser probes on the merged build all PASS (eatvoice, nowfood, nowfoodsound,
+timebeat, killbeat, savour, burp, endbeat, endparty, nomstream, juice,
+heromotion, dangerchannel, bitetime, chomp). The merge also fixed a push-gate
+probe no item had run: G9's comment quoted evoHold.due(), which evohold's
+wiring bar counts as text.
+
 **halocensus v2, and why v1 was retired.** v1 measured the RESULT — pixels
 bloom lifted by 3+ L* more than 16 px from a light — and condemned Lantern's
 lanterns (a lit table's haze reaches ~200 px, all 405 "hot" cells) while
@@ -211,11 +222,11 @@ Five research lenses (genre, retention, feel, audio, graphics) against a source 
 | G2 | OWNER | Pull out every calendar hook: missing a day costs nothing | PLAY | a day | OWNER DECISION — removes the daily streak and streak-gated skins he designed; the rule it enforces is the crew's, not his (see Fixed). Recommended: yes — his "come back and your void turns SHINY" survives as a count-up. |
 | G3 | P0 | The biggest bite makes the biggest sound: CHOMP and eating a rival | AUDIO | hours | **DONE** d529a31 — CHOMP −20.6 dB → +3.4 dB vs a big bite; rival +26.2 dB; 50 buffers → 1 (call sites land with G1) |
 | G4 | P1 | Every match ends as a party in the world, with its own whistle | CHOREOGRAPHY + AUDIO | a day | **DONE** aeffe9d, 7a7f7ef, 2a17344, 281c29a — qa/endparty.mjs before (pre-G4 build, instrumented): **8/8 BAD** — evolve() at both end doors; 'cruise' on a dot won from 3rd; 0 in-world confetti; 16 card confetti; lose() on a 3rd-place card; win+evolve 0 ms apart on the card. After: **8/8 PASS** — a whistle and no evolve at both doors; 'victory'; 140 confetti scraps before the card; 40 on it; no lose(); "finale then win, never two within 0.5 s". Per-world whistle + motif, ticks and bonk: qa/chomp.mjs parts 4-5 before BAD, after PASS. Frames read: qa/out/hudshots/maple-party.png. Not done from the spec: victoryHop (folds into G9, HERO). |
-| G5 | P1 | What you eat talks back | AUDIO | days | queued |
+| G5 | P1 | What you eat talks back | AUDIO | days | **DONE** da91d9b (merge) — nine eat voices (meep, wheee, baa, quack, crumble, rustle, crinkle, squeak, poof) under the pop, one per 0.35 s, alternating sides; the pop's transient varies, its note never does. qa/eatvoice.mjs: FAIL 20 of 21 on the instrumented pre-fix build, PASS 24 on the merge. Review caught Skylark's bagged balloons crumbling like houses (now squeak). Open: Maple says 5 of 6 voices, because its pond ducks never spawn (an older bug); owner's call. |
 | G6 | P1 | One number stream a child can read, and a chain she can see | UI | a day | **DONE** 796a246, aeffe9d, 4c11aa4 — qa/nomstream.mjs before (dist-base, Maple, 25-bite spree, probe counting only RISING floaters): **8/8 BAD** — 23 per-bite '+N', 5 decimal COMBO floaters, flights 20px→20px across banks 33→80, no crowns for a chain of 25, no cash-in, no pill, no chain sound, 0/2 flights in the beat colour. After: 7/8 — (a) 0 per-bite, (b) 0 decimal, (d) crowns 10, 20 for a chain of 27, (e) "27 NOMS! +464" 1.55 s after the last bite, (f) pill on 118/120 chain-5+ frames, 0 stray, 0 over the face, (g) 2 crowns + 1 cash-in heard, (h) 2/2 flights in the beat colour. (c) failed twice on FIXED size scales: the spec's formula 1.30x, a meal term on `bite` 1.13x (saturated: early in a match nearly every meal is "big" to him, so every number was 40px). Now sized against her own recent average bank: **(c) 20.0px → 34.4px = 1.72x across banks 39→104. PASS 8/8.** Chain sounds: qa/chomp.mjs part 3 before 3/3 BAD, after PASS. |
-| G7 | P1 | 'Now I can eat that!' is heard and seen | PLAY + AUDIO | days | queued |
-| G8 | P1 | Time, not the camera, sells the marquee moments | CHOREOGRAPHY | a day | queued |
-| G9 | P1 | Follow-through: he savours it, and the BURP OF CHAMPIONS finally exists | HERO | a day | queued |
+| G7 | P1 | 'Now I can eat that!' is heard and seen | PLAY + AUDIO | days | **DONE** e49a1a8 (merge) — outgrown sibling announced once (float, outgrow(), startled look, 'uh oh...'), un-gate wave with one class float and a sparkle, bonk(ratio) on a too-big prop. qa/nowfood.mjs PASS 16, qa/nowfoodsound.mjs PASS 7 on the merge. ringcount AWAY share: pre-fix windows alone ranged 15-29%, and G7 adds no ring. Owner to judge the bonk rate (39/min in a chase-heavy census). |
+| G8 | P1 | Time, not the camera, sells the marquee moments | CHOREOGRAPHY | a day | **DONE** 3fca2cb (merge) — ships ON: hero clock through a hit-stop, 60 ms ease out, flash governor, rival path's no-op shake/punch/kick and overwritten gold flash gone. Behind ?killbeat=1 for the owner: the kill's 0.14-0.16 s freeze, slow 0.25, dizzy pupils, one ray pulse; landmark/sticker/evolution/goal-met beats. qa/timebeat.mjs PASS on the merge; qa/killbeat.mjs sheets to the owner. |
+| G9 | P1 | Follow-through: he savours it, and the BURP OF CHAMPIONS finally exists | HERO | a day | **DONE** 842eb81 (merge) — ships ON: cheek puff, second gulp wobble, happy squint, G4's victoryHop. Behind ?burp=1 for the owner's ear: the burp (0.25 s, no partial under 120 Hz), once per 20 s, never over the whistle or a ceremony. qa/savour.mjs PASS 12, qa/burp.mjs PASS 7 on the merge. Owner art call: the squint as flat lines vs ^ ^. |
 | G10 | P1 | Anti-aliasing back on the two best rungs | LIGHT | hours | **DONE (Job 1, 2a17344; reopened by studio round 4 and closed the same day)** — bb1430b gave the composer a 4-sample scene target, but RenderPass draws into `readBuffer`, the composer starts with readBuffer = the 0-sample clone, and OutputPass swaps every frame: the scene alternated 4, 0, 4, 0 — a 30 Hz shimmer the probe passed, because bar (a) read renderTarget1.samples once. The 29.6% edge reading was a frame that happened to be multisampled. Fix: OutputPass `needsSwap = false`, readBuffer pinned to the multisampled target. Probe bar (a') records readBuffer.samples on six consecutive renders. Native AA reference on the same frame 32.9%; bar (b) 35% still unmet by MSAA alone (G10b). |
 | G10b | P2 | A post-process AA pass (SMAA) on the bloom rungs, if a real phone can pay for it | LIGHT | hours + a device | queued — cost unmeasurable here (no GPU); needs the TestFlight run |
 | G11 | P1 | The WORLD ENDER minute survives a phone: the crowd stops casting shadows | STATIC + MOTION | days | queued |
