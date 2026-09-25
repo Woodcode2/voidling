@@ -23,10 +23,32 @@
 //   (d) a crown at every tenth link the chain reached, and only there
 //   (e) exactly one 'N NOMS! +N' cash-in, within 1.8 s of the chain's last
 //       bite, naming the chain's own length
-//   (f) the NOMS pill is up whenever the chain is 5 or more, says the chain's
+//   (f) the NOMS badge is up whenever the chain is 5 or more, says the chain's
 //       length, wears the right tier, and never covers his face
 //   (g) the crowns and the cash-in are HEARD — the audio engine logged them
 //   (h) inside a beat window the flying number wears the beat's colour
+//   (i) the badge lives in a TOP CORNER and does not ride him: on every frame
+//       it is up, its centre is in the top tenth of the screen and the outer
+//       third of its width, it is wholly on screen with 8 px to spare, it is
+//       clear by 4 px of the clock's own glyphs, the coins and the pause
+//       button, and it does not move more than 1 px from where it first stood
+//   (j) the same corner at 430x932, 390x844 and 360x780 — the live page,
+//       resized mid-chain — and clear of the goal chip too (staged up for the
+//       one synchronous read, because this match is not a level)
+//
+// ── RETRACTED: (f)'s PLACEMENT HALF, AS FIRST WRITTEN ────────────────────────
+// Until 2026-09-25 (f) was this file's only placement bar, and all it asked of
+// the pill was "never covers his face" — the rule for something that sits
+// BESIDE him, which is where G6 put it (paintNoms placed it off the edge of his
+// disc every frame). It passed 8/8 on that build while the pill stood next to
+// the void on every chain frame of the spree. The owner, on his own recording
+// that day: "the noms on the side ... it's always there next to the void ... it
+// just takes real estate space. What if we put that on the top screen
+// somewhere, like in a corner". So the bar was grading the one thing the pill
+// must not do and nothing about where it should be, and the defect he reported
+// was invisible to it. The face half stays in (f), because a badge over his
+// face is still wrong; where the chain lives is (i) and (j) now, and "beside
+// the void" is exactly what they fail.
 //
 // Everything is keyed on __matchState().t. The software renderer here manages
 // about 0.04 match-seconds per wall-second, and the chain lapses on a 1.6 s
@@ -35,8 +57,11 @@
 import { chromium } from 'playwright';
 import { enterMatch } from './_enter.mjs';
 
-const PORT = process.argv[2] || '4177';
-const WORLD = process.argv[3] || 'maple';
+const POS = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const PORT = POS[0] || '4177';
+const WORLD = POS[1] || 'maple';
+/** --shot=<file.png>: a picture of the mid-chain frame at 430x932, for a person */
+const SHOT = (process.argv.find((a) => a.startsWith('--shot=')) || '').slice(7);
 const BITES = 25, GAP = 0.2, BIG_AT = new Set([8, 18]);
 
 const die = (m) => { console.log(`FAIL — ${m}`); process.exit(1); };
@@ -86,36 +111,123 @@ await p.evaluate(() => {
       },
     });
   });
+  // the HUD pieces the badge has to stay clear of, as they are drawn on this
+  // frame. #timer is a full-width line box (left: 0; right: 0), so its glyphs
+  // are read through a Range — the element's own rect would collide with
+  // anything anywhere in the top band.
+  const box = (e) => {
+    if (!e || !e.getClientRects().length) return null;
+    const cs = getComputedStyle(e);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) < 0.05) return null;
+    const r = e.getBoundingClientRect();
+    return r.width && r.height ? [r.left, r.top, r.right, r.bottom] : null;
+  };
+  const glyphs = (e) => {
+    if (!e || !box(e) || !e.firstChild) return null;
+    const rg = document.createRange(); rg.selectNodeContents(e);
+    const r = rg.getBoundingClientRect();
+    return r.width ? [r.left, r.top, r.right, r.bottom] : null;
+  };
+  window.__nsHud = () => ({ timer: glyphs(document.getElementById('timer')), coins: box(document.getElementById('coins')),
+    btnQuit: box(document.getElementById('btnQuit')), goal: box(document.getElementById('goal')) });
   const tick = () => {
     const s = ms();
     const pill = document.getElementById('noms');
-    let pv = false, ptxt = '', ptier = '', hit = false;
+    let pv = false, ptxt = '', ptier = '', hit = false, pr = null, po = null, hud = null;
     if (pill) {
       const cs = getComputedStyle(pill);
       pv = cs.display !== 'none' && cs.visibility !== 'hidden' && parseFloat(cs.opacity) > 0.05;
       ptxt = (pill.textContent || '').trim(); ptier = pill.dataset.tier || '';
       const fb = window.__formBox?.();
-      if (pv && fb && fb.on) {
+      if (pv) {
         const r = pill.getBoundingClientRect();
-        hit = r.left < fb.right && r.right > fb.left && r.top < fb.bottom && r.bottom > fb.top;
+        pr = [r.left, r.top, r.right, r.bottom];
+        // where it is LAID OUT, transforms aside: (i)'s "does not ride him" is
+        // about position, and a rect caught inside the badge's own entrance
+        // pop (a scale) would read as movement on a fast enough renderer
+        po = [pill.offsetLeft, pill.offsetTop];
+        hud = window.__nsHud();
+        if (fb && fb.on) hit = r.left < fb.right && r.right > fb.left && r.top < fb.bottom && r.bottom > fb.top;
       }
     }
-    L.fr.push({ t: s.t ?? 0, eaten: s.eaten ?? 0, combo: s.combo, fever: s.fever ?? 1, pv, ptxt, ptier, hit });
+    L.fr.push({ t: s.t ?? 0, eaten: s.eaten ?? 0, combo: s.combo, fever: s.fever ?? 1, pv, ptxt, ptier, hit,
+      pr, po, hud, W: innerWidth, H: innerHeight });
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
 });
 
+// ── WHERE THE BADGE STANDS, AGAINST WHAT IT MUST CLEAR ─────────────────────
+// One rule for (i) and (j), so the per-frame reading and the three-phone
+// reading cannot disagree about what "a top corner" means.
+const cornerFaults = (pr, hud, W, H) => {
+  const out = [];
+  if (!pr) return ['not on screen'];
+  const [l, t, r, bt] = pr;
+  const cx = (l + r) / 2, cy = (t + bt) / 2;
+  if (cy > 0.1 * H) out.push(`centre ${cy.toFixed(0)}px down (bar ${(0.1 * H).toFixed(0)})`);
+  if (cx > W / 3 && cx < (2 * W) / 3) out.push(`centre ${cx.toFixed(0)}px across — the middle third`);
+  if (l < 8 || t < 8 || r > W - 8 || bt > H - 8) out.push(`off the 8 px margin (${pr.map((v) => v.toFixed(0)).join(',')})`);
+  for (const [k, q] of Object.entries(hud || {})) {
+    if (!q) continue;
+    if (l < q[2] + 4 && r > q[0] - 4 && t < q[3] + 4 && bt > q[1] - 4) out.push(`within 4 px of #${k}`);
+  }
+  return out;
+};
+
 const now = () => p.evaluate(() => window.__matchState().t);
 const waitT = async (t) => { await p.waitForFunction((x) => window.__matchState().t >= x, t, { timeout: 900000, polling: 100 }); };
+
+// ── (j) THREE PHONES, ONE LIVE CHAIN ────────────────────────────────────────
+// The badge is read on the live page resized mid-chain, not on three fresh
+// matches: a chain is minutes of wall clock to build here, and what (j) asks —
+// where the corner is at each width — is a question for the stylesheet the
+// badge is laid out by, not for the chain. The goal chip is display:none on a
+// match nobody chose a dot for, so it is put up for the one synchronous read
+// (no frame can be drawn inside an evaluate) with a long value in it, and put
+// back exactly as it was.
+const VIEWS = [[430, 932], [390, 844], [360, 780]];
+const readPhones = async () => {
+  const out = [];
+  for (const [w, h] of VIEWS) {
+    await p.setViewportSize({ width: w, height: h });
+    out.push(await p.evaluate(() => {
+      const pill = document.getElementById('noms');
+      const cs = getComputedStyle(pill);
+      const on = cs.display !== 'none' && cs.visibility !== 'hidden' && parseFloat(cs.opacity) > 0.05;
+      const g = document.getElementById('goal');
+      const gl = g && g.querySelector('.gLabel'), gv = g && g.querySelector('.gVal');
+      const was = g ? { hidden: g.hidden, l: gl ? gl.textContent : null, v: gv ? gv.textContent : null } : null;
+      if (g && was.hidden) { g.hidden = false; if (gl) gl.textContent = 'EAT'; if (gv) gv.textContent = '12,345 / 30,000'; }
+      const r = pill.getBoundingClientRect();
+      const hud = window.__nsHud();
+      if (g && was.hidden) { g.hidden = true; if (gl) gl.textContent = was.l; if (gv) gv.textContent = was.v; }
+      return { on, pr: on ? [r.left, r.top, r.right, r.bottom] : null, hud, W: innerWidth, H: innerHeight,
+        combo: window.__matchState().combo, txt: (pill.textContent || '').trim() };
+    }));
+  }
+  await p.setViewportSize({ width: 430, height: 932 });
+  return out;
+};
 
 // ── THE SPREE ───────────────────────────────────────────────────────────────
 const t0 = await now();
 const meals = [];
+let phones = null;
 for (let i = 0; i < BITES; i++) {
   await waitT(t0 + i * GAP);
   const got = await p.evaluate((rel) => window.__eatNearest(rel) ?? window.__eatNearest(0.1), BIG_AT.has(i) ? 0.55 : 0.1);
   meals.push(got);
+  if (i === 11) {
+    phones = await readPhones();
+    if (SHOT) {
+      // one frame at 430x932 again before the picture, so the canvas is not
+      // the last size's frame stretched
+      const tc = await p.evaluate(() => window.__matchState().tClock);
+      await p.waitForFunction((x) => window.__matchState().tClock > x, tc, { timeout: 600000, polling: 100 });
+      await p.screenshot({ path: SHOT });
+    }
+  }
 }
 const spreeEnd = await now();
 const hasCombo = await p.evaluate(() => typeof window.__matchState().combo === 'number');
@@ -260,5 +372,41 @@ if (beat) {
     : `no flight landed inside "${beat.title}" — nothing to colour`);
 } else bar(false, 'h', 'no unfired beat left to force');
 
-console.log(bad ? `\nFAIL — ${bad} of 8 bar(s)` : '\nPASS — one stream, a chain she can see, and a cash-in when it ends');
+if (hasCombo) {
+  const shownR = chainFrames.filter((x) => x.pv && x.pr);
+  const faults = [];
+  const first = new Map();
+  let drift = 0;
+  for (const x of shownR) {
+    const k = `${x.W}x${x.H}`;
+    const at0 = x.po || x.pr;
+    if (!first.has(k)) first.set(k, at0);
+    const f0 = first.get(k);
+    drift = Math.max(drift, Math.abs(at0[0] - f0[0]), Math.abs(at0[1] - f0[1]));
+    const fl = cornerFaults(x.pr, x.hud, x.W, x.H);
+    if (fl.length) faults.push({ t: x.t, n: x.combo, fl });
+  }
+  const at = shownR.length ? shownR[0].pr.map((v) => v.toFixed(0)).join(',') : '—';
+  bar(shownR.length > 0 && faults.length === 0 && drift <= 1, 'i', shownR.length
+    ? `badge in a top corner on ${shownR.length - faults.length}/${shownR.length} frames it was up (first at ${at}), moved ${drift.toFixed(1)}px (bar 1)`
+      + (faults.length ? ` — e.g. chain ${faults[0].n}: ${faults[0].fl.join('; ')}` : '')
+    : 'the badge was never up, so there is no corner to grade');
+}
+
+{
+  const rows = phones || [];
+  const bits = [];
+  let nbad = rows.length === VIEWS.length ? 0 : 1;
+  for (const r of rows) {
+    const fl = r.on ? cornerFaults(r.pr, r.hud, r.W, r.H) : [`not up (chain ${r.combo})`];
+    if (!r.hud || !r.hud.goal) fl.push('the goal chip could not be put up to measure against');
+    if (fl.length) nbad++;
+    const room = r.pr && r.hud && r.hud.timer ? (r.pr[0] < r.hud.timer[0] ? r.hud.timer[0] - r.pr[2] : r.pr[0] - r.hud.timer[2]) : NaN;
+    const below = r.pr && r.hud && r.hud.goal ? r.hud.goal[1] - r.pr[3] : NaN;
+    bits.push(`${r.W}x${r.H} "${r.txt}" ${fl.length ? 'BAD: ' + fl.join('; ') : `ok, ${room.toFixed(0)}px to the clock, ${below.toFixed(0)}px above the goal chip`}`);
+  }
+  bar(nbad === 0, 'j', rows.length ? bits.join(' · ') : 'the three-phone read never ran');
+}
+
+console.log(bad ? `\nFAIL — ${bad} of 10 bar(s)` : '\nPASS — one stream, a chain she can see in its corner, and a cash-in when it ends');
 process.exit(bad ? 1 : 0);
