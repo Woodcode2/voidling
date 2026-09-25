@@ -861,6 +861,14 @@ const SUITE = [
     cmd: ['node', 'qa/skylarkfield.mjs', PORT, '--tag=gate'], verdict: pf,
     why: 'there is something to eat everywhere on Skylark, not only in the middle — an envelope and a mid-size meal in frame from every part of the island, and a quarter of the envelopes standing' },
 
+  // Ship mode, 2026-09-25: the owner's one-second freeze on Skylark. Counts
+  // every WebGL program linked after the first playable frame of a real match
+  // on the phone's path (poster menu, a touch to start). Live and quality until
+  // the lead has read two greens.
+  { id: 'shaderwarm', tier: 'feel', profiles: ['live', 'quality'], timeout: 4800,
+    cmd: ['node', 'qa/shaderwarm.mjs', PORT, 'skylark', 'maple'], verdict: pf,
+    why: 'no shader is compiled on first sight during play — every program a match needs (the family, every form, the effects, the end card) is linked before the first playable frame, so nothing new on screen can freeze the game' },
+
   // Research governor G5. Not in push until two greens: the lead promotes it.
   // Maple and Skylark because Skylark is the world whose census offers six
   // voices today and Maple is the world a first match is played on. Its
