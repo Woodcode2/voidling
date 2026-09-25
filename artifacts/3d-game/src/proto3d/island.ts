@@ -723,15 +723,18 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   // Powder keeps a hint of aurora rather than becoming one flat blue.
   const SKY_MOOD: Record<WorldId, { tint: string; tintA: number; fog: number; bgI: number }> = {
     maple:   { tint: '#7a4ad6', tintA: 0.00, fog: 0x1b1038, bgI: 0.55 },   // the reference violet — untouched
-    // SKYLARK FIELD at first light. Periwinkle, because that is what the west
-    // half of a dawn sky is and it is the colour every shadow on the field
-    // takes — the same physics alpine.ts's blue-shadow rule runs on. Held at
-    // 0.58 between Maple's 0.55 and Powder's 0.62: brighter than a night world,
-    // short of a noon one, which is exactly what the half hour before sunrise
-    // is. The apricot in this world is a THIN band on the east horizon and it
-    // belongs to the light rig, not to the sky tint — the moment apricot
-    // spreads into the tint this becomes Game Day's golden hour.
-    skylark: { tint: '#6478c8', tintA: 0.62, fog: 0x232a52, bgI: 0.58 },   // periwinkle, half an hour before the sun
+    // SKYLARK FIELD at SUNRISE — it was the half hour before one, periwinkle
+    // at 0.58, and the owner's poster for this world (approved 2026-09-24) is
+    // the sun up over bright grass under a lilac sky. So the tint warms from
+    // periwinkle to lilac, a little less of it (0.55) so the painting's own
+    // violet shows through as it does in Maple's untouched sky, and bgI moves
+    // to 0.64, just over Powder's 0.62: a morning, brighter than any dusk
+    // world. The fog lifts off navy to a dawn lilac-grey, so the far arms fade
+    // into morning haze instead of into night. The apricot is still a THIN
+    // band on the east horizon and it still belongs to the light rig, not to
+    // the tint — the moment apricot spreads into the tint this becomes Game
+    // Day's golden hour.
+    skylark: { tint: '#8c7fd6', tintA: 0.55, fog: 0x3a3a6c, bgI: 0.64 },
     pirate:  { tint: '#2f9fb5', tintA: 0.80, fog: 0x0e2237, bgI: 0.60 },   // sea-teal, daylit
     // GAME DAY WAS THE ONE WORLD NOBODY PHOTOGRAPHED, and it was the worst of
     // the five: flat bright magenta at the coast with not one star in it.

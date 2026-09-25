@@ -1937,24 +1937,39 @@ const WORLD_LIGHT: Record<WorldId, WorldLight> = {
   // whole-screen difference a stranger reads in the first second and no
   // repaint can fake.
   //
-  // It is also a LOW key: y=30 against everyone else's 72-96. The sun is not
-  // up yet, it is arriving, so the light comes across the field rather than
-  // down onto it and every mast, pole and standing envelope throws a shadow
-  // most of its own length. That is what half an hour before sunrise looks
-  // like and it is why the balloons read as objects sitting ON grass.
+  // It was also a LOW key: y=30 against everyone else's 72-96, the sun not up
+  // yet, the light coming across the field rather than down onto it.
   //
-  // hemiSky is periwinkle and hemiGround is wet grass, so the shadow side of
-  // everything is sky-coloured rather than grey — alpine.ts's blue-shadow rule,
-  // which is not a snow rule at all but a "the sky is the only other light"
-  // rule, and dawn is when it is most true. dusk 0.80 so the tower glazing,
-  // the van hatches, the runway edge lights still on from the night and every
-  // pilot flame are lit from frame one.
+  // …AND THAT IS WHY THE OWNER SAW GREY-GREEN GROUND. Flat grass takes the key
+  // by the sine of its elevation, and at y=30 over a 90.6 run that is 18
+  // degrees and 0.31 of the sun, where Maple's key at 54 degrees lands 0.81.
+  // The grass here is Maple's own meadow colour (dialled 0.55 to Maple's
+  // 0.62); it was the light that drained it. Measured with qa/skylarkfield.mjs from the settled r-4 camera, SEED 7:
+  // grass luminance 0.377 at the spawn against Maple's 0.626, the whole frame
+  // 0.371 against 0.553. His poster for this world is a sunrise, not the half
+  // hour before one — bright green grass and warm light.
+  //
+  // So the sun has come up: y=60 (33.5 degrees, 0.55 of the key on the flat),
+  // still keyed from the EAST so every shadow still rakes the other way and
+  // is still longer than its object; the key 1.50 -> 1.90 and the fill 0.55
+  // -> 0.62; and the hemisphere is applied (see HEMI_APPLIED) at 0.58 with a
+  // lilac-white dawn sky over lit grass instead of periwinkle over wet grass.
+  // Same shots after: grass 0.508 at the spawn, 0.534 on the north arm (was
+  // 0.405), frame 0.467 — lifted most of the way to Maple's noon and held
+  // short of it, because this is still a morning. The north arm's grass
+  // averages rgb(129,145,70) (was 90,113,48); the poster's greens average
+  // rgb(135,158,70). qa/halocensus.mjs's diffuse
+  // ceiling went 0.423 -> 0.669 against a bloom cut of 1.05, so no paint
+  // glows; the 'sun on the deck' hour (x1.18) has room too.
+  //
+  // dusk 0.80 so the tower glazing, the van hatches, the runway edge lights
+  // still on from the night and every pilot flame are lit from frame one.
   //
   // exposure 1.15, and the ceiling is the mascot's: above ~1.26 he stops being
   // one colour across the game, measured at 9.6 dE against a bar of 6.
-  skylark: { sun: 0xffc78e, sunI: 1.50, hemiSky: 0x9fb6e8, hemiGround: 0x6a7a68, hemiI: 1.05,
-             off: [78, 30, -46], dusk: 0.80, normalBias: 0.15, exposure: 1.15,
-             fill: 0x8fa8e4, fillI: 0.55, fillOff: [-70, 52, 40] },
+  skylark: { sun: 0xffc78e, sunI: 1.90, hemiSky: 0xe2d8f0, hemiGround: 0x7c8a5e, hemiI: 0.58,
+             off: [78, 60, -46], dusk: 0.80, normalBias: 0.15, exposure: 1.15,
+             fill: 0x8fa8e4, fillI: 0.62, fillOff: [-70, 52, 40] },
 };
 const LIGHT = WORLD_LIGHT[pickedWorld];
 
@@ -2086,7 +2101,9 @@ const HOURS: Record<WorldId, WorldHour[]> = {
  *  a no-op would make the column lie a second time, in the same way, while
  *  looking like it had been fixed. This set is byte-identical for five worlds
  *  and preserves what they asked for, for whoever dials them in next. */
-const HEMI_APPLIED = new Set<WorldId>(['maple']);
+// SKYLARK joined 2026-09-25 with a value measured for it (0.58, the sunrise
+// retune above) rather than the unread 1.05 its row used to carry.
+const HEMI_APPLIED = new Set<WorldId>(['maple', 'skylark']);
 const hemiNow = (): number => (HEMI_APPLIED.has(pickedWorld) ? LIGHT.hemiI : RIG.hemiI);
 /** The bloom threshold for this world at this hour: the world's cut scaled by
  *  the dealt hour's sun (paint is lit by it; a 1.1x morning lifts the white
