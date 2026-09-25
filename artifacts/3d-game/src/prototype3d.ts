@@ -9483,6 +9483,8 @@ interface BitePay {
 // the ceremony's smug face spends on it.
 const BURP_ON = (() => { try { return new URLSearchParams(location.search).get('burp') === '1'; } catch { return false; } })();
 const BURP_AFTER = 0.45, BURP_CD = 20, BURP_STREAK = 3, BURP_STREAK_WIN = 5, EVO_CLEAR = 1.8;
+/** BELLCLOUD HEIGHTS: the Great Bell's burp waits for its BONG to bloom */
+const BELL_BURP_AFTER = 1.6;
 /** world seconds until the owed burp starts; -1 when none is owed */
 let burpWait = -1;
 /** tClock before which no burp may be owed */
@@ -9936,6 +9938,17 @@ function biteSinks(e: Edible, pay: BitePay) {
     pay.said = said ?? '-';
     if (said) logAudio(`eat:${said}`);
   } else if (pay.vc) pay.said = '-';
+  // ── BELLCLOUD HEIGHTS: THE GREAT BELL GOES DOWN. The whole island hears a
+  // BONG on the drop (G8: the reward lands on the drop, not on contact), every
+  // docked balloon lets go (life.ts's 'bell' cue) and the camera takes its
+  // four-second look up at a sky filling with them — a camera move, not shake.
+  // Not in the end beat: on dot 3 eating the bell IS the win, and the whistle
+  // is the bell there (audio3d's skylark whistle()).
+  if (pickedWorld === 'skylark' && e === heroProp && !beat && !ended) {
+    audio.greatBell();
+    life.cue('bell', voidState.x, voidState.z);
+    lookUpAt = matchElapsed() + 2.5;
+  }
   // The pop's pitch is the link THIS bite was (pay.combo), so the ladder now
   // climbs in the order meals go DOWN, not the order they were taken: a crumb
   // drains faster than a meal, so a crumb taken just after a meal can sink
@@ -10039,7 +10052,10 @@ function biteGulps(e: Edible, pay: BitePay) {
   if (!endBeat()) {
     voidling.afterBite(pay.bite);
     while (burpStreak.length && tClock - burpStreak[0] > BURP_STREAK_WIN) burpStreak.shift();
-    if (pay.treat || burpStreak.length >= BURP_STREAK) oweBurp(BURP_AFTER);
+    // (on BELLCLOUD HEIGHTS the Great Bell's burp waits for the bell's bloom:
+    // "BONG … burp")
+    if (pay.treat || burpStreak.length >= BURP_STREAK)
+      oweBurp(pickedWorld === 'skylark' && pay.id === heroProp?.mesh.id ? BELL_BURP_AFTER : BURP_AFTER);
   }
 }
 
@@ -10389,7 +10405,10 @@ function beginMatch(solo = false) {
   for (const e of edibles) {
     if (!e.mesh.userData.landmark) continue;
     if (!goalProp) goalProp = e;
-    if (goal?.n === 3) e.mesh.userData.reserved = true;
+    // …and on every dot for a landmark its world marks keepForPlayer — only
+    // BELLCLOUD HEIGHTS' Great Bell (island.ts): the summit of the trip, which
+    // a sibling must never ring first. No other world sets the flag.
+    if (goal?.n === 3 || e.mesh.userData.keepForPlayer) e.mesh.userData.reserved = true;
   }
   {
     const tl = document.querySelector('#titlecard .lvl');
@@ -16293,7 +16312,10 @@ function animate() {
     //
     // Same five channels, same latch shape, same calm gating — the only new
     // thing here is that it fires for the right object.
-    if (goal && goal.n === 3 && goalProp && !goalCued && !goalProp.mesh.userData.eaten
+    // (not when the landmark IS the hero — BELLCLOUD HEIGHTS' Great Bell — whose
+    // cue above has already fired all five channels on this frame; on every
+    // other world goalProp !== heroProp, so this changes nothing there)
+    if (goal && goal.n === 3 && goalProp && !goalCued && !goalProp.mesh.userData.eaten && goalProp !== heroProp
         && goalProp.radius <= voidling.radius * EAT_RATIO) {
       goalCued = true;
       announce(`${LEVEL_SPEC[pickedWorld].landmark.toUpperCase()} — GO EAT IT!`);
@@ -16308,7 +16330,10 @@ function animate() {
       // congratulation for something a rival had just taken off the board —
       // on every hero world, including the one the copy was written for.
       // byPlayer is already tracked for the DEVOURED meter's you-vs-family split.
-      if (heroProp.mesh.userData.byPlayer) {
+      // (and not over the whistle: when the hero IS dot 3's landmark, eating
+      // it is the win on the spot and the end beat owns the moment — only on
+      // BELLCLOUD HEIGHTS, the one world where goalProp === heroProp)
+      if (heroProp.mesh.userData.byPlayer && !(goalProp === heroProp && endBeat())) {
         announce(COPY.heroGone); audio.voice('happy'); buzz(120);
         // …and the paper covers it, six seconds behind the banner. Same shape
         // as the beat reaction and for the same reason: the banner owns the

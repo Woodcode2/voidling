@@ -5725,6 +5725,12 @@ export function createLife(
             begin(w);
           }
         }
+        // THE GREAT BELL HAS BEEN RUNG (BELLCLOUD HEIGHTS — prototype3d.ts sends
+        // this when the child eats it): every docked balloon lets go, the
+        // cascade spreading outward from the void, which is on the plaza. The
+        // 'whale' beat's clock (13 s after its card) still starts it if that
+        // comes first; whichever does, wins.
+        else if (n === 'bell' && live && !cascade) { cascade = true; cascadeAt = mt + 1.5; }
       });
       movers.push({ mesh: null as unknown as THREE.Object3D, update(dt, _t, vx, vz) {
         if (!live) return;
