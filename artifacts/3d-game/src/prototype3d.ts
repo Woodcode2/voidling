@@ -11019,9 +11019,15 @@ const CARD_FALLBACK: Record<string, string> = {
   // lantern amber falling into an indigo night — the level's own two colours,
   // so a card that never loads its poster still says the right thing
   lantern: 'radial-gradient(ellipse at 50% 38%, #ffbe6a 0%, #d1452f 34%, #241436 68%, #0e1226 100%)',
-  // BELLCLOUD HEIGHTS: a kingdom on the clouds in a golden day — the bell's
-  // gold at the centre, warm cloud, then the sky around it.
-  skylark: 'radial-gradient(ellipse at 50% 40%, #fff4d6 0%, #f2d488 26%, #8fc4ee 60%, #3a5fa8 100%)',
+  // BELLCLOUD HEIGHTS: the bell's gold high in the middle, the day's blue
+  // round it, and the same deep evening the posters float in under the type.
+  // The spec's first row (#fff4d6 / #f2d488 26% / #8fc4ee 60% / #3a5fa8) was
+  // a daytime sky all the way down, and the card's type sits on this until
+  // the poster decodes. qa/pickerfit.mjs --atrest, on the words half merged
+  // with this one and the poster withheld: that row failed the tagline at
+  // 3.83:1 and the best line at 3.19:1 (bar 4.5); this one reads title 9.3,
+  // tagline 6.4, best 5.6. With the poster up: 11.0, 6.9, 7.5.
+  skylark: 'radial-gradient(ellipse at 50% 34%, #fff1c8 0%, #f0c050 18%, #5a7fcc 46%, #27306e 72%, #141a40 100%)',
 };
 function paintWorldCard(host: HTMLElement, id: string): void {
   host.style.backgroundSize = 'cover';
