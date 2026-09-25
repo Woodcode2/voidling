@@ -38,7 +38,7 @@ export const WORLD_ORDER: WorldKey[] = ['maple', 'pirate', 'gameday', 'lantern',
 /** Display names, for the "finish X to unlock" line on a locked card. */
 export const WORLD_LABEL: Record<WorldKey, string> = {
   maple: 'MAPLE FALLS', pirate: 'PIRATE BAY', gameday: 'GAME DAY', lantern: 'LANTERN NIGHT', powder: 'POWDER PASS',
-  skylark: 'SKYLARK FIELD',
+  skylark: 'BELLCLOUD HEIGHTS',   // world 6; the key stays 'skylark' (save data)
 };
 
 const KEY = 'voidUnlocked';

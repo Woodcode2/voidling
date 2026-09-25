@@ -405,7 +405,7 @@ document.body.insertBefore(renderer.domElement, document.body.firstChild);
 // ── WHICH WORLD ───────────────────────────────────────────────────────────
 // Resolved before anything else, because the light rig, the ground bake and
 // the prop kit all branch on it.
-const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE FALLS', pirate: 'PIRATE BAY RESORT', gameday: 'GAME DAY', lantern: 'LANTERN NIGHT', powder: 'POWDER PASS', skylark: 'SKYLARK FIELD' };
+const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE FALLS', pirate: 'PIRATE BAY RESORT', gameday: 'GAME DAY', lantern: 'LANTERN NIGHT', powder: 'POWDER PASS', skylark: 'BELLCLOUD HEIGHTS' };
 // A ternary chain resolved exactly two worlds, so a third could never be
 // picked however the picker was wired. Validate against the real list instead,
 // which also means an unknown ?w= on a shared link lands on Maple rather than
@@ -2723,7 +2723,10 @@ const LEVEL_SPEC: Record<WorldId, LevelSpec> = {
   // family eats 40-50% of the board, so 40 would have been a race against the
   // rubber band for the last few. 15 clears the 6N rule and the hunt reached it
   // at 22 s.
-  skylark: { eat: 30000, landmark: 'hangar', landmarkR: 4.95, rank: 1, clear: 38,
+  // BELLCLOUD HEIGHTS: dot 3 is the Great Bell (docs/BELLCLOUD.md §5.2), which
+  // takes the hangar's eat radius 5.5, so landmarkR stays 4.95. The timings on
+  // this row were all measured on the airfield's food, not the kingdom's.
+  skylark: { eat: 30000, landmark: 'great bell', landmarkR: 4.95, rank: 1, clear: 38,
     set: [{ kind: 'gild', n: 6, label: 'GOLD', icon: '💰' }, { kind: 'car', n: 15, label: 'VANS', icon: '🚐' }, { kind: 'snack', n: 100, label: 'SNACKS', icon: '🍿' }] },
 };
 
@@ -3163,27 +3166,32 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     heroGone: '🏔️ THE LODGE IS GONE. ALL SLURPED UP.',
     heroName: 'The Lodge',
   },
+  // BELLCLOUD HEIGHTS (the id stays 'skylark': save keys and probe arguments).
+  // The last island of the trip, and its festival is the Ringing of the Great
+  // Bell. Strings from docs/BELLCLOUD.md §9.1 and §9.3; the numbers are as they
+  // were.
   skylark: {
-    n: 6, icon: '🎈', sub: 'get them before they go up',
-    // Mr Pym reads a briefing at a briefing's pace and finishes it every time,
-    // including the wind, the cloud base and "have a good flight"
+    n: 6, icon: '🔔', sub: 'the last stop · the biggest bell · eat it all',
+    // Master Tolly, the Town Crier, reads the Festival Programme at a
+    // proclamation's pace and reads it to the end every time
     newsGap: [16, 8], signOn: 6,
-    // THE WHALE, in 3D: skylark.ts puts the launch circle at world (6107, 4349)
+    // THE GREAT BELL, in 3D: it stands on skylark.ts's launch circle, world
+    // (6107, 4349), where the avenues cross
     hero: [(6107 - 6000) * 0.05, (4349 - 6000) * 0.05],
-    // an open field, not a corridor: the shot holds the whale lying across the
-    // launch circle and pulls back down 03 over the grass toward the arrivals
+    // an open plaza, not a corridor: the shot holds the Great Bell in its arch
+    // and pulls back down the Grand Avenue toward the Balloon Dock
     introLen: 3.4,
-    ender: '🎈 WORLD ENDER! The field is CLEAR.',
-    enderNews: 'SKYLARK FIELD IS CLEAR IN ALL DIRECTIONS. Visibility unlimited. Conditions perfect.',
-    houseNews: 'A hangar has gone. The flea market has relocated to the grass.',
-    rivalFullNews: 'The second feature has stopped moving. It is now, technically, terrain.',
-    winSub: 'the whole field belongs to the void', place: 'the field',
-    winTitles: ['FIELD: CLEARED FOR TAKEOFF', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS',
-                'NOTHING LEFT TO REPORT', 'CHOMPION OF SKYLARK FIELD'],
-    heroCue: '🐋 YOU CAN EAT THE WHALE NOW — GO!',
-    heroCueNews: 'It is big enough for the whale. The whale is inflating. Crews are asked to be brisk.',
-    heroGone: '🐋 THE WHALE IS GONE. ALL SLURPED UP.',
-    heroName: 'The Whale',
+    ender: '🔔 WORLD ENDER! The kingdom is CLEAR.',
+    enderNews: 'BY ROYAL PROCLAMATION: Bellcloud Heights is officially finished. Well done, everybody.',
+    houseNews: 'A cloud cottage has floated off. The Crier has proclaimed it a holiday home.',
+    rivalFullNews: 'The second visitor has stopped moving. It is now, by proclamation, scenery.',
+    winSub: 'the whole kingdom belongs to the void', place: 'the kingdom',
+    winTitles: ['KINGDOM: DEVOURED', 'SUMMIT!', 'BURP OF CHAMPIONS',
+                'THE BELL HAS SPOKEN', 'CHOMPION OF THE CLOUDS'],
+    heroCue: '🔔 YOU CAN EAT THE GREAT BELL NOW — GO!',
+    heroCueNews: 'It is big enough for the Great Bell. Master Tolly asks everybody to hold their ears.',
+    heroGone: '🔔 BONG!! THE GREAT BELL IS GONE.',
+    heroName: 'The Great Bell',
   },
 };
 const COPY = WORLD_COPY[pickedWorld];
@@ -6935,22 +6943,24 @@ const POWDER_BEATS: typeof MAPLE_BEATS = [
     icon: '🏔️', title: 'AVALANCHE!!', sub: 'the mountain is coming to you', cue: 'avalanche',
     news: 'The mountain has let go. The village is advised to be somewhere else.' },
 ];
-// SKYLARK FIELD's four, and the whole match is one morning: the crews arrive,
-// the burners light, the sheep are on the runway as they are every year, and
-// the whale goes up.
+// BELLCLOUD HEIGHTS' four (id 'skylark'), and the whole match is one festival
+// day: the Crier opens it, balloons arrive from every island, the cloud sheep
+// are on the avenue as they are every year, and the balloons lift. Only the
+// words changed from the airfield's; every id, cue, time and colour is its own.
+// The 'whale' cue name is kept: life.ts's ascension still starts on it.
 const SKYLARK_BEATS: typeof MAPLE_BEATS = [
   { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0xffc78e, flash: 'rgba(255,199,142,0.26)',
-    icon: '🎈', title: 'Filling the balloons!', sub: 'four people and a very loud fan',
-    news: 'Inflation has begun across the launch field. The fans are the loudest thing here.' },
+    icon: '🔔', title: 'The festival is open!', sub: 'bunting up, bells out',
+    news: 'The Crier proclaims the Festival of the Great Bell open. The bunting agrees.' },
   { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xff8a3d, flash: 'rgba(255,138,61,0.28)',
-    id: 'skylark.burner', icon: '🔥', title: 'Burner test!', sub: 'everyone\'s eyebrows are fine',
-    news: 'Burner checks are complete. The desk confirms all eyebrows present and correct.' },
+    id: 'skylark.burner', icon: '🎈', title: 'Balloons arriving!', sub: 'visitors from every island',
+    news: 'Balloons are docking along the edge. Every island on the map sent somebody.' },
   { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xd9e4c8, flash: 'rgba(217,228,200,0.26)',
-    id: 'skylark.sheep', icon: '🐑', title: 'The sheep are on the runway!', sub: 'they are always on the runway', cue: 'sheep',
-    news: 'The sheep are on 09. The sheep are on 09 every year and will not be moved.' },
+    id: 'skylark.sheep', icon: '🐑', title: 'The cloud sheep are on the avenue!', sub: 'they are always on the avenue', cue: 'sheep',
+    news: 'The cloud sheep are on the Grand Avenue. They are on it every year and will not be moved.' },
   { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0x4a7ad6, flash: 'rgba(74,122,214,0.34)',
-    icon: '🐋', title: 'THE WHALE IS GOING UP!!', sub: 'the whole field is going with her', cue: 'whale',
-    news: 'G-WAIL has been cleared to launch. The whole field is going up with her.' },
+    icon: '🎈', title: 'THE BALLOONS ARE LIFTING!!', sub: 'catch them before they float off', cue: 'whale',
+    news: 'Every balloon at the dock has been cleared to lift. The sky is filling up.' },
 ];
 const BEATS = pickedWorld === 'gameday' ? GAMEDAY_BEATS
   : pickedWorld === 'pirate' ? PIRATE_BEATS
@@ -6976,11 +6986,11 @@ const MID_110 = { at: 110, dur: 18, mult: 2, fired: false, base: 0 };
 const MID_POOL: Record<WorldId, MatchBeat[]> = {
   skylark: [SKYLARK_BEATS[1], SKYLARK_BEATS[2],
     { ...MID_66, id: 'skylark.crown', col: 0xa9d4ff, flash: 'rgba(169,212,255,0.26)',
-      icon: '🪢', title: 'Crown lines out!', sub: 'thirty metres, and hold it',
-      news: 'Crown lines are out across the field. Hold them, please. Hold them.' },
+      icon: '🎏', title: 'Banner parade!', sub: 'blue, gold, and very long',
+      news: 'The banner parade is crossing the Castle Yard. It is longer than the Castle Yard.' },
     { ...MID_110, id: 'skylark.bacon', col: 0xffb85e, flash: 'rgba(255,184,94,0.26)',
-      icon: '🥓', title: 'The bacon van is open!', sub: 'the queue is longer than the runway',
-      news: 'Breakfast Row is open. The desk notes the queue is visible from the tower.' }],
+      icon: '🧁', title: 'The cake carts are open!', sub: 'the queue goes round the rainbow',
+      news: 'The Cloud Market has opened its cake carts. The queue can be seen from the Keep.' }],
   maple: [MAPLE_BEATS[1], MAPLE_BEATS[2],
     { ...MID_66, id: 'maple.bake', col: 0xffb85e, flash: 'rgba(255,184,94,0.26)',
       icon: '🥧', title: 'Bake sale!', sub: 'the table is not load-bearing',
@@ -7049,6 +7059,11 @@ const MEAL_NAME: Record<string, string> = pickedWorld === 'gameday' ? {
   // somebody's house, and the house lines read correctly for it).
   house: 'a whole HOUSE', car: 'a pickup truck', rv: 'a whole MOTORHOME',
   big: 'an entire LANDMARK',
+} : pickedWorld === 'skylark' ? {
+  // BELLCLOUD HEIGHTS has basket carts, cake carts and a ticket wagon, and no
+  // parked cars in the sky. 'cart' keeps the 'car' substring that
+  // newsroom.ts's mealKind() routes the Crier's cart lines on.
+  house: 'a whole HOUSE', car: 'a little cart', big: 'an entire LANDMARK',
 } : {
   house: 'a whole HOUSE', car: 'a parked car', big: 'an entire LANDMARK',
 };
@@ -7362,16 +7377,12 @@ function showNews() {
           : pickedWorld === 'skylark' ? SKYLARK_BRAND
             : PB ? PB_BRAND : MAPLE_BRAND)[tier];
   } else if (pickedWorld === 'skylark') {
-    // SKYLARK FIELD is a BALLOON MEET, and Mr Pym the Balloonmeister is the
-    // only voice on the field radio. His denial is the one shape none of the
-    // other five have: it is TECHNICAL. He has instruments, they are excellent,
-    // and they are answering the wrong question with total confidence. As the
-    // child eats, the field gets flatter, emptier and clearer — so his
-    // anemometer, his ceiling and his visibility all keep reporting that
-    // conditions are IMPROVING, and by his own criteria he is right. Tier 2 is
-    // not him panicking; it is him reading perfect flying weather over an empty
-    // field. The district ids come straight off skRegionAt with no translation
-    // table, because skylark.ts's region ids and SkDist are the same nine words.
+    // BELLCLOUD HEIGHTS (id 'skylark'): Master Tolly the Town Crier reads the
+    // Festival Programme, and his denial is CEREMONIAL — whatever the void eats
+    // has "gone up early", so as the child eats the festival runs ahead of
+    // schedule, and by his own scroll he is right (newsroom_skylark.ts). The
+    // district ids come straight off skRegionAt with no translation table,
+    // because skylark.ts's region ids and SkDist are the same nine words.
     const sd = String(island.biomeAt(voidState.x, voidState.z));
     h = pickSkylarkNews({
       tier, morning, district: (isSkDist(sd) ? sd : null), lastMeal, devouredPct,
@@ -11343,7 +11354,7 @@ function renderFinds(): void {
 let bookWorld: WorldId = pickedWorld;
 function renderBook(): void {
   const tabs = el('bookTabs'), grid = el('bookGrid'), foot = el('bookFoot');
-  const NAMES: Record<WorldId, string> = { skylark: '🎈 SKYLARK FIELD', maple: '🍁 MAPLE FALLS', pirate: '🏴‍☠️ PIRATE BAY',
+  const NAMES: Record<WorldId, string> = { skylark: '🔔 BELLCLOUD HEIGHTS', maple: '🍁 MAPLE FALLS', pirate: '🏴‍☠️ PIRATE BAY',
     gameday: '🏈 GAME DAY', lantern: '🏮 LANTERN NIGHT', powder: '❄️ POWDER PASS' };
   tabs.innerHTML = (Object.keys(NAMES) as WorldId[]).map((w) =>
     `<button data-w="${w}" class="${w === bookWorld ? 'on' : ''}">${NAMES[w]} `

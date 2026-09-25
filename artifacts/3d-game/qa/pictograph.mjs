@@ -113,7 +113,7 @@ const KNOWN = new Set([
   'shop .pr',               // "💎 25" — the gem price on every paid row
   'shop .shopTier.gold',    // "✨ LEGENDARY"
   'profile #rankChip',      // "🥉 BRONZE · LVL 1"
-  'profile button',         // "🎈 SKYLARK FIELD 0/12"
+  'profile button',         // "🔔 BELLCLOUD HEIGHTS 0/12" (was "🎈 SKYLARK FIELD" until world 6's re-theme, 2026-09-25; same selector, same debt)
   'profile .on',            // "🍁 MAPLE FALLS 0/12"
   'profile i',              // "💜"
   // Found 2026-09-23 by the --atrest walk, and present on main as well
