@@ -1,91 +1,121 @@
 // ══════════════════════════════════════════════════════════════════════════
-//  SKYLARK FIELD — the dawn balloon-meet prop kit
-//  A disused grass-and-concrete airfield floating in space, and once a year,
-//  for one morning, a hundred hot air balloons come to it. A match is that
-//  morning: trailers arriving in the dark, then the mass ascension at sunrise.
+//  BELLCLOUD HEIGHTS — the cloud kingdom's prop kit (world 6, internal id
+//  'skylark'; the file keeps its name, see docs/BELLCLOUD.md §1)
+//  A kingdom on the clouds, the last island of the Voidling kids' road trip.
+//  Once a year it rings its Great Bell, and visitors from every island dock
+//  their balloons along its edge for the festival. A match is that festival.
+//
+//  (Until 2026-09-25 this file was SKYLARK FIELD, a dawn balloon meet on a
+//  disused airfield. The owner: "it's lame. There's no theme to it." The
+//  balloons stayed — visitors arrive by balloon — and everything else became
+//  the kingdom: the Great Bell, castles, cloud trees, cloud cottages.)
 //
 //  House rules, same as island.ts, alpine.ts and nightmarket.ts:
 //    • every prop is ONE merged mesh sharing PROP_SHARED_MAT (one draw call)
 //    • no per-prop materials, no textures, flat shading, chunky silhouettes
 //    • y = 0 is the ground plane, the prop's nose/front faces +X
-//    • keep each prop under ~140 parts
+//    • keep each prop under ~140 parts, and at most about three colours plus
+//      one dark accent
+//    • NO NEW SphereGeometry literals: every round part goes through sph()
+//      below, one definition for the whole kit (qa/roundlod.mjs ratchets on
+//      the count of those calls across src/proto3d)
 //
 //  ── THE CROWN RULE, and it is this world's eave line ────────────────────
 //  alpine.ts has the snow cap because a building seen from above is mostly its
 //  roof. nightmarket.ts learned the same thing the hard way when its bathhouse
-//  photographed as a black rectangle. Here the fact bites differently: FROM
-//  DIRECTLY ABOVE A STANDING BALLOON IS A DISC, and a disc of one colour is a
-//  dot. Ninety dots is confetti, and confetti photographs as a texture rather
-//  than as objects. So every envelope in this file obeys four rules, and a
-//  factory that skips one is not finished:
+//  photographed as a black rectangle. On a WHITE ground it bites twice: a white
+//  tower on white cloud is invisible from 46 degrees up unless its roof says
+//  otherwise. So every roof in this kit — the Keep, the turrets, the cottages,
+//  the gate, the shrines — is a coloured cone or pyramid with a DARK EAVE RING
+//  (EAVE) where it meets the wall. Seen from above, a building is its roof.
 //
-//    1. GORES REACH THE CROWN. The envelope is vertical coloured panels
-//       radiating from the top and the seams run ALL THE WAY UP, so from
-//       straight above the disc reads as a PINWHEEL. Spokes are what give a
-//       circle size, rotation and form when you cannot see its side.
-//    2. THE CROWN RING IS A DARK HOLE — the disc's pupil. It is the one thing
-//       that says "hollow bag standing up" rather than "painted coin".
-//    3. THE SKIRT IS A CONTRASTING DARK RING. A standing envelope hides its
-//       own basket, so the mouth is lifted clear on the burner frame and the
-//       skirt is dark: the overhead read is disc, dark ring, basket, people.
-//       Without that ring a balloon has no people and this world has no crowd.
-//    4. AT MOST THREE COLOURS PER ENVELOPE. At phone resolution a
-//       twelve-colour balloon is grey.
+//  AND THE BALLOONS KEEP THEIR OWN FOUR RULES. From directly above a standing
+//  balloon is a disc, and a disc of one colour is a dot:
+//    1. GORES REACH THE CROWN, so the disc reads as a PINWHEEL.
+//    2. THE CROWN RING IS A DARK HOLE — the disc's pupil.
+//    3. THE SKIRT IS A CONTRASTING DARK RING, lifted clear of the basket.
+//    4. AT MOST THREE COLOURS PER ENVELOPE.
 //
 //  ── AND ONE RULE THAT CAME OUT OF A MEASUREMENT ─────────────────────────
-//  A STANDING BALLOON IS ONE MESH WITH ONE EDIBLE RADIUS. fadeOccluders()
-//  (prototype3d.ts:1021) ghosts anything crossing the camera-to-hero sight line
-//  down to 62%, and armFade() is called inside mergedProp() so a merged prop is
-//  armed automatically. If an envelope were several meshes, only the piece
-//  actually crossing the axis would ghost and the child would see a balloon
-//  with a hole in it. One mesh. One radius. This is why every factory here
-//  returns a single mergedProp and never a Group of them.
+//  A PROP IS ONE MESH WITH ONE EDIBLE RADIUS. fadeOccluders() (prototype3d.ts)
+//  ghosts anything crossing the camera-to-hero sight line down to 62%, and
+//  armFade() is called inside mergedProp() so a merged prop is armed
+//  automatically. If the Great Bell's arch were several meshes, only the piece
+//  crossing the axis would ghost and the child would see a bell with a hole in
+//  it. One mesh. One radius. Every factory here returns a single mergedProp.
 //
-//  ── THE FOUR STAGES, WHICH ARE THE WHOLE COMPOSITION ────────────────────
-//  A field of upright envelopes would be a wall of opaque objects at a camera
-//  that looks down at 46.4°. So a balloon is authored in one of four stages —
-//  BAGGED, SPILLED, COLD, STANDING — held at roughly 5:4:3:2, and the ratio
-//  walks forward across the match. (The launch field's rows have authored
-//  2:4:3:5 since, and from 2026-09-25 the island measures 2.2 : 3.9 : 3.4 :
-//  4.5 per 14 on SEED 7, the owner's poster having asked for envelopes
-//  standing up — see island.ts's SKYLARK block.) Stages one to three are LOW: they read as
-//  enormous coloured shapes lying ON the ground, which is what an overhead
-//  camera actually wants, and the standing ones are punctuation. The world
-//  stands up as the child grows, which no other world in this game does.
-//
-//  ── COLOUR: THE INVERSION ───────────────────────────────────────────────
-//  Every other world carries its identity in the ground. This one drains its
-//  ground on purpose — wet green-grey grass, grey-lilac concrete — so the ONLY
-//  saturated colour in the frame is the ninety objects the child is here to
-//  eat. And nothing here uses a neutral grey in shadow: dawn shadows are
-//  SKY-coloured, which is alpine.ts's blue-shadow rule discovered at the other
-//  end of the day.
+//  ── COLOUR: THE INVERSION, KEPT ─────────────────────────────────────────
+//  The ground is pearl cloud, near-white (island.ts's cloud bake), so the props
+//  carry the colour: blue roofs, gold, pastel cloud trees, striped balloons.
+//  Cloud trees are NEVER white — white is the ground's. The rendered white of a
+//  white wall has to stay above the ground's luma, and the roofs and the eave
+//  ring are the read.
 // ══════════════════════════════════════════════════════════════════════════
 import * as THREE from 'three';
 import { part, mergedProp, PROP_GLOW_MAT } from './island';
 import { voiced } from './eatvoice';
+import { registerGloss } from './gloss';
 
 // ── the palette ────────────────────────────────────────────────────────────
-// The field's own colours are cold and drained. Nothing in this block is
-// saturated; everything saturated lives in ENVELOPE below.
-const GRASS_D = 0x5d6b55;      // wet grass in shadow — green-grey, never grey
-const CONCRETE = 0xa9a6b4;     // grey-lilac, dew still on it
-const CONCRETE_D = 0x8e8b98;   // the shaded face of anything on concrete
-const TARMAC = 0x6f6c68;       // the old perimeter track, darker and cracked
-const CHALK = 0xe8e6e0;        // painted markings
-const WICKER = 0xc9a267;       // basket cane
+// The kingdom's own colours (docs/BELLCLOUD.md §6.1). qa/formsep.mjs grades
+// every named constant here for a lit and a shaded face under this world's key.
+export const STONE = 0xf1ece2;       // white castle stone
+const STONE_D = 0xd9d0c4;            // its shaded courses, plinths and copings
+export const ROOF_BLUE = 0x3d6fd6;   // the castles' pointed roofs
+const EAVE = 0x27468f;               // THE EAVE RING, and every dark opening
+export const GOLD = 0xf2c14e;        // the Great Bell, finials, doors, rails
+const GOLD_D = 0xc8902a;             // the bell's lip and yoke, gold in shadow
+export const ROSE = 0xef8fae;        // a cottage roof, a stall's stripes
+export const MINT = 0x8fd8b4;        // a cottage roof
+const PUFF_W = 0xf7f4fb;             // the cloud puffs at a bridge's feet
+const PUFF_L = 0xe3dcf2;             // a lilac cloud tree's sunlit top
+const PUFF_M = 0xd6f0e2;             // a mint cloud tree's sunlit top
+const PUFF_P = 0xffe3d4;             // a peach cloud tree's sunlit top
+const WATER = 0x9fd8f0;              // a fountain's pool
+const BELL_MOUTH = 0x5a3a12;         // the Great Bell's mouth — its one dark accent
+const TRUNK = 0xe6cf98;              // a cloud tree's gold-cream trunk
+// the cloud trees' own bodies. Deeper than PUFF_*, because a tree in PUFF_M
+// alone measured against a pearl ground is a tree nobody can see; the pale
+// puff is the sunlit crown on top of it
+const TREE_MINT = 0xa6e3c3;
+const TREE_PEACH = 0xffc7a3;
+const TREE_LILAC = 0xc7b6ee;
+/** a cloud tree or puff bush's two tones — [body, sunlit crown] — picked by
+ *  index from island.ts so no factory draws a random number */
+export const CLOUD_TINTS: [number, number][] = [[TREE_MINT, PUFF_M], [TREE_PEACH, PUFF_P], [TREE_LILAC, PUFF_L]];
+// the cake carts at the Cloud Market, and the basket carts' cream
+export const CAKE_ROSE = 0xf6b8c8;
+export const CAKE_MINT = 0xa8e0c0;
+export const CAKE_LEMON = 0xf6e39a;
+export const CAKE_SKY = 0xa9cff2;
+const CREAM = 0xf2ede4;
+const WAGON_ROSE = 0xf3c9d4;         // the ticket wagon's canvas
+const RING_GOLD = 0xe6c173;          // the plaza's ring tiles
+// the cloud sheep and the cloud bunny
+const FLEECE = 0xf8f6f2;
+const FLEECE_D = 0xe8e2ea;
+const PLUM = 0x5a4a64;               // soft plum-grey: a sheep's face and legs
+const BUNNY = 0xf4f1ec;
+const BUNNY_EAR = 0xf3b5c4;
+// what the balloons and their kit are made of — unchanged from the airfield
+const WICKER = 0xc9a267;       // basket cane, and the basket carts' wood
 const WICKER_D = 0x8f6f42;     // its shadowed weave and the leather corners
 const STEEL = 0xb4b8c4;        // burner frames, fan cages, poles
 const STEEL_D = 0x6e7482;      // and their shadow side — cool, not grey
 const RUST = 0x8a5a3c;
-const CANVAS_W = 0xdcdbd4;     // the met hut, the caravan, the sock
+const CANVAS_W = 0xdcdbd4;     // the tea urn's paper cups
 const SKIRT_D = 0x2c3350;      // THE SKIRT AND CROWN RING — periwinkle-black.
                                // Deliberately not 0x000000: a true black hole
-                               // in a dawn frame reads as a rendering fault,
-                               // and this world's darks are all sky-coloured.
+                               // reads as a rendering fault.
 
-/** THE ENVELOPE COLOURS — and these are the only saturated things in the
- *  world. Three per balloon, no more, because at phone resolution a
+// THE GREAT BELL IS METAL. Gold shines and must not glow: the gloss term is
+// sheen, not emission, and qa/halocensus.mjs holds it under the bloom cut.
+// Neither hex is registered anywhere else (the collision warning in gloss.ts
+// and Game Day's GOLD, 0xf0b429, were checked).
+registerGloss([[GOLD, 0.55], [GOLD_D, 0.4]], 'skyfield');
+
+/** THE ENVELOPE COLOURS — the balloons are still the most saturated things in
+ *  the world. Three per balloon, no more, because at phone resolution a
  *  twelve-colour envelope averages to grey. Each triple is [gore A, gore B,
  *  gore C] and they alternate round the crown. */
 export const ENVELOPE: [number, number, number][] = [
@@ -107,9 +137,8 @@ const cone = (seg = 8) => new THREE.ConeGeometry(0.5, 1, seg);
 const torus = (tube = 0.12, seg = 12) => new THREE.TorusGeometry(0.5, tube, 6, seg);
 
 /** A gore-striped dome, built as N vertical wedges radiating from the crown.
- *  This is the one function the whole world's overhead read rests on: the
- *  wedges ARE the pinwheel, and they must reach y = h (the crown) or the disc
- *  is a flat coin from the play camera. */
+ *  The wedges ARE the pinwheel, and they must reach y = h (the crown) or the
+ *  disc is a flat coin from the play camera. */
 function goreDome(cols: [number, number, number], r: number, h: number, gores = 12): THREE.BufferGeometry[] {
   const out: THREE.BufferGeometry[] = [];
   const step = (Math.PI * 2) / gores;
@@ -132,19 +161,311 @@ function goreDome(cols: [number, number, number], r: number, h: number, gores = 
   return out;
 }
 
-// ── BAGGED — a fridge-sized roll of fabric on the grass, strapped. The lowest
-//    stage, and the one that says "this has not started yet". From above: a
-//    small bright oblong with two dark straps across it.
+/** A round tower's roof: the dark eave ring where it meets the wall (the crown
+ *  rule), a pointed cone in the roof colour, and a gold finial. Returns the
+ *  parts and the finial's top, so a caller can put something on it. */
+function towerRoof(p: THREE.BufferGeometry[], r: number, h: number, y0: number, roof: number, seg = 16): number {
+  p.push(part(cyl(r - 0.05, r - 0.15, seg), EAVE, 0, y0 + 0.15, 0, 0, 0, 0, 1, 0.3, 1));
+  p.push(part(cone(seg), roof, 0, y0 + 0.3 + h / 2, 0, 0, 0, 0, r * 2, h, r * 2));
+  const top = y0 + 0.3 + h;
+  p.push(part(sph(), GOLD, 0, top + 0.12, 0, 0, 0, 0, 0.5 + r * 0.08));
+  return top + 0.35;
+}
+
+// ══ THE GREAT BELL ═════════════════════════════════════════════════════════
+/** THE GREAT BELL — the kingdom's heart, the hero meal and dot 3's landmark.
+ *  A festival bell in a white stone arch on a two-step plinth: the arch spans
+ *  local x, so its open face is ±z, and island.ts turns that face toward the
+ *  spawn so the first frame looks through the arch at the bell. A little blue
+ *  cone roof sits on the crown under a gold ball. From the 46-degree camera
+ *  the read is: white arch, blue point, gold bell inside.
+ *
+ *  Sizes (docs/BELLCLOUD.md §5.1): plinth 12.4 x 5.4; piers 2.2 x 2.2 at
+ *  x = ±4.4; the arch a half torus (4.4, tube 1.1) on the piers with its crown
+ *  at y 16.7; the bell from y 8.3 to 13.3. The spec's 11-unit piers would put
+ *  the crown at 17.5; they are 10.2 so the crown lands where the spec's own
+ *  16.6 asks. qa/kitfit.mjs measures it 20.05 tall, 12.4 x 6.0 on the ground
+ *  (the bell's lip is 6.0 across) — under the 23.4-unit Pirate building that
+ *  fadeOccluders already handles. */
+export function skGreatBell(): THREE.Object3D {
+  const p: THREE.BufferGeometry[] = [];
+  // the plinth, two steps
+  p.push(part(box(), STONE_D, 0, 0.25, 0, 0, 0, 0, 12.4, 0.5, 5.4));
+  p.push(part(box(), STONE, 0, 0.75, 0, 0, 0, 0, 11.2, 0.5, 4.4));
+  // the piers, with a gold band at the foot and at the springing of the arch
+  const PIER_TOP = 11.2;
+  for (const sx of [-4.4, 4.4]) {
+    p.push(part(box(), STONE, sx, 1.0 + (PIER_TOP - 1.0) / 2, 0, 0, 0, 0, 2.2, PIER_TOP - 1.0, 2.2));
+    p.push(part(box(), GOLD, sx, 1.25, 0, 0, 0, 0, 2.5, 0.3, 2.5));
+    p.push(part(box(), GOLD, sx, PIER_TOP - 0.3, 0, 0, 0, 0, 2.45, 0.35, 2.45));
+  }
+  // the arch: a half torus standing on the piers, open face ±z
+  p.push(part(new THREE.TorusGeometry(4.4, 1.1, 6, 12, Math.PI), STONE, 0, PIER_TOP, 0));
+  // on the crown: the eave band, the little blue cone roof, the gold ball
+  const CROWN = PIER_TOP + 4.4 + 1.1;
+  p.push(part(cyl(1.0, 1.0, 12), EAVE, 0, CROWN - 0.05, 0, 0, 0, 0, 2.0, 0.3, 2.0));
+  p.push(part(cone(12), ROOF_BLUE, 0, CROWN + 0.1 + 1.3, 0, 0, 0, 0, 3.6, 2.6, 3.6));
+  p.push(part(sph(), GOLD, 0, CROWN + 2.95, 0, 0, 0, 0, 0.8));
+  // the yoke, from the arch's inner apex down to the bell's crown
+  const APEX_IN = PIER_TOP + 4.4 - 1.1;
+  p.push(part(box(), GOLD_D, 0, (APEX_IN + 13.3) / 2, 0, 0, 0, 0, 1.4, APEX_IN - 13.3 + 0.2, 1.0));
+  // THE BELL, y 8.3 -> 13.3: crown, shoulder, waist, flared lip
+  const bell = (rt: number, rb: number, y0: number, y1: number, col: number) =>
+    p.push(part(new THREE.CylinderGeometry(rt, rb, 1, 16), col, 0, (y0 + y1) / 2, 0, 0, 0, 0, 1, y1 - y0, 1));
+  bell(1.1, 1.1, 12.8, 13.3, GOLD);
+  bell(1.6, 2.2, 11.3, 12.8, GOLD);
+  bell(2.2, 2.6, 8.8, 11.3, GOLD);
+  bell(2.7, 3.0, 8.3, 8.8, GOLD_D);
+  // the mouth (the one dark accent) and the clapper just below it
+  p.push(part(cyl(0.5, 0.5, 16), BELL_MOUTH, 0, 8.32, 0, 0, 0, 0, 5.2, 0.06, 5.2));
+  p.push(part(sph(), GOLD, 0, 7.9, 0, 0, 0, 0, 1.1));
+  return mergedProp(p);
+}
+
+// ══ THE CASTLES ════════════════════════════════════════════════════════════
+/** THE CASTLE KEEP — a fat round tower with the Bell-Keeper's balcony, a dark
+ *  eave and a tall blue cone roof: about 17.6 tall. The Town Crier stands at
+ *  its foot (life.ts, off(tower, 5.5)). */
+export function skCastleKeep(): THREE.Object3D {
+  const p: THREE.BufferGeometry[] = [];
+  const R = 3.2, H = 10;
+  p.push(part(cyl(R + 0.45, R + 0.55, 18), STONE_D, 0, 0.3, 0, 0, 0, 0, 1, 0.6, 1));
+  p.push(part(cyl(R, R + 0.12, 18), STONE, 0, H / 2, 0, 0, 0, 0, 1, H, 1));
+  // the balcony at 7.5: a stone floor, a gold rail and eight merlons
+  p.push(part(cyl(R + 0.8, R + 0.55, 18), STONE_D, 0, 7.35, 0, 0, 0, 0, 1, 0.3, 1));
+  p.push(part(new THREE.TorusGeometry(R + 0.72, 0.12, 6, 24), GOLD, 0, 7.55, 0, Math.PI / 2, 0, 0));
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+    p.push(part(box(), STONE, Math.cos(a) * (R + 0.55), 7.9, Math.sin(a) * (R + 0.55), 0, -a, 0, 0.45, 0.8, 0.95));
+  }
+  // the door (gold, facing +x) and four dark window slits
+  p.push(part(box(), GOLD_D, R + 0.03, 1.2, 0, 0, 0, 0, 0.14, 2.4, 1.5));
+  for (const a of [Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4]) {
+    p.push(part(box(), EAVE, Math.cos(a) * (R + 0.02), 4.6, Math.sin(a) * (R + 0.02), 0, -a, 0, 0.12, 1.3, 0.42));
+  }
+  const top = towerRoof(p, R + 0.55, 6, H, ROOF_BLUE, 18);
+  p.push(part(cone(8), GOLD, 0, top + 0.45, 0, 0, 0, 0, 0.24, 0.9, 0.24));
+  return mergedProp(p);
+}
+
+/** A SKY TURRET — a slim round tower with a pointed roof in blue (or a
+ *  cottage colour), about 11.8 tall. The gardens' punctuation. */
+export function skSkyTurret(roof = ROOF_BLUE): THREE.Object3D {
+  const p: THREE.BufferGeometry[] = [];
+  const R = 2.3, H = 7;
+  p.push(part(cyl(R + 0.3, R + 0.4, 16), STONE_D, 0, 0.2, 0, 0, 0, 0, 1, 0.4, 1));
+  p.push(part(cyl(R, R + 0.1, 16), STONE, 0, H / 2, 0, 0, 0, 0, 1, H, 1));
+  p.push(part(cyl(R + 0.06, R + 0.06, 16), GOLD, 0, 5.4, 0, 0, 0, 0, 1, 0.25, 1));
+  p.push(part(box(), GOLD_D, R + 0.03, 1.0, 0, 0, 0, 0, 0.12, 2.0, 1.1));
+  for (const a of [(2 * Math.PI) / 3, (4 * Math.PI) / 3]) {
+    p.push(part(box(), EAVE, Math.cos(a) * (R + 0.02), 3.8, Math.sin(a) * (R + 0.02), 0, -a, 0, 0.12, 1.1, 0.36));
+  }
+  towerRoof(p, R + 0.4, 4, H, roof, 16);
+  return mergedProp(p);
+}
+
+/** A CASTLE GATEHOUSE — two short turrets with cone roofs and a white arch wall
+ *  between them with a dark opening through it. The passage runs along x. */
+export function skCastleGate(): THREE.Object3D {
+  const p: THREE.BufferGeometry[] = [];
+  for (const sz of [-2.9, 2.9]) {
+    const g: THREE.BufferGeometry[] = [];
+    g.push(part(cyl(1.6, 1.7, 14), STONE, 0, 3, 0, 0, 0, 0, 1, 6, 1));
+    towerRoof(g, 1.9, 2.8, 6, ROOF_BLUE, 14);
+    for (const q of g) p.push(q.translate(0, 0, sz));
+  }
+  p.push(part(box(), STONE, 0, 2.3, 0, 0, 0, 0, 1.6, 4.6, 2.8));
+  p.push(part(box(), STONE_D, 0, 4.7, 0, 0, 0, 0, 1.8, 0.2, 2.9));
+  for (const z of [-0.9, 0, 0.9]) p.push(part(box(), STONE, 0, 5.1, z, 0, 0, 0, 1.6, 0.6, 0.5));
+  // the passage, dark, open on both faces; a gold keystone over it
+  p.push(part(box(), EAVE, 0, 1.4, 0, 0, 0, 0, 1.7, 2.8, 1.5));
+  p.push(part(box(), GOLD, 0.82, 3.05, 0, 0, 0, 0, 0.12, 0.45, 0.5));
+  return mergedProp(p);
+}
+
+/** A CASTLE WALL — a crenellated run of white stone, 6 long (along z), with a
+ *  hanging blue banner and its gold stripe on the +x face. */
+export function skCastleWall(): THREE.Object3D {
+  const p: THREE.BufferGeometry[] = [
+    part(box(), STONE, 0, 1.2, 0, 0, 0, 0, 1.2, 2.4, 6),
+    part(box(), STONE_D, 0, 2.5, 0, 0, 0, 0, 1.35, 0.2, 6.1),
+  ];
+  for (let i = 0; i < 5; i++) p.push(part(box(), STONE, 0, 2.9, -2.5 + i * 1.25, 0, 0, 0, 1.2, 0.6, 0.7));
+  p.push(part(box(), GOLD, 0.66, 2.2, 0, 0, 0, 0, 0.08, 0.1, 1.1));
+  p.push(part(box(), ROOF_BLUE, 0.64, 1.45, 0, 0, 0, 0, 0.06, 1.4, 0.95));
+  p.push(part(box(), GOLD, 0.66, 1.05, 0, 0, 0, 0, 0.07, 0.2, 0.95));
+  return voiced(mergedProp(p), 'crumble');
+}
+
+// ══ THE CLOUD GARDENS AND THE TOWN ═════════════════════════════════════════
+/** A CLOUD COTTAGE — round, white, a dark eave and a pointed roof in blue, rose
+ *  or mint, a gold door facing +x. About 5.2 tall. Somebody's house. */
+export function skCloudCottage(roof = ROOF_BLUE): THREE.Object3D {
+  const p: THREE.BufferGeometry[] = [];
+  const R = 1.8, H = 2.2;
+  p.push(part(cyl(R + 0.2, R + 0.25, 14), STONE_D, 0, 0.1, 0, 0, 0, 0, 1, 0.2, 1));
+  p.push(part(cyl(R, R + 0.05, 14), STONE, 0, H / 2, 0, 0, 0, 0, 1, H, 1));
+  p.push(part(box(), GOLD, R + 0.02, 0.65, 0, 0, 0, 0, 0.12, 1.3, 0.75));
+  p.push(part(cyl(0.28, 0.28, 10), EAVE, 0, 1.45, R - 0.02, Math.PI / 2, 0, 0, 1, 0.1, 1));
+  p.push(part(cyl(0.28, 0.28, 10), EAVE, 0, 1.45, -(R - 0.02), Math.PI / 2, 0, 0, 1, 0.1, 1));
+  towerRoof(p, R + 0.35, 2.6, H, roof, 14);
+  return mergedProp(p);
+}
+
+/** A CLOUD TREE — a gold-cream trunk under overlapping puffs in one pastel
+ *  (mint, peach or lilac: CLOUD_TINTS), with a paler sunlit crown. Never
+ *  white; white is the ground's. About 5.7 tall. */
+export function skCloudTree(tint = 0): THREE.Object3D {
+  const [body, top] = CLOUD_TINTS[((tint % 3) + 3) % 3];
+  return voiced(mergedProp([
+    part(cyl(0.22, 0.32, 8), TRUNK, 0, 1.3, 0, 0, 0, 0, 1, 2.6, 1),
+    part(sph(), body, 0, 3.5, 0, 0, 0, 0, 2.8, 2.3, 2.8),
+    part(sph(), body, 0.95, 3.1, 0.45, 0, 0, 0, 2.0, 1.7, 2.0),
+    part(sph(), body, -0.85, 3.15, -0.5, 0, 0, 0, 2.1, 1.8, 2.1),
+    part(sph(), body, -0.3, 3.0, 0.95, 0, 0, 0, 1.8, 1.5, 1.8),
+    part(sph(), top, 0.15, 4.55, -0.15, 0, 0, 0, 2.0, 1.6, 2.0),
+  ]), 'poof');
+}
+
+/** A PUFF BUSH — three low pastel puffs, two tones. */
+export function skPuffBush(tint = 0): THREE.Object3D {
+  const [body, top] = CLOUD_TINTS[((tint % 3) + 3) % 3];
+  return voiced(mergedProp([
+    part(sph(), body, 0, 0.3, 0, 0, 0, 0, 0.8, 0.6, 0.8),
+    part(sph(), body, 0.38, 0.24, 0.2, 0, 0, 0, 0.6, 0.48, 0.6),
+    part(sph(), top, -0.2, 0.36, -0.25, 0, 0, 0, 0.6, 0.5, 0.6),
+  ]), 'poof');
+}
+
+/** A BELL POST — a slim white post with a blue cap and a gold hand bell on a
+ *  bracket. The festival's small bells; the cloud sweepers walk between them. */
+export function skBellPost(): THREE.Object3D {
+  return voiced(mergedProp([
+    part(box(), STONE_D, 0, 0.08, 0, 0, 0, 0, 0.5, 0.16, 0.5),
+    part(cyl(0.09, 0.11, 8), STONE, 0, 1.06, 0, 0, 0, 0, 1, 1.8, 1),
+    part(cone(8), ROOF_BLUE, 0, 2.12, 0, 0, 0, 0, 0.38, 0.32, 0.38),
+    part(box(), GOLD, 0.26, 1.78, 0, 0, 0, 0, 0.52, 0.07, 0.07),
+    part(cyl(0.07, 0.17, 10), GOLD, 0.47, 1.58, 0, 0, 0, 0, 1, 0.28, 1),
+    part(cyl(0.19, 0.19, 10), GOLD_D, 0.47, 1.43, 0, 0, 0, 0, 1, 0.05, 1),
+  ]), 'ding');
+}
+
+/** A BELL SHRINE — an open pavilion: four white posts, a dark eave, a blue
+ *  pyramid roof, and a small gold bell hanging inside. */
+export function skBellShrine(): THREE.Object3D {
+  const p: THREE.BufferGeometry[] = [part(box(), STONE_D, 0, 0.1, 0, 0, 0, 0, 2.6, 0.2, 2.6)];
+  for (const [dx, dz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+    p.push(part(box(), STONE, dx, 1.35, dz, 0, 0, 0, 0.26, 2.3, 0.26));
+  }
+  p.push(part(box(), EAVE, 0, 2.55, 0, 0, 0, 0, 2.7, 0.2, 2.7));
+  p.push(part(cone(4), ROOF_BLUE, 0, 3.5, 0, 0, Math.PI / 4, 0, 3.9, 1.7, 3.9));
+  p.push(part(sph(), GOLD, 0, 4.45, 0, 0, 0, 0, 0.4));
+  p.push(part(box(), GOLD_D, 0, 2.2, 0, 0, 0, 0, 0.15, 0.5, 0.15));
+  p.push(part(cyl(0.22, 0.45, 12), GOLD, 0, 1.7, 0, 0, 0, 0, 1, 0.6, 1));
+  p.push(part(cyl(0.5, 0.5, 12), GOLD_D, 0, 1.36, 0, 0, 0, 0, 1, 0.1, 1));
+  return voiced(mergedProp(p), 'ding');
+}
+
+/** A BROKEN COLUMN — the "old style" ruins: a fluted white stump on its base, a
+ *  fallen drum beside it and a gold capital fragment in the cloud. */
+export function skBrokenColumn(big = false): THREE.Object3D {
+  const s = big ? 1.35 : 1;
+  const p: THREE.BufferGeometry[] = [
+    part(box(), STONE_D, 0, 0.125 * s, 0, 0, 0, 0, 1.2 * s, 0.25 * s, 1.2 * s),
+    part(cyl(0.42 * s, 0.46 * s, 12), STONE, 0, 0.95 * s, 0, 0, 0, 0, 1, 1.4 * s, 1),
+    part(cyl(0.3 * s, 0.42 * s, 7), STONE_D, 0.05 * s, 1.72 * s, 0, 0, 0, 0.3, 1, 0.25 * s, 1),
+  ];
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    p.push(part(box(), STONE_D, Math.cos(a) * 0.44 * s, 0.95 * s, Math.sin(a) * 0.44 * s, 0, -a, 0, 0.07 * s, 1.3 * s, 0.1 * s));
+  }
+  p.push(part(cyl(0.4 * s, 0.4 * s, 12), STONE, 1.0 * s, 0.4 * s, 0.3 * s, 0, 0.4, Math.PI / 2, 1, 0.55 * s, 1));
+  p.push(part(box(), GOLD, -0.75 * s, 0.11 * s, -0.35 * s, 0, 0.5, 0, 0.7 * s, 0.22 * s, 0.55 * s));
+  // stone crumbles. It goes down as qk 'small', which says nothing, so the
+  // factory says it (the same for the wall, the fountain and the bridge)
+  return voiced(mergedProp(p), 'crumble');
+}
+
+/** A MARKET STALL — a striped awning (rose or blue on white) on white posts
+ *  over a gold counter; the front faces +x. Somebody's shop. */
+export function skMarketStall(stripe = ROSE): THREE.Object3D {
+  const p: THREE.BufferGeometry[] = [
+    part(box(), GOLD, 0.35, 0.45, 0, 0, 0, 0, 0.9, 0.9, 2.2),
+    part(box(), STONE, 0.35, 0.93, 0, 0, 0, 0, 1.0, 0.07, 2.3),
+  ];
+  for (const [dx, dz] of [[0.8, 1.15], [-0.75, 1.15], [0.8, -1.15], [-0.75, -1.15]]) {
+    p.push(part(cyl(0.06, 0.06, 6), STONE, dx, 1.15, dz, 0, 0, 0, 1, 2.3, 1));
+  }
+  for (let i = 0; i < 6; i++) {
+    p.push(part(box(), i % 2 ? STONE : stripe, 0.1, 2.38, -1.0 + i * 0.4, 0, 0, -0.25, 1.95, 0.08, 0.4));
+  }
+  // the awning's front edge: a dark valance line, the crown rule on a stall
+  p.push(part(box(), EAVE, 1.05, 2.12, 0, 0, 0, 0, 0.08, 0.14, 2.45));
+  for (const z of [-0.6, 0, 0.6]) p.push(part(cyl(0.16, 0.18, 8), GOLD_D, 0.35, 1.05, z, 0, 0, 0, 1, 0.18, 1));
+  return mergedProp(p);
+}
+
+/** A CLOUD FOUNTAIN — a round white basin, a pale pool, a slim pillar with a
+ *  small bowl and a gold ball on top. */
+export function skCloudFountain(): THREE.Object3D {
+  return voiced(mergedProp([
+    part(cyl(1.45, 1.55, 18), STONE, 0, 0.275, 0, 0, 0, 0, 1, 0.55, 1),
+    part(cyl(1.25, 1.25, 18), WATER, 0, 0.53, 0, 0, 0, 0, 1, 0.06, 1),
+    part(cyl(0.18, 0.26, 10), STONE, 0, 1.2, 0, 0, 0, 0, 1, 1.3, 1),
+    part(cyl(0.55, 0.3, 12), STONE, 0, 1.5, 0, 0, 0, 0, 1, 0.2, 1),
+    part(cyl(0.45, 0.45, 12), WATER, 0, 1.61, 0, 0, 0, 0, 1, 0.03, 1),
+    part(sph(), GOLD, 0, 1.9, 0, 0, 0, 0, 0.56),
+  ]), 'crumble');
+}
+
+/** A BANNER POLE — a tall white pole flying a long blue pennant with a gold
+ *  stripe. The pennant is rolled toward the sky so from 46 degrees up it is a
+ *  stroke of colour, not an edge. */
+export function skBannerPole(): THREE.Object3D {
+  const ROLL = -1.0;   // tips the pennant's broad face up toward the camera
+  return mergedProp([
+    part(box(), STONE_D, 0, 0.1, 0, 0, 0, 0, 0.5, 0.2, 0.5),
+    part(cyl(0.06, 0.08, 8), STONE, 0, 2.3, 0, 0, 0, 0, 1, 4.2, 1),
+    part(sph(), GOLD, 0, 4.48, 0, 0, 0, 0, 0.3),
+    part(box(), ROOF_BLUE, 0.75, 3.85, 0, ROLL, 0, 0, 1.4, 0.6, 0.05),
+    part(box(), ROOF_BLUE, 1.85, 3.85, 0, ROLL, 0, 0, 0.8, 0.34, 0.05),
+    part(box(), GOLD, 1.05, 3.87, 0.02, ROLL, 0, 0, 2.0, 0.12, 0.06),
+  ]);
+}
+
+/** A CLOUD BRIDGE — the poster's curving footbridge: an arched white deck with
+ *  gold rails, on stone feet in a cloud of puffs. Its long axis is x. */
+export function skCloudBridge(): THREE.Object3D {
+  const p: THREE.BufferGeometry[] = [];
+  const N = 7, L = 7.2, RISE = 1.5;
+  for (let i = 0; i < N; i++) {
+    const t = i / (N - 1);
+    // 0.52 lifts the steepest (end) segment's low corner clear of the ground:
+    // a 1.3 x 0.35 plank tilted 33 degrees reaches 0.50 below its centre
+    const x = -L / 2 + t * L, y = 0.52 + RISE * Math.sin(Math.PI * t);
+    const tilt = Math.atan((RISE * Math.PI * Math.cos(Math.PI * t)) / L);
+    p.push(part(box(), STONE, x, y, 0, 0, 0, tilt, 1.3, 0.35, 1.6));
+    for (const z of [-0.75, 0.75]) {
+      p.push(part(box(), GOLD, x, y + 0.6, z, 0, 0, tilt, 1.3, 0.1, 0.1));
+      p.push(part(box(), GOLD, x, y + 0.32, z, 0, 0, 0, 0.1, 0.5, 0.1));
+    }
+  }
+  for (const sx of [-1, 1]) {
+    p.push(part(box(), STONE_D, sx * 3.95, 0.25, 0, 0, 0, 0, 1.0, 0.5, 2.0));
+    for (const z of [-0.95, 0.95]) p.push(part(sph(), PUFF_W, sx * 4.3, 0.35, z, 0, 0, 0, 1.2, 0.7, 1.0));
+  }
+  return voiced(mergedProp(p), 'crumble');
+}
+
+// ══ THE BALLOONS — visitors from every island, docking for the festival ════
+
+// ── BAGGED — a fridge-sized roll of fabric, strapped. The lowest stage.
 //
 //    IT SQUEAKS WHEN EATEN, AND THE FACTORY SAYS SO. Every other envelope
 //    reaches the classifier (prototype3d.ts eatVoiceOf) with island.ts's
-//    `balloon` papers on it. The 57 bags in the arrivals scatter do not: they
-//    go down as plain qk 'big', and 'big' is the building rule, so they
-//    crumbled like a hangar while the same mesh dropped through tagBalloon
-//    squeaked (qa/eatvoice.mjs (r), which reads a prop's shape against its
-//    voice). The papers are not the fix — tagBalloon numbers the envelope and
-//    puts it in the ascension's roll call (life.ts), which is gameplay. The
-//    tag is a userData write after the geometry is built: no draw moves.
+//    `balloon` papers on it. The bags in the dock scatter do not: they go down
+//    as plain qk 'big', and 'big' is the building rule, so they crumbled while
+//    the same mesh dropped through tagBalloon squeaked (qa/eatvoice.mjs (r)).
 export function skBalloonBagged(cols: [number, number, number] = ENVELOPE[0]): THREE.Object3D {
   return voiced(mergedProp([
     part(cyl(0.5, 0.5, 10), cols[0], 0, 0.55, 0, 0, 0, Math.PI / 2, 1.1, 2.4, 1.1),
@@ -155,10 +476,8 @@ export function skBalloonBagged(cols: [number, number, number] = ENVELOPE[0]): T
   ]), 'squeak');
 }
 
-// ── SPILLED — a long flat gore-striped crescent laid out on the grass, two to
-//    three times longer than wide. THIS IS THE ONE THE POSTER SELLS: from
-//    directly overhead it is spilled paint, and it is the stage that makes a
-//    field of balloons read as a composition instead of a car park.
+// ── SPILLED — a long flat gore-striped crescent laid out on the cloud, two to
+//    three times longer than wide: from directly overhead it is spilled paint.
 export function skBalloonSpilled(cols: [number, number, number] = ENVELOPE[1]): THREE.Object3D {
   const p: THREE.BufferGeometry[] = [];
   const L = 9.5;
@@ -171,18 +490,15 @@ export function skBalloonSpilled(cols: [number, number, number] = ENVELOPE[1]): 
     const wide = 1.5 + Math.sin(t * Math.PI) * 1.9;
     p.push(part(box(), col, x, 0.16, z, 0, Math.sin(t * Math.PI) * 0.22, 0, L / 14 + 0.12, 0.30, wide));
   }
-  // the mouth end, gathered, and the crown end with its dark ring lying flat
   // the gathered mouth: a cylinder on its side, so its RADIUS is its vertical
   // half-height. At y=0.22 with a 0.75 radius the mouth sat 0.53 UNDER the
-  // grass — invisible in a screenshot and 2,477 'sunk' rows in the audit.
+  // ground — invisible in a screenshot and 2,477 'sunk' rows in the audit.
   p.push(part(cyl(0.5, 0.5, 10), SKIRT_D, -L * 0.5 - 0.2, 0.78, 0, Math.PI / 2, 0, 0, 1.5, 0.34, 1.5));
   p.push(part(torus(0.10, 12), SKIRT_D, L * 0.5 + 0.1, 0.20, 1.0, Math.PI / 2, 0, 0, 1.5, 1.5, 1.5));
   return mergedProp(p);
 }
 
-// ── COLD — a fat lying sausage, half-inflated, propped off the ground along
-//    its length with a fan at its mouth. Mid height. The stage where the shape
-//    has arrived but the balloon has not stood up.
+// ── COLD — a fat lying sausage, half-inflated, a fan at its mouth.
 export function skBalloonCold(cols: [number, number, number] = ENVELOPE[2]): THREE.Object3D {
   const p: THREE.BufferGeometry[] = [];
   for (let i = 0; i < 9; i++) {
@@ -196,12 +512,10 @@ export function skBalloonCold(cols: [number, number, number] = ENVELOPE[2]): THR
   return mergedProp(p);
 }
 
-// ── STANDING — the full envelope, upright, and the only tall thing on the
-//    field. ONE MESH, ONE RADIUS. All four crown rules: gores to the crown, a
-//    dark crown ring, a dark skirt lifted clear of the basket, three colours.
-//    ~14 units tall, which is under every building the game already ships
-//    (maple #0 is 19.4, pirate #2737 is 23.4) and well inside what
-//    fadeOccluders already handles.
+// ── STANDING — the full envelope, upright: the poster's docked balloons. ONE
+//    MESH, ONE RADIUS. All four crown rules. 9.48 units tall and 9.6 x 9.6 on
+//    the ground (qa/kitfit.mjs, recorded in docs/BELLCLOUD.md §14; this note
+//    said "~14" until then), under the Great Bell and the Keep.
 export function skBalloonStanding(cols: [number, number, number] = ENVELOPE[3]): THREE.Object3D {
   const R = 4.6, H = 9.4;
   const p = goreDome(cols, R, H, 12);
@@ -216,82 +530,17 @@ export function skBalloonStanding(cols: [number, number, number] = ENVELOPE[3]):
     p.push(part(cyl(0.06, 0.06, 6), STEEL, -0.55, 1.75, dz, 0, 0, 0, 1, 1.5, 1));
   }
   p.push(part(box(), STEEL_D, 0, 2.45, 0, 0, 0, 0, 1.5, 0.14, 1.5));
-  // the basket, and the four tiny people are the crowd's job, not the prop's
   p.push(part(box(), WICKER, 0, 0.62, 0, 0, 0, 0, 1.55, 1.25, 1.35));
   p.push(part(box(), WICKER_D, 0, 1.22, 0, 0, 0, 0, 1.62, 0.14, 1.42));
   p.push(part(box(), WICKER_D, 0, 0.10, 0, 0, 0, 0, 1.62, 0.16, 1.42));
   return mergedProp(p);
 }
 
-// ── THE WHALE, G-WAIL ──────────────────────────────────────────────────────
-// The hero prop and the biggest single object in the game. Cobalt, white
-// belly, and one small absurd entirely convincing eye — the eye is the whole
-// character and it gets the parts it needs.
-
-/** LYING — a colossal crescent of fabric spilled across the launch circle,
- *  70 3D units nose to tail, flukes flat on the concrete. For the first half
- *  of the match the child can walk her whole length before they are big enough
- *  to eat any of her. From directly overhead at dawn on grey concrete this is
- *  the most striking image this game has produced. */
-export function skWhaleLying(): THREE.Object3D {
-  const p: THREE.BufferGeometry[] = [];
-  const BLUE = 0x2c62b8, BELLY = 0xe9eef5, BLUE_D = 0x1d4384;
-  const L = 70;
-  for (let i = 0; i < 26; i++) {
-    const t = i / 25;
-    const x = -L * 0.5 + t * L;
-    const z = Math.sin(t * Math.PI * 0.9) * 4.2;
-    // fat at the head, tapering to the tail stock
-    const wide = 2.0 + Math.sin(Math.min(1, t * 1.35) * Math.PI) * 7.4;
-    const col = t > 0.30 && t < 0.86 && i % 3 === 0 ? BELLY : BLUE;
-    p.push(part(cyl(0.5, 0.5, 10), col, x, 0.30 + wide * 0.5, z, 0, 0, Math.PI / 2, wide, L / 26 + 0.3, wide * 0.55));
-  }
-  // the tail flukes, flat on the ground
-  p.push(part(box(), BLUE_D, L * 0.5 + 1.6, 0.22, 5.6, 0, 0.5, 0, 7.5, 0.35, 3.2));
-  p.push(part(box(), BLUE_D, L * 0.5 + 1.6, 0.22, 1.4, 0, -0.5, 0, 7.5, 0.35, 3.2));
-  // one pectoral fin, spread
-  p.push(part(box(), BLUE_D, -L * 0.24, 0.24, 7.4, 0, 0.35, 0, 6.0, 0.32, 2.6));
-  // THE EYE — and it is the reason a child says "there was a WHALE"
-  p.push(part(sph(), 0xf7f7f2, -L * 0.42, 3.6, 4.1, 0, 0, 0, 2.1, 2.1, 1.0));
-  p.push(part(sph(), 0x121826, -L * 0.42 - 0.35, 3.7, 4.5, 0, 0, 0, 1.15, 1.15, 0.7));
-  p.push(part(sph(), 0xffffff, -L * 0.42 - 0.6, 4.05, 4.7, 0, 0, 0, 0.4, 0.4, 0.3));
-  // the mouth line, a long dark seam
-  p.push(part(box(), BLUE_D, -L * 0.36, 1.10, 0, 0, 0.06, 0, 13.0, 0.22, 8.4));
-  return mergedProp(p);
-}
-
-/** STANDING — she cold-inflates and stands at beat 3. A blue dome with a white
- *  belly and the eye, and she is the last thing eaten: the child who gets her
- *  gets her in the two seconds after her basket leaves the ground. */
-export function skWhaleStanding(): THREE.Object3D {
-  const BLUE = 0x2c62b8, BELLY = 0xe9eef5, BLUE_D = 0x1d4384;
-  const R = 9.5, H = 17.5;
-  const p = goreDome([BLUE, BLUE, BELLY], R, H, 14);
-  p.push(part(cyl(0.5, 0.5, 12), SKIRT_D, 0, H - 0.2, 0, 0, 0, 0, 2.4, 0.6, 2.4));
-  p.push(part(cyl(3.9, 2.6, 14), SKIRT_D, 0, 4.4, 0, 0, 0, 0, 1, 2.2, 1));
-  // the flukes, now hanging behind her
-  p.push(part(box(), BLUE_D, -8.6, 7.0, 3.0, 0, 0.5, 0, 8.0, 0.4, 3.4));
-  p.push(part(box(), BLUE_D, -8.6, 7.0, -3.0, 0, -0.5, 0, 8.0, 0.4, 3.4));
-  // THE EYE, and it must survive the shrink to a card thumbnail
-  p.push(part(sph(), 0xf7f7f2, 7.4, 10.6, 3.6, 0, 0, 0, 3.4, 3.4, 2.0));
-  p.push(part(sph(), 0x121826, 8.1, 10.7, 4.2, 0, 0, 0, 1.9, 1.9, 1.3));
-  p.push(part(sph(), 0xffffff, 8.3, 11.3, 4.5, 0, 0, 0, 0.7, 0.7, 0.5));
-  // basket and frame
-  p.push(part(box(), WICKER, 0, 1.0, 0, 0, 0, 0, 2.6, 2.0, 2.3));
-  p.push(part(box(), WICKER_D, 0, 2.0, 0, 0, 0, 0, 2.7, 0.2, 2.4));
-  p.push(part(box(), STEEL_D, 0, 4.2, 0, 0, 0, 0, 2.4, 0.16, 2.2));
-  return mergedProp(p);
-}
-
-// ── THE CREW KIT ───────────────────────────────────────────────────────────
+// ── THE BALLOON CREWS' KIT ─────────────────────────────────────────────────
 // Everything a balloon crew touches, and every one of these is an errand
-// DESTINATION for the crowd: a crew's whole morning is carrying something from
-// a named A to a named B and then standing still with their hands busy, which
-// is exactly the shape life.ts's errand opt-in rewards.
+// DESTINATION for the crowd (life.ts).
 
-/** A wicker basket — the classic rounded rectangle with padded leather corners
- *  and two cylinders inside. Four adults can just carry it, which is the
- *  longest and most legible walk in the game. */
+/** A wicker basket with padded leather corners and two cylinders inside. */
 export function skBasket(): THREE.Object3D {
   const p = [
     part(box(), WICKER, 0, 0.62, 0, 0, 0, 0, 1.55, 1.25, 1.35),
@@ -306,10 +555,7 @@ export function skBasket(): THREE.Object3D {
   return mergedProp(p);
 }
 
-/** The stainless frame that sits over a basket, with the burner coil and pilot.
- *  The pilot is on the glow material — it is the only warm point light on the
- *  field at dawn apart from the vans, and a neon thing is neon because it
- *  ignores the lighting. */
+/** The stainless frame that sits over a basket, with the burner coil. */
 export function skBurnerFrame(): THREE.Object3D {
   const p: THREE.BufferGeometry[] = [];
   for (const [dx, dz] of [[0.55, 0.55], [-0.55, 0.55], [0.55, -0.55], [-0.55, -0.55]]) {
@@ -321,8 +567,7 @@ export function skBurnerFrame(): THREE.Object3D {
   return mergedProp(p);
 }
 
-/** The burner's pilot flame. Separate and on PROP_GLOW_MAT, because the flame
- *  must not be shaded by a sun that has not risen. */
+/** The burner's pilot flame, on PROP_GLOW_MAT: a flame is a light. */
 export function skPilotFlame(): THREE.Object3D {
   return mergedProp([
     part(cone(6), 0xffb347, 0, 0.22, 0, Math.PI, 0, 0, 0.30, 0.55, 0.30),
@@ -330,8 +575,7 @@ export function skPilotFlame(): THREE.Object3D {
   ], PROP_GLOW_MAT);
 }
 
-/** A petrol inflator fan in a round cage — the loudest thing on the field, and
- *  the destination of the shortest errand in the world. */
+/** An inflator fan in a round cage — the destination of the shortest errand. */
 export function skInflatorFan(): THREE.Object3D {
   const p = [
     part(box(), STEEL_D, 0, 0.18, 0, 0, 0, 0, 1.1, 0.30, 0.9),
@@ -345,7 +589,7 @@ export function skInflatorFan(): THREE.Object3D {
   return mergedProp(p);
 }
 
-/** Two propane cylinders standing together, strapped. */
+/** Two burner-fuel cylinders standing together, strapped. */
 export function skCylinderPair(): THREE.Object3D {
   return mergedProp([
     part(cyl(0.5, 0.5, 10), 0xd8443a, 0.22, 0.52, 0, 0, 0, 0, 0.44, 1.05, 0.44),
@@ -356,8 +600,7 @@ export function skCylinderPair(): THREE.Object3D {
   ]);
 }
 
-/** A coil of crown line and its stake — the far end of a thirty-metre walk
- *  that ends with somebody standing still, facing back. A perfect journey. */
+/** A coil of crown line and its stake. */
 export function skCrownLine(): THREE.Object3D {
   return mergedProp([
     part(torus(0.09, 12), 0xe8e2d0, 0, 0.12, 0, Math.PI / 2, 0, 0, 0.85, 0.85, 0.85),
@@ -366,15 +609,16 @@ export function skCrownLine(): THREE.Object3D {
   ]);
 }
 
-/** An open trailer with a roof rack, tailgate down, an envelope bag half out.
- *  The arrivals field is a row of these, nose-in. */
+/** A BASKET CART — the open trailer a visiting crew brought its balloon in on,
+ *  wooden now with cream sides, tailgate down, an envelope bag half out. It
+ *  has wheels, so it meeps (kind 'trailer' in island.ts). */
 export function skTrailer(): THREE.Object3D {
   return mergedProp([
-    part(box(), 0x9aa0ad, 0, 0.62, 0, 0, 0, 0, 3.4, 0.34, 1.8),
-    part(box(), 0x6e7482, 0, 0.86, 0.85, 0, 0, 0, 3.3, 0.55, 0.14),
-    part(box(), 0x6e7482, 0, 0.86, -0.85, 0, 0, 0, 3.3, 0.55, 0.14),
-    part(box(), 0x6e7482, -1.65, 0.86, 0, 0, 0, 0, 0.14, 0.55, 1.7),
-    part(box(), 0x8f6f42, 1.85, 0.24, 0, 0, 0, -0.35, 1.0, 0.14, 1.7),
+    part(box(), WICKER, 0, 0.62, 0, 0, 0, 0, 3.4, 0.34, 1.8),
+    part(box(), CREAM, 0, 0.86, 0.85, 0, 0, 0, 3.3, 0.55, 0.14),
+    part(box(), CREAM, 0, 0.86, -0.85, 0, 0, 0, 3.3, 0.55, 0.14),
+    part(box(), CREAM, -1.65, 0.86, 0, 0, 0, 0, 0.14, 0.55, 1.7),
+    part(box(), WICKER_D, 1.85, 0.24, 0, 0, 0, -0.35, 1.0, 0.14, 1.7),
     part(cyl(0.5, 0.5, 10), SKIRT_D, 0.6, 0.34, 0.92, 0, 0, Math.PI / 2, 0.68, 0.22, 0.68),
     part(cyl(0.5, 0.5, 10), SKIRT_D, 0.6, 0.34, -0.92, 0, 0, Math.PI / 2, 0.68, 0.22, 0.68),
     part(cyl(0.5, 0.5, 10), 0xe4513a, 1.0, 0.92, 0, 0, 0, Math.PI / 2, 0.85, 1.5, 0.85),
@@ -382,240 +626,109 @@ export function skTrailer(): THREE.Object3D {
   ]);
 }
 
-/** A screw tether pin with a loop of line — the launch circle is ringed with
- *  them, and pulling them is what starts the finale. */
+/** A MOORING POST — a gold stake with a ring, where a balloon ties up. */
 export function skTetherPin(): THREE.Object3D {
   return mergedProp([
-    part(cyl(0.5, 0.5, 8), STEEL_D, 0, 0.18, 0, 0, 0, 0, 0.16, 0.38, 0.16),
+    part(cyl(0.5, 0.5, 8), GOLD, 0, 0.18, 0, 0, 0, 0, 0.16, 0.38, 0.16),
     part(torus(0.06, 10), STEEL, 0, 0.40, 0, 0, 0, 0, 0.30, 0.30, 0.30),
     part(box(), 0xf5b731, 0, 0.05, 0, 0, 0, 0, 0.55, 0.08, 0.55),
   ]);
 }
 
-// ── THE TOWER DISTRICT ─────────────────────────────────────────────────────
-
-/** The preserved control tower, CHECKERBOARD-painted by volunteers every
- *  spring. The checkerboard is the point: it is the one high-frequency pattern
- *  allowed in this world, and from directly overhead it is the only object on
- *  the field that reads instantly as man-made and cared for. Mr Pym broadcasts
- *  from the balcony and does not come down. */
-export function skControlTower(): THREE.Object3D {
-  const p: THREE.BufferGeometry[] = [];
-  const W = 2.6, H = 6.2;
-  p.push(part(box(), CANVAS_W, 0, H * 0.5, 0, 0, 0, 0, W, H, W));
-  // the checkerboard, four courses of alternating squares round the shaft
-  for (let ring = 0; ring < 4; ring++) {
-    const y = 0.8 + ring * 1.15;
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2;
-      const col = (ring + i) % 2 ? 0xd84c34 : CANVAS_W;
-      p.push(part(box(), col, Math.cos(a) * (W * 0.5 + 0.02), y, Math.sin(a) * (W * 0.5 + 0.02),
-        0, -a, 0, 0.10, 1.0, W * 0.52));
-    }
-  }
-  // the cab: glazed, oversailing, with a dark eave line under it so it does not
-  // merge with the shaft from above — the same trick alpine.ts uses on a roof
-  p.push(part(box(), 0x2b3550, 0, H + 0.75, 0, 0, 0, 0, W + 1.3, 1.5, W + 1.3));
-  p.push(part(box(), 0x9fc4e8, 0, H + 0.95, 0, 0, 0, 0, W + 1.16, 0.95, W + 1.16));
-  p.push(part(box(), SKIRT_D, 0, H + 1.58, 0, 0, 0, 0, W + 1.7, 0.22, W + 1.7));
-  p.push(part(box(), 0x8e8b98, 0, H + 1.78, 0, 0, 0, 0, W + 1.5, 0.20, W + 1.5));
-  // the balcony rail and the external stair
-  p.push(part(box(), STEEL, 0, H + 0.15, 0, 0, 0, 0, W + 2.0, 0.12, W + 2.0));
-  for (let i = 0; i < 7; i++) {
-    p.push(part(box(), STEEL_D, W * 0.5 + 0.55, 0.5 + i * 0.85, 0, 0, 0, 0, 0.9, 0.10, 0.7));
-  }
-  return mergedProp(p);
-}
-
-/** A louvred instrument hut on legs, white — the met station whose excellent
- *  instruments answer the wrong question with total confidence. */
-export function skMetHut(): THREE.Object3D {
-  const p = [
-    part(box(), CANVAS_W, 0, 1.05, 0, 0, 0, 0, 0.95, 0.85, 0.85),
-    part(box(), SKIRT_D, 0, 1.52, 0, 0, 0, 0, 1.10, 0.14, 1.00),
-  ];
-  for (let i = 0; i < 4; i++) {
-    p.push(part(box(), 0xc8c6bd, 0.49, 0.78 + i * 0.20, 0, 0, 0, 0.18, 0.05, 0.14, 0.82));
-  }
-  for (const [dx, dz] of [[0.34, 0.30], [-0.34, 0.30], [0.34, -0.30], [-0.34, -0.30]]) {
-    p.push(part(cyl(0.5, 0.5, 6), 0x8f8b80, dx, 0.32, dz, 0, 0, 0, 0.10, 0.64, 0.10));
-  }
-  return mergedProp(p);
-}
-
-/** An old touring caravan with its awning out and a whiteboard — the briefing
- *  room, and the only place on the field with a kettle.
- *
- *  It meeps when eaten, like the ticket caravan at arrivals: the same build on
- *  the same two wheels. That one reaches the classifier as kind 'caravan',
- *  which island.ts writes because life.ts's ticket sellers look it up by kind
- *  (`byKind('caravan')[0]`); this one had no kind, fell through to qk 'house'
- *  and crumbled. It is tagged here rather than given the kind, so the sellers'
- *  lookup still finds exactly one caravan. */
-export function skBriefingCaravan(): THREE.Object3D {
-  return voiced(mergedProp([
-    part(box(), CANVAS_W, 0, 1.05, 0, 0, 0, 0, 3.2, 1.35, 1.7),
-    part(box(), 0x9fb6c8, 0, 1.78, 0, 0, 0, 0, 3.0, 0.30, 1.6),
-    part(box(), SKIRT_D, 0, 1.95, 0, 0, 0, 0, 3.3, 0.14, 1.85),
-    part(box(), 0x2b3550, 0.9, 1.15, 0.86, 0, 0, 0, 0.85, 0.55, 0.06),
-    part(box(), 0x2b3550, -0.7, 1.15, 0.86, 0, 0, 0, 0.55, 0.55, 0.06),
-    part(box(), 0xf5b731, 0, 2.10, 1.15, 0, 0, -0.22, 2.4, 0.06, 1.5),
-    part(cyl(0.06, 0.06, 6), STEEL, 1.15, 1.05, 1.85, 0, 0, 0, 1, 2.1, 1),
-    part(cyl(0.06, 0.06, 6), STEEL, -1.15, 1.05, 1.85, 0, 0, 0, 1, 2.1, 1),
-    part(box(), CHALK, -1.75, 1.20, 0, 0, 0, 0, 0.08, 0.90, 1.20),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.85, 0.34, 0.88, 0, 0, Math.PI / 2, 0.66, 0.22, 0.66),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.85, 0.34, -0.88, 0, 0, Math.PI / 2, 0.66, 0.22, 0.66),
-  ]), 'meep');
-}
-
-/** A flagpole with a limp flag, and a windsock hanging straight down. BOTH ARE
- *  CHARACTERS, not dressing: the air is dead calm, which is the entire reason a
- *  balloon meet happens at dawn, and these two are how the field says so
- *  without a word. */
-export function skFlagpole(): THREE.Object3D {
+/** THE TICKET WAGON — the first thing at the Balloon Dock: a rose canvas wagon
+ *  with a gold roof and one bulb on. */
+export function skTicketCaravan(): THREE.Object3D {
   return mergedProp([
-    part(cyl(0.05, 0.06, 6), CANVAS_W, 0, 2.2, 0, 0, 0, 0, 1, 4.4, 1),
-    part(box(), 0x8f8b80, 0, 0.10, 0, 0, 0, 0, 0.55, 0.20, 0.55),
-    part(box(), 0xd8443a, 0.10, 3.55, 0, 0, 0, 0.06, 0.16, 1.05, 0.55),
+    part(box(), WAGON_ROSE, 0, 0.95, 0, 0, 0, 0, 2.4, 1.25, 1.5),
+    part(box(), GOLD, 0, 1.62, 0, 0, 0, 0, 2.3, 0.26, 1.45),
+    part(box(), SKIRT_D, 0, 1.78, 0, 0, 0, 0, 2.5, 0.12, 1.65),
+    part(box(), 0xffd9a0, 0.55, 1.05, 0.78, 0, 0, 0, 0.85, 0.60, 0.06),
+    part(box(), 0x2b3550, -0.70, 1.00, 0.78, 0, 0, 0, 0.55, 0.70, 0.06),
+    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.5, 0.30, 0.78, 0, 0, Math.PI / 2, 0.58, 0.22, 0.58),
+    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.5, 0.30, -0.78, 0, 0, Math.PI / 2, 0.58, 0.22, 0.58),
   ]);
 }
 
-export function skWindsock(): THREE.Object3D {
-  return mergedProp([
-    part(cyl(0.05, 0.06, 6), STEEL_D, 0, 2.0, 0, 0, 0, 0, 1, 4.0, 1),
-    part(box(), 0x8f8b80, 0, 0.10, 0, 0, 0, 0, 0.5, 0.20, 0.5),
-    part(torus(0.05, 10), STEEL, 0.32, 3.85, 0, 0, 0, Math.PI / 2, 0.55, 0.55, 0.55),
-    part(cyl(0.30, 0.14, 8), 0xf06a25, 0.32, 3.25, 0, 0, 0, 0, 1, 1.25, 1),
-    part(cyl(0.16, 0.10, 8), CANVAS_W, 0.32, 2.55, 0, 0, 0, 0, 1, 0.55, 1),
-  ]);
-}
+// ── THE AVENUE AND THE PLAZA — paint and lights, not food ─────────────────
 
-/** A small vintage fire tender that has never been used, immaculate. */
-export function skFireTender(): THREE.Object3D {
-  return mergedProp([
-    part(box(), 0xb43e24, 0, 0.78, 0, 0, 0, 0, 3.0, 0.85, 1.5),
-    part(box(), 0x8e2f1b, 0.75, 1.45, 0, 0, 0, 0, 1.3, 0.75, 1.4),
-    part(box(), 0x9fc4e8, 1.25, 1.50, 0, 0, 0, 0, 0.35, 0.50, 1.25),
-    part(cyl(0.5, 0.5, 10), 0xe8e2d0, -0.9, 1.35, 0, 0, 0, Math.PI / 2, 0.55, 1.1, 0.55),
-    part(box(), STEEL, -0.2, 1.30, 0, 0, 0, 0, 1.4, 0.14, 1.3),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.95, 0.36, 0.80, 0, 0, Math.PI / 2, 0.70, 0.24, 0.70),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.95, 0.36, -0.80, 0, 0, Math.PI / 2, 0.70, 0.24, 0.70),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, -0.95, 0.36, 0.80, 0, 0, Math.PI / 2, 0.70, 0.24, 0.70),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, -0.95, 0.36, -0.80, 0, 0, Math.PI / 2, 0.70, 0.24, 0.70),
-  ]);
-}
-
-// ── THE AIRFIELD ITSELF ────────────────────────────────────────────────────
-// The things that make concrete read as an airfield from directly overhead.
-// Every one of these is LOW and FLAT on purpose: the runways are the level's
-// one sightline and furniture in them is furniture in the way.
-
-/** The big painted designator at a runway end. THESE ARE THE BIGGEST NUMERALS
- *  IN THE WORLD and they are read from directly above, so they are the single
- *  clearest statement of what this place is. Seven-segment digits in chalk on
- *  concrete, lying flat. */
-const SEG: Record<string, number[]> = {
-  //      top, tl, tr, mid, bl, br, bot
-  '0': [1, 1, 1, 0, 1, 1, 1], '1': [0, 0, 1, 0, 0, 1, 0], '2': [1, 0, 1, 1, 1, 0, 1],
-  '3': [1, 0, 1, 1, 0, 1, 1], '4': [0, 1, 1, 1, 0, 1, 0], '5': [1, 1, 0, 1, 0, 1, 1],
-  '6': [1, 1, 0, 1, 1, 1, 1], '7': [1, 0, 1, 0, 0, 1, 0], '8': [1, 1, 1, 1, 1, 1, 1],
-  '9': [1, 1, 1, 1, 0, 1, 1],
-};
-function digit(d: string, ox: number, s: number): THREE.BufferGeometry[] {
-  const on = SEG[d] ?? SEG['0'];
-  const t = 0.22 * s, L = 1.5 * s;
-  const g: THREE.BufferGeometry[] = [];
-  const bar = (x: number, z: number, w: number, h: number) =>
-    g.push(part(box(), CHALK, ox + x, 0.03, z, 0, 0, 0, w, 0.06, h));
-  if (on[0]) bar(0, -L, L, t);
-  if (on[1]) bar(-L * 0.5, -L * 0.5, t, L);
-  if (on[2]) bar(L * 0.5, -L * 0.5, t, L);
-  if (on[3]) bar(0, 0, L, t);
-  if (on[4]) bar(-L * 0.5, L * 0.5, t, L);
-  if (on[5]) bar(L * 0.5, L * 0.5, t, L);
-  if (on[6]) bar(0, L, L, t);
-  return g;
-}
-export function skThresholdNumerals(text = '03', s = 2.2): THREE.Object3D {
-  const g: THREE.BufferGeometry[] = [];
-  const chars = text.split('');
-  chars.forEach((c, i) => g.push(...digit(c, (i - (chars.length - 1) * 0.5) * 2.1 * s, s)));
-  return mergedProp(g);
-}
-
-/** One painted dash of the runway centreline. */
-export function skCentrelineDash(): THREE.Object3D {
-  return mergedProp([part(box(), CHALK, 0, 0.03, 0, 0, 0, 0, 3.0, 0.06, 0.45)]);
-}
-
-/** A low blue runway edge light, still on from the night. On the glow material:
- *  it is unlit by design, and at dawn these are the only cool points in a frame
- *  whose one warm accent is a burner. */
+/** AN AVENUE LANTERN — a low gold lamp along the Grand Avenue's edges. On the
+ *  glow material: the pale core is the part that crosses the bloom cut, and
+ *  qa/halocensus.mjs checks that nothing but a light does. */
 export function skRunwayEdgeLight(): THREE.Object3D {
   return mergedProp([
-    part(cyl(0.5, 0.5, 8), 0x3aa0ff, 0, 0.16, 0, 0, 0, 0, 0.24, 0.30, 0.24),
-    part(sph(), 0x9fd8ff, 0, 0.30, 0, 0, 0, 0, 0.26, 0.20, 0.26),
+    part(cyl(0.5, 0.5, 8), 0xffd98a, 0, 0.16, 0, 0, 0, 0, 0.24, 0.30, 0.24),
+    part(sph(), 0xfff3d0, 0, 0.30, 0, 0, 0, 0, 0.26, 0.20, 0.26),
   ], PROP_GLOW_MAT);
 }
 
-/** A segment of the painted white launch ring. */
+/** A PLAZA RING TILE — one gold segment of the Bell Plaza's painted ring. */
 export function skLaunchCircleMarker(): THREE.Object3D {
-  return mergedProp([part(box(), CHALK, 0, 0.03, 0, 0, 0, 0, 2.4, 0.06, 0.55)]);
+  return mergedProp([part(box(), RING_GOLD, 0, 0.03, 0, 0, 0, 0, 2.4, 0.06, 0.55)]);
 }
 
-/** A small yellow-on-black airfield sign on short legs. */
-export function skTaxiwaySign(): THREE.Object3D {
-  return mergedProp([
-    part(box(), 0xf5b731, 0, 0.55, 0, 0, 0, 0, 1.30, 0.50, 0.10),
-    part(box(), 0x1b1b1b, 0, 0.55, -0.06, 0, 0, 0, 1.10, 0.34, 0.06),
-    part(cyl(0.05, 0.05, 6), STEEL_D, 0.42, 0.24, 0, 0, 0, 0, 1, 0.48, 1),
-    part(cyl(0.05, 0.05, 6), STEEL_D, -0.42, 0.24, 0, 0, 0, 0, 1, 0.48, 1),
-  ]);
-}
+// ── THE CLOUD MARKET — cake carts ───────────────────────────────────────────
+// Four pastel carts in the measured row (island.ts), every errand's end. Their
+// hatches and insides are the warmest things in the frame.
 
-/** A marshal's cone and a numbered post on the perimeter track. */
-export function skPerimeterCone(): THREE.Object3D {
-  return mergedProp([
-    part(cone(8), 0xf06a25, 0, 0.38, 0, 0, 0, 0, 0.52, 0.76, 0.52),
-    part(box(), CHALK, 0, 0.44, 0, 0, 0, 0, 0.34, 0.12, 0.34),
-    part(box(), 0xd85a1c, 0, 0.05, 0, 0, 0, 0, 0.70, 0.10, 0.70),
-  ]);
-}
-export function skMarshalPost(): THREE.Object3D {
-  return mergedProp([
-    part(cyl(0.06, 0.06, 6), CANVAS_W, 0, 0.75, 0, 0, 0, 0, 1, 1.5, 1),
-    part(box(), 0xf5b731, 0, 1.42, 0, 0, 0, 0, 0.34, 0.30, 0.08),
-    part(box(), 0x8f8b80, 0, 0.06, 0, 0, 0, 0, 0.38, 0.12, 0.38),
-  ]);
-}
-
-// ── THE HANGARS AND THE SUNDAY FLEA MARKET ────────────────────────────────
-
-/** A curved-roof shed with its door half-slid open. THE ROOF IS WHAT THE
- *  CAMERA SEES, so the curve gets real ribs and a dark eave line where it meets
- *  the wall — alpine.ts's lesson applied to a curve instead of a snow cap. A
- *  hangar that reads as a plain grey lozenge from above is not finished. */
-export function skHangar(): THREE.Object3D {
-  const p: THREE.BufferGeometry[] = [];
-  const W = 7.0, D = 9.0, H = 2.4;
-  p.push(part(box(), 0x9c988e, 0, H * 0.5, 0, 0, 0, 0, W, H, D));
-  // the barrel roof as eight ribbed courses, so from above it is a set of arcs
-  for (let i = 0; i < 8; i++) {
-    const t = (i + 0.5) / 8;
-    const a = t * Math.PI;
-    const x = Math.cos(a) * W * 0.5, y = H + Math.sin(a) * 2.5;
-    p.push(part(box(), i % 2 ? 0xb0aca1 : 0xa19d93, x, y, 0, 0, 0, -a + Math.PI / 2, 1.05, 0.34, D + 0.4));
+/** A CAKE CART with its hatch up, a lit inside and a striped awning. Takes a
+ *  body and a stripe colour so the row is not a row of one cart. */
+export function skBaconVan(body = CAKE_ROSE, trim = GOLD): THREE.Object3D {
+  const p = [
+    part(box(), body, 0, 1.20, 0, 0, 0, 0, 3.6, 1.70, 1.9),
+    part(box(), trim, 0, 0.55, 0, 0, 0, 0, 3.64, 0.40, 1.94),
+    part(box(), body, 1.95, 0.95, 0, 0, 0, 0, 0.60, 1.10, 1.75),
+    part(box(), 0x2b3550, 2.22, 1.25, 0, 0, 0, 0, 0.12, 0.55, 1.55),
+    // the serving hatch, open, with the warm inside behind it
+    part(box(), 0xffd9a0, -0.20, 1.30, 0.96, 0, 0, 0, 2.2, 1.00, 0.08),
+    part(box(), 0x2b2f38, -0.20, 1.30, 1.02, 0, 0, 0, 2.0, 0.85, 0.05),
+    part(cyl(0.5, 0.5, 10), SKIRT_D, 1.20, 0.36, 0.90, 0, 0, Math.PI / 2, 0.72, 0.26, 0.72),
+    part(cyl(0.5, 0.5, 10), SKIRT_D, 1.20, 0.36, -0.90, 0, 0, Math.PI / 2, 0.72, 0.26, 0.72),
+    part(cyl(0.5, 0.5, 10), SKIRT_D, -1.30, 0.36, 0.90, 0, 0, Math.PI / 2, 0.72, 0.26, 0.72),
+    part(cyl(0.5, 0.5, 10), SKIRT_D, -1.30, 0.36, -0.90, 0, 0, Math.PI / 2, 0.72, 0.26, 0.72),
+  ];
+  // the striped awning over the hatch
+  for (let i = 0; i < 6; i++) {
+    p.push(part(box(), i % 2 ? CREAM : trim, -1.2 + i * 0.4, 2.12, 1.35, -0.45, 0, 0, 0.4, 0.08, 1.05));
   }
-  // THE EAVE LINE — dark, both sides, where roof meets wall
-  p.push(part(box(), SKIRT_D, W * 0.5, H + 0.06, 0, 0, 0, 0, 0.30, 0.22, D + 0.5));
-  p.push(part(box(), SKIRT_D, -W * 0.5, H + 0.06, 0, 0, 0, 0, 0.30, 0.22, D + 0.5));
-  // the half-open door, and the dark inside it
-  p.push(part(box(), 0x2b2f38, 0, H * 0.55, D * 0.5 + 0.02, 0, 0, 0, W * 0.55, H * 0.95, 0.10));
-  p.push(part(box(), 0x7e7a72, W * 0.30, H * 0.5, D * 0.5 + 0.08, 0, 0, 0, W * 0.42, H, 0.12));
   return mergedProp(p);
 }
 
-/** A flea-market trestle with jumble on it. */
+/** A mint cake cart with a cream roof and a striped awning. */
+export function skCoffeeHorsebox(): THREE.Object3D {
+  const p = [
+    part(box(), CAKE_MINT, 0, 1.25, 0, 0, 0, 0, 2.9, 1.60, 1.7),
+    part(box(), CREAM, 0, 2.15, 0, 0, 0, -0.10, 2.6, 0.16, 1.75),
+    part(box(), SKIRT_D, 0, 2.28, 0, 0, 0, 0, 3.0, 0.12, 1.85),
+    part(box(), 0xffd9a0, -0.10, 1.35, 0.87, 0, 0, 0, 1.7, 0.85, 0.06),
+    part(box(), CREAM, -0.10, 0.80, 1.02, 0, 0, 0, 1.8, 0.12, 0.40),
+    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.85, 0.34, 0.82, 0, 0, Math.PI / 2, 0.66, 0.24, 0.66),
+    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.85, 0.34, -0.82, 0, 0, Math.PI / 2, 0.66, 0.24, 0.66),
+    part(cyl(0.5, 0.5, 10), SKIRT_D, -0.95, 0.34, 0.82, 0, 0, Math.PI / 2, 0.66, 0.24, 0.66),
+    part(cyl(0.5, 0.5, 10), SKIRT_D, -0.95, 0.34, -0.82, 0, 0, Math.PI / 2, 0.66, 0.24, 0.66),
+  ];
+  for (let i = 0; i < 5; i++) {
+    p.push(part(box(), i % 2 ? CREAM : ROSE, -0.9 + i * 0.4, 2.0, 1.2, -0.5, 0, 0, 0.4, 0.07, 0.8));
+  }
+  return mergedProp(p);
+}
+
+/** A lemon cake cart with a rose roof and the spiral sign (a cake is a cake). */
+export function skDoughnutTrailer(): THREE.Object3D {
+  return mergedProp([
+    part(box(), CAKE_LEMON, 0, 1.05, 0, 0, 0, 0, 2.3, 1.30, 1.5),
+    part(box(), ROSE, 0, 1.78, 0, 0, 0, 0, 2.4, 0.22, 1.6),
+    part(box(), 0xffd9a0, 0, 1.15, 0.78, 0, 0, 0, 1.5, 0.75, 0.06),
+    part(torus(0.16, 12), 0xf5b731, 0, 2.35, 0, 0, 0, 0, 1.15, 1.15, 0.35),
+    part(cyl(0.06, 0.06, 6), STEEL_D, 0, 2.05, 0, 0, 0, 0, 1, 0.60, 1),
+    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.3, 0.32, 0.72, 0, 0, Math.PI / 2, 0.62, 0.22, 0.62),
+    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.3, 0.32, -0.72, 0, 0, Math.PI / 2, 0.62, 0.22, 0.62),
+    part(cyl(0.05, 0.05, 6), STEEL_D, -1.45, 0.40, 0, 0, 0, 1.35, 1, 0.9, 1),
+  ]);
+}
+
+// ── THE CASTLE YARD'S CRAFT MARKET, AND THE BENCHES ───────────────────────
+
+/** A craft-market trestle with things on it. */
 export function skTrestleTable(): THREE.Object3D {
   const p = [
     part(box(), 0xc8b98a, 0, 0.72, 0, 0, 0, 0, 2.2, 0.10, 0.85),
@@ -625,37 +738,6 @@ export function skTrestleTable(): THREE.Object3D {
   const jum = [0xd8443a, 0x2f6fd0, 0xf5b731, 0x2e9e5b];
   for (let i = 0; i < 5; i++) {
     p.push(part(box(), jum[i % 4], -0.8 + i * 0.42, 0.86, (i % 2) * 0.22 - 0.11, 0, i * 0.7, 0, 0.32, 0.20, 0.28));
-  }
-  return mergedProp(p);
-}
-
-/** A board of rosettes from thirty previous meets. */
-export function skRosetteWall(): THREE.Object3D {
-  const p = [
-    part(box(), 0x8f6f42, 0, 0.95, 0, 0, 0, 0, 1.8, 1.3, 0.10),
-    part(cyl(0.05, 0.06, 6), 0x7a5c36, 0.75, 0.15, 0, 0, 0, 0, 1, 0.32, 1),
-    part(cyl(0.05, 0.06, 6), 0x7a5c36, -0.75, 0.15, 0, 0, 0, 0, 1, 0.32, 1),
-  ];
-  const cols = [0xd8443a, 0x2f6fd0, 0xf5b731, 0x2e9e5b, 0x7a3fb0];
-  for (let i = 0; i < 9; i++) {
-    p.push(part(cyl(0.5, 0.5, 8), cols[i % 5], -0.65 + (i % 3) * 0.65, 1.35 - Math.floor(i / 3) * 0.42, 0.08, Math.PI / 2, 0, 0, 0.26, 0.06, 0.26));
-  }
-  return mergedProp(p);
-}
-
-/** The model aircraft club's table, three little models on stands. */
-export function skModelPlaneStand(): THREE.Object3D {
-  const p = [
-    part(box(), 0xc8b98a, 0, 0.72, 0, 0, 0, 0, 1.9, 0.10, 0.7),
-    part(box(), 0x8f6f42, 0.80, 0.36, 0, 0, 0, 0, 0.10, 0.72, 0.60),
-    part(box(), 0x8f6f42, -0.80, 0.36, 0, 0, 0, 0, 0.10, 0.72, 0.60),
-  ];
-  const cols = [0xe4513a, 0xf2ede4, 0x2f6fd0];
-  for (let i = 0; i < 3; i++) {
-    const x = -0.6 + i * 0.6;
-    p.push(part(cyl(0.04, 0.04, 6), STEEL_D, x, 0.86, 0, 0, 0, 0, 1, 0.28, 1));
-    p.push(part(box(), cols[i], x, 1.04, 0, 0, i * 0.5, 0, 0.62, 0.09, 0.10));
-    p.push(part(box(), cols[i], x, 1.04, 0, 0, i * 0.5, 0, 0.12, 0.08, 0.52));
   }
   return mergedProp(p);
 }
@@ -674,86 +756,6 @@ export function skTeaUrn(): THREE.Object3D {
   ]);
 }
 
-/** One of the vintage tractor line-up. */
-export function skVintageTractor(): THREE.Object3D {
-  return mergedProp([
-    part(box(), 0x2e9e5b, 0, 0.85, 0, 0, 0, 0, 1.9, 0.65, 1.0),
-    part(box(), 0x257f49, -0.55, 1.35, 0, 0, 0, 0, 0.75, 0.55, 0.85),
-    part(cyl(0.5, 0.5, 6), 0x1b1b1b, -0.30, 1.85, 0, 0, 0, 0, 0.14, 0.55, 0.14),
-    part(cyl(0.5, 0.5, 12), SKIRT_D, -0.75, 0.72, 0.72, 0, 0, Math.PI / 2, 1.42, 0.30, 1.42),
-    part(cyl(0.5, 0.5, 12), SKIRT_D, -0.75, 0.72, -0.72, 0, 0, Math.PI / 2, 1.42, 0.30, 1.42),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.85, 0.42, 0.60, 0, 0, Math.PI / 2, 0.82, 0.26, 0.82),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.85, 0.42, -0.60, 0, 0, Math.PI / 2, 0.82, 0.26, 0.82),
-    part(box(), 0x8f6f42, -0.55, 1.10, 0, 0, 0, 0, 0.42, 0.14, 0.55),
-  ]);
-}
-
-// ── BREAKFAST ROW ──────────────────────────────────────────────────────────
-// The food vans along the old taxiway spur, and the single most-visited place
-// in the world because every errand ends here. THESE ARE THE WARMEST-LIT
-// OBJECTS ON THE FIELD: their hatches and interiors are the only warm light in
-// the frame apart from the burners, which at dawn is what a queue is drawn to.
-
-/** A snub-nosed catering van with its hatch up, a lit interior and a menu
- *  board. Takes a colourway so the row is not a row of one van. */
-export function skBaconVan(body = 0xe8e2d0, trim = 0xd8443a): THREE.Object3D {
-  return mergedProp([
-    part(box(), body, 0, 1.20, 0, 0, 0, 0, 3.6, 1.70, 1.9),
-    part(box(), trim, 0, 0.55, 0, 0, 0, 0, 3.64, 0.40, 1.94),
-    part(box(), body, 1.95, 0.95, 0, 0, 0, 0, 0.60, 1.10, 1.75),
-    part(box(), 0x2b3550, 2.22, 1.25, 0, 0, 0, 0, 0.12, 0.55, 1.55),
-    // the serving hatch, open, with the warm inside behind it
-    part(box(), 0xffd9a0, -0.20, 1.30, 0.96, 0, 0, 0, 2.2, 1.00, 0.08),
-    part(box(), body, -0.20, 2.12, 1.35, 0, 0, -0.45, 2.3, 0.10, 1.05),
-    part(box(), 0x2b2f38, -0.20, 1.30, 1.02, 0, 0, 0, 2.0, 0.85, 0.05),
-    // menu board and counter clutter
-    part(box(), 0x2b2f38, -1.70, 1.05, 1.15, 0, 0.3, 0, 0.08, 0.85, 0.65),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, 1.20, 0.36, 0.90, 0, 0, Math.PI / 2, 0.72, 0.26, 0.72),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, 1.20, 0.36, -0.90, 0, 0, Math.PI / 2, 0.72, 0.26, 0.72),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, -1.30, 0.36, 0.90, 0, 0, Math.PI / 2, 0.72, 0.26, 0.72),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, -1.30, 0.36, -0.90, 0, 0, Math.PI / 2, 0.72, 0.26, 0.72),
-  ]);
-}
-
-/** A small towed trailer with a spiral sign. */
-export function skDoughnutTrailer(): THREE.Object3D {
-  return mergedProp([
-    part(box(), 0xf2ede4, 0, 1.05, 0, 0, 0, 0, 2.3, 1.30, 1.5),
-    part(box(), 0xd8425f, 0, 1.78, 0, 0, 0, 0, 2.4, 0.22, 1.6),
-    part(box(), 0xffd9a0, 0, 1.15, 0.78, 0, 0, 0, 1.5, 0.75, 0.06),
-    part(torus(0.16, 12), 0xf5b731, 0, 2.35, 0, 0, 0, 0, 1.15, 1.15, 0.35),
-    part(cyl(0.06, 0.06, 6), STEEL_D, 0, 2.05, 0, 0, 0, 0, 1, 0.60, 1),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.3, 0.32, 0.72, 0, 0, Math.PI / 2, 0.62, 0.22, 0.62),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.3, 0.32, -0.72, 0, 0, Math.PI / 2, 0.62, 0.22, 0.62),
-    part(cyl(0.05, 0.05, 6), STEEL_D, -1.45, 0.40, 0, 0, 0, 1.35, 1, 0.9, 1),
-  ]);
-}
-
-/** A converted horsebox — the fashionable one, with a chalkboard. */
-export function skCoffeeHorsebox(): THREE.Object3D {
-  return mergedProp([
-    part(box(), 0x3f6b58, 0, 1.25, 0, 0, 0, 0, 2.9, 1.60, 1.7),
-    part(box(), 0xc8b98a, 0, 2.15, 0, 0, 0, -0.10, 2.6, 0.16, 1.75),
-    part(box(), SKIRT_D, 0, 2.28, 0, 0, 0, 0, 3.0, 0.12, 1.85),
-    part(box(), 0xffd9a0, -0.10, 1.35, 0.87, 0, 0, 0, 1.7, 0.85, 0.06),
-    part(box(), 0xc8b98a, -0.10, 0.80, 1.02, 0, 0, 0, 1.8, 0.12, 0.40),
-    part(box(), 0x2b2f38, 1.35, 0.95, 1.00, 0, 0.35, 0, 0.08, 0.90, 0.60),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.85, 0.34, 0.82, 0, 0, Math.PI / 2, 0.66, 0.24, 0.66),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.85, 0.34, -0.82, 0, 0, Math.PI / 2, 0.66, 0.24, 0.66),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, -0.95, 0.34, 0.82, 0, 0, Math.PI / 2, 0.66, 0.24, 0.66),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, -0.95, 0.34, -0.82, 0, 0, Math.PI / 2, 0.66, 0.24, 0.66),
-  ]);
-}
-
-export function skStrawBale(): THREE.Object3D {
-  return mergedProp([
-    part(box(), 0xd9c079, 0, 0.32, 0, 0, 0, 0, 1.2, 0.64, 0.75),
-    part(box(), 0xc0a75f, 0, 0.32, 0.38, 0, 0, 0, 1.15, 0.55, 0.06),
-    part(box(), 0x8f8b80, 0.30, 0.33, 0, 0, 0, 0, 0.06, 0.68, 0.78),
-    part(box(), 0x8f8b80, -0.30, 0.33, 0, 0, 0, 0, 0.06, 0.68, 0.78),
-  ]);
-}
-
 export function skPicnicBench(): THREE.Object3D {
   return mergedProp([
     part(box(), 0xc8b98a, 0, 0.72, 0, 0, 0, 0, 2.2, 0.10, 0.85),
@@ -764,37 +766,9 @@ export function skPicnicBench(): THREE.Object3D {
   ]);
 }
 
-/** A wheelie bin that lost an argument with a gull at five o'clock. Comic
- *  litter — one paper bag and one chip carton, nothing more: a 4+ game does
- *  not do squalor. */
-export function skWheelieBin(): THREE.Object3D {
-  return mergedProp([
-    part(box(), 0x3f6b58, 0, 0.62, 0, 0, 0, 0, 0.85, 1.20, 0.75),
-    part(box(), 0x2f5342, 0, 1.28, -0.12, 0, 0, -0.55, 0.88, 0.12, 0.80),
-    part(cyl(0.5, 0.5, 8), SKIRT_D, 0.32, 0.10, 0.34, 0, 0, Math.PI / 2, 0.22, 0.14, 0.22),
-    part(cyl(0.5, 0.5, 8), SKIRT_D, -0.32, 0.10, 0.34, 0, 0, Math.PI / 2, 0.22, 0.14, 0.22),
-    part(box(), 0xe8e2d0, 0.75, 0.08, 0.45, 0, 0.6, 0, 0.28, 0.14, 0.20),
-    part(box(), 0xd8443a, -0.70, 0.06, -0.50, 0, -0.4, 0, 0.24, 0.10, 0.18),
-  ]);
-}
+// ── THE CLOUD MEADOWS ──────────────────────────────────────────────────────
 
-// ── THE ROUGH ──────────────────────────────────────────────────────────────
-// The uncut grass in the three bites of the coast, and the things that dress a
-// disused airfield. Three silhouettes for the grass, not one, and all of them
-// LOW — the rough is the quiet the runways are read against.
-
-export function skTussock(): THREE.Object3D {
-  const p: THREE.BufferGeometry[] = [];
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2;
-    p.push(part(cone(5), i % 2 ? 0x6f7d5e : GRASS_D, Math.cos(a) * 0.18, 0.28, Math.sin(a) * 0.18,
-      Math.cos(a) * 0.25, 0, Math.sin(a) * 0.25, 0.20, 0.62, 0.20));
-  }
-  // the field's own greenery rustles when eaten, like a tree does elsewhere —
-  // an airfield has no trees (eatvoice.ts)
-  return voiced(mergedProp(p), 'rustle');
-}
-
+/** The cloud flowers — a small clump in white, gold and rose. */
 export function skWildflowerClump(): THREE.Object3D {
   const p: THREE.BufferGeometry[] = [];
   const petals = [0xf2ede4, 0xf5c542, 0xd8779e];
@@ -806,18 +780,8 @@ export function skWildflowerClump(): THREE.Object3D {
   return voiced(mergedProp(p), 'rustle');
 }
 
-export function skThistle(): THREE.Object3D {
-  return voiced(mergedProp([
-    part(cyl(0.03, 0.05, 5), 0x6f7d5e, 0, 0.34, 0, 0, 0, 0, 1, 0.68, 1),
-    part(sph(), 0x8f7fb8, 0, 0.72, 0, 0, 0, 0, 0.22, 0.26, 0.22),
-    part(cone(6), 0x6f7d5e, 0, 0.60, 0, 0, 0, 0, 0.22, 0.20, 0.22),
-    part(box(), 0x6f7d5e, 0.14, 0.30, 0, 0, 0, 0.7, 0.26, 0.05, 0.10),
-  ]), 'rustle');
-}
-
-/** THE SKYLARK. The world is named after it, so it must be findable and it
- *  must be small — a child who spots one has found the thing the field is
- *  called. Head up, tail down, on the ground where they actually nest. */
+/** THE SKYLARK — larks sing above the clouds. It must be findable and it must
+ *  be small: head up, tail down, on the ground where they nest. */
 export function skSkylark(): THREE.Object3D {
   return mergedProp([
     part(sph(), 0x9c8a6a, 0, 0.13, 0, 0, 0, 0, 0.26, 0.20, 0.18),
@@ -828,87 +792,33 @@ export function skSkylark(): THREE.Object3D {
   ]);
 }
 
-/** A hare, sitting up with its ears back. One per match, out in the rough. */
+/** A CLOUD BUNNY, sitting up with its pink ears back. Three per match. */
 export function skHare(): THREE.Object3D {
   return mergedProp([
-    part(sph(), 0xa08a68, 0, 0.26, 0, 0, 0, 0, 0.34, 0.44, 0.30),
-    part(sph(), 0x9c8560, 0.06, 0.52, 0, 0, 0, 0, 0.22, 0.22, 0.20),
-    part(cone(5), 0x8a7452, 0.02, 0.70, 0.06, -0.25, 0, -0.15, 0.07, 0.32, 0.07),
-    part(cone(5), 0x8a7452, 0.02, 0.70, -0.06, 0.25, 0, -0.15, 0.07, 0.32, 0.07),
-    part(sph(), 0xe8e2d0, -0.14, 0.16, 0, 0, 0, 0, 0.14, 0.14, 0.12),
+    part(sph(), BUNNY, 0, 0.26, 0, 0, 0, 0, 0.34, 0.44, 0.30),
+    part(sph(), BUNNY, 0.06, 0.52, 0, 0, 0, 0, 0.22, 0.22, 0.20),
+    part(cone(5), BUNNY_EAR, 0.02, 0.70, 0.06, -0.25, 0, -0.15, 0.07, 0.32, 0.07),
+    part(cone(5), BUNNY_EAR, 0.02, 0.70, -0.06, 0.25, 0, -0.15, 0.07, 0.32, 0.07),
+    part(sph(), 0xffffff, -0.14, 0.16, 0, 0, 0, 0, 0.14, 0.14, 0.12),
+    part(sph(), 0x2b2f38, 0.16, 0.56, 0.06, 0, 0, 0, 0.04, 0.04, 0.03),
   ]);
 }
 
-/** The fence nobody has mended: a post, and a run that leans. */
-export function skFencePost(): THREE.Object3D {
-  return mergedProp([
-    part(cyl(0.06, 0.07, 6), 0x8f6f42, 0, 0.55, 0, 0, 0, 0.06, 1, 1.10, 1),
-    part(box(), 0x7a5c36, 0, 0.95, 0, 0, 0, 0, 0.14, 0.10, 0.14),
-  ]);
-}
-export function skFenceRun(): THREE.Object3D {
-  const p: THREE.BufferGeometry[] = [];
-  for (let i = 0; i < 3; i++) {
-    p.push(part(cyl(0.06, 0.07, 6), 0x8f6f42, -1.6 + i * 1.6, 0.55, 0, 0, 0, (i - 1) * 0.10, 1, 1.10, 1));
-  }
-  p.push(part(box(), 0x9a9a92, 0, 0.86, 0, 0, 0, 0.02, 3.4, 0.04, 0.04));
-  p.push(part(box(), 0x9a9a92, 0, 0.56, 0, 0, 0, 0.03, 3.4, 0.04, 0.04));
-  return mergedProp(p);
-}
-
-/** The old windsock mast, rusted and lying in the grass. */
-export function skCollapsedWindsockPole(): THREE.Object3D {
-  return mergedProp([
-    part(cyl(0.06, 0.08, 6), RUST, 0, 0.12, 0, 0, 0, Math.PI / 2, 1, 4.2, 1),
-    part(torus(0.05, 8), RUST, 2.0, 0.30, 0, 0, 0.4, Math.PI / 2, 0.5, 0.5, 0.5),
-    part(box(), 0x8f8b80, -2.2, 0.08, 0, 0, 0, 0, 0.5, 0.16, 0.5),
-  ]);
-}
-
-/** A sheep, grazing. An airfield's real grass cutters, and they are on the
- *  runway every year. FROM DIRECTLY OVERHEAD A SHEEP IS AN OVAL, so the head
- *  and the four dark legs are the entire read — without them this is a stone. */
+/** A CLOUD SHEEP, grazing. FROM DIRECTLY OVERHEAD A SHEEP IS AN OVAL, so the
+ *  plum-grey head and four legs are the entire read — without them this is a
+ *  cloud on a cloud. One more puff each side than the airfield's sheep. */
 export function skSheep(): THREE.Object3D {
   const p = [
-    part(sph(), 0xe4e0d6, 0, 0.52, 0, 0, 0, 0, 0.92, 0.62, 0.62),
-    part(sph(), 0xdad5c8, 0.28, 0.60, 0.16, 0, 0, 0, 0.42, 0.40, 0.36),
-    part(sph(), 0xdad5c8, -0.30, 0.58, -0.14, 0, 0, 0, 0.40, 0.38, 0.34),
-    part(sph(), 0x3a3a34, 0.50, 0.34, 0, 0, 0, 0, 0.26, 0.28, 0.22),
-    part(sph(), 0x2b2b26, 0.62, 0.24, 0, 0, 0, 0, 0.16, 0.14, 0.14),
+    part(sph(), FLEECE, 0, 0.52, 0, 0, 0, 0, 0.92, 0.62, 0.62),
+    part(sph(), FLEECE_D, 0.28, 0.60, 0.16, 0, 0, 0, 0.42, 0.40, 0.36),
+    part(sph(), FLEECE_D, -0.30, 0.58, -0.14, 0, 0, 0, 0.40, 0.38, 0.34),
+    part(sph(), FLEECE, 0.05, 0.62, -0.2, 0, 0, 0, 0.44, 0.40, 0.34),
+    part(sph(), FLEECE, -0.12, 0.62, 0.2, 0, 0, 0, 0.44, 0.40, 0.34),
+    part(sph(), PLUM, 0.50, 0.34, 0, 0, 0, 0, 0.26, 0.28, 0.22),
+    part(sph(), PLUM, 0.62, 0.24, 0, 0, 0, 0, 0.16, 0.14, 0.14),
   ];
   for (const [dx, dz] of [[0.28, 0.20], [-0.28, 0.20], [0.28, -0.20], [-0.28, -0.20]]) {
-    p.push(part(cyl(0.5, 0.5, 5), 0x3a3a34, dx, 0.13, dz, 0, 0, 0, 0.09, 0.28, 0.09));
+    p.push(part(cyl(0.5, 0.5, 5), PLUM, dx, 0.13, dz, 0, 0, 0, 0.09, 0.28, 0.09));
   }
-  return mergedProp(p);
-}
-
-/** A spectator car parked on the grass verge, seen from above: roof, screen,
- *  bonnet. Takes a colour so the thin band of them along the perimeter reads as
- *  cars rather than as a stripe. */
-export function skSpectatorCar(body = 0x8ea3c4): THREE.Object3D {
-  return mergedProp([
-    part(box(), body, 0, 0.52, 0, 0, 0, 0, 3.1, 0.62, 1.45),
-    part(box(), body, -0.15, 1.00, 0, 0, 0, 0, 1.55, 0.42, 1.32),
-    part(box(), 0x2b3550, 0.62, 0.98, 0, 0, 0, 0.35, 0.14, 0.40, 1.24),
-    part(box(), 0x2b3550, -0.95, 0.98, 0, 0, 0, -0.40, 0.14, 0.40, 1.24),
-    part(box(), 0x9fb6d0, -0.15, 1.20, 0, 0, 0, 0, 1.40, 0.06, 1.20),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, 1.00, 0.30, 0.72, 0, 0, Math.PI / 2, 0.58, 0.22, 0.58),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, 1.00, 0.30, -0.72, 0, 0, Math.PI / 2, 0.58, 0.22, 0.58),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, -1.05, 0.30, 0.72, 0, 0, Math.PI / 2, 0.58, 0.22, 0.58),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, -1.05, 0.30, -0.72, 0, 0, Math.PI / 2, 0.58, 0.22, 0.58),
-  ]);
-}
-
-/** A ticket caravan with one bulb on — the first thing in the arrivals field,
- *  and at 5:40 in the morning the only thing awake in it. */
-export function skTicketCaravan(): THREE.Object3D {
-  return mergedProp([
-    part(box(), CANVAS_W, 0, 0.95, 0, 0, 0, 0, 2.4, 1.25, 1.5),
-    part(box(), 0x9fb6c8, 0, 1.62, 0, 0, 0, 0, 2.3, 0.26, 1.45),
-    part(box(), SKIRT_D, 0, 1.78, 0, 0, 0, 0, 2.5, 0.12, 1.65),
-    part(box(), 0xffd9a0, 0.55, 1.05, 0.78, 0, 0, 0, 0.85, 0.60, 0.06),
-    part(box(), 0x2b3550, -0.70, 1.00, 0.78, 0, 0, 0, 0.55, 0.70, 0.06),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.5, 0.30, 0.78, 0, 0, Math.PI / 2, 0.58, 0.22, 0.58),
-    part(cyl(0.5, 0.5, 10), SKIRT_D, 0.5, 0.30, -0.78, 0, 0, Math.PI / 2, 0.58, 0.22, 0.58),
-  ]);
+  return mergedProp(p);   // it baas by its kind, 'sheep' (island.ts), as it always has
 }

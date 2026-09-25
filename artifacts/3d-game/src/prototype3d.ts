@@ -2733,13 +2733,15 @@ const LEVEL_SPEC: Record<WorldId, LevelSpec> = {
   // 11,104 at half · bell tower r 4.4 needs R 3.96 (~55%) · SET at 91 s (50%)
   powder: { eat: 10000, landmark: 'bell tower', landmarkR: 3.96, rank: 1, clear: 30,
     set: [{ kind: 'gild', n: 4, label: 'GOLD', icon: '💰' }, { kind: 'house', n: 4, label: 'CHALETS', icon: '🏡' }, { kind: 'snack', n: 40, label: 'SNACKS', icon: '🍿' }] },
-  // 32,020 at half · hangar r 5.5 needs R 4.95 (~73%) · SET at 39 s (22%)
-  // vans were 40 on the hunt's timing (39 s) but the island carries 98 and the
-  // family eats 40-50% of the board, so 40 would have been a race against the
-  // rubber band for the last few. 15 clears the 6N rule and the hunt reached it
-  // at 22 s.
-  skylark: { eat: 30000, landmark: 'hangar', landmarkR: 4.95, rank: 1, clear: 38,
-    set: [{ kind: 'gild', n: 6, label: 'GOLD', icon: '💰' }, { kind: 'car', n: 15, label: 'VANS', icon: '🚐' }, { kind: 'snack', n: 100, label: 'SNACKS', icon: '🍿' }] },
+  // BELLCLOUD HEIGHTS: the Great Bell r 5.5 needs R 4.95 (the hangar's figure,
+  // which the bell replaces as dot 3's landmark and the hero both).
+  // eat, clear and every set.n are PROVISIONAL — not re-measured on
+  // Bellcloud's food (qa/goalcurve.mjs has not been run on it). The set moves
+  // from VANS to HOUSES because there are no vans in the sky; 10 is under the
+  // 6N rule's ceiling for the house supply counted on the page (see the
+  // HARD_BY_WORLD note).
+  skylark: { eat: 30000, landmark: 'great bell', landmarkR: 4.95, rank: 1, clear: 38,
+    set: [{ kind: 'gild', n: 6, label: 'GOLD', icon: '💰' }, { kind: 'house', n: 10, label: 'HOUSES', icon: '🏠' }, { kind: 'snack', n: 100, label: 'SNACKS', icon: '🍿' }] },
 };
 
 /** The dot being played, or null. Non-null ONLY when a human chose a level —
@@ -6643,14 +6645,10 @@ const HARD_BY_WORLD: Record<string, string[]> = {
   lantern: ['houses', 'rival', 'big'],
   pirate:  ['cabanas', 'rival', 'big'],
   powder:  ['houses', 'rival'],
-  // ...and no 'houses' here. An airfield has two hangars, a tower and a row of
-  // stalls; qa/questable.mjs measured the house supply at TWO against a quest
-  // that asks for three, so with skylark absent from this table and falling
-  // through to `?? HARD_BY_WORLD.maple` a child was drawn an impossible board.
-  // That is the identical bug this table was created to end, one world later.
-  // Two chips rather than three, as POWDER PASS carries two, because an honest
-  // absence beats tagging a control tower as somebody's house.
-  skylark: ['rival', 'big'],
+  // BELLCLOUD HEIGHTS has houses now — cloud cottages and market stalls — so
+  // 'houses' is back (the airfield's house supply was TWO, which is why it was
+  // left out). qa/questable.mjs decides whether each chip can be cleared.
+  skylark: ['houses', 'rival', 'big'],
 };
 const MED_Q = MED_BY_WORLD[pickedWorld] ?? MED_BY_WORLD.maple;
 const HARD_Q = HARD_BY_WORLD[pickedWorld] ?? HARD_BY_WORLD.maple;   // easy rotates daily; 'solo' retired with the menu button

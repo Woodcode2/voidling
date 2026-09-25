@@ -1212,6 +1212,15 @@ export function createAudio(): Audio3D {
       eatGrain(d, t, 'bandpass', 1800, 0.7, 0.24, v, 700, 0.015);
       eatGrain(d, t + 0.02, 'bandpass', 5200, 2, 0.03, v * 0.25);
     },
+    // BELLS (BELLCLOUD HEIGHTS: the Great Bell, the bell shrines and the bell
+    // posts): a small bell's ding — a glock on E6 give or take two semitones,
+    // and its fifth a hair behind at half the level. The landmark rule would
+    // make the Great Bell crumble; a bell never rustles or crumbles.
+    ding: (d, t, v) => {
+      const f = 1318.5 * 2 ** (((eatRand() * 2 - 1) * 2) / 12);
+      glock(d, f, t, 0.6, v);
+      glock(d, f * 1.5, t + 0.06, 0.4, v * 0.5);
+    },
   };
   // ── THE LEVELS, CALIBRATED — qa/eatvoice.mjs (c), qa/_eatspread.mjs ──────
   // Each voice's gain, set on its LOUDEST take: at a car's meal (mealR 1.3 on
@@ -1224,6 +1233,11 @@ export function createAudio(): Audio3D {
   const EAT_LEVEL: Record<EatVoice, number> = {
     meep: 0.0049, wheee: 0.0158, baa: 0.014, quack: 0.0182, crumble: 0.115,
     rustle: 0.064, crinkle: 0.0153, squeak: 0.0295, poof: 0.0575,
+    // BELLCLOUD HEIGHTS' bells. Started at crinkle's 0.0153 (the same glock)
+    // and measured by qa/eatvoice.mjs (c) at only 0.7-0.8 dB under the pop:
+    // ding plays its glock at the full level plus a fifth at half, where
+    // crinkle's ping is 0.45 of it. 7 dB down from there.
+    ding: 0.0066,
   };
   /** eatSizeK at the meal the table above was calibrated on (mealR 1.3, a
    *  2.5 void): each voice's envelope is run at this level and scaled after

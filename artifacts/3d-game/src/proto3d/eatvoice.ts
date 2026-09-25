@@ -20,7 +20,7 @@ import type * as THREE from 'three';
 
 /** Every voice the eat can speak in. A kind that fits none of them stays
  *  silent — a silent kind is better than a wrong one. */
-export const EAT_VOICES = ['meep', 'wheee', 'baa', 'quack', 'crumble', 'rustle', 'crinkle', 'squeak', 'poof'] as const;
+export const EAT_VOICES = ['meep', 'wheee', 'baa', 'quack', 'crumble', 'rustle', 'crinkle', 'squeak', 'poof', 'ding'] as const;
 export type EatVoice = typeof EAT_VOICES[number];
 
 /** Tag a prop with the voice it makes when eaten. Returns the prop, so a
