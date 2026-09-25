@@ -29,8 +29,8 @@ gate before `main`, no multi-round workflows for small things.
 | # | launch item | state |
 |---|---|---|
 | S-1 | Merge G5/G7/G8/G9 to main (push gate) and send him the review pack | merged 8f489ee; pack sent |
-| S-2 | Five menu posters in Maple's floating-island style (Higgsfield credits approved) | generated 2026-09-24 on Maple's recipe (z_image, 3:4); all five APPROVED by the owner ("Images look great!"); wired 97e685e (MENU_ART + per-world falling touch); the 13 menu steps of the push gate PASS on that build (two runs, a container restart between them); reaches main with S-3 under one full gate |
-| S-3 | Skylark, keep the theme and fix it: spread the field (everything sits in the central launch rows), brighter sunrise, more standing balloons, one landmark; his music | he sources the track |
+| S-2 | Five menu posters in Maple's floating-island style (Higgsfield credits approved) | generated 2026-09-24 on Maple's recipe (z_image, 3:4); all five APPROVED by the owner ("Images look great!"); wired 97e685e (MENU_ART + per-world falling touch); the 13 menu steps of the push gate PASS on that build (two runs, a container restart between them); **on main** with S-3, push gate 73/73 |
+| S-3 | Skylark, keep the theme and fix it: spread the field (everything sits in the central launch rows), brighter sunrise, more standing balloons, one landmark; his music | **on main** (merge b10685c): envelope in frame from 42.1% -> 90.4% of the island (rough 5.1 -> 98.5, shoulders 19.8 -> 84.5, verge 16.4 -> 86.1); standing 13.9% -> 32.5%; spawn frame luminance 0.371 -> 0.467 (Maple 0.553); the boot sweep had retired 42 envelopes (disc in the box), fixed for Skylark only; other five worlds hash-identical. qa/skylarkfield.mjs FAIL 6 -> PASS. Open: no upright envelope inside her first frame yet; the landmark skipped; his music track |
 | S-4 | The hook: a 15-second store clip (the burp after eating the town) and App Store screenshots | |
 | S-5 | His calls on the burp (?burp=1), the kill beat (?killbeat=1), the after-bite squint (flat lines vs ^ ^), the too-big bonk rate | he reviews on Vercel once main moves |
 | S-6 | Mac day: iOS build (Capacitor, `pnpm build:ios`), TestFlight, App Store Connect | owner |
@@ -201,6 +201,9 @@ timebeat, killbeat, savour, burp, endbeat, endparty, nomstream, juice,
 heromotion, dangerchannel, bitetime, chomp). The merge also fixed a push-gate
 probe no item had run: G9's comment quoted evoHold.due(), which evohold's
 wiring bar counts as text.
+
+**Merged to main (2026-09-25): the five menu posters and Skylark (ship mode S-2,
+S-3).** Push gate 73/73 in one run, the box to itself.
 
 **halocensus v2, and why v1 was retired.** v1 measured the RESULT — pixels
 bloom lifted by 3+ L* more than 16 px from a light — and condemned Lantern's
