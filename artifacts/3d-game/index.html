@@ -1981,6 +1981,18 @@
       #menuArt .leaf:nth-child(3) { left: 41%; animation-duration: 12.2s; animation-delay: -7s; }
       #menuArt .leaf:nth-child(4) { left: 63%; animation-duration: 17s;   animation-delay: -4s;  width: 13px; height: 13px; }
       #menuArt .leaf:nth-child(5) { left: 79%; animation-duration: 14.4s; animation-delay: -10s; width: 8px;  height: 8px; }
+      /* …and each world drops its own, once every world had a poster
+         (2026-09-24). paintMenuArt() writes data-world. Game Day is a fall
+         Saturday and keeps the leaves; Powder Pass snows; Lantern Night lets
+         warm sparks drift past; the resort and the balloon field have no
+         weather of their own, so nothing falls on them. */
+      #menuArt[data-world="powder"] .leaf { border-radius: 50%;
+        background: radial-gradient(circle, #ffffff 0%, #eef6ff 60%, #d8e8ff 100%);
+        box-shadow: 0 0 4px rgba(255,255,255,0.75); }
+      #menuArt[data-world="lantern"] .leaf { border-radius: 50%;
+        background: radial-gradient(circle, #fff4c8 0%, #ffc15a 55%, #ff8a2a 100%);
+        box-shadow: 0 0 8px rgba(255,170,70,0.8); }
+      #menuArt[data-world="pirate"] .leaf, #menuArt[data-world="skylark"] .leaf { display: none; }
       /* The travel is 52vh and it ends INSIDE the layer on purpose: #menuArt
          clips (so no leaf ever lands on the PLAY button) and a leaf still at
          half opacity when it meets that edge vanishes mid-air. It is faded out

@@ -1515,6 +1515,16 @@ const MENU_ART: Partial<Record<string, string>> = {
   // hands and feet. "What if we just carved out the bottom island part with him
   // in it?" There is no void on this poster. He is the thing you play.
   maple: '/assets/hf/hf_20260916_114234_f51f66e2-c219-4eb4-a04e-95f33f03240d.png',
+  // …AND NOW THE OTHER FIVE, on the owner's word ("Images look great!",
+  // 2026-09-24) once Maple's had been agreed. Each is Maple's own recipe —
+  // z_image, 3:4, "ONE small floating island alone in a deep purple starry sky,
+  // nothing below it", the rounded rock underside, no text — with only the
+  // world on top changed, so the six read as one set in the picker.
+  pirate: '/assets/hf/hf_20260924_231056_183bb38f-6fed-41e8-8b44-aa38e34e6dca.png',   // the resort: ship at the dock, lagoon pool, lighthouse, treasure chest
+  gameday: '/assets/hf/hf_20260924_231035_f95c9e35-4908-4d91-a47c-e6fefc1b59aa.png',  // the bowl on a fall Saturday: stands, band, tailgate, school bus
+  lantern: '/assets/hf/hf_20260924_231035_1dbd993e-c9ad-4ccf-bcda-0e4c1454f99a.png',  // the night market: strung lanterns, torii, moon bridge over the canal
+  powder: '/assets/hf/hf_20260924_231056_1ba33ae4-fb6a-4793-a1d3-0748bd10e915.png',   // the ski village: chalets, chairlift, snowman, skating pond
+  skylark: '/assets/hf/hf_20260924_231035_273ea24c-0dd4-4837-9029-2510c36afe8d.png',  // the balloon meet at sunrise — and the look the level is being brought to
 };
 /** ── THE POSTER IS OPAQUE, SO THE SCENE BEHIND IT IS NOT DRAWN ─────────────
  *
@@ -1542,6 +1552,9 @@ function paintMenuArt(id: string): void {
   const host = document.getElementById('menuArt');
   const img = document.getElementById('menuArtImg') as HTMLImageElement | null;
   if (!host || !img) return;
+  // what falls past the island is the world's own (index.html, #menuArt .leaf):
+  // Maple's autumn leaves were drawn for Maple, and snow is not a maple leaf
+  host.dataset.world = id;
   const src = MENU_ART[id];
   // SWITCHING WORLDS MUST BE ABLE TO SWITCH BACK. Without this the class from
   // the world she came from survives into a world with no poster of its own,
