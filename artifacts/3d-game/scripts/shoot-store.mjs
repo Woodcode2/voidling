@@ -352,7 +352,11 @@ if (want('01', '02')) {
   if (want('01')) await shot('01-menu.png');
 
   // ── 02 · the world picker ─────────────────────────────────────────────────
-  await tap('#btnPlay');
+  // THE WORLD'S NAME IS THE DOOR (#worldSwitch). PLAY starts Maple dot 1 since
+  // research G1, so tapping it here photographed a town, not the picker — and
+  // enterMatch still found its cards only because tap() dispatches the click
+  // straight onto a hidden element. Rehearsed 2026-09-25 (SHOOT_DRYRUN).
+  await tap('#worldSwitch');
   await settle(1800);
   if (want('02')) await shot('02-worlds.png');
 }
@@ -471,7 +475,7 @@ const toPicker = async () => {
   await page.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show');
   }));
-  await tap('#btnPlay');
+  await tap('#worldSwitch');   // the picker, as a child opens it (see 02)
   await settle(1400);
 };
 
@@ -629,7 +633,11 @@ if (want('08')) {
   await page.evaluate(() => document.getElementById('shop')?.classList.remove('show'));
   await toPicker();
   await enterMatch('pirate');
-  await page.evaluate(() => { window.__setVoidR(7.5); window.__rushClock(0.3); });
+  // A WIN, not a "NOT YET". The rehearsal of this shot ran the clock out short
+  // of the dot's goal and photographed TRY AGAIN — true to the app, and the
+  // wrong card to lead a listing with. Past the goal the match ends on the
+  // spot (the owner's win rule) and the card is the one a child is proud of.
+  await page.evaluate(() => { window.__setVoidR(7.5); window.__setScore(26000); });
   // 400s like the other match-path waits: the harness clock runs 14-40x slow,
   // and this one 120s wait killed the run on the eighth shot with seven on disk.
   await page.waitForFunction(() => document.getElementById('end')?.classList.contains('show'), null, { timeout: 400000 });
@@ -640,7 +648,8 @@ if (want('08')) {
 // ── 09 · SKYLARK FIELD, the balloon meet ────────────────────────────────────
 // Added at launch (ship mode, 2026-09-25), once the field reached the island's
 // arms: the west shoulder of 03/21 at r 4 is where qa/skylarkfield.mjs's after
-// frame showed two standing envelopes beside him. Warped and framed the way 04
+// frame showed two standing envelopes beside him — but the rehearsal there was
+// mostly grass, so it frames the launch field's rows. Warped and framed the way 04
 // is, for the same reason — a hero image is framed, not hoped for.
 if (want('09')) {
   const w = (v) => (v - 6000) * 0.05;
@@ -650,7 +659,7 @@ if (want('09')) {
   try {
     await page.waitForFunction(() => (window.__matchState?.().t ?? 0) > 7, null, { timeout: 180000 });
   } catch { console.log('  (intro camera may still be moving — check 09 framing)'); }
-  const [wx, wy] = [3500, 6500];
+  const [wx, wy] = [6200, 7700];   // the launch field's rows, where most of the standing envelopes are
   await page.evaluate(([x, z]) => { window.__setVoidR(4); window.__warpVoid(x, z); }, [w(wx), w(wy)]);
   await settle(2400);
   await page.evaluate(([x, z]) => { window.__warpVoid(x, z); window.__setMood('frenzy'); }, [w(wx), w(wy)]);
