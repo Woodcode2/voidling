@@ -53,6 +53,13 @@
 //
 // REPORTED, not barred: seconds of #news and #banner per match — the headline
 // number — with #evolve beside them for scale, and every card by its reason.
+//
+// RETRACTED, 2026-09-25 — "#banner 0.0 s (24 cards)" on Pirate, on the build
+// after the fix. The card length was read with .show ADDED to whatever the
+// element wore at the buzzer, and a banner pulled down at the end wears .bye,
+// whose `animation: none !important` read back as 0 s. That was the probe, not
+// the game. The length is now read with the class list set to 'show' alone,
+// and a card whose length reads 0 is a FAIL instead of a silent zero.
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { ALL_WORLDS, initScript } from './worlds.mjs';
@@ -176,13 +183,19 @@ for (const world of worlds) {
   }
   const R = await p.evaluate(() => {
     // each card's own length, off the stylesheet, on the element wearing .show
+    // AND NOTHING ELSE. The first version added .show to whatever the element
+    // was wearing at the buzzer, and a banner pulled down at the end wears
+    // .bye, whose `animation: none !important` read back as 0 s — Pirate's
+    // twenty-four banners reported 0.0 s of screen on the after build, which
+    // was the probe, not the game. The class list is set to 'show' alone for
+    // the read and put back; className bypasses the tap on classList.add.
     const dur = {};
     for (const id of ['banner', 'news', 'evolve']) {
       const el = document.getElementById(id);
-      const had = el.classList.contains('show');
-      DOMTokenList.prototype.add.call(el.classList, 'show');
+      const was = el.className;
+      el.className = 'show';
       dur[id] = parseFloat(getComputedStyle(el).animationDuration.split(',')[0]) || 0;
-      if (!had) DOMTokenList.prototype.remove.call(el.classList, 'show');
+      el.className = was;
     }
     const na = window.__newsArc();
     const ms = window.__matchState();
@@ -192,6 +205,8 @@ for (const world of worlds) {
   });
   await p.close();
   if (broke) { console.log(`\nFAIL — ${world}: the rAF chain broke mid-match (animate() threw)`); process.exit(1); }
+  const noLen = Object.entries(R.dur).filter(([, v]) => !(v > 0)).map(([k]) => k);
+  if (noLen.length) { console.log(`\nFAIL — ${world}: no card length could be read off the stylesheet for #${noLen.join(', #')}; every second below would be a guess`); process.exit(1); }
   if (!ended) { console.log(`\nFAIL — ${world}: the match never reached the end card`); process.exit(1); }
 
   // ── OCCUPANCY on the frame clock ────────────────────────────────────────
