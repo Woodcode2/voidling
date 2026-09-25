@@ -222,16 +222,20 @@ function worldData(wid) {
     // distToPath closes the loop and there is no gap to hide a prop in
     d.roads.push({ name: 'PERIMETER', pts: P(pts('PERIMETER', s)),
       half: w3len(num(/export const PERIMETER_HALF = (\d+);/, s, 'PERIMETER_HALF')), kind: 'road' });
-    // THE LAUNCH CIRCLE is the whale's precinct and is authored, not scattered:
-    // her ground crew, fan trailer, tether pins and the commentary trestle are
+    // (2026-09-25: the airfield is BELLCLOUD HEIGHTS now. RWY03 is the Grand
+    // Avenue, still kept clear at its FULL half-width; the two slabs are the
+    // Old Stone Ways, placeable ground; PERIMETER is the Rainbow Ring, kept
+    // clear. The rule below did not change, only what the strips are called.)
+    // THE LAUNCH CIRCLE is the Bell Plaza, the Great Bell's precinct, and is
+    // authored, not scattered: its bell posts, fountains and banner poles are
     // meant to be inside it, exactly as Powder's lake carries authored clutter
     const m = /export const LAUNCH = \{ cx: (\d+), cy: (\d+), rx: (\d+), ry: (\d+) \}/.exec(s);
     if (!m) throw new Error('placement: no LAUNCH in skylark.ts');
-    // PRECINCT, not just an ellipse. The launch circle is painted ON the
-    // runway crossing and it carries the whale, her ground crew, her fan
-    // trailer and her tether pins BY DESIGN — the same relationship bay.ts's
-    // boardwalk has with its furniture, which this file already exempts with
-    // `deck`. Without this the hero prop of the world is a road offence.
+    // PRECINCT, not just an ellipse. The plaza is painted ON the avenues'
+    // crossing and it carries the Great Bell and its plaza kit BY DESIGN —
+    // the same relationship bay.ts's boardwalk has with its furniture, which
+    // this file already exempts with `deck`. Without this the hero prop of the
+    // world is a road offence.
     d.ellipses.push({ name: 'LAUNCH', cx: w3(+m[1]), cz: w3(+m[2]), rx: w3len(+m[3]), rz: w3len(+m[4]), precinct: true });
   }
   if (!KNOWN.includes(wid)) {

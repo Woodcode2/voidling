@@ -221,6 +221,18 @@ const SPOTS = {
   // position has no business being on the one surface with different physics.
   powder: { name: 'THE VILLAGE — chalets on the south-east shore',
     x: w3(6800), z: w3(8800) },
+
+  // ── BELLCLOUD HEIGHTS (world 6, id 'skylark') — THE BELL PLAZA ──────────
+  // skylark.ts fixes LAUNCH at world (6107, 4349), the avenues' crossing, and
+  // island.ts drops the Great Bell there, force-placed at radius 5.5: the
+  // world's hero, dot 3's landmark and the thing the whole world is about
+  // (docs/BELLCLOUD.md §5). Standing 26 units back toward the lens puts the
+  // bell under its arch centred and high in the frame, with the plaza's gold
+  // rings, its bell posts and the cloud ground around it — which is what
+  // qa/groundgrain.mjs needs a fixed spot for. Without this entry that probe
+  // failed "no fixed spot is authored" on a sixth world.
+  skylark: { name: 'THE BELL PLAZA — the Great Bell under its arch',
+    x: w3(6107) + back(26), z: w3(4349) + back(26) },
 };
 
 // ── the verdict is printed even if this file throws ────────────────────────
