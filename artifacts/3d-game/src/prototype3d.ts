@@ -3833,7 +3833,7 @@ _dbg.__settleAgain = () => settleFootprints().map((i) => {
     + `${m.userData.authored ? ' AUTHORED' : ''}${m.userData.building ? ' bldg' : ''}`;
 });
 
-_dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the live templates)
+_dbg.__news = () => showNews('qa');   // QA: fire a headline on demand (audits the live templates)
 // QA: what the MUSIC ENGINE is actually doing. qa/music.mjs judged a world by
 // "the slot was requested and the synth is quiet" — and a track that loads but
 // never starts is exactly that, so total silence read as RECORDING. This is the
@@ -5659,7 +5659,7 @@ rivals.onStuffed = (name) => {
   // once you outgrow her (measured +41 s, natural run, refute-cards 2026-09-02).
   // "Too full" lands here through her own stuffed line (rivals.ts, if within 55)
   // and breakingNews below; audio.ready() marks the moment.
-  breakingNews(COPY.rivalFullNews);
+  breakingNews(COPY.rivalFullNews, 'rivalFull');
   audio.ready();
 };
 // QA: drive the score's stage directly, so a harness can audit each world's
@@ -7178,12 +7178,18 @@ let heroCued = false, heroAte = false;
 let goalCued = false;
 // reactive one-shots: big beats the player just caused jump the queue
 const newsQueue: string[] = [];
-function breakingNews(h: string) {
+/** WHY each queued line is on the ticker, in step with newsQueue — the
+ *  reaction's kind ('landmark', 'evolve', 'beat', 'rivalGone') or the one-shot
+ *  that filed it. QA only: it rides into newsLog so qa/realestate.mjs can say
+ *  which cards a match printed and for what, rather than guess from timing. */
+const newsWhy: string[] = [];
+function breakingNews(h: string, why = 'breaking') {
   if (newsQueue.length > 1) return;   // never stack a queue of cards at the player
   // The queue BYPASSES the newsroom, so it also bypassed the newsroom's own
   // 78-character ticker clip — all three hero cues ran to 84, 88 and 89 and
   // reached the card unclipped. Everything on the ticker gets the same width.
   newsQueue.push(h.length > 78 ? h.slice(0, h.lastIndexOf(' ', 78)).trim() : h);
+  newsWhy.push(why);
   // 2.5 let a busy minute machine-gun the ticker; 4s is the fastest a jumped
   // story may follow the previous one (comms redesign: one feed, breathing)
   newsCd = Math.min(newsCd, 4.0);
@@ -7229,7 +7235,7 @@ let reactHardCd = 0, reactCd = 0;
 // A QUEUE, not a single slot: the hero landmark also files late (6s), so an
 // urgent line arriving while a beat is still waiting used to overwrite it and
 // the beat was never reported at all.
-const pendingReact: { line: string; at: number }[] = [];
+const pendingReact: { line: string; at: number; why: string }[] = [];
 function townReacts(inp: Omit<ReactIn, 'world'>, delay = 0): void {
   if (!started || ended) return;
   // A NAMED THING GOING OUTRANKS THE VOID CHANGING SHAPE. See the two floors.
@@ -7259,7 +7265,7 @@ function townReacts(inp: Omit<ReactIn, 'world'>, delay = 0): void {
     const line = reactLine({ ...inp, world: pickedWorld });
     if (!line) return;
     reactCd = REACT_SOFT;
-    pendingReact.push({ line, at: reactHardCd + 0.1 });
+    pendingReact.push({ line, at: reactHardCd + 0.1, why: inp.kind });
     return;
   }
   if (!urgent && reactCd > 0) return;
@@ -7274,17 +7280,17 @@ function townReacts(inp: Omit<ReactIn, 'world'>, delay = 0): void {
   //   it here would let a landmark at t=5 print ahead of a beat line due at
   //   t=8, putting two cards three seconds apart.
   reactCd = REACT_SOFT;
-  if (delay > 0) pendingReact.push({ line, at: delay });
-  else fileReaction(line);
+  if (delay > 0) pendingReact.push({ line, at: delay, why: inp.kind });
+  else fileReaction(line, inp.kind);
 }
 /** print a reaction and start the card-spacing floor from the moment it lands */
-function fileReaction(line: string): void {
+function fileReaction(line: string, why: string): void {
   reactHardCd = REACT_HARD;
-  breakingNews(line);
+  breakingNews(line, why);
 }
 /** QA: every card that reached the screen this match, with the phase it was
  *  drawn at. Read by qa/newsarc.mjs. */
-const newsLog: { t: number; phase: number; tier: number; react: boolean; brand: string; text: string }[] = [];
+const newsLog: { t: number; tc: number; phase: number; tier: number; react: boolean; why: string; brand: string; text: string }[] = [];
 const newsSeen: string[] = [];
 // Both worlds now have their own newsroom module — ./proto3d/newsroom for
 // PIRATE BAY RESORT and ./proto3d/newsroom_maple for MAPLE FALLS. What used to
@@ -7315,7 +7321,7 @@ function fillHeadline(t: string): string {
     .replace('{R}', String(100 - pct))
     .replace('{S}', String(Math.max(1, Math.ceil(matchClock))));
 }
-function showNews() {
+function showNews(asked = 'arc') {
   // ── THE ARC DRIVES THE CARD ───────────────────────────────────────────────
   // This used to be a MOOD: `max(pctTier, formTier)` recomputed from scratch on
   // every card, three rungs, no beginning. A mood drifts, it can go backwards
@@ -7334,13 +7340,15 @@ function showNews() {
   // guarantees it returns the greeting on its first call, but `queue.shift() ??`
   // short-circuits — so a breaking-news one-shot fired in the opening seconds
   // would jump the queue and the station would never say good morning.
-  if (!signedOn) { signedOn = true; newsQueue.length = 0; }
+  const why0 = signedOn ? asked : 'morning';
+  if (!signedOn) { signedOn = true; newsQueue.length = 0; newsWhy.length = 0; }
   // A REACTIVE LINE PREEMPTS THE ARC WITHOUT DERAILING IT. The queued line is
   // printed instead of a scheduled one, but the arc still advances a step and
   // still supplies the brand chip — so the water tower going gets reported
   // under whatever badge the town has earned, and the next scheduled card picks
   // up exactly where the story was.
   const queued = newsQueue.shift();
+  const why = queued !== undefined ? newsWhy.shift() ?? 'breaking' : why0;
   const arc = arcPhase({
     devouredPct, elapsed: matchElapsed(), matchLen, stage: curStage,
   });
@@ -7454,7 +7462,7 @@ function showNews() {
   // so it can only contain lines that actually went to screen. The probe still
   // checks #news's own bounding box separately — a log entry is evidence the
   // code ran, not evidence a child saw anything.
-  newsLog.push({ t: Math.round(matchElapsed()), phase: arc.phase, tier, react: queued !== undefined, brand, text: h });
+  newsLog.push({ t: Math.round(matchElapsed()), tc: +tClock.toFixed(3), phase: arc.phase, tier, react: queued !== undefined, why, brand, text: h });
   if (newsLog.length > 80) newsLog.shift();
 }
 
@@ -9838,7 +9846,7 @@ function capture(e: Edible, giveHunger = true) {
   const houseLike = !!qk && HOUSE_LIKE.includes(qk);
   if (houseLike && qk !== 'house') questEvent('house');
   if (comboMult >= 2) questEvent('combo');
-  if (houseLike && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! Crunch.'); breakingNews(COPY.houseNews); }
+  if (houseLike && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! Crunch.'); breakingNews(COPY.houseNews, 'firstBuilding'); }
   if (qk === 'car' && !moments.firstCar) { moments.firstCar = true; announce('🚗 FIRST CAR! Tastes like vroom.'); }
   // catching the first RUNNER — the top thrill on the hole.io list — had no
   // moment, and the 1.5x chase bonus was paid in silence. Chase framing on
@@ -9851,7 +9859,7 @@ function capture(e: Edible, giveHunger = true) {
   }
   // no COPY row for this one: 'rv' is tagged on RV Row and nowhere else, so it
   // can only ever fire on GAME DAY. It should still sound like the booth.
-  if (qk === 'rv' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🚐 A WHOLE MOTORHOME! Gone.'); breakingNews('A whole MOTORHOME, Bill. Somebody was living in that until Sunday.'); }
+  if (qk === 'rv' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🚐 A WHOLE MOTORHOME! Gone.'); breakingNews('A whole MOTORHOME, Bill. Somebody was living in that until Sunday.', 'firstBuilding'); }
   // ── THE BITE IS HEARD WHEN IT GOES IN ───────────────────────────────────
   // It used to be heard HERE, last in capture(), after byPlayer and the
   // tallies above so that endBeat() — which reads them through goalMet() for a
@@ -16123,7 +16131,7 @@ function animate() {
       fx.flash('#ffffff', 0.55);
       fx.shake(1.1);
       announce(COPY.ender);
-      breakingNews(COPY.enderNews);
+      breakingNews(COPY.enderNews, 'ender');
       buzz(120);
     }
     }
@@ -16257,7 +16265,7 @@ function animate() {
       // on an optimal run, but a slower one drifts toward the warning, and
       // holdBanner queues rather than clobbers.
       holdBanner(2.4);
-      if (COPY.heroCueNews) breakingNews(COPY.heroCueNews);
+      if (COPY.heroCueNews) breakingNews(COPY.heroCueNews, 'heroCue');
       audio.ready(); buzz(30);
       fx.ring(heroProp.mesh.position.x, heroProp.mesh.position.z, 0xf0b429, heroProp.radius * 5, 0.9);
     }
@@ -16305,7 +16313,7 @@ function animate() {
     if (reactCd > 0) reactCd -= dt;
     for (let i = pendingReact.length - 1; i >= 0; i--) {
       pendingReact[i].at -= dt;
-      if (pendingReact[i].at <= 0) { fileReaction(pendingReact[i].line); pendingReact.splice(i, 1); }
+      if (pendingReact[i].at <= 0) { fileReaction(pendingReact[i].line, pendingReact[i].why); pendingReact.splice(i, 1); }
     }
     newsCd -= dt;
     // BREATHING ROOM: a headline every 14-20s meant the card was on screen

@@ -70,6 +70,9 @@ const RUNS = Number(flag('runs', '5'));
 // ate 484 snacks and zero houses by 70% of the clock, because a snack is
 // always nearer. A goal set from a run that was not trying is not a goal.
 const HUNT = flag('hunt', '');
+// --out=<dir> keeps a comparison run from overwriting the committed day-2
+// series in qa/out/goalcurve, which the goal table cites.
+const OUT_DIR = flag('out', 'qa/out/goalcurve');
 const worlds = WORLD_ARG === 'all' ? ALL_WORLDS : [WORLD_ARG];
 for (const w of worlds) if (!ALL_WORLDS.includes(w)) { console.log(`\nFAIL — unknown world "${w}"`); process.exit(1); }
 
@@ -208,6 +211,9 @@ const runOnce = async (world) => {
           // very different numbers.
           you: +(ms.ate?.you ?? 0).toFixed(2), fam: +(ms.ate?.family ?? 0).toFixed(2),
           rank: ms.rank ?? 0, k: { ...window.__kindTally() },
+          // the score multiplier live at this sample, 1 outside a beat window —
+          // so a series can say how much of a score the windows paid for
+          fv: ms.fever ?? 1,
           // THE NUMBER THAT RE-SPECIFIES LANDMARK. Not "did she reach the
           // landmark" but "what was the biggest thing she COULD eat, at this
           // moment" — the largest uneaten prop inside the eat rule
@@ -343,15 +349,15 @@ for (const world of worlds) {
 // samples are written out so any later question — what radius at what second,
 // what was edible when — is a file read rather than a re-run.
 try {
-  mkdirSync('qa/out/goalcurve', { recursive: true });
+  mkdirSync(OUT_DIR, { recursive: true });
   for (const [w, runs] of Object.entries(out)) {
-    writeFileSync(`qa/out/goalcurve/${w}.json`, JSON.stringify({
+    writeFileSync(`${OUT_DIR}/${w}.json`, JSON.stringify({
       world: w, seed: SEED, runs: runs.length,
       supply: runs[0].supply, landmark: runs[0].landmark,
       series: runs.map((r) => ({ final: r.final, gc: r.gc })),
     }, null, 1));
   }
-  console.log(`  series written to qa/out/goalcurve/`);
+  console.log(`  series written to ${OUT_DIR}/`);
 } catch (e) { console.log(`  [could not write the series: ${e.message}]`); }
 
 await b.close();
