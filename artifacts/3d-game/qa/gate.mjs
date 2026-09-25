@@ -854,6 +854,13 @@ const SUITE = [
     cmd: ['node', 'qa/bitetime.mjs', PORT, 'maple'], verdict: pf,
     why: 'every bite is heard within 67 ms of its meal starting to fall — the reward lands when the object drops in, not on contact' },
 
+  // Ship mode, 2026-09-25: Skylark's field reaches the island's arms, verge and
+  // rough, and a third of its envelopes stand. Live and quality until the lead
+  // has read two greens. FAIL, 6 bars, on the build before the change.
+  { id: 'skylarkfield', tier: 'world', profiles: ['live', 'quality'], timeout: 1200,
+    cmd: ['node', 'qa/skylarkfield.mjs', PORT, '--tag=gate'], verdict: pf,
+    why: 'there is something to eat everywhere on Skylark, not only in the middle — an envelope and a mid-size meal in frame from every part of the island, and a quarter of the envelopes standing' },
+
   // Research governor G5. Not in push until two greens: the lead promotes it.
   // Maple and Skylark because Skylark is the world whose census offers six
   // voices today and Maple is the world a first match is played on. Its
