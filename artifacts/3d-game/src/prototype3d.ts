@@ -1986,9 +1986,29 @@ const WORLD_LIGHT: Record<WorldId, WorldLight> = {
   //
   // exposure 1.15, and the ceiling is the mascot's: above ~1.26 he stops being
   // one colour across the game, measured at 9.6 dE against a bar of 6.
-  skylark: { sun: 0xffc78e, sunI: 1.90, hemiSky: 0xe2d8f0, hemiGround: 0x7c8a5e, hemiI: 0.58,
-             off: [78, 60, -46], dusk: 0.80, normalBias: 0.15, exposure: 1.15,
-             fill: 0x8fa8e4, fillI: 0.62, fillOff: [-70, 52, 40] },
+  //
+  // ── BELLCLOUD HEIGHTS, 2026-09-25: the airfield became a cloud kingdom in a
+  // bright golden day (docs/BELLCLOUD.md §4). It keeps the one big idea above
+  // — the ONLY rig keyed from the east, so every shadow still rakes the other
+  // way — and raises the sun to [70, 95, -40], 49.7 degrees, warmed to gold.
+  // The ground is pearl cloud now, not grass; the hemisphere's ground bounce
+  // is bright lilac-white off cloud and the lamps are barely on (dusk 0.10).
+  //
+  // THE SPEC'S STARTING ROW READ GREY, and qa/skylarkfield.mjs D measured it:
+  // key 1.70, hemi 0.60, fill 0.55, exposure 1.05 put the spawn frame at luma
+  // 0.593 and the cloud pixels' median at 0.718-0.740 across its four frames,
+  // under L1's 0.60 and L2's 0.74 — a cloud kingdom at noon that reads
+  // overcast. One page load, the live rig scaled (qa/_scratch/lightsweep.mjs,
+  // spawn / north arm cloud median): exposure alone 1.12 -> 0.735 / 0.756,
+  // 1.18 -> 0.747 / 0.768; key x1.2 and hemi x1.3 at 1.05 -> 0.751 / 0.772;
+  // key and fill x1.1, hemi x1.2 at 1.15 -> 0.762 / 0.781, spawn luma 0.651,
+  // nothing blown. That last row is this one: key 1.87, fill 0.605, hemi
+  // 0.72, exposure 1.15 — the airfield's own shipped exposure, so the mascot
+  // stays where he was measured, under his ~1.26 ceiling.
+  // MEASURED ON THIS ROW: (pending — filled in from the runs)
+  skylark: { sun: 0xffe3a8, sunI: 1.87, hemiSky: 0xd2e6ff, hemiGround: 0xf0eaf2, hemiI: 0.72,
+             off: [70, 95, -40], dusk: 0.10, normalBias: 0.15, exposure: 1.15,
+             fill: 0xa9c6f2, fillI: 0.605, fillOff: [-70, 52, 40], bloomCut: 1.25 },
 };
 const LIGHT = WORLD_LIGHT[pickedWorld];
 
@@ -2093,17 +2113,12 @@ const HOURS: Record<WorldId, WorldHour[]> = {
     { name: 'last light', dusk: 1.0, sunK: 0.8, warm: 0.3 },
     { name: 'cold bright morning', dusk: 0.55, sunK: 1.14, warm: -0.12 },
   ],
-  // A BALLOON MEET IS A WEATHER STORY, so this world's hours are the three
-  // mornings a meet actually gets. Hour 0 is the shipped rig untouched, by
-  // construction.
+  // BELLCLOUD HEIGHTS: the festival's three kinds of day. Hour 0 is the
+  // shipped rig untouched, by construction. The names are internal.
   skylark: [
-    { name: 'first light', dusk: 0.80, sunK: 1, warm: 0 },
-    // the sun clears the horizon mid-match: the one hour in the game that gets
-    // WARMER as it goes, because that is what sunrise does
-    { name: 'sun on the deck', dusk: 0.58, sunK: 1.18, warm: 0.26 },
-    // the morning the meet nearly got called off. Flatter, cooler, and the
-    // Balloonmeister's instruments have never been happier about it
-    { name: 'low cloud', dusk: 0.92, sunK: 0.78, warm: -0.16 },
+    { name: 'festival morning', dusk: 0.10, sunK: 1, warm: 0 },
+    { name: 'golden afternoon', dusk: 0.30, sunK: 0.92, warm: 0.30 },
+    { name: 'bright noon', dusk: 0.00, sunK: 1.08, warm: -0.12 },
   ],
 };
 /** ── WHICH WORLDS' AUTHORED hemiI ACTUALLY REACHES A LIGHT ─────────────────
@@ -10981,10 +10996,9 @@ const CARD_FALLBACK: Record<string, string> = {
   // lantern amber falling into an indigo night — the level's own two colours,
   // so a card that never loads its poster still says the right thing
   lantern: 'radial-gradient(ellipse at 50% 38%, #ffbe6a 0%, #d1452f 34%, #241436 68%, #0e1226 100%)',
-  // skylark is the only rig in the game keyed from the EAST: a dawn balloon
-  // meet, sun still low. Amber at the horizon, the balloons' violet above it,
-  // then the morning blue the fog colour is mixed from (0x232a52).
-  skylark: 'radial-gradient(ellipse at 50% 40%, #ffd6a0 0%, #c99ad8 30%, #6478c8 62%, #232a52 100%)',
+  // BELLCLOUD HEIGHTS: a kingdom on the clouds in a golden day — the bell's
+  // gold at the centre, warm cloud, then the sky around it.
+  skylark: 'radial-gradient(ellipse at 50% 40%, #fff4d6 0%, #f2d488 26%, #8fc4ee 60%, #3a5fa8 100%)',
 };
 function paintWorldCard(host: HTMLElement, id: string): void {
   host.style.backgroundSize = 'cover';

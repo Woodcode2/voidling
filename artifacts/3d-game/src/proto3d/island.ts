@@ -734,7 +734,12 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     // band on the east horizon and it still belongs to the light rig, not to
     // the tint — the moment apricot spreads into the tint this becomes Game
     // Day's golden hour.
-    skylark: { tint: '#8c7fd6', tintA: 0.55, fog: 0x3a3a6c, bgI: 0.64 },
+    // BELLCLOUD HEIGHTS, 2026-09-25: the airfield became a kingdom on the
+    // clouds in a bright golden day. A day-blue tint, and a pale haze fog so
+    // the far arms and the cloud sea fade into bright air rather than navy
+    // (docs/BELLCLOUD.md §3.4). The 'color' composite keeps the painting's
+    // structure. The sky only shows in the look-up and the intro.
+    skylark: { tint: '#8cc3ef', tintA: 0.85, fog: 0xd3e3f3, bgI: 0.75 },
     pirate:  { tint: '#2f9fb5', tintA: 0.80, fog: 0x0e2237, bgI: 0.60 },   // sea-teal, daylit
     // GAME DAY WAS THE ONE WORLD NOBODY PHOTOGRAPHED, and it was the worst of
     // the five: flat bright magenta at the coast with not one star in it.
@@ -1019,9 +1024,10 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       // the LOW-contrast body in the game's set: at dawn the sky itself is the
       // brightest thing in frame, and a hot planet would fight the one thin
       // warm band this world is allowed.
+      // BELLCLOUD HEIGHTS: two daytime moons, a big warm one and a small sky one
       skylark: [
-        { d: 800, el: -58, az: AZ - 0.11, size: 124, hue: '#a9b8ee', dark: '#1b2044', bands: 4, glow: '#cdd8ff' },
-        { d: 680, el: -76, az: AZ + 0.11, size: 36, hue: '#ffcda0', dark: '#3a2416', glow: '#ffe3c4' },
+        { d: 800, el: -58, az: AZ - 0.11, size: 110, hue: '#fff1c8', dark: '#c9a860', glow: '#fff6dc' },
+        { d: 680, el: -76, az: AZ + 0.11, size: 34, hue: '#d8ecff', dark: '#6f8fb8', glow: '#eef6ff' },
       ],
       // an ice world with a bright ring, to match the aurora the poster set
       powder: [
@@ -1157,7 +1163,10 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   // violet energy halo off the island edge" and it is the 3D descendant of the
   // 2D game's sticker rim — it is what stops the island reading as a flat
   // cutout pasted on a flat sky. The job was never to remove it.
-  {
+  //
+  // BELLCLOUD HEIGHTS HAS NONE: a violet energy glow is the wrong edge for a
+  // kingdom on the clouds, and its cloud sea (below) is its edge instead.
+  if (WORLD_ID !== 'skylark') {
     const cv = document.createElement('canvas'); cv.width = cv.height = 512;
     const g = cv.getContext('2d')!;
     const grd = g.createRadialGradient(256, 256, 211, 256, 256, 256);
@@ -1180,6 +1189,74 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     halo.rotation.x = -Math.PI / 2; halo.position.y = -3;
     halo.position.x = (minX + maxX) / 2; halo.position.z = (minZ + maxZ) / 2;
     scene.add(halo);
+  } else {
+    // ── THE CLOUD SEA AND THE CLOUD LIP (BELLCLOUD HEIGHTS, §3.3) ──────────
+    // The island floats on a sea of low flat-shaded cloud puffs, and its coast
+    // is scalloped by a lip of white puffs — the poster's read. Decor, never
+    // place()d and never food: two InstancedMeshes, one draw call each, one
+    // material made once here. Placement is a hash of the cell, not a draw
+    // from any stream, so nothing seeded moves.
+    const hash = (n: number) => { const s = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return s - Math.floor(s); };
+    const mat = new THREE.MeshLambertMaterial({ color: 0xf5f2fb, flatShading: true });
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), scl = new THREE.Vector3();
+    const e = new THREE.Euler();
+    // the sea: a jittered 40-unit grid over a 1,400-unit square round the
+    // island, skipping every cell whose centre is on the island more than 20
+    // units in from the coast, so the rim can tuck its puffs under the edge
+    const cx3 = (minX + maxX) / 2, cz3 = (minZ + maxZ) / 2;
+    const sea: THREE.Matrix4[] = [];
+    let n = 0;
+    for (let gz = -700; gz < 700; gz += 40) for (let gx = -700; gx < 700; gx += 40) {
+      n++;
+      const x = cx3 + gx + (hash(n) - 0.5) * 30, z = cz3 + gz + (hash(n + 0.5) - 0.5) * 30;
+      const wx = x / SCALE + CX, wy = z / SCALE + CZ;
+      if (SK.onSkylarkLand(wx, wy) && SK.distToEdge(wx, wy) > 20 / SCALE) continue;
+      // radius 22-40: the spec's 18-34 left the space dome showing between
+      // puffs in the straight-down overview (qa/skylarkfield.mjs after1)
+      const r = 22 + hash(n + 0.25) * 18;
+      pos.set(x, -34 + hash(n + 0.75) * 12, z);
+      q.setFromEuler(e.set(0, hash(n + 0.125) * Math.PI * 2, 0));
+      scl.set(r, r * 0.40, r);
+      sea.push(m4.clone().compose(pos, q, scl));
+    }
+    // detail 1, 80 triangles a puff: the spec's 20-triangle icosahedron read as
+    // grey faceted boulders in the overview, not cloud. Still one draw call.
+    const seaMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), mat, sea.length);
+    sea.forEach((m, i) => seaMesh.setMatrixAt(i, m));
+    seaMesh.instanceMatrix.needsUpdate = true;
+    seaMesh.castShadow = false; seaMesh.receiveShadow = false;
+    seaMesh.name = 'cloudSea';
+    scene.add(seaMesh);
+    // the lip: a row of white puffs every 150 world units along the coast,
+    // half inside and half over the edge, and a smaller row 60 units inland
+    const ring = SK.SK_LAND_RING, lip: THREE.Matrix4[] = [];
+    let k = 0, carry = 0;   // walked by distance along the whole ring, not per segment
+    for (let i = 0; i < ring.length - 1; i++) {
+      const [x1, y1] = ring[i], [x2, y2] = ring[i + 1];
+      const L = Math.hypot(x2 - x1, y2 - y1);
+      if (L < 1e-6) continue;
+      const nx = -(y2 - y1) / L, ny = (x2 - x1) / L;
+      const inward = SK.onSkylarkLand((x1 + x2) / 2 + nx * 30, (y1 + y2) / 2 + ny * 30) ? 1 : -1;
+      let s = carry;
+      for (; s < L; s += 150) {
+        for (const [inset, big] of [[0, 1], [60, 0.6]] as const) {
+          k++;
+          const wx = x1 + (x2 - x1) * (s / L) + nx * inset * inward, wy = y1 + (y2 - y1) * (s / L) + ny * inset * inward;
+          const r = (2.5 + hash(k) * 2.0) * big;
+          pos.set(w(wx), 0.4, w(wy));
+          q.setFromEuler(e.set(0, hash(k + 0.5) * Math.PI * 2, 0));
+          scl.set(r, r * 0.7, r);
+          lip.push(m4.clone().compose(pos, q, scl));
+        }
+      }
+      carry = s - L;
+    }
+    const lipMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), mat, lip.length);
+    lip.forEach((m, i) => lipMesh.setMatrixAt(i, m));
+    lipMesh.instanceMatrix.needsUpdate = true;
+    lipMesh.castShadow = false; lipMesh.receiveShadow = true;
+    lipMesh.name = 'cloudLip';
+    scene.add(lipMesh);
   }
 
 
@@ -1618,6 +1695,141 @@ const QUIET_LEDGER: number[][] = [];
       g.fillStyle = 'rgba(150,150,164,0.42)'; g.fill();
       g.restore();
     }
+  }
+
+  // ══ BELLCLOUD HEIGHTS BAKE (world 6, id 'skylark') ═════════════════════
+  // The airfield never had a bake of its own: its ground was WORLD.meadow and
+  // the grain above, and the runways existed only as the numerals and lights
+  // standing on grass. The kingdom is a NEW branch, modelled on Powder's:
+  // pearl cloud, soft billows at patch scale (grain-scale blobs vanish at the
+  // play camera's magnification), a lilac rolled edge, and pale district floors
+  // separated by hue and value rather than chroma (docs/BELLCLOUD.md §3.2).
+  // Every colour goes through hex()/quiet(), so the 0.55 dial and
+  // qa/groundtruth.mjs's ledger see them. Math.random for the grain, as
+  // Powder's: unseeded and inside this branch, so no seeded stream moves. No
+  // clip path for the tiny ops.
+  if (WORLD_ID === 'skylark') {
+    const ppath = (pts: SK.Pt[], close = false) => {
+      g.beginPath();
+      g.moveTo(pxW(pts[0][0]), pyW(pts[0][1]));
+      for (const [x, y] of pts) g.lineTo(pxW(x), pyW(y));
+      if (close) g.closePath();
+    };
+    const PU = (pxW(1000) - pxW(0)) / 1000;   // canvas px per world unit
+    const stroke = (pts: SK.Pt[], width: number, style: string, close = false) => {
+      ppath(pts, close); g.strokeStyle = style; g.lineWidth = width * PU; g.stroke();
+    };
+    g.save();
+    g.lineCap = 'round'; g.lineJoin = 'round';
+
+    // 1. BASE — pearl cloud. Not paper white: ACES needs room above the ground
+    //    for the white walls and the gold.
+    g.fillStyle = hex(0xebe7f1); g.fillRect(0, 0, TEX, TEX);
+
+    // 2. BILLOWS — what makes it cloud rather than paper. Matched pairs of big
+    //    soft radial gradients at patch scale, 60-260 world units: a lilac
+    //    shade crescent offset WEST, then a warm highlight offset EAST, where
+    //    the key comes from. Same count and alpha each side.
+    const SHADE = quiet('rgba(190,180,222,0.20)'), SHADE0 = quiet('rgba(190,180,222,0)');
+    const LIGHT = quiet('rgba(255,248,236,0.22)'), LIGHT0 = quiet('rgba(255,248,236,0)');
+    const blob = (cx: number, cy: number, r: number, c0: string, c1: string) => {
+      const gr = g.createRadialGradient(cx, cy, 0, cx, cy, r);
+      gr.addColorStop(0, c0); gr.addColorStop(1, c1);
+      g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+    };
+    for (let i = 0; i < 900; i++) {
+      const x = Math.random() * TEX, y = Math.random() * TEX, r = rand(60, 260) * PU;
+      blob(x - r * 0.28, y, r, SHADE, SHADE0);
+      blob(x + r * 0.22, y - r * 0.06, r * 0.9, LIGHT, LIGHT0);
+    }
+
+    // 3. THE ROLLED EDGE — a lilac shade band in from the coast, so the cloud
+    //    curves over the edge (the island clip keeps only its inner half)
+    stroke(SK.SK_LAND_RING, 840, quiet('rgba(190,180,222,0.22)'), true);
+    stroke(SK.SK_LAND_RING, 420, quiet('rgba(180,168,214,0.16)'), true);
+
+    // 4. DISTRICT FLOORS — pale, low chroma, told apart by hue and value.
+    const REGION = (id: SK.SkBiome) => SK.SK_REGIONS.find((r) => r.id === id);
+    const floor = (id: SK.SkBiome, col: number) => {
+      const r = REGION(id); if (!r) return;
+      ppath(r.poly, true); g.fillStyle = hex(col); g.fill();
+    };
+    floor('launchfield', 0xe3f0e7);   // THE CLOUD GARDENS: a mint tint
+    floor('arrivals', 0xecdcc6);      // THE BALLOON DOCK: a pale plank deck
+    floor('tower', 0xe4dff0);         // THE CASTLE KEEP: lavender flagstones
+    floor('hangars', 0xe4dff0);       // THE CASTLE YARD: the same flags
+    floor('breakfast', 0xf2e1e5);     // THE CLOUD MARKET: rose cobbles
+    // the dock's plank lines, every 60 units along 090, and the yard's and the
+    // keep's flag joints — clipped to their own floors
+    const inside = (id: SK.SkBiome, draw: (b: [number, number, number, number]) => void) => {
+      const r = REGION(id); if (!r) return;
+      let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity;
+      for (const [x, y] of r.poly) { a = Math.min(a, x); b = Math.max(b, x); c = Math.min(c, y); d = Math.max(d, y); }
+      g.save(); ppath(r.poly, true); g.clip(); draw([a, b, c, d]); g.restore();
+    };
+    inside('arrivals', ([a, b, c, d]) => {
+      g.strokeStyle = quiet('rgba(170,140,110,0.22)'); g.lineWidth = Math.max(1, 6 * PU);
+      for (let y = c; y <= d; y += 60) { g.beginPath(); g.moveTo(pxW(a), pyW(y)); g.lineTo(pxW(b), pyW(y)); g.stroke(); }
+    });
+    for (const id of ['tower', 'hangars'] as SK.SkBiome[]) inside(id, ([a, b, c, d]) => {
+      g.strokeStyle = quiet('rgba(150,140,180,0.22)'); g.lineWidth = Math.max(1, 6 * PU);
+      for (let y = c; y <= d; y += 120) { g.beginPath(); g.moveTo(pxW(a), pyW(y)); g.lineTo(pxW(b), pyW(y)); g.stroke(); }
+      for (let x = a; x <= b; x += 160) { g.beginPath(); g.moveTo(pxW(x), pyW(c)); g.lineTo(pxW(x), pyW(d)); g.stroke(); }
+    });
+    // THE RAINBOW RING — five pastel bands across the 340-unit track: rose,
+    // peach, lemon, mint, sky, each 68 wide. Drawn widest first.
+    const BANDS = [0xf3b5c4, 0xf6cfa6, 0xf3e7a6, 0xbfe6cf, 0xb9d7f2];
+    for (let i = 0; i < 5; i++) stroke(SK.PERIMETER, (5 - i) * 68, hex(BANDS[i]), true);
+    // THE OLD STONE WAYS (09/27, 15/33) — pale lilac stone with its cracks
+    for (const r of SK.SLABS) {
+      stroke(r.pts, r.half * 2, hex(0xdfd8e4));
+      const [a, b] = [r.pts[0], r.pts[r.pts.length - 1]];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
+      g.strokeStyle = quiet('rgba(150,140,170,0.25)'); g.lineWidth = Math.max(1, 5 * PU);
+      for (let i = 0; i < 150; i++) {
+        const s = Math.random() * L, o = (Math.random() * 2 - 1) * r.half * 0.9;
+        const x = a[0] + ux * s - uy * o, y = a[1] + uy * s + ux * o;
+        const ang = Math.random() * Math.PI, len = rand(25, 70);
+        g.beginPath(); g.moveTo(pxW(x), pyW(y));
+        g.lineTo(pxW(x + Math.cos(ang) * len), pyW(y + Math.sin(ang) * len)); g.stroke();
+      }
+    }
+    // THE GRAND AVENUE (03/21, the live strip) — warm cloud-stone, a darker
+    // outline and gold edge lines on both sides, paving joints every 260
+    for (const r of SK.LIVE_RUNWAYS) {
+      stroke(r.pts, r.half * 2 + 24, hex(0xd9cfbf));
+      stroke(r.pts, r.half * 2, hex(0xefe3c9));
+      const [a, b] = [r.pts[0], r.pts[r.pts.length - 1]];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
+      for (const sgn of [-1, 1]) {
+        const off = sgn * (r.half - 40);
+        stroke([[a[0] - uy * off, a[1] + ux * off], [b[0] - uy * off, b[1] + ux * off]], 30, hex(0xe2c27e));
+      }
+      g.strokeStyle = quiet('rgba(200,180,140,0.25)'); g.lineWidth = Math.max(1, 8 * PU);
+      for (let s = 260; s < L; s += 260) {
+        const x = a[0] + ux * s, y = a[1] + uy * s;
+        g.beginPath(); g.moveTo(pxW(x - uy * r.half * 0.9), pyW(y + ux * r.half * 0.9));
+        g.lineTo(pxW(x + uy * r.half * 0.9), pyW(y - ux * r.half * 0.9)); g.stroke();
+      }
+    }
+    // THE BELL PLAZA — white marble on the avenues' crossing, two gold rings
+    // and twelve paler spokes
+    {
+      const L0 = SK.LAUNCH, cx = pxW(L0.cx), cy = pyW(L0.cy), rx = L0.rx * PU, ry = L0.ry * PU;
+      g.fillStyle = hex(0xf5f2ec);
+      g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = quiet('rgba(255,255,255,0.55)'); g.lineWidth = 30 * PU;
+      for (let i = 0; i < 12; i++) {
+        const t = (i / 12) * Math.PI * 2;
+        g.beginPath(); g.moveTo(cx + Math.cos(t) * rx * 0.54, cy + Math.sin(t) * ry * 0.54);
+        g.lineTo(cx + Math.cos(t) * rx * 0.95, cy + Math.sin(t) * ry * 0.95); g.stroke();
+      }
+      g.strokeStyle = hex(0xe6c173); g.lineWidth = 40 * PU;
+      for (const k of [0.97, 0.52]) { g.beginPath(); g.ellipse(cx, cy, rx * k, ry * k, 0, 0, Math.PI * 2); g.stroke(); }
+    }
+    g.restore();
   }
 
   // ══ PIRATE BAY BAKE ═══════════════════════════════════════════════════
@@ -3697,13 +3909,10 @@ const QUIET_LEDGER: number[][] = [];
   // taken and multiplied by it.
   const GRAIN: Record<WorldId, [number, number, number, number]> = {
     maple:   [0.45, 0.08, 0.00, 9],
-    // SKYLARK FIELD is two surfaces and they want opposite things. Dewed grass
-    // at a low sun is all grain — it is the one ground in the game with real
-    // texture at arm's length. Concrete is nearly none, and a runway that
-    // sparkles reads as gravel. Mid layer high, coarse layer modest, and the
-    // fine layer kept off maple's 0.45 so the strips stay flat: the runways
-    // are the level's sightline and a sightline should be calm.
-    skylark: [0.38, 0.22, 0.12, 8],
+    // BELLCLOUD HEIGHTS is cloud: soft up close, so the fine layer comes down
+    // off the airfield's dewed-grass 0.38, and the bake's billows carry the
+    // patch scale (docs/BELLCLOUD.md §3.2 step 5).
+    skylark: [0.18, 0.20, 0.20, 8],
     pirate:  [0.45, 0.08, 0.00, 9],
     gameday: [0.45, 0.08, 0.00, 9],
     // LANTERN NIGHT leans on the mid and coarse layers hard. Its floor is
@@ -3889,10 +4098,14 @@ const QUIET_LEDGER: number[][] = [];
     const wallGeo = new THREE.BufferGeometry();
     wallGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
     wallGeo.computeVertexNormals();
-    const wall = new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: WORLD.cliff, roughness: 1, flatShading: true, side: THREE.DoubleSide, emissive: 0x3a2a4e, emissiveIntensity: 0.3 }));
+    // BELLCLOUD HEIGHTS: the island is cloud all the way down — a pale lilac
+    // wall with no violet emissive (that is what reads the rock as purple) and
+    // a lilac underside, where every other world has rock
+    const sky = WORLD_ID === 'skylark';
+    const wall = new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: sky ? 0xe2dcef : WORLD.cliff, roughness: 1, flatShading: true, side: THREE.DoubleSide, emissive: 0x3a2a4e, emissiveIntensity: sky ? 0 : 0.3 }));
     scene.add(wall);
     // underside cap
-    const cap = new THREE.Mesh(topGeo.clone(), new THREE.MeshStandardMaterial({ color: 0x1c1636, roughness: 1, side: THREE.DoubleSide }));
+    const cap = new THREE.Mesh(topGeo.clone(), new THREE.MeshStandardMaterial({ color: sky ? 0xb9b1d6 : 0x1c1636, roughness: 1, side: THREE.DoubleSide }));
     cap.rotation.x = -Math.PI / 2; cap.position.y = -DEPTH; scene.add(cap);
   }
 
