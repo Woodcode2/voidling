@@ -20,49 +20,61 @@ game; Capacitor wraps it in a native shell.
   (`favicon.png`, `apple-touch-icon.png`, `icon-192/512.png`, `manifest.json`).
 - **Launch screen** — cosmic splash (2732×2732) in
   `ios/App/App/Assets.xcassets/Splash.imageset/`.
-- **App Store screenshots** — `pnpm shoot:store` captures **eight** at
-  1290x2796 (the 6.7" slot, which also covers 6.5"): menu, world picker, a
-  match mid-devour, Lantern Night's market and bathhouse, Game Day, the shop
-  framed on the legendary tier, and the results screen. It seeds a wallet and a
+- **App Store screenshots** — `pnpm shoot:store` captures **nine** at
+  1290x2796 (accepted in the 6.9" slot, which also covers the smaller
+  iPhones; the app is iPhone-only, `TARGETED_DEVICE_FAMILY = 1`): menu, world
+  picker, a match mid-devour, Lantern Night's market and bathhouse, Game Day,
+  the shop framed on the legendary tier, the results screen, and (added at
+  launch, 2026-09-25) Skylark Field's balloon meet. It seeds a wallet and a
   play history first so the shop photographs the catalogue rather than an empty
   account, and it REFUSES to run until the art is vendored — screenshots of grey
   boxes would misrepresent the app in the other direction. Run it against
   `vite preview`, never the dev server, which hot-reloads the page mid-capture.
   It deletes every old `.png` in `store/` BEFORE the first capture and verifies
-  all eight exist afterwards, so a run that fails half way leaves an obviously
+  all nine exist afterwards, so a run that fails half way leaves an obviously
   short set rather than a plausible mixture of old and new.
-- **The existing `store/01..06-*.png` MUST BE REPLACED.**
-  They are of the RETIRED 2D game, which is no longer what the bundle runs.
-  Submitting screenshots that do not match the app is Guideline 2.3.3, and it
-  is what got the previous attempt rejected. `shoot:store` now handles this
-  itself — it purges them before shooting.
-- **`store/preview.mp4` IS ALSO THE RETIRED 2D GAME, AND THERE IS NO TOOL TO
-  RESHOOT IT.** The transcode step below turns `preview-raw.webm` into the mp4,
-  but nothing produces that raw capture, so "reshoot it" is not an instruction
-  anyone can follow. An App Preview is **optional** in App Store Connect.
-  Until a real one exists: **do not upload the existing file** — submitting a
-  video of a different game is the same 2.3.3 finding as the screenshots.
-  Ship the eight screenshots alone, or record a fresh capture by hand first.
+  On a Mac it uses Playwright's own browser (`npx playwright install chromium`
+  once). `SHOOT_DRYRUN=1 SHOOT_OUT=<scratch dir>` rehearses the whole capture
+  path without the art and refuses to write into `store/`.
+- **The `store/*.png` in the repo today are stale (9 Sep)** — before the six
+  world posters, the eat voices and the Skylark field. Re-shoot on the Mac day,
+  after `pnpm build:ios` has vendored the art: submitting screenshots that do
+  not match the app is Guideline 2.3.3, and it is what got the previous attempt
+  rejected. `shoot:store` purges the old set itself.
+- **The App Preview (the 15-second hook) — record it on the iPhone, from the
+  TestFlight build.** `store/preview.mp4` is footage of the RETIRED 2D game:
+  **do not upload it** (the same 2.3.3 finding as the screenshots). A preview is
+  optional, but it is the listing's hook, and a real device records it at full
+  frame rate with sound, which this project's software-rendered harness cannot.
+  1. Before the iOS build: the owner's calls on the burp and the kill beat.
+     The app has no address bar, so `?burp=1` / `?killbeat=1` do not exist in
+     it — whatever ships ON is what the preview can show.
+  2. iPhone: Do Not Disturb on, sound on, Control Center → Screen Recording
+     (long-press it and turn the microphone OFF — game audio only).
+  3. Play Maple Falls dot 1 and record ~60 s, aiming for these beats:
+     the menu's floating island → PLAY; a small void eating townsfolk
+     ("wheee"), cars ("meep") and a NOMS chain; outgrowing a sibling
+     ("YOU'RE BIGGER THAN …!") and eating it; grown huge, eating houses; the
+     whistle and the end-of-match party.
+  4. Cut 15-30 s in iMovie on the Mac (File → New App Preview exports the size
+     App Store Connect wants), strongest moment first. No captions that
+     promise anything the app does not do; no device frame.
 - **Capacitor** — `capacitor.config.ts` (appId `com.voidling.game`), iOS
   platform generated in `ios/` (SwiftPM, no CocoaPods needed), portrait-only,
   status bar hidden, haptics + status-bar plugins installed.
 
 - **Audio** — 30 layered WAV SFX (`public/assets/audio/`) + **six** recorded
   tracks: one per world plus the menu theme (`public/assets/music/{menu,maple,
-  pirate,gameday,lantern,powder}.mp3`), all mastered to the house spec
+  pirate,gameday,lantern,powder}.mp3`; Skylark's track is the owner's to
+  source, 2026-09-25), all mastered to the house spec
   (−16 LUFS ±1, ≤−1 dBTP). Presence of the file is the entire switch; absent
   means that world plays its synth score, which remains the fallback.
   (This said "3 intensity-tiered tracks, `track_1..3.mp3`". No such file has
   existed for months.)
 
-- **Preview video** — **DO NOT UPLOAD.** `store/preview.mp4` exists and is
-  footage of the RETIRED 2D game. This bullet used to end with an instruction
-  to put it in the App Preview slot — fourteen lines after the block above
-  tells you that same file is a Guideline 2.3.3 rejection. A deliverables list
-  that contradicts itself gets followed at the point it is actionable, so the
-  instruction is gone rather than merely qualified.
-  An App Preview is optional. Ship the screenshots alone until a real capture
-  of the 3D game exists.
+- **Preview video** — see "The App Preview" above: record a fresh one on the
+  iPhone; never upload `store/preview.mp4` (the retired 2D game).
+
 - **Analytics** — OFF BY DEFAULT, and behind a parental gate. Batched client
   (`src/game/analytics.ts`, 3D wrapper `src/proto3d/telemetry.ts`) → Supabase
   edge function `ingest-events` → `vd_events` table (project

@@ -29,7 +29,16 @@ import path from 'node:path';
 import { collectRefs, ROOT } from './asset-refs.mjs';
 
 const URL = process.env.SHOOT_URL || 'http://127.0.0.1:4173';
-const OUT = path.join(ROOT, 'store');
+// SHOOT_OUT redirects the set (default store/). SHOOT_DRYRUN=1 skips the art
+// check below so the capture path can be rehearsed on a machine that cannot
+// reach the CDN — and then REFUSES to write into store/, because shots taken
+// without the art are exactly the misrepresentation that check exists for.
+const OUT = process.env.SHOOT_OUT ? path.resolve(process.env.SHOOT_OUT) : path.join(ROOT, 'store');
+const DRY = process.env.SHOOT_DRYRUN === '1';
+if (DRY && OUT === path.join(ROOT, 'store')) {
+  console.error('SHOOT_DRYRUN=1 needs SHOOT_OUT pointed somewhere other than store/ — a rehearsal must never be uploadable.');
+  process.exit(1);
+}
 
 // ── precondition: the art that PHOTOGRAPHS must be on disk ──────────────────
 //
@@ -57,7 +66,9 @@ const OUT = path.join(ROOT, 'store');
   const missing = refs.filter((r) => !fs.existsSync(path.join(ROOT, 'public', r.replace(/^\//, ''))));
   const images = missing.filter((r) => !r.endsWith('.glb'));
   const meshes = missing.filter((r) => r.endsWith('.glb'));
-  if (images.length) {
+  if (images.length && DRY) {
+    console.warn(`DRY RUN: ${images.length} image(s) missing — these shots are a rehearsal, NOT for App Store Connect (${OUT}).`);
+  } else if (images.length) {
     console.error(`REFUSING TO SHOOT: ${images.length} of ${refs.filter((r) => !r.endsWith('.glb')).length} IMAGES are missing.`);
     console.error('Every paid skin would photograph as a plain ball and the void would have no');
     console.error('galaxy inside it. Run `node scripts/vendor-assets.mjs` first.');
@@ -73,7 +84,7 @@ const OUT = path.join(ROOT, 'store');
 // ── the eight shots this run must produce ───────────────────────────────────
 const EXPECTED = ['01-menu.png', '02-worlds.png', '03-devouring.png',
   '04-lantern-market.png', '05-lantern-bathhouse.png', '06-gameday.png',
-  '07-skins.png', '08-results.png'];
+  '07-skins.png', '08-results.png', '09-skylark.png'];
 
 // ── PURGE FIRST, SHOOT SECOND ───────────────────────────────────────────────
 // Every .png in store/ goes before the first capture: the retired 2D game's
@@ -149,7 +160,7 @@ const want = (...ns) => ns.some((n) => {
   const prev = path.join(OUT, '.previous');
   const gone = PARTIAL ? [] : fs.readdirSync(OUT).filter((f) => f.toLowerCase().endsWith('.png'));
   if (PARTIAL) {
-    const todo = ['01', '02', '03', '04', '05', '06', '07', '08'].filter((n) => want(n));
+    const todo = ['01', '02', '03', '04', '05', '06', '07', '08', '09'].filter((n) => want(n));
     if (!todo.length) {
       console.log(ONLY.length
         ? `nothing to shoot — SHOOT_ONLY=${ONLY.join(',')} names no known segment (01..08)`
@@ -186,7 +197,10 @@ const browser = await chromium.launch({
   // Playwright's bundled headless shell, which is not installed here, so it
   // launched nothing and failed after the purge had already run. Same default
   // as the rest of the kit now, still overridable.
-  executablePath: process.env.CHROME_PATH || '/opt/pw-browsers/chromium',
+  // CHROME_PATH, else the Linux crew image's browser if it is there, else
+  // Playwright's own download (a Mac: `npx playwright install chromium`)
+  executablePath: process.env.CHROME_PATH
+    || (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined),
   args: ['--no-sandbox'],
 });
 const page = await browser.newPage({ viewport: VIEW, deviceScaleFactor: SCALE, isMobile: true, hasTouch: true });
@@ -623,6 +637,30 @@ if (want('08')) {
   await shot('08-results.png');
 }
 
+// ── 09 · SKYLARK FIELD, the balloon meet ────────────────────────────────────
+// Added at launch (ship mode, 2026-09-25), once the field reached the island's
+// arms: the west shoulder of 03/21 at r 4 is where qa/skylarkfield.mjs's after
+// frame showed two standing envelopes beside him. Warped and framed the way 04
+// is, for the same reason — a hero image is framed, not hoped for.
+if (want('09')) {
+  const w = (v) => (v - 6000) * 0.05;
+  await page.evaluate(() => document.getElementById('end')?.classList.remove('show'));
+  await toPicker();
+  await enterMatch('skylark');
+  try {
+    await page.waitForFunction(() => (window.__matchState?.().t ?? 0) > 7, null, { timeout: 180000 });
+  } catch { console.log('  (intro camera may still be moving — check 09 framing)'); }
+  const [wx, wy] = [3500, 6500];
+  await page.evaluate(([x, z]) => { window.__setVoidR(4); window.__warpVoid(x, z); }, [w(wx), w(wy)]);
+  await settle(2400);
+  await page.evaluate(([x, z]) => { window.__warpVoid(x, z); window.__setMood('frenzy'); }, [w(wx), w(wy)]);
+  await settle(700);
+  await grinning('09-skylark');
+  await shot('09-skylark.png');
+  await unpin();
+  await stopPlay();
+}
+
 // ── the folder must contain THIS run, or obviously nothing ──────────────────
 // The stale 2D images used to be removed here, at the end, after all eight
 // captures. Any capture that threw — a timeout, a renamed selector — exited the
@@ -648,6 +686,6 @@ if (want('08')) {
   }
 }
 
-console.log('\nDone. Upload store/01..08 to the 6.7" slot in App Store Connect.');
+console.log(DRY ? `\nDRY RUN done — ${OUT} is a rehearsal. Do NOT upload it.` : '\nDone. Upload store/01..09 to the 6.9" (1290x2796) slot in App Store Connect.');
 console.log('Check each one first: they must show the app a reviewer will actually see.');
 await browser.close();
