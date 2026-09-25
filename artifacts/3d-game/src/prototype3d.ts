@@ -11420,6 +11420,24 @@ function settleFootprints(): number[] {
   // the contact-shadow disc (assets3d.ts contactShadow: rotated flat, y=0.045)
   // is not footprint — it is r*1.1 wide and would fatten every small prop
   const isDisc = (o: THREE.Object3D) => (o as THREE.Mesh).isMesh && Math.abs(o.rotation.x + Math.PI / 2) < 1e-4 && Math.abs(o.position.y - 0.045) < 1e-3;
+  // ── …AND expandByObject TAKES THE CHILDREN WITH IT ─────────────────────
+  // isDisc skips the disc when the traverse reaches it, but a prop whose ROOT
+  // is the merged mesh carries its disc as that mesh's CHILD, and
+  // Box3.expandByObject walks a mesh's children — so the root's own expand
+  // swallowed the very disc this was written to skip. Every skyfield.ts
+  // factory returns a bare mergedProp, so every Skylark prop was measured as
+  // a square 1.485 r across (the disc: r x 1.1 x 1.35) — a standing envelope
+  // as 14.26 units — and a launch field pegged out at 12.5 lost the later of
+  // every close pair as 'through': 42 envelopes on SEED 7, 19 of 36 cold and
+  // 23 of 38 standing, gone before the first frame. The field never showed
+  // the ratio it authored, which is most of why it read as flat. (It is not
+  // the yaw: a build with the field re-laid on 030 still retired 43.)
+  // SKYLARK ONLY, FOR NOW. alpine.ts, nightmarket.ts and mainstreet.ts return
+  // bare meshes too, so Powder, Lantern and Maple carry the same fault, and
+  // fixing it there moves their placement ledgers — post-launch, with its own
+  // before and after. A mesh with no children measures the same either way.
+  const ownBox = pickedWorld === 'skylark';
+  const gBox = new THREE.Box3();
   for (let i = 0; i < edibles.length; i++) {
     const e = edibles[i], m = e.mesh, ud = m.userData;
     if (ud.mover || ud.afloat) continue;
@@ -11427,7 +11445,14 @@ function settleFootprints(): number[] {
     const ry = m.rotation.y;
     m.rotation.y = 0; m.updateMatrixWorld(true);
     box.makeEmpty();
-    m.traverse((o) => { if ((o as THREE.Mesh).isMesh && !isDisc(o)) box.expandByObject(o); });
+    m.traverse((o) => {
+      if (!(o as THREE.Mesh).isMesh || isDisc(o)) return;
+      const g = (o as THREE.Mesh).geometry;
+      if (ownBox && o.children.length && g) {
+        if (!g.boundingBox) g.computeBoundingBox();
+        box.union(gBox.copy(g.boundingBox!).applyMatrix4(o.matrixWorld));
+      } else box.expandByObject(o);
+    });
     m.rotation.y = ry; m.updateMatrixWorld(true);
     if (box.isEmpty()) continue;
     const px = m.position.x, pz = m.position.z;
