@@ -6906,8 +6906,11 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       // stand in it (the poster). Not on the camera's side of the spawn,
       // though: the lens sits south-east of her (camOffset +x, +z), and a
       // 9.4-unit dome between it and a new void is the one thing the first
-      // frame must never show. North-west of her, a standing envelope is
-      // the top of that frame, which is exactly where it belongs.
+      // frame must never show. North-west of her a standing envelope may
+      // top that frame — but on the SEED 7 field none of the rigs that land
+      // is a standing one inside it: her first frame shows spilled and cold
+      // envelopes, and the first upright ones stand just outside it (the
+      // ship-mode review, 2026-09-25).
       rig.forEach((p2, i) => {
         const cols = env();
         let stage = i % 3;
@@ -7213,7 +7216,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     //     86.1% of the verge (16.4%) and 98.5% of the rough (5.1%).
     //
     //     WHAT IT COST: the rough's own dressing. drop() refuses a tussock
-    //     inside a crew's claim, so ~200 small props of the rough and verge
+    //     inside a crew's claim, so 295 small props of the rough and verge
     //     are not there (small edibles 3,518 -> 3,223 island-wide); every cell
     //     still has one in frame, and those that went were grass.
     //

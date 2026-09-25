@@ -2096,11 +2096,11 @@ const HOURS: Record<WorldId, WorldHour[]> = {
  *
  *  OPT-IN, NOT A FLAG DAY. The obvious move is to point the light at the
  *  column and set the other five rows to 0.22 so nothing changes — but
- *  gameday 0.86, lantern 1.75, powder 0.9 and skylark 1.05 are AUTHORED
- *  numbers somebody reasoned about, and overwriting them with 0.22 to fake
- *  a no-op would make the column lie a second time, in the same way, while
- *  looking like it had been fixed. This set is byte-identical for five worlds
- *  and preserves what they asked for, for whoever dials them in next. */
+ *  gameday 0.86, lantern 1.75 and powder 0.9 are AUTHORED numbers somebody
+ *  reasoned about, and overwriting them with 0.22 to fake a no-op would make
+ *  the column lie a second time, in the same way, while looking like it had
+ *  been fixed. This set is byte-identical for the four worlds outside it and
+ *  preserves what they asked for, for whoever dials them in next. */
 // SKYLARK joined 2026-09-25 with a value measured for it (0.58, the sunrise
 // retune above) rather than the unread 1.05 its row used to carry.
 const HEMI_APPLIED = new Set<WorldId>(['maple', 'skylark']);
