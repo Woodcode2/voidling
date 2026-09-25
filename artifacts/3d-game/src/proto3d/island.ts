@@ -6796,6 +6796,81 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       mesh.userData.balloon = { id: balloonId++, stage, cols };
       return mesh;
     };
+    // ── THE AUDIT'S OWN QUESTION, ASKED BEFORE A PROP LANDS ───────────────
+    // qa/placement.mjs fails this world on any SOLID (eat radius >= 2, 2+
+    // tall, 2.4+ wide on the ground: a cottage, a turret, a standing or lying
+    // envelope) whose ground rectangle another prop's enters by more than
+    // 0.35, and on any prop whose ground centre is off the island — and a new
+    // world's ceiling is zero. Claims are circles standing in for rectangles,
+    // and at a zero ceiling a circle is too fat or too thin somewhere: the
+    // first full run filed four overlaps (the worst three a cottage with a
+    // bush or a broken column 0.57-0.67 inside a corner) and one meadow bush
+    // off the island; the next, with fatter cottage claims, a broken column
+    // 0.38 into a lying envelope and the same bush — its origin was on the
+    // island, its drawn footprint's centre was not. So drop() measures the
+    // rectangle the audit measures — the prop's own vertices under 1 unit,
+    // in its own frame, turned by its yaw — and refuses a spot where it meets
+    // a solid's (or, for a solid, anything's) by more than 0.25, or where its
+    // centre is off the island. Claims still space the world; this only says
+    // no to a real collision. On SEED 7 the audit now reads offisland 0,
+    // overlap 0 and inside 0 over 4,060 static props: PASS at a ceiling of 0.
+    type Foot = { cx: number; cz: number; rOut: number; solid: boolean; axes: [number, number][]; corners: [number, number][] };
+    const FOOT_CELL = 16;
+    const feet = new Map<string, Foot[]>();
+    const footOf = (mesh: THREE.Object3D, r: number, x3: number, z3: number, yaw: number): Foot | null => {
+      const p0 = mesh.position.clone(), r0 = mesh.rotation.y;
+      mesh.position.set(0, 0, 0); mesh.rotation.y = 0; mesh.updateMatrixWorld(true);
+      let lx0 = Infinity, lx1 = -Infinity, lz0 = Infinity, lz1 = -Infinity, minY = Infinity, maxY = -Infinity;
+      const v = new THREE.Vector3();
+      mesh.traverse((o) => {
+        const g = (o as THREE.Mesh).isMesh ? (o as THREE.Mesh).geometry : null;
+        const pa = g?.attributes.position; if (!pa) return;
+        for (let i = 0; i < pa.count; i++) {
+          v.fromBufferAttribute(pa, i).applyMatrix4(o.matrixWorld);
+          if (v.y < minY) minY = v.y; if (v.y > maxY) maxY = v.y;
+          if (v.y > 1.0) continue;
+          if (v.x < lx0) lx0 = v.x; if (v.x > lx1) lx1 = v.x; if (v.z < lz0) lz0 = v.z; if (v.z > lz1) lz1 = v.z;
+        }
+      });
+      mesh.position.copy(p0); mesh.rotation.y = r0; mesh.updateMatrixWorld(true);
+      if (lx0 === Infinity) return null;
+      const cy = Math.cos(yaw), sy = Math.sin(yaw);
+      const at = (x: number, z: number): [number, number] => [x3 + x * cy + z * sy, z3 - x * sy + z * cy];
+      const hx = (lx1 - lx0) / 2, hz = (lz1 - lz0) / 2;
+      const [cx, cz] = at((lx0 + lx1) / 2, (lz0 + lz1) / 2);
+      return { cx, cz, rOut: Math.hypot(hx, hz),
+        solid: r >= 2 && !mesh.userData.spin && maxY - Math.min(0, minY) >= 2 && Math.min(2 * hx, 2 * hz) >= 2.4,
+        axes: [[cy, -sy], [sy, cy]], corners: [at(lx0, lz0), at(lx1, lz0), at(lx1, lz1), at(lx0, lz1)] };
+    };
+    /** separating-axis penetration of two oriented rectangles (0 = apart) */
+    const footDepth = (a: Foot, b: Foot): number => {
+      let best = Infinity;
+      for (const [ux, uz] of [...a.axes, ...b.axes]) {
+        let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+        for (const [x, z] of a.corners) { const t = x * ux + z * uz; if (t < a0) a0 = t; if (t > a1) a1 = t; }
+        for (const [x, z] of b.corners) { const t = x * ux + z * uz; if (t < b0) b0 = t; if (t > b1) b1 = t; }
+        const o = Math.min(a1, b1) - Math.max(a0, b0); if (o <= 0) return 0; if (o < best) best = o;
+      }
+      return best;
+    };
+    const footCells = (f: Foot, pad = 0): string[] => {
+      const out: string[] = [], R = f.rOut + pad;
+      for (let i = Math.floor((f.cx - R) / FOOT_CELL); i <= Math.floor((f.cx + R) / FOOT_CELL); i++)
+        for (let j = Math.floor((f.cz - R) / FOOT_CELL); j <= Math.floor((f.cz + R) / FOOT_CELL); j++) out.push(`${i},${j}`);
+      return out;
+    };
+    const footClear = (f: Foot): boolean => {
+      if (!insideIsland3(f.cx, f.cz)) return false;
+      const seen = new Set<Foot>();
+      for (const k of footCells(f)) for (const q of feet.get(k) ?? []) {
+        if (seen.has(q)) continue; seen.add(q);
+        if (!(f.solid || q.solid)) continue;
+        if (Math.hypot(f.cx - q.cx, f.cz - q.cz) > f.rOut + q.rOut) continue;
+        if (footDepth(f, q) > 0.25) return false;
+      }
+      return true;
+    };
+    const footAdd = (f: Foot) => { for (const k of footCells(f)) { const L = feet.get(k); if (L) L.push(f); else feet.set(k, [f]); } };
     const drop = (mesh: THREE.Object3D, p2: SK.Pt, r: number, rotY?: number, force = false, qk?: string, claim?: number) => {
       const c = claim ?? r;
       // ── LEGALITY IS drop()'s JOB, NOT THE CALLER'S ────────────────────────
@@ -6828,11 +6903,20 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       // just outside the lip and hang its far end over.
       if (!force && !SK.skPlaceable(p2[0], p2[1], Math.max(30, r * 34))) return false;
       if (!force && !SK.spotOpen(p2[0], p2[1], c * 20)) return false;
-      if (force) mesh.userData.authored = true;   // a landmark: the settle pass may never retire it
+      // …AND ON THE ISLAND THE CHILD SEES, as paint() already asks.
       const [x3, z3] = P3(p2);
+      if (!force && !insideIsland3(x3, z3)) return false;
+      // …and the audit's own rectangles (THE AUDIT'S OWN QUESTION, above),
+      // turned by the yaw the prop will actually stand at: place() gives a
+      // no-front prop left at 0 its spinFor() angle, so that is the one asked
+      const yaw0 = rotY ?? mesh.rotation.y;
+      const foot = footOf(mesh, r, x3, z3, mesh.userData.spin && Math.abs(yaw0) < 1e-6 ? spinFor(x3, z3) : yaw0);
+      if (!force && foot && !footClear(foot)) return false;
+      if (force) mesh.userData.authored = true;   // a landmark: the settle pass may never retire it
       if (rotY !== undefined) mesh.rotation.y = rotY;
       if (qk) mesh.userData.qk = qk;
       place(mesh, x3, z3, r);
+      if (foot) footAdd(foot);   // forced landmarks too: everything after must clear the Great Bell
       SK.claimSpot(p2[0], p2[1], c * 20);
       return true;   // …and says so, so a crew's kit only follows an envelope that landed
     };
@@ -7006,7 +7090,9 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       // spotOpen() (bay.ts) enforces max((a + b) * 0.45, max(a, b) * 0.62), so
       // against the small scatter the 0.62 term binds and a claim has to be a
       // prop's half-extent DIVIDED by 0.62 to keep a bush out of its wall:
-      //     cottage   roof r 2.15          -> 3.5
+      //     cottage   roof r 2.15          -> 3.5  (a circle: the corners of
+      //               its 4.0 x 4.1 ground rect are drop()'s footprint
+      //               guard's to keep clear — see THE AUDIT'S OWN QUESTION)
       //     tree      foot 3.9 x 3.3       -> 3.2
       //     turret    9.0 (the spec's: it keeps a lane round every tower)
       //     shrine    foot 2.8 x 2.8       -> 3.2
@@ -7293,7 +7379,9 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     }
     // MARKET STALLS where sixteen spilled balloons lay. The scatter keeps its
     // 9.0 sep (its stream and its ledger row are unchanged); a stall claims
-    // its own 5.0, which is what the spec's row asks.
+    // its own 5.0, which is what the spec's row asks. That claim sits inside
+    // the scatter's own 180-unit one at the same point, so it moves nothing
+    // after it: qa/rng.mjs read the identical ledger at 5.0 and at 2.6.
     for (const p2 of SK.scatterInRegion(REG('breakfast'), 16, 150, { sep: 9.0 })) {
       drop(SKF.skMarketStall(hue++ % 2 ? SKF.ROSE : SKF.ROOF_BLUE), p2, 2.2, layoutYaw(), false, 'house', 5.0);
     }
@@ -7302,8 +7390,17 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       [61, 0.75, 0.95, 'small', () => SKF.skPicnicBench()],
       [47, 0.75, 0.95, 'small', () => SKF.skPuffBush(hue++)],
       // the cloud sweepers walk bell post to bell post (life.ts's 'bin' route)
-      [29, 0.75, 0.95, 'small', () => kinded(SKF.skBellPost(), 'bin')],
-      [25, 0.75, 0.95, 'small', () => SKF.skWildflowerClump()],
+      // BELL POSTS AND FLOWERS AT THEIR OWN SIZE. These two rows inherited
+      // the wheelie bins' and tussocks' r 0.75 / sep 0.95 — a bench's spacing
+      // for a post 0.9 x 0.5 on the ground and a clump 0.4 x 0.5 — and, last
+      // in a district the kingdom's other passes now crowd, they came up
+      // 3/29 and 16/25: the market placed 177 of its 225 asks (78.7%) against
+      // qa/rng.mjs's bar of 80. They now ask what the Cloud Gardens' rows ask
+      // for the same two props (r 0.5 / sep 0.8, r 0.35 / sep 0.6), and both
+      // rows fill (29/29, 25/25): the island places 4,519 of 4,541 (99.5%),
+      // no district thin. (The airfield's build read 8/29 and 21/25 here.)
+      [29, 0.5, 0.8, 'small', () => kinded(SKF.skBellPost(), 'bin')],
+      [25, 0.35, 0.6, 'small', () => SKF.skWildflowerClump()],
     ] as [number, number, number, string, () => THREE.Object3D][])
       for (const p2 of SK.scatterInRegion(REG('breakfast'), n, 40, { sep }))
         drop(mk(), p2, r, layoutYaw(), false, qk);
