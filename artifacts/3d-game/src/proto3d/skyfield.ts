@@ -45,7 +45,10 @@
 //  A field of upright envelopes would be a wall of opaque objects at a camera
 //  that looks down at 46.4°. So a balloon is authored in one of four stages —
 //  BAGGED, SPILLED, COLD, STANDING — held at roughly 5:4:3:2, and the ratio
-//  walks forward across the match. Stages one to three are LOW: they read as
+//  walks forward across the match. (The launch field's rows have authored
+//  2:4:3:5 since, and from 2026-09-25 the island measures 2.2 : 3.9 : 3.4 :
+//  4.5 per 14 on SEED 7, the owner's poster having asked for envelopes
+//  standing up — see island.ts's SKYLARK block.) Stages one to three are LOW: they read as
 //  enormous coloured shapes lying ON the ground, which is what an overhead
 //  camera actually wants, and the standing ones are punctuation. The world
 //  stands up as the child grows, which no other world in this game does.
