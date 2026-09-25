@@ -25,8 +25,7 @@ game; Capacitor wraps it in a native shell.
   iPhones; the app is iPhone-only, `TARGETED_DEVICE_FAMILY = 1`): menu, world
   picker, a match mid-devour, Lantern Night's market and bathhouse, Game Day,
   the shop framed on the legendary tier, the results screen, and (added at
-  launch, 2026-09-25) world 6, Bellcloud Heights (the balloon field before its
-  re-theme the same day). It seeds a wallet and a
+  launch, 2026-09-25) world 6, Bellcloud Heights. It seeds a wallet and a
   play history first so the shop photographs the catalogue rather than an empty
   account, and it REFUSES to run until the art is vendored — screenshots of grey
   boxes would misrepresent the app in the other direction. Run it against
