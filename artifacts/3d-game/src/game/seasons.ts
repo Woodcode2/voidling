@@ -37,9 +37,12 @@ export interface SeasonEvent {
   /** inclusive [month 1-12, day] window, device-local, recurs yearly */
   from: [number, number];
   to: [number, number];
-  /** repaints the beat palette + fever rings while live */
+  /** the season's colour on its picker chip and menu ribbon. (It repainted
+   *  the beat cards and fever rings too, until the beats went quiet on
+   *  2026-09-25 and there were none left to paint.) */
   accent: number;
-  /** the beat card's screen flash while live */
+  /** was the beat card's screen flash while live; nothing draws it since the
+   *  beats went quiet (2026-09-25). Kept as the season's authored record. */
   flash: string;
   /** the ribbon's second line, in the world's own voice */
   line: string;

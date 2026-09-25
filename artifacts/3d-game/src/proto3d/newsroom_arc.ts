@@ -43,8 +43,9 @@ const PHASE_AT = [0, 0.13, 0.45, 0.78];
  *  goes in the first ten seconds the town has genuinely bigger news than the
  *  goat, and holding morning open afterwards would have the paper report a
  *  water tower vanishing and then go back to the parking meter. The first card
- *  is the greeting either way — the caller clears the reactive queue before it
- *  — so the baseline is never skipped outright. */
+ *  is the greeting either way — the caller holds the reactive queue until the
+ *  greeting has printed (it used to clear it; since 2026-09-25 a queued line
+ *  is a milestone and waits instead) — so the baseline is never skipped. */
 const MORNING_MIN_CARDS = 2;
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
