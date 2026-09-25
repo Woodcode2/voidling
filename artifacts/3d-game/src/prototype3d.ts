@@ -10992,11 +10992,17 @@ const CARD_ART: Record<string, string> = {
   // (:6630), so a 404 leaves the painted dawn gradient in place. A change whose
   // worst case is the status quo and whose best case is the one blank card on
   // the world picker is not a change to sit on for a round.
-  skylark: '/assets/hf/hf_20260904_175218_7e696395-fbec-4ba2-a7a2-9b02e2b5bdf5.png',
   //
-  // The card is NOT blank meanwhile — CARD_FALLBACK carries skylark in its own
-  // dawn amber, balloon violet and morning blue, which is the whole reason that
-  // table exists. qa/worldreg.mjs prints this debt on every gate run.
+  // ── BELLCLOUD HEIGHTS, 2026-09-25: that card was the balloon meet — the
+  // runways, the whale on her side — and the world it showed is gone. The card
+  // is now the owner's own Bellcloud poster, the one MENU_ART carries: a small
+  // floating island to the same recipe, committed to public/, so it loads
+  // here and in production alike.
+  skylark: '/assets/hf/bellcloud_20260925.png',
+  //
+  // The card is never blank while it loads — CARD_FALLBACK carries skylark in
+  // the bell's gold and the sky's blue, which is the whole reason that table
+  // exists.
 };
 // A CARD IS NEVER BLANK. This set the background and hoped: if the file 404s —
 // which is exactly what every /assets/hf path does inside an iOS bundle that
