@@ -17,7 +17,14 @@
 //   placeable ground      >= 56% of the island       (was 41.0%; measured 61.5% at the rebuild's widths)
 //   largest connected      >= 50% of placeable       (was 35.6%; the live runway still halves the island, by design)
 //   spawn district         === 'arrivals'            (was 'meadow')
-//   whale off-axis         <= 20 degrees             (was 66.6)
+//   hero off-axis          <= 20 degrees             (was 66.6)
+//
+// 2026-09-25, BELLCLOUD HEIGHTS (docs/BELLCLOUD.md §10.1): the airfield became
+// a kingdom on the clouds and the whale is gone. The bars do not move. The
+// spawn is still 'arrivals' ON PURPOSE — it is the Balloon Dock now, where the
+// visitors land, and the spawn does not move. The fourth bar reads LAUNCH,
+// which is where the Great Bell stands, so only its label changes: it was
+// "the whale", it is "the Great Bell".
 import { createServer } from 'vite';
 
 const s = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'silent', optimizeDeps: { noDiscovery: true, include: [] } });
@@ -61,8 +68,9 @@ const pct = 100 * place / land, big = 100 * best / place;
 
 // THE CAMERA NEVER TURNS. camOffset (0.62, 0.92, 0.62) sits the camera at +x,+z
 // of the child, so the ground view direction is (-1, -1) in world x,y. The
-// whale is in frame when the vector from the spawn to the launch circle lies
-// within the half-FOV (29.8 degrees at aspect 2.0) of that direction.
+// Great Bell is in frame when the vector from the spawn to the Bell Plaza (the
+// launch circle) lies within the half-FOV (29.8 degrees at aspect 2.0) of that
+// direction.
 const [sx, sy] = SK.SK_SPAWN;
 const dx = SK.LAUNCH.cx - sx, dy = SK.LAUNCH.cy - sy;
 const L = Math.hypot(dx, dy);
@@ -75,7 +83,7 @@ console.log(`  island ${land} cells at ${CELL}u; placeable ${place} in ${pieces}
 bar(pct >= 56, `placeable ground ${pct.toFixed(1)}% of the island (bar 56%; shipped 41.0%)`);
 bar(big >= 50, `largest connected piece ${big.toFixed(1)}% of placeable (bar 50%; shipped 35.6%)`);
 bar(district === 'arrivals', `spawn (${sx},${sy}) resolves to '${district}' (must be 'arrivals'; shipped 'meadow')`);
-bar(off <= 20, `the whale is ${off.toFixed(1)} degrees off the camera centreline at ${(L / 20).toFixed(0)} units (bar 20; shipped 66.6)`);
+bar(off <= 20, `the Great Bell is ${off.toFixed(1)} degrees off the camera centreline at ${(L / 20).toFixed(0)} units (bar 20; shipped 66.6)`);
 console.log('');
-console.log(bad ? `FAIL — skyland: ${bad} of 4 land bars short` : 'PASS — skyland: the field has ground to stand on, the child stands in arrivals, and the whale is in frame');
+console.log(bad ? `FAIL — skyland: ${bad} of 4 land bars short` : 'PASS — skyland: the kingdom has ground to stand on, the child lands at the Balloon Dock, and the Great Bell is in frame');
 process.exit(bad ? 1 : 0);

@@ -606,11 +606,11 @@ const SUITE = [
 
   { id: 'skyland', tier: 'quality', profiles: ['push', 'live'], timeout: 90,
     cmd: ['node', 'qa/skyland.mjs'], verdict: pf,
-    why: 'SKYLARK FIELD has ground to stand on — placeable >= 56% (shipped 41%), the child spawns in arrivals (shipped: the rough), and the whale is inside the fixed camera\'s frame when controls go live (shipped: 66 degrees out of it)' },
+    why: 'BELLCLOUD HEIGHTS (world 6) has ground to stand on — placeable >= 56% (shipped 41%), the child lands at the Balloon Dock (arrivals; shipped: the rough), and the Great Bell is inside the fixed camera\'s frame when controls go live (the airfield shipped its hero 66 degrees out of it)' },
 
   { id: 'airfield', tier: 'quality', profiles: ['push', 'live'], timeout: 30,
     cmd: ['node', 'qa/airfield.mjs'], verdict: pf,
-    why: 'SKYLARK FIELD is a real airfield — runway designators match their headings, the perimeter closes, the launch circle sits on the true crossing, spawn is off the strips and every district has room to stand in' },
+    why: 'BELLCLOUD HEIGHTS\' geometry is what it claims — every avenue stays on the island, the Rainbow Ring closes, the Bell Plaza sits on the avenues\' true crossing, the spawn is off the Grand Avenue and every district has room to stand in (the designator check retired with the airfield\'s numerals)' },
 
   { id: 'formsep', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 60,
     cmd: ['node', 'qa/formsep.mjs'], verdict: pf,
@@ -857,9 +857,13 @@ const SUITE = [
   // Ship mode, 2026-09-25: Skylark's field reaches the island's arms, verge and
   // rough, and a third of its envelopes stand. Live and quality until the lead
   // has read two greens. FAIL, 6 bars, on the build before the change.
+  // Re-themed the same day as BELLCLOUD HEIGHTS (docs/BELLCLOUD.md §10.1): its
+  // envelope bar A and standing bar C are retired in the probe's own header
+  // and replaced by A' (a big meal), C' (the balloons docked at the edge), D
+  // (the cloud ground and the light) and E (the Great Bell is the hero).
   { id: 'skylarkfield', tier: 'world', profiles: ['live', 'quality'], timeout: 1200,
     cmd: ['node', 'qa/skylarkfield.mjs', PORT, '--tag=gate'], verdict: pf,
-    why: 'there is something to eat everywhere on Skylark, not only in the middle — an envelope and a mid-size meal in frame from every part of the island, and a quarter of the envelopes standing' },
+    why: 'there is something to eat everywhere on BELLCLOUD HEIGHTS — a big and a mid-size meal in frame from every part of the island — its balloons dock along the edge with a quarter standing, its ground reads as cloud in a bright day without blowing out, and the Great Bell is the largest meal on the island' },
 
   // Research governor G5. Not in push until two greens: the lead promotes it.
   // Maple and Skylark because Skylark is the world whose census offers six
