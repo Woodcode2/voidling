@@ -255,34 +255,67 @@
       #wayfind.on { opacity: 1; visibility: visible;
         transition: opacity 0.22s linear, visibility 0s linear 0s; }
       body.ovl #wayfind, body.menu #wayfind { display: none; }
-      /* ── THE NOMS PILL ──────────────────────────────────────────────────────
-         The eating chain, counted in words a child reads: '12 NOMS'. Placed
-         beside the void from JS every frame (paintNoms), so like #wayfind it
-         carries no @keyframes — only a class-driven fade — and cannot be caught
-         by the reduced-motion catch-all. Teal from five links, gold from ten,
-         rainbow from twenty. A beat window adds a static ×2 tag. Nothing on it
-         drains or counts down (research governor G6).
+      /* ── THE NOMS BADGE ─────────────────────────────────────────────────────
+         The eating chain, counted in words a child reads: '12 NOMS'. It was a
+         pill placed beside the void from JS every frame; the owner, on his own
+         recording (2026-09-25): "it's always there next to the void ... it just
+         takes real estate space. What if we put that on the top screen
+         somewhere, like in a corner, um, that makes it look beautiful, makes it
+         look fun." So it is a HUD chip now, pinned in the TOP-LEFT corner — the
+         one corner of the top band nothing else uses: the clock is centred, the
+         coins and the pause button stack on the right, the goal chip hangs
+         under the clock. It sits on the clock's own line (--timer-top) and is
+         36px tall; the goal chip starts 1.25 x the clock's type + 6 below that
+         line, and the clock's type never drops under 26px, so the chip is at
+         least 38.5px down at any width. qa/nomstream.mjs (i)/(j) read it live at
+         430, 390 and 360 wide.
+
+         .clay owns the fill, rim, edge and shadow, as on every HUD chip, so the
+         tier cannot live on the badge: it lives on the count's own coin. Teal
+         from five links, gold from ten — where the coin puts on the crown the
+         tenth link pops — rainbow from twenty. A beat window adds a static ×2.
+         Nothing on it drains or counts down (research governor G6). Weights
+         stop at 700: the old pill asked for 800 and 900, which Fredoka does not
+         ship, so the browser was faking them.
          TEAL, NOT VIOLET: the first tier was #8a5cff, a hair off the hero's own
-         0x9a5cff, sitting right beside him — and the style's rule is that nothing
-         in the frame wears his violet (studio round 3, 2026-09-23). */
-      #noms { position: fixed; left: 0; top: 0; z-index: 5; pointer-events: none;
-        transform: translate(0, -50%); padding: 4px 12px 5px; border-radius: 999px;
-        font-family: 'Fredoka', system-ui, sans-serif; font-weight: 800; font-size: 15px;
-        letter-spacing: 0.6px; line-height: 1.25; white-space: nowrap; color: #fff;
-        -webkit-text-stroke: 2.5px rgba(26,10,22,0.9); paint-order: stroke fill;
+         0x9a5cff — and the style's rule is that nothing in the frame wears his
+         violet (studio round 3, 2026-09-23). */
+      #noms { position: fixed; z-index: 5; pointer-events: none;
+        top: var(--timer-top); left: calc(12px + env(safe-area-inset-left, 0px));
+        box-sizing: border-box; height: 36px; padding: 0 13px 0 3px; border-radius: 999px;
+        display: flex; align-items: center; gap: 7px; white-space: nowrap;
+        font-family: 'Fredoka', system-ui, sans-serif; line-height: 1;
+        opacity: 0; visibility: hidden; transform: scale(0.6); transform-origin: 17px 50%; }
+      /* it pops IN from its coin, and it goes the instant the chain ends: the
+         cash-in pops over him in its place, and a badge still fading while
+         "14 NOMS! +420" rises is two answers to one question (qa/nomstream.mjs
+         caught the old pill lingering) */
+      #noms.on { opacity: 1; visibility: visible; transform: none;
+        transition: opacity 0.16s linear, transform 0.3s cubic-bezier(0.2, 1.6, 0.4, 1), visibility 0s linear 0s; }
+      #noms .nC { position: relative; display: flex; align-items: center; justify-content: center;
+        box-sizing: border-box; min-width: 30px; height: 30px; padding: 0 7px; border-radius: 999px;
         background: #14a89a;
-        box-shadow: 0 0 0 2.5px rgba(26,10,22,0.9), 0 3px 8px rgba(0,0,0,0.35);
-        opacity: 0; visibility: hidden; }
-      /* it fades IN, and it goes the instant the chain ends: the cash-in pops
-         in its place, and a pill still fading beside "14 NOMS! +420" is two
-         answers to one question (qa/nomstream.mjs caught it lingering) */
-      #noms.on { opacity: 1; visibility: visible;
-        transition: opacity 0.16s linear, visibility 0s linear 0s; }
-      #noms.lft { transform: translate(-100%, -50%); }
-      #noms.mid { transform: translate(-50%, -50%); }
-      #noms[data-tier="2"] { background: #f5a300; }
-      #noms[data-tier="3"] { background: linear-gradient(90deg, #ff4f7b, #ff9f1c, #ffd23f, #3fcf7a, #3fb4ff, #9b6bff); }
-      #noms b { margin-left: 7px; font-weight: 900; color: #ffe46b; }
+        box-shadow: inset 0 2px 0 rgba(255,255,255,0.38), inset 0 -2px 0 rgba(0,0,0,0.2);
+        color: #fff; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;
+        -webkit-text-stroke: 2.5px rgba(26,10,22,0.9); paint-order: stroke fill; }
+      /* the count bumps on every link — two identical keyframes, alternated by
+         paintNoms, because changing the NAME is what restarts an animation
+         without forcing a layout */
+      #noms .nC.ba { animation: nomBumpA 0.3s cubic-bezier(0.2, 1.6, 0.4, 1); }
+      #noms .nC.bb { animation: nomBumpB 0.3s cubic-bezier(0.2, 1.6, 0.4, 1); }
+      @keyframes nomBumpA { 0% { transform: scale(1.32) rotate(-7deg); } 100% { transform: none; } }
+      @keyframes nomBumpB { 0% { transform: scale(1.32) rotate(-7deg); } 100% { transform: none; } }
+      #noms .nL { color: #fff6df; font-size: 13px; font-weight: 700; letter-spacing: 1.6px; }
+      #noms .nX { color: #ffe46b; font-size: 14px; font-weight: 700; margin-left: -2px; }
+      #noms .nX:empty { display: none; }
+      /* the crown the tenth link pops, kept: perched on the coin, tilted, from
+         ten links up. The drawn mark from the icon sheet, not an emoji. */
+      #noms .nCrown { position: absolute; left: -8px; top: -12px; width: 19px; height: 19px;
+        transform: rotate(-24deg); display: none;
+        filter: drop-shadow(0 1.5px 0 rgba(26,10,22,0.9)); }
+      #noms[data-tier="2"] .nC { background: #f5a300; }
+      #noms[data-tier="3"] .nC { background: linear-gradient(90deg, #ff4f7b, #ff9f1c, #ffd23f, #3fcf7a, #3fb4ff, #9b6bff); }
+      #noms[data-tier="2"] .nCrown, #noms[data-tier="3"] .nCrown { display: block; }
       body.ovl #noms, body.menu #noms { display: none; }
       /* ── THE PARTY: confetti out of the void when the match ends (G4) ───────
          Spawned and retired by partyBurst()/tClock in JS. Paper scraps, not
@@ -379,9 +412,12 @@
          anywhere from 2.00:1 to 2.75:1 depending on the ground. */
       #growth .gTrack { position: relative; height: 20px; border-radius: 10px; overflow: hidden;
         background: #150a26; box-shadow: inset 0 1px 3px rgba(0,0,0,0.55); }
-      /* IT STEPS NOW, IT DOES NOT CREEP. The fill is written from gShown, which
-         only a bite moves, so this transition is the STEP's own easing rather
-         than a smoother over per-frame slivers. Low stop #7b4fe0 -> #a05cff:
+      /* IT GLIDES, AND NO CSS TRANSITION CARRIES IT. The width is written every
+         frame it moves, from a spring that follows what the bar has been paid
+         (prototype3d.ts gSpring) — a transition here would ease the ease, and
+         it runs on the wall clock while the game runs on its own. The one it
+         had carried each payment across in 0.12 s and then stood still: the
+         "little blocks" the owner saw on 2026-09-25. Low stop #7b4fe0 -> #a05cff:
          4.958:1 against the solid track, where the old pair measured 2.4:1.
          background-size is pinned to the TRACK's width as a static calc, so the
          gradient stays put as the fill grows and a 90% bar is a different
@@ -392,8 +428,7 @@
       #growth .gFill { position: absolute; inset: 0 auto 0 0; width: 0%; border-radius: 10px;
         background: linear-gradient(90deg, #a05cff 0%, #b875ff 55%, #e3c8ff 100%);
         background-size: calc(min(92vw, 460px) - 26px) 100%;
-        box-shadow: 0 0 12px rgba(184,117,255,0.55);
-        transition: width 0.16s cubic-bezier(0.2, 1.1, 0.35, 1); }
+        box-shadow: 0 0 12px rgba(184,117,255,0.55); }
       /* THE HEAD. This existed only under .big; it is permanent now, because it
          is where the bar is ADDING and it is what the flying number aims at. */
       #growth .gFill::before { content: ''; position: absolute; top: 0; bottom: 0; right: -2px;
@@ -429,7 +464,7 @@
          transition-duration turns the fade into a snap. Both are correct. A
          child who has turned motion off still has to be told the bite landed;
          what they asked not to have is things MOVING. */
-      #growth .gFill { transition: width 0.12s linear, filter 0.09s ease-out, box-shadow 0.09s ease-out; }
+      #growth .gFill { transition: filter 0.09s ease-out, box-shadow 0.09s ease-out; }
       #growth.tick .gFill { filter: brightness(1.30) saturate(1.12);
         box-shadow: 0 0 14px rgba(184,117,255,0.85); }
       #growth.tick .gTrack { box-shadow: inset 0 1px 2px rgba(0,0,0,0.4), 0 0 9px rgba(184,117,255,0.45); }
@@ -3231,6 +3266,8 @@
          on every run, so a third one cannot hide the same way. */
       body.calm #news::after,
       body.calm #evolve::before, body.calm #evolve::after,
+      /* the NOMS badge's per-link bump, named the day it was written */
+      body.calm #noms .nC.ba, body.calm #noms .nC.bb,
       /* and the menu's floating island, for the same reason */
       body.calm #menuArtBob, body.calm #menuArtImg,
       body.calm #menuArt .leaf, body.calm #menuArt .tw {
@@ -3243,6 +3280,10 @@
       /* the flag stays, it just stops bobbing — its visibility is CSS, not a
          keyframe, so silencing it does not take it away (see calmcards) */
       body.calm .pipFlag { animation: none !important; }
+      /* the NOMS badge arrives without its pop: it is simply there, as it is
+         under the OS query, where the catch-all flattens the transition */
+      body.calm #noms { transform: none; }
+      body.calm #noms.on { transition: opacity 0.16s linear, visibility 0s linear 0s; }
       /* THE DRAG LESSON IS THE ONE THING A PRE-READER GETS, and it ignored this
          contract entirely: none of .handG, .hTrail or .hTouch appeared in this
          list or in the @media block that mirrors it, so a child who had asked
@@ -3304,7 +3345,8 @@
         .skCard.bought, .burst > i, #shopWallet.bump, .skCard.isnew::before,
         #skinPrev.win .spWin,
         .handG, .hTrail, .hTouch, .pip.shake, #mlPips .pip.shake,
-        #pause.show .setCard, #shop.show, #worlds.show, #profile.show, #end.show {
+        #pause.show .setCard, #shop.show, #worlds.show, #profile.show, #end.show,
+        #noms .nC.ba, #noms .nC.bb {
           animation: none !important;
         }
         /* the sparkles are pure animation: with none, they would sit in a pile
@@ -3523,7 +3565,9 @@
     </div>
     <div id="evolve"><div class="big"></div><div class="sm">EVOLVED</div></div>
     <div id="wayfind"></div>
-    <div id="noms"></div>
+    <!-- the NOMS badge: built once here, and the module writes only the count,
+         the beat's tag and the tier (prototype3d.ts paintNoms) -->
+    <div id="noms" class="clay" aria-hidden="true"><span class="nC"><svg class="nCrown" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-crown"/></svg><span class="nN">5</span></span><span class="nL">NOMS</span><span class="nX"></span></div>
     <div id="form"></div>
     <div id="guide"></div>
     <!-- the ghost hand: a looping press-and-drag demo over the live game.
