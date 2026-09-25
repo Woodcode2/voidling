@@ -723,15 +723,18 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   // Powder keeps a hint of aurora rather than becoming one flat blue.
   const SKY_MOOD: Record<WorldId, { tint: string; tintA: number; fog: number; bgI: number }> = {
     maple:   { tint: '#7a4ad6', tintA: 0.00, fog: 0x1b1038, bgI: 0.55 },   // the reference violet — untouched
-    // SKYLARK FIELD at first light. Periwinkle, because that is what the west
-    // half of a dawn sky is and it is the colour every shadow on the field
-    // takes — the same physics alpine.ts's blue-shadow rule runs on. Held at
-    // 0.58 between Maple's 0.55 and Powder's 0.62: brighter than a night world,
-    // short of a noon one, which is exactly what the half hour before sunrise
-    // is. The apricot in this world is a THIN band on the east horizon and it
-    // belongs to the light rig, not to the sky tint — the moment apricot
-    // spreads into the tint this becomes Game Day's golden hour.
-    skylark: { tint: '#6478c8', tintA: 0.62, fog: 0x232a52, bgI: 0.58 },   // periwinkle, half an hour before the sun
+    // SKYLARK FIELD at SUNRISE — it was the half hour before one, periwinkle
+    // at 0.58, and the owner's poster for this world (approved 2026-09-24) is
+    // the sun up over bright grass under a lilac sky. So the tint warms from
+    // periwinkle to lilac, a little less of it (0.55) so the painting's own
+    // violet shows through as it does in Maple's untouched sky, and bgI moves
+    // to 0.64, just over Powder's 0.62: a morning, brighter than any dusk
+    // world. The fog lifts off navy to a dawn lilac-grey, so the far arms fade
+    // into morning haze instead of into night. The apricot is still a THIN
+    // band on the east horizon and it still belongs to the light rig, not to
+    // the tint — the moment apricot spreads into the tint this becomes Game
+    // Day's golden hour.
+    skylark: { tint: '#8c7fd6', tintA: 0.55, fog: 0x3a3a6c, bgI: 0.64 },
     pirate:  { tint: '#2f9fb5', tintA: 0.80, fog: 0x0e2237, bgI: 0.60 },   // sea-teal, daylit
     // GAME DAY WAS THE ONE WORLD NOBODY PHOTOGRAPHED, and it was the worst of
     // the five: flat bright magenta at the coast with not one star in it.
@@ -6556,6 +6559,19 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
   // a field of upright envelopes at a camera looking down 46.4 degrees is a
   // wall of opaque objects, and a field of flat gore-striped crescents on grey
   // grass is the shot the poster sells. The standing ones are punctuation.
+  //
+  // …AND THE RATIO NEVER REACHED THE SCREEN, SO IT WAS NEVER TESTED. The boot
+  // sweep measured every skyfield.ts prop with its contact disc folded in
+  // (see settleFootprints, prototype3d.ts) and retired 23 of 38 standing and
+  // 19 of 36 cold envelopes before the first frame — SEED 7, qa/skylarkfield
+  // counted 15 standing of 108 on the island, 13.9%. The owner's poster for
+  // this world is envelopes standing up and lifting off, and his read of the
+  // field was grey-green ground with coloured blobs. With the sweep measuring
+  // the envelopes themselves, the crews out on the arms (8b) and a third of
+  // the tower's crews up, the island carries 200 envelopes at 2.2 : 3.9 : 3.4
+  // : 4.5 per 14 — 65 standing, 32.5%. The wall this note warns about is held
+  // off by spacing, not by keeping them flat: the launch field's pitch clears
+  // two domes, and a crew out on an arm is CREW_GAP from the next.
   if (WORLD_ID === 'skylark') {
     const P3 = (p2: SK.Pt): [number, number] => [w(p2[0]), w(p2[1])];
     SK.resetPlacement();
@@ -6601,14 +6617,15 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       // radius and a footprint's half-diagonal runs about 1.45x it across this
       // kit, with a 2-unit floor so a long thin marker cannot centre itself
       // just outside the lip and hang its far end over.
-      if (!force && !SK.skPlaceable(p2[0], p2[1], Math.max(30, r * 34))) return;
-      if (!force && !SK.spotOpen(p2[0], p2[1], c * 20)) return;
+      if (!force && !SK.skPlaceable(p2[0], p2[1], Math.max(30, r * 34))) return false;
+      if (!force && !SK.spotOpen(p2[0], p2[1], c * 20)) return false;
       if (force) mesh.userData.authored = true;   // a landmark: the settle pass may never retire it
       const [x3, z3] = P3(p2);
       if (rotY !== undefined) mesh.rotation.y = rotY;
       if (qk) mesh.userData.qk = qk;
       place(mesh, x3, z3, r);
       SK.claimSpot(p2[0], p2[1], c * 20);
+      return true;   // …and says so, so a crew's kit only follows an envelope that landed
     };
     const REG = (id: SK.SkBiome) => SK.SK_REGIONS.find((r2) => r2.id === id)!;
     // ── ITS OWN STREAM, LIKE EVERY OTHER WORLD ────────────────────────────
@@ -6689,7 +6706,8 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     }
 
     // 2. THE LAUNCH FIELD — the hero district and the densest lawn in the game.
-    //    ROWS, pegged out along 030, four stages at 5:4:3:2. This is the one
+    //    ROWS, pegged out along 030, four stages at 2:4:3:5 (the pattern
+    //    below; the 5:4:3:2 this line once said is the header's). This is the one
     //    place in the world where the composition is hand-authored.
     {
       const R = REG('launchfield');
@@ -6883,13 +6901,25 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
           cy + uy * (i * 250 + (j % 2 ? 125 : 0)) + rvy * j * 280];
         if (SK.pointInPoly(p2[0], p2[1], R.poly) && SK.skPlaceable(p2[0], p2[1], 130)) rig.push(p2);
       }
+      // …and every third crew is already UP. The arrivals field is the first
+      // frame a child ever sees, and a meet reads as a meet when envelopes
+      // stand in it (the poster). Not on the camera's side of the spawn,
+      // though: the lens sits south-east of her (camOffset +x, +z), and a
+      // 9.4-unit dome between it and a new void is the one thing the first
+      // frame must never show. North-west of her a standing envelope may
+      // top that frame — but on the SEED 7 field none of the rigs that land
+      // is a standing one inside it: her first frame shows spilled and cold
+      // envelopes, and the first upright ones stand just outside it (the
+      // ship-mode review, 2026-09-25).
       rig.forEach((p2, i) => {
         const cols = env();
-        const stage = i % 2;
-        const m = stage === 0 ? SKF.skBalloonSpilled(cols) : SKF.skBalloonCold(cols);
+        let stage = i % 3;
+        const dx = p2[0] - SK.SK_SPAWN[0], dy = p2[1] - SK.SK_SPAWN[1];
+        if (stage === 2 && dx + dy > -200 && Math.hypot(dx, dy) < 600) stage = 0;
+        const m = stage === 0 ? SKF.skBalloonSpilled(cols) : stage === 1 ? SKF.skBalloonCold(cols) : SKF.skBalloonStanding(cols);
         m.userData.kind = 'rig';
         drop(tagBalloon(m, stage + 1, cols),
-          p2, stage === 0 ? 5.2 : 4.6, layoutYaw(), false, 'big', stage === 0 ? 11.0 : 10.5);
+          p2, stage === 0 ? 5.2 : stage === 1 ? 4.6 : 4.8, layoutYaw(), false, 'big', stage === 0 ? 11.0 : stage === 1 ? 10.5 : 12.5);
       });
     }
     // One class, one footprint — see the launch field's note. The big items go
@@ -6929,9 +6959,13 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const cols = env();
       // ONE draw decides both the mesh and its radius. This drew twice, so a
       // spilled envelope could carry a cold one's eat radius and vice versa.
-      const spilled = rnd2() < 0.5;
-      drop(tagBalloon(spilled ? SKF.skBalloonSpilled(cols) : SKF.skBalloonCold(cols), spilled ? 1 : 2, cols),
-        p2, spilled ? 5.2 : 4.6, layoutYaw(), false, 'big', 9.0);
+      // A third of them stand now, round the tower the Balloonmeister calls
+      // them up from; a standing one claims its skirt (12.5, see the launch
+      // field's note) so the cones and signs stay out of it.
+      const k = rnd2();
+      const stage = k < 0.34 ? 1 : k < 0.67 ? 2 : 3;
+      drop(tagBalloon(stage === 1 ? SKF.skBalloonSpilled(cols) : stage === 2 ? SKF.skBalloonCold(cols) : SKF.skBalloonStanding(cols), stage, cols),
+        p2, stage === 1 ? 5.2 : stage === 2 ? 4.6 : 4.8, layoutYaw(), false, 'big', stage === 3 ? 12.5 : 9.0);
     }
     for (const p2 of SK.scatterInRegion(REG('tower'), 110, 50, { sep: 1.1 })) {
       const k = rnd2();
@@ -6968,6 +7002,24 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         // dot 3's landmark. §8.2 asked hangar or whale; the whale needs R 16.2
         // against a law topping at 12, so the question is answered by arithmetic.
         if (best) drop(asLandmark(SKF.skHangar(), 'hangar'), best, 5.5, layoutYaw() + Math.PI / 2, true, 'big', 9.5);
+      }
+      // …AND TWO CREWS ON THE APRON. The hangars were the one district with no
+      // envelope of its own, and the only one qa/skylarkfield.mjs still found
+      // mostly out of sight of one once the arms were crewed. Authored, not
+      // scattered: the first two legal spots walking out from the district's
+      // middle, before the flea market takes the ground. Their own stream, so
+      // nothing drawn from rnd2 moves.
+      const arnd = RNG.stream('skylark', 'apron');
+      let crewed = 0;
+      for (let ring = 1; ring <= 4 && crewed < 2; ring++) {
+        for (let a = 0; a < 10 && crewed < 2; a++) {
+          const p2: SK.Pt = [cx + Math.cos((a / 10) * Math.PI * 2 + ring) * ring * 150, cy + Math.sin((a / 10) * Math.PI * 2 + ring) * ring * 150];
+          if (!SK.pointInPoly(p2[0], p2[1], R.poly)) continue;
+          const up = crewed === 0;
+          const cols = SKF.ENVELOPE[Math.floor(arnd() * SKF.ENVELOPE.length) % SKF.ENVELOPE.length];
+          if (drop(tagBalloon(up ? SKF.skBalloonStanding(cols) : SKF.skBalloonCold(cols), up ? 3 : 2, cols), p2,
+            up ? 4.8 : 4.6, (30 * Math.PI) / 180 + (arnd() - 0.5) * 0.28, false, 'big', up ? 12.5 : 10.5)) crewed++;
+        }
       }
     }
     for (const [n, r, sep, qk, mk] of [
@@ -7026,6 +7078,11 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         drop(m, p2, 2.1, deg + Math.PI / 2 + (rnd2() - 0.5) * 0.2, true, 'car', 3.0);
       });
     }
+    // All spilled, still. Every other one stood up for one build, and the
+    // standing envelope's 12.5 claim took the row's ground: qa/rng.mjs read
+    // the bins 15/29 -> 1/29 and the tussocks 14/25 -> 8/25, the district
+    // 74% of its ask against a bar of 80. Breakfast is the one district too
+    // small to carry a dome.
     for (const p2 of SK.scatterInRegion(REG('breakfast'), 16, 150, { sep: 9.0 })) {
       const cols = env();
       drop(tagBalloon(SKF.skBalloonSpilled(cols), 1, cols), p2, 5.2, layoutYaw(), false, 'big', 9.0);
@@ -7135,6 +7192,66 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
             break seat;
           }
         }
+      }
+    }
+
+    // 8b. THE CREWS OUT ON THE ARMS — the owner's note, 2026-09-24: "Item
+    //     placement is like all just in the middle." Passes 2-6 put every
+    //     envelope on the island in five districts in its south-east quarter,
+    //     and the three arms, the track's verge and the rough carried tussocks
+    //     (qa/skylarkfield.mjs: an envelope in frame from 19.8% of the shoulder
+    //     cells, 16.4% of the verge, 5.1% of the rough). skCrewSites() says
+    //     WHERE a late crew rigs — the strips' shoulders, the verge, the holes
+    //     in the rough — and this says what each one is: an envelope at its
+    //     stage, the trailer it came in parked alongside, and the kit that
+    //     stage needs, laid out on the same 030 as the rest of the field.
+    //
+    //     THE STAGES RUN 4 : 2 : 1 : 1, standing : cold : spilled : bagged.
+    //     Out here they are spaced a crew apart (CREW_GAP, 21 scene units),
+    //     so the wall of opaque domes the file's header warns about cannot
+    //     form, and a standing envelope is what reads from the far side of a
+    //     strip. It is what moves the island toward the poster. Measured, SEED
+    //     7: 49 envelopes now stand outside the five districts (it was 1), and
+    //     an envelope is in frame from 84.5% of the strips' shoulders (19.8%),
+    //     86.1% of the verge (16.4%) and 98.5% of the rough (5.1%).
+    //
+    //     WHAT IT COST: the rough's own dressing. drop() refuses a tussock
+    //     inside a crew's claim, so 295 small props of the rough and verge
+    //     are not there (small edibles 3,518 -> 3,223 island-wide); every cell
+    //     still has one in frame, and those that went were grass.
+    //
+    //     Before the rough, so the grass and the wildflowers fill in around the
+    //     crews rather than the crews fighting the grass for ground. Its own
+    //     stream, so nothing drawn from rnd2 after this moves.
+    {
+      const crnd = RNG.stream('skylark', 'crews', 'dress');
+      const cyaw = () => (30 * Math.PI) / 180 + (crnd() - 0.5) * 0.28;   // as layoutYaw
+      const ux = Math.sin((30 * Math.PI) / 180), uy = -Math.cos((30 * Math.PI) / 180);
+      const vx = -uy, vy = ux;
+      const STAGE = [3, 2, 3, 1, 3, 0, 3, 2];
+      // eat radii and claims as the launch field sizes them (see its notes)
+      const R = [1.4, 5.2, 4.6, 4.8], CLAIM = [3.5, 11.0, 10.5, 12.5];
+      const kitAt = (mk: () => THREE.Object3D, p2: SK.Pt, r: number, yaw: number, claim: number, qk: string, kind?: string) => {
+        if (!SK.skPlaceable(p2[0], p2[1], 15)) return;
+        const m = mk(); if (kind) m.userData.kind = kind;
+        drop(m, p2, r, yaw, false, qk, claim);
+      };
+      let k = 0;
+      for (const p2 of SK.skCrewSites()) {
+        const stage = STAGE[k % STAGE.length];
+        const cols = SKF.ENVELOPE[Math.floor(crnd() * SKF.ENVELOPE.length) % SKF.ENVELOPE.length];
+        const mesh = stage === 0 ? SKF.skBalloonBagged(cols) : stage === 1 ? SKF.skBalloonSpilled(cols)
+          : stage === 2 ? SKF.skBalloonCold(cols) : SKF.skBalloonStanding(cols);
+        if (!drop(tagBalloon(mesh, stage, cols), p2, R[stage], cyaw(), false, 'big', CLAIM[stage])) continue;
+        k++;
+        // the trailer, alongside and untagged: a 'trailer' kind is a chase
+        // driver's destination (life.ts) and would cast two more people per
+        // crew; the crew's own fetch still finds the nearest trailer or van.
+        // Its claim is its half-diagonal over spotOpen's 0.62 (2.38 / 0.62).
+        kitAt(() => SKF.skTrailer(), [p2[0] + vx * 330, p2[1] + vy * 330], 2.0, cyaw(), 3.9, 'car');
+        if (stage >= 1) kitAt(() => SKF.skBasket(), [p2[0] - vx * 190, p2[1] - vy * 190], 0.9, cyaw(), 1.8, 'small', 'crewkit');
+        if (stage >= 2) kitAt(() => SKF.skInflatorFan(), [p2[0] + ux * 230, p2[1] + uy * 230], 0.8, cyaw() + Math.PI, 1.7, 'small', 'crewkit');
+        if (stage === 3) kitAt(() => SKF.skCylinderPair(), [p2[0] - ux * 210, p2[1] - uy * 210], 0.6, crnd() * Math.PI * 2, 1.5, 'small', 'crewkit');
       }
     }
 

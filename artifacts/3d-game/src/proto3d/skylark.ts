@@ -367,3 +367,89 @@ export function clusterAt(cx: number, cy: number, n: number, radius: number,
   tally('skylark/cluster', n, out.length, { tries, outside: 0, blocked, busy });
   return out;
 }
+
+// ── THE CREWS OUT ON THE ARMS ──────────────────────────────────────────────
+// The owner, 2026-09-24: "Item placement is like all just in the middle." It
+// was. Every envelope on the island stood in five districts in the south-east
+// quarter — the launch field, arrivals, the tower, the hangars, breakfast row —
+// and the three runway arms, the track's verge and the rough carried tussocks.
+//
+// A real meet does not squeeze its late crews into the organisers' rows. They
+// rig wherever there is grass and a lane to drive the chase car out on, and on
+// an airfield that is the shoulders of the strips and the verge of the track.
+// So these are the spots a crew rigs on, in three passes, each one keeping
+// CREW_GAP from every crew already out:
+//   a. the grass shoulders of all THREE strips, both sides, two rows deep,
+//      walking each strip's own heading — this is what puts something at the
+//      end of every arm
+//   b. the verge of the perimeter track, inside it and (where there is land
+//      before the coast) outside it
+//   c. whatever rough is still further than CREW_GAP from any crew
+// Only on open ground — the rough and the two disused slabs, which are
+// cracked concrete a crew is allowed to park on (see RUNWAYS) — and never on
+// a district (they are authored and full), the live strip or the track
+// (skPlaceable). On a slab a crew keeps SLAB_LINE off the centreline, so the
+// painted dashes and numerals still draw the strip down its middle.
+//
+// Geometry only. island.ts decides what each crew is and asks spotOpen before
+// it puts anything down, so a spot here is a proposal, not a claim.
+/** a crew's reach from its envelope's centre: a standing envelope's half-
+ *  diagonal is 6.8 scene units (136 world), and drop() keeps an envelope
+ *  r x 34 from the live strip — 177 for a spilled one — so 180 clears both */
+export const CREW_REACH = 180;
+/** crews keep this far apart, centre to centre. Set against the play frame:
+ *  qa/skylarkfield.mjs grades "an envelope in frame" at the equal-area radius
+ *  of the settled r-4 frame (514-523 world units), and 560 — just over it —
+ *  proposed 42 spots and still left the probe's north-arm frame with nothing
+ *  in it. 420 proposes 58, and 49 of them land on SEED 7 (spotOpen takes the
+ *  rest). */
+export const CREW_GAP = 420;
+const SLAB_LINE = 200;
+export function skCrewSites(): Pt[] {
+  const out: Pt[] = [];
+  const rnd = stream('skylark', 'crews');
+  const jit = (): number => (rnd() - 0.5) * 120;
+  const add = (x: number, y: number): void => {
+    const reg = skRegionAt(x, y);
+    if (reg !== 'meadow' && reg !== 'slab') return;
+    if (!skPlaceable(x, y, CREW_REACH)) return;
+    if (distToEdge(x, y) < CREW_REACH) return;
+    for (const r of SLABS) if (distToPath(x, y, r.pts) < SLAB_LINE) return;
+    for (const [cx, cy] of out) if (Math.hypot(cx - x, cy - y) < CREW_GAP) return;
+    out.push([x, y]);
+  };
+  // a. THE SHOULDERS — two rows each side of every strip, the second row
+  //    staggered half a pitch so the pair reads as a pegged line, not a grid
+  for (const r of RUNWAYS) {
+    const a = r.pts[0], b = r.pts[r.pts.length - 1];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const tx = (b[0] - a[0]) / L, ty = (b[1] - a[1]) / L, nx = -ty, ny = tx;
+    for (const [off, stag] of [[r.half + CREW_REACH + 170, 0], [r.half + CREW_REACH + 170 + CREW_GAP, 0.5]] as const) {
+      for (let d = 260 + stag * CREW_GAP; d < L - 200; d += CREW_GAP) {
+        for (const side of [-1, 1]) {
+          const j = jit();
+          add(a[0] + tx * (d + j) + nx * off * side, a[1] + ty * (d + j) + ny * off * side);
+        }
+      }
+    }
+  }
+  // b. THE TRACK'S VERGE — inside the ring, and outside it where the coast
+  //    leaves room (the track runs 700 in from the coast for most of its loop)
+  for (let i = 0; i < PERIMETER.length - 1; i++) {
+    const [x1, y1] = PERIMETER[i], [x2, y2] = PERIMETER[i + 1];
+    const nx = -(y2 - y1), ny = x2 - x1, nl = Math.hypot(nx, ny) || 1;
+    for (const t of [0.3, 0.8]) {
+      const bx = x1 + (x2 - x1) * t, by = y1 + (y2 - y1) * t;
+      const inward = ((6000 - bx) * nx + (6000 - by) * ny) > 0 ? 1 : -1;
+      add(bx + (nx / nl) * 560 * inward, by + (ny / nl) * 560 * inward);
+      add(bx - (nx / nl) * 420 * inward, by - (ny / nl) * 420 * inward);
+    }
+  }
+  // c. THE ROUGH — a jittered sweep over the whole coast; add() drops every
+  //    spot already within CREW_GAP of a crew, so this only fills the holes
+  const [minX, maxX, minY, maxY] = LAND_BOX;
+  for (let y = minY + 200; y < maxY; y += CREW_GAP * 0.5) {
+    for (let x = minX + 200; x < maxX; x += CREW_GAP * 0.5) add(x + jit(), y + jit());
+  }
+  return out;
+}
