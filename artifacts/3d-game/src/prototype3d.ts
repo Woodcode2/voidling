@@ -1524,7 +1524,13 @@ const MENU_ART: Partial<Record<string, string>> = {
   gameday: '/assets/hf/hf_20260924_231035_f95c9e35-4908-4d91-a47c-e6fefc1b59aa.png',  // the bowl on a fall Saturday: stands, band, tailgate, school bus
   lantern: '/assets/hf/hf_20260924_231035_1dbd993e-c9ad-4ccf-bcda-0e4c1454f99a.png',  // the night market: strung lanterns, torii, moon bridge over the canal
   powder: '/assets/hf/hf_20260924_231056_1ba33ae4-fb6a-4793-a1d3-0748bd10e915.png',   // the ski village: chalets, chairlift, snowman, skating pond
-  skylark: '/assets/hf/hf_20260924_231035_273ea24c-0dd4-4837-9029-2510c36afe8d.png',  // the balloon meet at sunrise — and the look the level is being brought to
+  // BELLCLOUD HEIGHTS (world 6, internal id 'skylark' so saves carry over): the
+  // owner re-themed the balloon field to a cloud kingdom with a great bell
+  // (2026-09-25) and picked this one ("Looks good"). A first take drew the
+  // name onto the arch and misspelled it; this take has no lettering, like
+  // the other five. It is committed rather than CDN-hosted because it is his
+  // own download of the image he chose — the file IS the approval.
+  skylark: '/assets/hf/bellcloud_20260925.png',
 };
 /** ── THE POSTER IS OPAQUE, SO THE SCENE BEHIND IT IS NOT DRAWN ─────────────
  *
