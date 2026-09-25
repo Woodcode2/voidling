@@ -29,6 +29,16 @@
 // t > 0 — the first frame after the touch that starts the match — and it is
 // latched, so the end card (where the game resets t to 0) still counts as after.
 //
+// …AND 0 FIRST DRAWN AFTER IT. The link count alone was passed by a build that
+// compiled the too-big tint's clones ahead of play without ever drawing them,
+// and that build still stopped: in the first 30 s of a steered Skylark drive
+// its one frame over 500 ms was a tint clone's first draw, 1505 ms, 1469 of
+// them inside getProgramParameter, three's first-use query (a scratch
+// per-frame timing of every WebGL call). Linked is not ready; whatever the
+// driver still owes a program is paid on its first draw. So the first
+// useProgram of every program is stamped as well, and a program linked before
+// play but first drawn during it fails too.
+//
 // TIME: every wait is on the GAME's clock (tClock / match t), never the wall —
 // under this software renderer the match clock runs ~14x slower than real time
 // (GOVERNOR.md rule 4). Wall time is used for one thing only: the load-side
@@ -56,7 +66,7 @@ const VERBOSE = process.argv.includes('--verbose');
 const HOOK = () => {
   const L = { ev: [], play: null, playT: null, act: 'boot', dropped: 0 };
   window.__sw = L;
-  const SRC = new WeakMap(), ATT = new WeakMap(), PROGS = [];
+  const SRC = new WeakMap(), ATT = new WeakMap(), PROGS = [], USED = new WeakSet();
   window.__swProg = (i) => PROGS[i];
   const DEFS = ['USE_INSTANCING', 'USE_INSTANCING_COLOR', 'USE_SHADOWMAP', 'USE_MAP', 'USE_SKINNING',
     'USE_COLOR', 'USE_COLOR_ALPHA', 'OPAQUE', 'TONE_MAPPING', 'USE_FOG', 'DEPTH_PACKING', 'FLAT_SHADED',
@@ -107,6 +117,16 @@ const HOOK = () => {
       PROGS.push(pr);
       push({ k: 'link', ...s, type, name, defs, i: PROGS.length - 1 });
       return lp.call(this, pr);
+    };
+    // THE FIRST DRAW, NOT ONLY THE LINK. A program linked ahead of time can
+    // still stop the frame it is first drawn in: the driver builds the
+    // program's pipeline for the state it is drawn under on that draw, and
+    // three's first-use query waits for it. So the first useProgram of every
+    // program is stamped too.
+    const use = P.useProgram;
+    P.useProgram = function (pr) {
+      if (pr && !USED.has(pr)) { USED.add(pr); push({ k: 'use', ...stamp(), i: PROGS.indexOf(pr) }); }
+      return use.call(this, pr);
     };
     const wrapTex = (fn, dims) => {
       const o = P[fn]; if (!o) return;
@@ -336,14 +356,15 @@ async function runWorld(browser, world) {
     // which materials (and on which objects) use each three program
     const users = new Map();
     window.__scene.traverse((o) => {
-      const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+      const ms = Array.isArray(o.material) ? [...o.material] : o.material ? [o.material] : [];
+      if (o.userData.gateMat && !ms.includes(o.userData.gateMat)) ms.push(o.userData.gateMat);
       for (const m of ms) {
         const pr = r.properties.get(m);
         if (!pr || !pr.programs) continue;
         for (const prog of pr.programs.values()) {
           if (!users.has(prog)) users.set(prog, new Set());
           const s = users.get(prog);
-          if (s.size < 3) s.add(`${m.type}${m.name ? ` "${m.name}"` : ''} on ${o.name || o.type}${o.parent?.name ? ` < ${o.parent.name}` : ''}`);
+          if (s.size < 3) s.add(`${m.type}${m.name ? ` "${m.name}"` : ''}${m === o.userData.gateMat ? ' (too-big tint)' : ''} on ${o.name || o.type}${o.parent?.name ? ` < ${o.parent.name}` : ''}`);
         }
       }
     });
@@ -352,7 +373,15 @@ async function runWorld(browser, world) {
       return { ...e, who: pp && users.has(pp) ? [...users.get(pp)] : [], pid: pp ? pp.id : null };
     });
     const tex = L.ev.filter((e) => e.k === 'tex');
-    return { links, tex, dropped: L.dropped, programs: progs.length };
+    // a program's first draw, with where its link landed (before or after play)
+    const linkPost = new Map(L.ev.filter((e) => e.k === 'link').map((e) => [e.i, e.post]));
+    const uses = L.ev.filter((e) => e.k === 'use').map((e) => {
+      const lk = L.ev.find((x) => x.k === 'link' && x.i === e.i);
+      const pp = byGl.get(window.__swProg(e.i));
+      return { ...e, linkedPost: !!linkPost.get(e.i), type: lk ? lk.type : 'raw', name: lk ? lk.name : '', defs: lk ? lk.defs : [],
+        who: pp && users.has(pp) ? [...users.get(pp)] : [] };
+    });
+    return { links, uses, tex, dropped: L.dropped, programs: progs.length };
   });
   // ── the ladder, asked separately: rung 0 -> 1 (pixel ratio and shadow map
   //    size), then 1 -> 2 (the bloom rung: render target -> screen). Printed,
@@ -384,6 +413,9 @@ for (const world of WORLDS) {
   for (const e of post) byAct[e.act] = (byAct[e.act] || 0) + 1;
   const preBy = {};
   for (const e of pre) preBy[e.act] = (preBy[e.act] || 0) + 1;
+  // first drawn during play, though linked before it (a program linked during
+  // play is first drawn then too, and is already counted above)
+  const lateUse = r.uses.filter((e) => e.post && !e.linkedPost);
   const texPost = r.tex.filter((e) => e.post && !e.alloc);
   const allocPost = r.tex.filter((e) => e.post && e.alloc);
   console.log(`\n  ${world}`);
@@ -396,13 +428,18 @@ for (const world of WORLDS) {
     console.log(`      t=${e.t === null ? '-' : e.t.toFixed(2)} ${e.end ? '[end card] ' : ''}${e.act.padEnd(8)} ${e.type}${e.name ? ` "${e.name}"` : ''} [${e.defs.join(' ')}]${e.who.length ? `  <- ${e.who.join('; ')}` : ''}`);
   }
   if (post.length > 60) console.log(`      … and ${post.length - 60} more`);
+  console.log(`    programs linked before it but FIRST DRAWN after it: ${lateUse.length}`);
+  for (const e of lateUse.slice(0, 30)) {
+    console.log(`      t=${e.t === null ? '-' : e.t.toFixed(2)} ${e.end ? '[end card] ' : ''}${e.act.padEnd(8)} ${e.type}${e.name ? ` "${e.name}"` : ''} [${e.defs.join(' ')}]${e.who.length ? `  <- ${e.who.join('; ')}` : ''}`);
+  }
   console.log(`    big texture uploads after the first playable frame: ${texPost.length}${texPost.length ? ' — ' + texPost.slice(0, 8).map((e) => `${e.fn} ${e.tw}x${e.th} (${e.act}, t=${e.t === null ? '-' : e.t.toFixed(2)})`).join(', ') : ''}`);
   console.log(`    big texture allocations after it: ${allocPost.length}${allocPost.length ? ' — ' + allocPost.slice(0, 8).map((e) => `${e.fn} ${e.tw}x${e.th} (${e.act}, t=${e.t === null ? '-' : e.t.toFixed(2)})`).join(', ') : ''}`);
   console.log(`    the run: NOMS chain ${r.combo}, rival ${r.who ? r.who.name : 'none'}, programs alive at the end ${r.programs}${r.dropped ? `, ${r.dropped} events dropped` : ''}`);
   console.log(`    (not barred) the quality ladder mid-match: rung 0 -> 1 linked ${r.ladder.r1.links} programs and made ${r.ladder.r1.allocs} big allocations; 1 -> 2 (bloom off) linked ${r.ladder.r2.links}`);
   if (r.errs.length) console.log(`    page errors: ${r.errs.slice(0, 3).join(' | ')}`);
-  if (post.length > 0) { console.log(`  FAIL — ${world}: ${post.length} program(s) linked after the match's first playable frame (bar 0)`); bad++; }
-  else console.log(`  PASS — ${world}: 0 programs linked after the match's first playable frame (${pre.length} linked before it)`);
+  if (post.length > 0 || lateUse.length > 0) {
+    console.log(`  FAIL — ${world}: ${post.length} program(s) linked and ${lateUse.length} more first drawn after the match's first playable frame (bar 0 and 0)`); bad++;
+  } else console.log(`  PASS — ${world}: 0 programs linked and 0 first drawn after the match's first playable frame (${pre.length} linked before it)`);
 }
 await browser.close();
 if (rows.length === WORLDS.length && bad === 0) console.log(`\n  PASS — ${WORLDS.join(', ')}: no shader compiled on first sight during play`);
