@@ -29,7 +29,7 @@ gate before `main`, no multi-round workflows for small things.
 | # | launch item | state |
 |---|---|---|
 | S-1 | Merge G5/G7/G8/G9 to main (push gate) and send him the review pack | merged 8f489ee; pack sent |
-| S-2 | Five menu posters in Maple's floating-island style (Higgsfield credits approved) | generated 2026-09-24 on Maple's recipe (z_image, 3:4); all five APPROVED by the owner ("Images look great!"); wiring into MENU_ART |
+| S-2 | Five menu posters in Maple's floating-island style (Higgsfield credits approved) | generated 2026-09-24 on Maple's recipe (z_image, 3:4); all five APPROVED by the owner ("Images look great!"); wired 97e685e (MENU_ART + per-world falling touch); the 13 menu steps of the push gate PASS on that build (two runs, a container restart between them); reaches main with S-3 under one full gate |
 | S-3 | Skylark, keep the theme and fix it: spread the field (everything sits in the central launch rows), brighter sunrise, more standing balloons, one landmark; his music | he sources the track |
 | S-4 | The hook: a 15-second store clip (the burp after eating the town) and App Store screenshots | |
 | S-5 | His calls on the burp (?burp=1), the kill beat (?killbeat=1), the after-bite squint (flat lines vs ^ ^), the too-big bonk rate | he reviews on Vercel once main moves |
