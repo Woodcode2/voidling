@@ -13,7 +13,11 @@
 //    thing there. Because so much of the screen keeps getting taken up."
 //
 // One whole match per world, on the nearest-edible autopilot, hand-cranked at
-// 16.667 ms a frame exactly as qa/goalcurve.mjs does it — so the frame clock
+// 16.667 ms a frame exactly as qa/goalcurve.mjs does it. WHOLE, because a card
+// on the picker starts her current dot and a met goal ends the match on the
+// spot: a fresh profile's dot 1 on Maple is over in about 65 match-seconds.
+// So dots 1-3 are seeded as won and the match is dot 4, RIVALS, which only the
+// buzzer decides — 180 seconds, through the door a child uses. The frame clock
 // (tClock) IS a phone's wall clock, and a 2.4 s card is 2.4 s of it, however
 // slowly this sandbox renders. Rendering is stubbed once the clock runs;
 // nothing here is visual except which cards reached the DOM and for how long.
@@ -86,6 +90,12 @@ for (const world of worlds) {
     localStorage.setItem('voidDailyLast', new Date().toDateString());
     localStorage.setItem('voidFirstNom', '1');
     localStorage.setItem('voidBookSeen', '1');   // the once-per-LIFETIME scrapbook card is not a match's
+    const w = {};
+    for (const id of (localStorage.getItem('voidUnlocked') || 'maple').split(',')) {
+      w[id] = {};
+      for (let g = 1; g < 4; g++) w[id][String(g)] = { st: 'done', best: 0, pct: 0, first: '', n: 1 };
+    }
+    localStorage.setItem('voidLevels', JSON.stringify({ v: 1, seen: 1, w }));
   } catch { } });
   await p.goto(`http://127.0.0.1:${PORT}/?w=${world}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 420000 });
@@ -105,6 +115,8 @@ for (const world of worlds) {
   await p.waitForSelector(`#worldRow .wCard[data-world="${world}"]`, { state: 'visible', timeout: 400000 });
   await p.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`)?.click(), world);
   await p.waitForFunction(() => (window.__matchState?.().armed ?? false) === true, null, { timeout: 400000 });
+  const dot = await p.evaluate(() => window.__goalState?.()?.n ?? 0);
+  if (dot !== 4) { console.log(`\nFAIL — ${world}: the card started dot ${dot}, not the full-length dot 4 this reading needs`); process.exit(1); }
 
   // ── THE TAPS, before the first touch so the opening card is caught ───────
   await p.evaluate(() => {
@@ -226,9 +238,8 @@ for (const world of worlds) {
   say(offBeat.length === 0 && miles.length > 0, 'c',
     `${later.length} card(s) after the morning: ${miles.length} at a milestone, ${offBeat.length} not`
     + (offBeat.length ? ` (${[...new Set(offBeat.map((x) => x.why))].join(', ')})` : ''));
-  const exercised = (R.k.car || 0) + (R.k.house || 0);
   say(smallFirsts.length === 0, 'd', `small first-of-kind banners ${smallFirsts.length}${smallFirsts.length ? ` ("${smallFirsts[0].txt.slice(0, 40)}")` : ''}`
-    + ` — the run ate ${R.k.car || 0} car(s) and ${R.k.house || 0} house(s)${exercised ? '' : ', so this bar was not exercised'}`);
+    + ` — the run ate ${R.k.car || 0} car(s) and ${R.k.house || 0} house(s), and runners besides`);
   const cued = R.beats.filter((x) => x.cue);
   const unfired = cued.filter((x) => !x.fired);
   say(cued.length === 0 || unfired.length === 0, 'e',

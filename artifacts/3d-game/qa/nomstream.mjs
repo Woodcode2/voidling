@@ -13,8 +13,8 @@
 // match-seconds for 25 bites (two of them deliberately big meals, so the
 // stream has something to size), then the chain is left to lapse. Every
 // floater the pool shows is logged by its class, text, computed size and
-// colour, at the match time it was raised. Then a beat window is forced
-// through the game's own schedule and three more bites are taken inside it.
+// colour, at the match time it was raised. Then a beat is forced through the
+// game's own schedule and three more bites are taken after it.
 //
 // THE BARS:
 //   (a) no per-bite '+N' rises off a non-coin prop — the flight is the stream
@@ -26,7 +26,19 @@
 //   (f) the NOMS pill is up whenever the chain is 5 or more, says the chain's
 //       length, wears the right tier, and never covers his face
 //   (g) the crowns and the cash-in are HEARD — the audio engine logged them
-//   (h) inside a beat window the flying number wears the beat's colour
+//   (h) a beat pays nothing and paints nothing: after it fires, every flying
+//       number wears the colour the chain's own flights wore before it —
+//       never the beat's — and the NOMS pill carries no ×N badge
+//
+// RETRACTED, 2026-09-25 — the old (h) was "inside a beat window the flying
+// number wears the beat's colour". It was right for the game it measured, in
+// which a beat opened a x2/x3 scoring window and the doubled number deserved
+// to look doubled. The owner removed the windows on his own recording ("these
+// events, like there's a bakery sale or double points ... I say we get rid of
+// that"), so a flight in the beat's colour is now the defect, and (h) says so.
+// It waits on the beat's own `fired` flag, not on __matchState().fever, which
+// went with the windows; on the build before the change the forced beat still
+// opens a window and (h) fails on its colour.
 //
 // Everything is keyed on __matchState().t. The software renderer here manages
 // about 0.04 match-seconds per wall-second, and the chain lapses on a 1.6 s
@@ -138,11 +150,12 @@ const beat = await p.evaluate(() => {
   const bt = (window.__beats || []).find((x) => !x.fired);
   if (!bt) return null;
   bt.at = 0;
-  return { title: bt.title, col: bt.col, mult: bt.mult };
+  return { title: bt.title, col: bt.col };
 });
 let beatFrom = null;
 if (beat) {
-  await p.waitForFunction(() => window.__matchState().fever > 1, null, { timeout: 900000, polling: 200 });
+  await p.waitForFunction((title) => (window.__beats || []).some((x) => x.title === title && x.fired),
+    beat.title, { timeout: 900000, polling: 200 });
   beatFrom = await now();
   for (let i = 0; i < 3; i++) {
     await waitT(beatFrom + 0.3 + i * GAP);
@@ -252,12 +265,14 @@ if (hasCombo) {
 }
 
 if (beat) {
-  const want = `rgb(${(beat.col >> 16) & 255}, ${(beat.col >> 8) & 255}, ${beat.col & 255})`;
-  const inBeat = f.filter((r) => r.t >= beatFrom && r.fly && r.fever > 1 && PLUS.test(r.text));
-  const match = inBeat.filter((r) => r.col === want);
-  bar(inBeat.length > 0 && match.length === inBeat.length, 'h', inBeat.length
-    ? `${match.length}/${inBeat.length} flights inside "${beat.title}" wore its colour ${want} (saw ${[...new Set(inBeat.map((r) => r.col))].join(', ')})`
-    : `no flight landed inside "${beat.title}" — nothing to colour`);
+  const beatCol = `rgb(${(beat.col >> 16) & 255}, ${(beat.col >> 8) & 255}, ${beat.col & 255})`;
+  const own = new Set(flights.map((r) => r.col));   // the chain's flights, before the beat
+  const after = f.filter((r) => r.t >= beatFrom && r.fly && PLUS.test(r.text) && r.col);
+  const painted = after.filter((r) => r.col === beatCol || !own.has(r.col));
+  const badged = fr.filter((x) => x.t >= beatFrom && /×\d/.test(x.ptxt || ''));
+  bar(after.length > 0 && own.size > 0 && painted.length === 0 && badged.length === 0, 'h', after.length
+    ? `${after.length - painted.length}/${after.length} flights after "${beat.title}" wore the chain's own colour (${[...own].join(', ')}; the beat's is ${beatCol}, seen ${[...new Set(after.map((r) => r.col))].join(', ')}), ${badged.length} pill frame(s) carried ×N`
+    : `no flight landed after "${beat.title}" — nothing to read`);
 } else bar(false, 'h', 'no unfired beat left to force');
 
 console.log(bad ? `\nFAIL — ${bad} of 8 bar(s)` : '\nPASS — one stream, a chain she can see, and a cash-in when it ends');
