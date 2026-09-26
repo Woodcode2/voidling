@@ -988,6 +988,15 @@ Score reached at 50% of the clock (p10), and the goal set under it:
 | Powder | 11,104 | 28,146 | 64,392 | **10,000** | ~46% |
 | Skylark | 32,020 | 59,502 | 76,827 | **30,000** | ~47% |
 
+**Re-measured 2026-09-25, when the owner cut the beat windows** ("double points
+... I say we get rid of that"). These scores were partly paid by x2/x3 windows,
+so the goals are now 13,000 / 13,500 / 22,500 / 27,500 / 9,000 / 26,500 in the
+order above: each old goal times the after/before ratio of the median run's
+score across 45-120 s, off `qa/goalcurve.mjs --dot=4` run on both builds. The
+median run meets each new goal within 11 s of when it met the old one (Pirate
+the widest, 69 s -> 58 s). The table and the method are in `LEVEL_SPEC`'s
+header in `src/prototype3d.ts`.
+
 Dot 1 is the first thing a child meets in a world and it is deliberately the
 easiest: met at about half the clock by a competent run, which leaves the whole
 second half as margin for a slower one. §3.4's draft set these at 0.6 x par —

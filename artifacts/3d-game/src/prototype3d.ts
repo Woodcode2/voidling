@@ -2720,30 +2720,44 @@ export interface LevelSpec {
 // ── DOT 1 WAS RE-MEASURED WHEN THE BEAT WINDOWS WENT (2026-09-25) ─────────
 // EAT is the one goal a child reads in points, and the points it was set in
 // were partly paid by the x2/x3 beat windows the owner cut. So it is held at
-// the same SECOND, not the same number. On the build before the cut, the
-// goal-curve autopilot (qa/goalcurve.mjs --dot=4, five seeded matches a world)
-// was read for when its p10 curve crossed each old goal, and for what the same
-// eating banks with no window by then (each second's points over that
-// second's multiplier, logged live); the new goal is that, rounded down to a
-// 500. The comments on each row below are the day-2 readings, in the old
-// points.
+// the same EATING, not the same number. The goal-curve autopilot
+// (qa/goalcurve.mjs --dot=4, five seeded matches a world, a whole match each)
+// was run on the build before the cut and on the build after it, and each old
+// goal is scaled by the after/before ratio of the median run's score at 45,
+// 60, 75, 90, 105 and 120 s, averaged (one second alone is too noisy: Maple's
+// ratio reads 0.644 to 0.862 across those six), and rounded down to a 500. The comments on each row below
+// are the day-2 readings, in the old points.
 //
-//   world     old goal  p10 crossed it  same eating, no window   new goal
-//   maple       18,000       71 s              12,896              12,500
-//   pirate      18,000       78 s              12,964              12,500
-//   gameday     32,000       87 s              22,508              22,500
-//   lantern     40,000       97 s              28,876              28,500
-//   powder      10,000       79 s               7,326               7,000
-//   skylark     30,000       93 s              23,788              23,500
+//   world     old goal  after/before  new goal   the median run meets it   slowest of five
+//                                                 old goal -> new goal      old -> new
+//   maple       18,000     0.725        13,000      64 s -> 57 s              71 s -> 64 s
+//   pirate      18,000     0.770        13,500      69 s -> 58 s              78 s -> 156 s *
+//   gameday     32,000     0.715        22,500      73 s -> 74 s              87 s -> 77 s
+//   lantern     40,000     0.700        27,500      83 s -> 79 s              97 s -> 97 s
+//   powder      10,000     0.933         9,000      76 s -> 75 s              78 s -> 93 s
+//   skylark     30,000     0.885        26,500      76 s -> 74 s              93 s -> 97 s
+//
+//   * the family's bites held one Pirate run at 6,562 points or less from 75 s
+//     to 150 s (radius 0.9 at 120 s); the other four met 13,500 by 68 s.
+//
+// The FIRST estimate was derived from the old build alone — each second's
+// points over that second's live multiplier — and read 12,500 / 12,500 /
+// 22,500 / 28,500 / 7,000 / 23,500. The build after the cut met four of those
+// 9-13 s sooner than the old goals had been met (Powder's 7,000 at 63 s against
+// 76 s): by mid-match it has eaten more than the old build's unmultiplied
+// points say, and the goals are met by eating. The direct ratio replaced it.
 //
 // SET, LANDMARK and CLEAR are counted in things, radius and share of the
 // world, which no window paid; RIVALS is a place, and the par it is raced
 // against is read through windowless() (beside WORLD_PAR), as is the growth
-// law's par, so neither the family nor her size moves with the cut.
+// law's par, so neither the family nor her size moves with the cut. On the
+// same runs: first place at the buzzer in all thirty after the cut (Pirate's
+// worst was 2nd before), and her median radius at the buzzer 12.0-15.9 before,
+// 12.0-16.6 after.
 const LEVEL_SPEC: Record<WorldId, LevelSpec> = {
   // p10 run reaches 18,790 at half the clock · barn r 5.0 needs R 4.50 (~62%)
   // · SET done at 76 s (42%) · devours 29% by 70%
-  maple: { eat: 12500, landmark: 'barn', landmarkR: 4.50, rank: 3, clear: 28,
+  maple: { eat: 13000, landmark: 'barn', landmarkR: 4.50, rank: 3, clear: 28,
     set: [{ kind: 'house', n: 5, label: 'HOUSES', icon: '🏠' }, { kind: 'car', n: 8, label: 'CARS', icon: '🚗' }, { kind: 'snack', n: 40, label: 'SNACKS', icon: '🍿' }] },
   // 19,353 at half · lookout r 4.0 needs R 3.60 (~45%) · SET at 56 s (31%)
   // GOLD IS CAPPED AT 6 EVERYWHERE, and the cap is arithmetic rather than
@@ -2752,24 +2766,24 @@ const LEVEL_SPEC: Record<WorldId, LevelSpec> = {
   // The hunt agrees — on Pirate a hunting run reached 8 gold at 56 s but 15 at
   // 81 s with a p90 of 147, and 20 never. A gold goal above this is a race
   // against the rubber band for the last few coins.
-  pirate: { eat: 12500, landmark: 'lookout', landmarkR: 3.60, rank: 3, clear: 28,
+  pirate: { eat: 13500, landmark: 'lookout', landmarkR: 3.60, rank: 3, clear: 28,
     set: [{ kind: 'gild', n: 6, label: 'GOLD', icon: '💰' }, { kind: 'cabana', n: 20, label: 'CABANAS', icon: '⛱️' }, { kind: 'snack', n: 60, label: 'SNACKS', icon: '🍿' }] },
   // 34,800 at half · clock tower r 4.5 needs R 4.05 (~51%) · SET at 99 s (55%)
   gameday: { eat: 22500, landmark: 'clock tower', landmarkR: 4.05, rank: 2, clear: 32,
     set: [{ kind: 'car', n: 4, label: 'TRUCKS', icon: '🛻' }, { kind: 'house', n: 8, label: 'HOUSES', icon: '🏠' }, { kind: 'snack', n: 40, label: 'SNACKS', icon: '🍿' }] },
   // 41,206 at half · gate r 5.0 needs R 4.50 (~62%) · SET at 48 s (27%) ·
   // devours 48% by 70%, the densest world in the game
-  lantern: { eat: 28500, landmark: 'gate', landmarkR: 4.50, rank: 2, clear: 45,
+  lantern: { eat: 27500, landmark: 'gate', landmarkR: 4.50, rank: 2, clear: 45,
     set: [{ kind: 'gild', n: 6, label: 'GOLD', icon: '💰' }, { kind: 'house', n: 40, label: 'STALLS', icon: '🎪' }, { kind: 'snack', n: 100, label: 'SNACKS', icon: '🍿' }] },
   // 11,104 at half · bell tower r 4.4 needs R 3.96 (~55%) · SET at 91 s (50%)
-  powder: { eat: 7000, landmark: 'bell tower', landmarkR: 3.96, rank: 1, clear: 30,
+  powder: { eat: 9000, landmark: 'bell tower', landmarkR: 3.96, rank: 1, clear: 30,
     set: [{ kind: 'gild', n: 4, label: 'GOLD', icon: '💰' }, { kind: 'house', n: 4, label: 'CHALETS', icon: '🏡' }, { kind: 'snack', n: 40, label: 'SNACKS', icon: '🍿' }] },
   // 32,020 at half · hangar r 5.5 needs R 4.95 (~73%) · SET at 39 s (22%)
   // vans were 40 on the hunt's timing (39 s) but the island carries 98 and the
   // family eats 40-50% of the board, so 40 would have been a race against the
   // rubber band for the last few. 15 clears the 6N rule and the hunt reached it
   // at 22 s.
-  skylark: { eat: 23500, landmark: 'hangar', landmarkR: 4.95, rank: 1, clear: 38,
+  skylark: { eat: 26500, landmark: 'hangar', landmarkR: 4.95, rank: 1, clear: 38,
     set: [{ kind: 'gild', n: 6, label: 'GOLD', icon: '💰' }, { kind: 'car', n: 15, label: 'VANS', icon: '🚐' }, { kind: 'snack', n: 100, label: 'SNACKS', icon: '🍿' }] },
 };
 
