@@ -45,7 +45,27 @@
 //
 // --quick stops after bar A and one airborne sample at 0:34, for iterating
 // on the mechanic; the full run is a real 3:00 match, which under swiftshader
-// in this container is about 27 minutes of wall clock.
+// in this container is about 27 minutes of wall clock. (Since the retraction
+// below, --quick runs A and the Great Bell's cascade instead.)
+//
+// ── RETRACTION (GOVERNOR rule 3b), 2026-09-25: B AND D, WITH THE WHALE ───
+// The airfield became BELLCLOUD HEIGHTS (docs/BELLCLOUD.md §10.1) and the
+// whale is gone. B's 2:28-3:00 figures (16 / 18 / 35 airborne) measured the
+// whale's cascade, which her beat started; D's "before the whale beat" named
+// her card as the end of the one-at-a-time rule. On the kingdom they would
+// move for the wrong reason — the balloons are visitors docked along the edge
+// now, and the cascade starts when the child EATS THE GREAT BELL (life.ts's
+// 'bell' cue, sent from prototype3d.ts's biteSinks on the drop). So:
+//
+//   B' 1:00 >= 3 and 1:30 >= 6 airborne (the one-at-a-time rule, one
+//      departure every >= 6 s after the first at 0:30); and 25 match seconds
+//      after the bell's cascade starts, at least 50% of the flyable balloons
+//      (stage 1-3, not one of the tethered eight) that were still on the
+//      ground when it started have lifted. The bell is eaten through the
+//      game's own capture() (window.__eatLandmark), so the cue is the game's.
+//   D' every departure telegraphed >= 8 s (unchanged), and none closer than
+//      6 s to the one before it BEFORE THE BELL.
+//   A and C are unchanged. --quick runs A and the bell's cascade only.
 import { chromium } from 'playwright';
 import { ALL_WORLDS } from './worlds.mjs';
 
@@ -110,12 +130,11 @@ const untilT = (t) => p.waitForFunction((tt) => (window.__matchState?.().t ?? 0)
   }
 }
 
-// ── B, C, D over the match clock ────────────────────────────────────────────
+// ── B', C, D' over the match clock ──────────────────────────────────────────
 const field = (e) => e.stage >= 1 && e.stage <= 4;
 const airborne = (c) => c.env.filter((e) => field(e) && e.vis && !e.eaten && e.y > 2).length;
 const grounded = (c) => c.env.filter((e) => field(e) && e.vis && !e.eaten && e.y < 1).length;
-// --quick samples at 0:34: the first telegraph starts at 22 and lifts at 30
-const BARS = QUICK ? [[34, 1]] : [[60, 4], [90, 8], [148, 16], [160, 18], [180, 35]];
+const BARS = QUICK ? [] : [[60, 3], [90, 6]];
 let last = null;
 for (const [t, want] of BARS) {
   await untilT(t);
@@ -123,9 +142,32 @@ for (const [t, want] of BARS) {
   last = c;
   const n = airborne(c);
   const mm = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
-  if (n >= want) ok('B', `${mm}: ${n} airborne (bar ${want})`);
-  else fail('B', `${mm}: ${n} airborne against a bar of ${want}`);
+  if (n >= want) ok('B\'', `${mm}: ${n} airborne (bar ${want})`);
+  else fail('B\'', `${mm}: ${n} airborne against a bar of ${want}`);
 }
+// THE BELL IS RUNG. Eaten through capture(); the cue fires on the drop, and
+// the controller's own `cascade` flag says when it started.
+let bellAt = null;
+{
+  const lm = await p.evaluate(() => window.__eatLandmark?.() ?? null);
+  if (!lm || lm.name !== 'great bell') fail('B\'', `__eatLandmark() ate ${lm ? `'${lm.name}'` : 'nothing'}, not the Great Bell`);
+  else {
+    const started = await p.waitForFunction(() => window.__asc?.state().cascade === true, null, { timeout: 900000, polling: 500 }).then(() => true).catch(() => false);
+    if (!started) fail('B\'', 'the Great Bell was eaten and the balloons\' cascade never started (life.ts \'bell\' cue)');
+    else {
+      const s0 = await p.evaluate(() => ({ t: window.__matchState().t, ph: window.__asc.phases() }));
+      bellAt = s0.t;
+      const waiting = s0.ph.filter((e) => e.stage >= 1 && e.stage <= 3 && !e.keep && !e.eaten && !e.departed && e.phase === 0 && e.alt === 0).map((e) => e.id);
+      await untilT(s0.t + 25);
+      const ph = await p.evaluate(() => window.__asc.phases());
+      const lifted = ph.filter((e) => waiting.includes(e.id) && (e.departed || e.alt > 2)).length;
+      const share = waiting.length ? lifted / waiting.length : 0;
+      const line = `25 s after the bell (match ${s0.t.toFixed(1)} s): ${lifted} of ${waiting.length} grounded flyable balloons lifted (${(share * 100).toFixed(0)}%, bar 50%)`;
+      if (share >= 0.5) ok('B\'', line); else fail('B\'', line);
+    }
+  }
+}
+if (!QUICK) { await untilT(180); last = await census(); }
 if (!QUICK && last) {
   const g = grounded(last);
   if (g >= 8) ok('C', `3:00: ${g} envelopes still on the ground and edible`);
@@ -136,16 +178,19 @@ if (!QUICK && last) {
   else {
     const short = deps.filter((e) => e.telegraphAt === null || e.departAt - e.telegraphAt < 8);
     let crowded = 0;
-    for (let i = 1; i < deps.length; i++) if (deps[i].departAt < 148 && deps[i].departAt - deps[i - 1].departAt < 6) crowded++;
-    if (short.length) fail('D', `${short.length} of ${deps.length} departures were edible for under 8 s after their first burner pulse`);
-    else if (crowded) fail('D', `${crowded} departure(s) came within 6 s of the previous one before the whale beat — a wave, not one at a time`);
-    else ok('D', `${deps.length} departures, every one telegraphed >= 8 s, none closer than 6 s before the whale`);
+    const cut = bellAt ?? Infinity;
+    for (let i = 1; i < deps.length; i++) if (deps[i].departAt < cut && deps[i].departAt - deps[i - 1].departAt < 6) crowded++;
+    if (short.length) fail('D\'', `${short.length} of ${deps.length} departures were edible for under 8 s after their first burner pulse`);
+    else if (crowded) fail('D\'', `${crowded} departure(s) came within 6 s of the previous one before the bell — a wave, not one at a time`);
+    else ok('D\'', `${deps.length} departures, every one telegraphed >= 8 s, none closer than 6 s before the bell`);
   }
 }
 
 await b.close();
 console.log('');
 console.log(fails.length
-  ? `FAIL — ascension: ${fails.length} bar(s) short on ${WORLD}; the tagline says "get them before they go up"`
-  : `PASS — ascension: the third state holds, the sky fills, the last handful stay, and every departure pays`);
+  ? `FAIL — ascension: ${fails.length} bar(s) short on ${WORLD}`
+  : QUICK
+    ? `PASS — ascension --quick: the third state holds and the balloons lift together when the Great Bell is rung (B' 1:00/1:30, C and D' need the full run)`
+    : `PASS — ascension: the third state holds, the balloons lift one at a time and all together when the Great Bell is rung, the last handful stay, and every departure pays`);
 process.exit(fails.length ? 1 : 0);

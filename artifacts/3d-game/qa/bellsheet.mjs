@@ -44,9 +44,23 @@ if (FINALE) {
       Math.random = () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
       try { localStorage.clear(); localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1'); localStorage.setItem('voidDailyLast', new Date().toDateString()); localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark'); } catch { }
     });
+    p.on('pageerror', (e) => console.log(`  [pageerror] ${e.message.split('\n')[0]}`));
     await p.goto(`http://127.0.0.1:${FINALE}/?w=skylark`, { waitUntil: 'domcontentloaded', timeout: 300000 });
     await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
+    // qa/skylarkfield.mjs's own entry, step for step: the overlays off, PLAY,
+    // and one touch on the canvas. The first version of this skipped the
+    // touch and photographed the same frame twice — the bell still standing
+    // 3 and 5 s after it was eaten, the void nowhere — because the canvas
+    // never drew the play camera. The byte check below now throws on that.
+    await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
+      if (['daily', 'gift'].includes(e.id)) e.classList.remove('show');
+    }));
     await p.evaluate(() => document.getElementById('btnPlay')?.click());
+    await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
+    await p.evaluate(() => {
+      const cv = document.querySelector('canvas');
+      cv.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: innerWidth / 2, clientY: innerHeight / 2, bubbles: true }));
+    });
     await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 400000 });
     await p.evaluate(() => {
       const cv = document.querySelector('canvas');
@@ -63,12 +77,14 @@ if (FINALE) {
     const lm = await p.evaluate(() => window.__eatLandmark?.() ?? null);
     if (!lm || lm.name !== 'great bell') throw new Error(`bellsheet: __eatLandmark() ate ${lm ? lm.name : 'nothing'}, not the Great Bell`);
     const te = await p.evaluate(() => window.__matchState().t);
+    const shots = [];
     for (const [dt, name] of [[3, 'finale.png'], [5, 'finale_5s.png']]) {
       await p.waitForFunction((t) => window.__matchState().t >= t, te + dt, { timeout: 900000, polling: 250 });
-      await p.screenshot({ path: path.join(DIR, name) });
+      shots.push(await p.screenshot({ path: path.join(DIR, name) }));
       const asc = await p.evaluate(() => window.__asc?.state());
       console.log(`bellsheet: ${path.join(DIR, name)} — ${dt} match s after the bell; cascade ${asc?.cascade}`);
     }
+    if (shots[0].equals(shots[1])) throw new Error('bellsheet: the 3 s and 5 s finale frames are byte-identical — the canvas did not redraw, so neither frame shows the finale');
   } finally { await br.close(); }
   process.exit(0);
 }
