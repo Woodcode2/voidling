@@ -58,6 +58,11 @@ export interface Void3D {
   setSkin(s: Skin): void;    // recolour body/glow/halo/rings to a skin
   /** Wear a hat, or null for none. Independent of the skin — see hats.ts. */
   setHat(id: string | null): void;
+  /** Textures this void binds later in a match on its own — today the WORLD
+   *  ENDER nebula — once they have loaded, so the game's warm frame can put
+   *  them on the GPU before play (prototype3d.ts, warmShaders). The first call
+   *  starts the load. */
+  latentTextures(): THREE.Texture[];
   /** What is on its head right now — the hat's voice lines read this. */
   readonly hatId: string | null;
   setMood(m: Mood): void;    // the emotional state machine's current state
@@ -766,6 +771,21 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     texCache.set(src, t);
     bodyMat.uniforms.uStars.value = t;
   }
+  // the WORLD ENDER nebula (setStage wraps him in it at form 4). One getter,
+  // so the game's warm frame can fetch and upload it before play through
+  // latentTextures() — it used to be requested on the frame the form was
+  // reached, and decoded and uploaded on the next.
+  const NEB_SRC = '/assets/hf/hf_20260717_005240_697d3ae9-f61f-4f42-8ece-3b2413779221.png';
+  const nebula = (): THREE.Texture => {
+    let t = texCache.get(NEB_SRC);
+    if (!t) {
+      t = new THREE.TextureLoader().load(NEB_SRC, () => { if (stage >= 4 && !skinHasTex) bodyMat.uniforms.uTexAmt.value = 0.55; });
+      t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
+      t.colorSpace = THREE.SRGBColorSpace;
+      texCache.set(NEB_SRC, t);
+    }
+    return t;
+  };
 
   // (The old translucent glow SHELL read as a soap-bubble outline around the
   // orb — killed. The rim light lives in the body shader; ambient glow comes
@@ -2000,19 +2020,16 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         // intensify; WORLD ENDER becomes a living galaxy (auto nebula wrap)
         stageBoost = n >= 1 ? 1.15 : 1;
         if (n >= 4 && !skinHasTex) {
-          const nebSrc = '/assets/hf/hf_20260717_005240_697d3ae9-f61f-4f42-8ece-3b2413779221.png';
-          let t = texCache.get(nebSrc);
-          if (!t) {
-            t = new THREE.TextureLoader().load(nebSrc, () => { if (stage >= 4 && !skinHasTex) bodyMat.uniforms.uTexAmt.value = 0.55; });
-            t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
-            t.colorSpace = THREE.SRGBColorSpace;
-            texCache.set(nebSrc, t);
-          }
+          const t = nebula();
           bodyMat.uniforms.uTex.value = t;
           if (t.image) bodyMat.uniforms.uTexAmt.value = 0.55;
         }
       }
       stage = n;
+    },
+    latentTextures() {
+      const t = nebula();
+      return t.image ? [t] : [];
     },
     get hatId() { return wornHatId; },
     setHat(id) {

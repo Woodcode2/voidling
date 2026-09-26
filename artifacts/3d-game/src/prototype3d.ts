@@ -2493,6 +2493,249 @@ function applyQuality() {
   }
 }
 
+// ── EVERY SHADER BEFORE THE MATCH, NOT ON FIRST SIGHT ─────────────────────
+// The owner's recording, 2026-09-25 (Skylark, Safari, iPhone 17 Pro Max): one
+// 950 ms freeze twelve seconds into play — the canvas stopped on a "+49" bite
+// while the DOM progress bar kept animating, which points at the WebGL work
+// rather than the page. Nothing in this file ever compiled a shader ahead of
+// time. three builds a program the first time a material is DRAWN, and asks the
+// new program for its uniforms on that same draw, which waits for the link to
+// finish — on a phone, a visible stop per program. qa/shaderwarm.mjs counts
+// those links during a real match, and on the build before this found them at
+// the touch that starts it, when a hidden curio first went grey, when
+// Skylark's first balloon burner lit and at the whistle: 32 and 28 on Skylark,
+// 14 and 15 on Maple in two runs, every one of them after play had begun.
+//
+// WHAT three's OWN compile() DOES AND DOES NOT COVER (r185, WebGLRenderer.js
+// :1380, read before relying on it):
+//   covers   every Mesh/Points/Line/Sprite under the root it is given, visible
+//            or not (materials are gathered with traverse, not traverseVisible),
+//            keyed exactly as a draw would key them — against the lights and
+//            shadow state of the moment and the CURRENT render target (a target
+//            means NoToneMapping and linear output; the screen means the graded
+//            tone map — two different programs for the same material).
+//   misses   (1) the shadow pass: WebGLShadowMap draws casters with its own
+//            depth materials, keyed per caster (instancing, side, alpha-tested
+//            maps) — only a shadow render compiles those; (2) the post chain's
+//            full-screen passes; (3) scene.background's own mesh; (4) texture
+//            uploads, which happen on first draw too; (5) lights that are
+//            hidden right now — their COUNT is part of every lit program's key,
+//            and compile() gathers lights with traverseVisible.
+// So this does both halves: compile() first, so every program is requested in
+// one burst (the driver may link them side by side, and does where
+// KHR_parallel_shader_compile exists), then ONE real frame through the pipeline
+// the match uses — shadow pass, scene, bloom, output — which picks up (1)-(4)
+// and waits for the links here, while nobody is playing.
+//
+// ONE OF EACH, NOT ALL OF THEM. Skylark's scene is 16,800 objects and 12,261
+// drawables sharing 174 materials; compile() over all of it costs ~120 ms of
+// pure key-building in the sandbox even when every program already exists
+// (measured twice: 174.5 ms cold, 119.4 ms warm). A program is chosen by the
+// material plus a handful of things about the object — its class, instanced
+// colour and morphs, its geometry's attribute set, whether it casts — so one
+// representative per distinct pair is compiled, and the ones that came out of
+// it with a program nobody had are drawn, in a layer the camera is switched to
+// for the one frame, with culling off. Everything hidden is shown for that
+// frame, including hidden lights (pass one), and then drawn again with the
+// hidden lights back off (pass two), because a light's COUNT is in every
+// program's key. Skylark's balloon burner is exactly that light: on the build
+// before this, the first burner of a match linked 8 programs on one frame and
+// 13 inside 1.3 s of play (qa/shaderwarm.mjs, t 159.00-160.29).
+const WARM_LAYER = 31;
+interface WarmRun { at: string; ms: number; linked: number; reps: number; gated: number; drawn: number; passes: number; uploads: number; programs: number }
+const warmRuns: WarmRun[] = [];
+/** A match has been armed since the last warm frame: the next drawn frame warms
+ *  first. See beginMatch and the render block at the bottom of animate(). */
+let warmDue: string | null = null;
+const _warmGeo = new WeakMap<THREE.BufferGeometry, string>();
+const geoKey = (g: THREE.BufferGeometry): string => {
+  let k = _warmGeo.get(g);
+  if (k === undefined) {
+    const col = g.attributes.color as THREE.BufferAttribute | undefined;
+    k = `${Object.keys(g.attributes).sort().join(',')}:${col ? col.itemSize : 0}:${Object.keys(g.morphAttributes).sort().join(',')}${g.morphTargetsRelative ? 'r' : ''}`;
+    _warmGeo.set(g, k);
+  }
+  return k;
+};
+function warmShaders(at: string): WarmRun {
+  const t0 = performance.now();
+  const p0 = renderer.info.programs?.length ?? 0;
+  const known = new Set<unknown>(renderer.info.programs ?? []);
+  const reps: THREE.Object3D[] = [];
+  const seen = new Set<string>();
+  const hidden: THREE.Object3D[] = [];
+  const hiddenLights: THREE.Object3D[] = [];
+  const lights: THREE.Object3D[] = [];
+  const matsOf = (o: THREE.Object3D): THREE.Material[] => {
+    const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+    return (Array.isArray(m) ? m : [m]).filter((x): x is THREE.Material => !!x);
+  };
+  scene.traverse((o) => {
+    if (!o.visible) { hidden.push(o); if ((o as THREE.Light).isLight) hiddenLights.push(o); }
+    if ((o as THREE.Light).isLight) { lights.push(o); return; }
+    const d = o as THREE.Mesh;
+    if (!(d.isMesh || (o as THREE.Points).isPoints || (o as THREE.Line).isLine || (o as THREE.Sprite).isSprite)) return;
+    const im = o as THREE.InstancedMesh;
+    const shape = `${o.type}|${im.isInstancedMesh ? `${im.instanceColor ? 'c' : ''}${im.morphTexture ? 'm' : ''}` : ''}|`
+      + `${o.castShadow ? 's' : ''}${o.customDepthMaterial ? 'd' : ''}|${d.geometry ? geoKey(d.geometry) : ''}`;
+    let fresh = false;
+    for (const m of matsOf(o)) {
+      const k = `${m.uuid}|${shape}`;
+      if (!seen.has(k)) { seen.add(k); fresh = true; }
+    }
+    if (fresh) reps.push(o);
+  });
+  // ── THE TOO-BIG TINT'S CLONES ────────────────────────────────────────
+  // tintGate gives a prop it greys a material of its own with the prop shader
+  // installed (gateMatFrom). For a material that did not carry that shader —
+  // the hidden curios' gem and halo, the crowd — that clone is a key nobody
+  // has compiled, and it was linked on the tick the prop first went grey:
+  // qa/shaderwarm.mjs found two of them mid-match on Skylark once everything
+  // else was warm. One throwaway clone per such material, worn by each of its
+  // representatives for the compile; the programs stay in three's cache when
+  // the clone is dropped (nothing disposes it), which is all a later tint
+  // needs to find them.
+  const gated: { o: THREE.Mesh; gm: THREE.Material }[] = [];
+  {
+    const gmFor = new Map<THREE.Material, THREE.Material>();
+    for (const o of reps) {
+      const mm = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      if (!mm || Array.isArray(mm) || !(mm as THREE.MeshStandardMaterial).color) continue;
+      if (mm === (PROP_GLOW_MAT as THREE.Material) || mm === o.userData.gateMat) continue;
+      let e: THREE.Object3D | null = o;
+      while (e && e.userData.eRadius === undefined) e = e.parent;
+      if (!e) continue;
+      let gm = gmFor.get(mm);
+      if (!gm) { gm = gateMatFrom(mm); gmFor.set(mm, gm); }
+      gated.push({ o: o as THREE.Mesh, gm });
+    }
+  }
+  const gateRoot = {
+    traverse: (cb: (o: THREE.Object3D) => void) => { for (const g of gated) cb(g.o); },
+    traverseVisible: () => { /* the lights are the scene's */ },
+  } as unknown as THREE.Object3D;
+  for (const o of hidden) o.visible = true;
+  // compile()'s root: a VIEW onto the representatives, not an Object3D — it is
+  // never added to the scene, never anyone's parent, and costs no uuid (an
+  // Object3D draws four Math.random() calls for one). compile() asks its root
+  // for exactly two things: its lights (none here — they come from the scene,
+  // passed as the target) and a traverse.
+  const root = {
+    traverse: (cb: (o: THREE.Object3D) => void) => { for (const o of reps) o.traverse(cb); },
+    traverseVisible: () => { /* the lights are the scene's */ },
+  } as unknown as THREE.Object3D;
+  const target = renderer.getRenderTarget();
+  const camMask = camera.layers.mask;
+  const masks = new Map<THREE.Object3D, number>();
+  const culls = new Map<THREE.Object3D, boolean>();
+  let passes = 0, drawn = 0;
+  /** compile every representative against the pipeline's real target, then
+   *  DRAW only the ones that were just given a program nobody had. `force`
+   *  draws regardless: the boot frame is also what compiles the post chain and
+   *  the sky's own mesh. */
+  const pass = (force: boolean) => {
+    passes++;
+    const c = bloomOn ? ensureComposer() : null;
+    if (c) {
+      c.setPixelRatio(renderer.getPixelRatio());
+      c.setSize(renderer.domElement.clientWidth, renderer.domElement.clientHeight);
+    }
+    renderer.setRenderTarget(c ? c.readBuffer : null);
+    renderer.compile(root, camera, scene);
+    if (gated.length) {
+      const was = gated.map((g) => g.o.material);
+      gated.forEach((g) => { g.o.material = g.gm; });
+      try { renderer.compile(gateRoot, camera, scene); }
+      finally { gated.forEach((g, i) => { g.o.material = was[i]; }); }
+    }
+    const fresh = new Set<unknown>((renderer.info.programs ?? []).filter((q) => !known.has(q)));
+    for (const q of fresh) known.add(q);
+    const usesFresh = (m: THREE.Material): boolean => {
+      const progs = (renderer.properties.get(m) as { programs?: Map<string, unknown> }).programs;
+      if (progs) for (const q of progs.values()) if (fresh.has(q)) return true;
+      return false;
+    };
+    const draw = fresh.size ? reps.filter((o) => matsOf(o).some(usesFresh)) : [];
+    // ── A COMPILED PROGRAM IS NOT YET A DRAWN ONE ─────────────────────────
+    // The gate clones above used to be compiled and never drawn, and the
+    // first real draw of one still stopped the frame. Skylark, the first 30 s
+    // of a steered drive on the build that did that: the one frame over
+    // 500 ms was a tint clone's first draw, 1505 ms, 1469 of them inside
+    // getProgramParameter — three's first-use query, waiting on whatever the
+    // driver still owed the program (another drive: three frames of
+    // 958-1082 ms, ~1 s of each in the same call). Linked is not ready; drawn
+    // is. So they are drawn too, worn by their representatives, in a render
+    // of their own below, and qa/shaderwarm.mjs counts first draws as well
+    // as links.
+    //   The price is paid here now, and it is not small on Skylark: the boot
+    // warm went from 2019 ms (compiled only) to 9676 ms (drawn), sandbox
+    // wall under swiftshader, one run each — the driver work those first
+    // draws in play used to stop for, moved behind the loading cover. Maple's
+    // barely moved (1382 -> 1596 ms).
+    const drawGated = fresh.size ? gated.filter((g) => usesFresh(g.gm)) : [];
+    if (!draw.length && !drawGated.length && !force) return;
+    drawn += draw.length + drawGated.length;
+    const onLayer = (o: THREE.Object3D) => {
+      if (!masks.has(o)) { masks.set(o, o.layers.mask); culls.set(o, o.frustumCulled); }
+      o.layers.enable(WARM_LAYER); o.frustumCulled = false;
+    };
+    for (const o of draw) onLayer(o);
+    for (const o of lights) if (!masks.has(o)) { masks.set(o, o.layers.mask); o.layers.enable(WARM_LAYER); }
+    camera.layers.set(WARM_LAYER);
+    renderer.shadowMap.needsUpdate = true;
+    if (c) c.render(); else renderer.render(scene, camera);
+    if (drawGated.length) {
+      for (const o of draw) o.layers.disable(WARM_LAYER);
+      const was = drawGated.map((g) => g.o.material);
+      drawGated.forEach((g) => { g.o.material = g.gm; onLayer(g.o); });
+      renderer.shadowMap.needsUpdate = true;
+      try { if (c) c.render(); else renderer.render(scene, camera); }
+      finally { drawGated.forEach((g, i) => { g.o.material = was[i]; }); }
+    }
+    camera.layers.mask = camMask;
+  };
+  let uploads = 0;
+  try {
+    pass(at === 'boot');
+    if (hiddenLights.length) { for (const o of hiddenLights) o.visible = false; pass(at === 'boot'); }
+    // ── AND THE PIXELS, NOT ONLY THE PROGRAMS ────────────────────────────
+    // A texture uploads on its first draw too, and an image nobody has decoded
+    // yet is decoded inside that upload. Anything a representative wears that
+    // is loaded and not yet on the GPU goes up now, and so does what the void
+    // binds later on its own: the WORLD ENDER nebula, 1024x1024, which
+    // qa/shaderwarm.mjs caught uploading mid-match on reaching that form.
+    const texSeen = new Set<THREE.Texture>();
+    const up = (v: unknown) => {
+      const t = v as THREE.Texture | null | undefined;
+      if (!t || !t.isTexture || texSeen.has(t)) return;
+      texSeen.add(t);
+      const img = t.image as { complete?: boolean } | null | undefined;
+      if (t.version === 0 || !img || img.complete === false) return;
+      if ((renderer.properties.get(t) as { __version?: number }).__version === t.version) return;
+      renderer.initTexture(t);
+      uploads++;
+    };
+    for (const o of reps) for (const m of matsOf(o)) {
+      for (const v of Object.values(m)) up(v);
+      const u = (m as THREE.ShaderMaterial).uniforms;
+      if (u) for (const k in u) up(u[k]?.value);
+    }
+    for (const t of voidling.latentTextures()) up(t);
+  } finally {
+    camera.layers.mask = camMask;
+    for (const [o, m] of masks) o.layers.mask = m;
+    for (const [o, c] of culls) o.frustumCulled = c;
+    for (const o of hidden) o.visible = false;
+    renderer.setRenderTarget(target);
+    // a warm frame drew only representatives into the shadow map
+    renderer.shadowMap.needsUpdate = true;
+  }
+  const programs = renderer.info.programs?.length ?? 0;
+  const run = { at, ms: Math.round(performance.now() - t0), linked: programs - p0, reps: reps.length, gated: gated.length, drawn, passes, uploads, programs };
+  warmRuns.push(run);
+  return run;
+}
+
 // ── edibles + island ─────────────────────────────────────────────────────────
 interface Edible { mesh: THREE.Object3D; radius: number; eaten: boolean; t: number; orbit: number; orbitR: number; spin: THREE.Vector3; home: THREE.Vector3; homeScale: THREE.Vector3; homeRotY: number;
   /** THE KEEL — the axis a prop tips over on its way in, the angle it stops
@@ -3531,6 +3774,7 @@ const _dbg = new Proxy(_dbgStore, {
   __rushClock: (to: number) => void;
   __setVoidR: (r: number) => void;
   __pinQuality: (n: number | null) => void;
+  __shaderWarm: () => { at: string; ms: number; linked: number; reps: number; gated: number; drawn: number; passes: number; uploads: number; programs: number }[];
   __frameTimes: () => number[];
   __frameInfo: () => Record<string, number | boolean | null>;
   __menuCam: (c: { x: number; z: number; az: number; dist?: number; h?: number;
@@ -4095,6 +4339,9 @@ _dbg.__pinQuality = (n: number | null) => {
   qPinned = n;
   if (n !== null) { qLevel = Math.max(0, Math.min(QUALITY.length - 1, n)); applyQuality(); }
 };
+// QA (qa/shaderwarm.mjs): every warm frame so far — where it ran, how long it
+// took, how many programs it added and from how many representatives
+_dbg.__shaderWarm = () => warmRuns.slice();
 _dbg.__quality = () => ({ level: qLevel, pinned: qPinned, shadows: renderer.shadowMap.enabled,
   shSize: sun.shadow.mapSize.x, pr: renderer.getPixelRatio() });
 // QA: put the hero anywhere on the map. There was no way to photograph a
@@ -7477,6 +7724,18 @@ let gateT = 0;      // throttle for the too-big-to-eat tint
 // passes were big enough to count as a WAVE. Read-only counters; see
 // __outgrownN and __ungateWaveN.
 let outgrownN = 0, ungateWaveN = 0;
+/** A gated prop's own material: its material cloned, the dead userData snapshot
+ *  dropped (see the note in tintGate), and the prop shader installed. One
+ *  recipe, because warmShaders compiles the same thing before play — for a
+ *  material that did not already carry the prop shader, the clone is a program
+ *  key nobody has compiled, and the tint used to link it mid-match on the tick
+ *  a prop first went grey. */
+function gateMatFrom(mm: THREE.Material): THREE.Material {
+  const gm = mm.clone();
+  gm.userData = {};             // drop the dead snapshot; let it compile its own
+  installPropShader(gm);
+  return gm;
+}
 /** THE TINT ITSELF, on one prop: greyed toward slate when it is too big, its
  *  own colour back when it is not. Lifted out of the gate pass unchanged so
  *  the rolling un-gate (ungateWave) can hand a prop its colour back on a
@@ -7521,9 +7780,7 @@ function tintGate(e: Edible, tooBig: boolean): void {
       // warnings in the console are this clone, JSON-ing a compiled
       // shader's uniforms.
       if (!o.userData.gateMat) {
-        const gm = mm.clone();
-        gm.userData = {};             // drop the dead snapshot; let it compile its own
-        installPropShader(gm);
+        const gm = gateMatFrom(mm);
         o.userData.gateMat = gm;
         (o as THREE.Mesh).material = gm;
       }
@@ -10176,8 +10433,9 @@ let guideStep = 0, guideT = 0, presenceT = 0;
 let introT = 0, outroT = 0;
 // how far the opening shot's subject currently sits from the void (see COPY.hero)
 let introHX = 0, introHZ = 0;
-// what the shadow map was set to before the opening move borrowed it
-let introShadow: boolean | null = null;
+// the sun's shadow intensity before the opening move borrowed it (null: not
+// borrowed). While it is held the shadow pass is skipped — see the descent.
+let introShadow: number | null = null;
 // THE DESCENT — round 7, stream A step 4. Measured from HOLE.IO's own opening:
 // 72 frames = 1.2000 s exactly, ease-in-out on camera HEIGHT with 50% of the
 // height travelled at t=0.45, and the ground magnifying x6.0 at the point the
@@ -10447,6 +10705,10 @@ function beginMatch(solo = false) {
   }
   refreshGoalChip();
   armed = true;
+  // the first frame of the armed idle warms whatever the boot warm could not
+  // have seen: a hat bought on the menu, a sky that finished loading after the
+  // island, props swapped in by a late GLB. Nothing new costs one cheap frame.
+  warmDue = 'match';
   // see AUTO_START: a browser with no human behind it starts its own match
   if (AUTO_START) queueMicrotask(() => startMatch());
   // The idle is the high view, not the play view. Without this the world opens at
@@ -15858,9 +16120,27 @@ function animate() {
       // that bill is the shadow pass, not the frustum. Sandbox numbers under
       // swiftshader; draw calls do not depend on how fast the box renders
       // them, frame times do, and no frame time is quoted here.
-      if (introShadow === null) { introShadow = renderer.shadowMap.enabled; renderer.shadowMap.enabled = false; sun.castShadow = false; }
+      //
+      // ── …AND IT SAVES THEM WITHOUT RE-KEYING A SINGLE SHADER ──────────────
+      // This used to switch renderer.shadowMap.enabled and sun.castShadow off
+      // for the move and back on at the end. Both are part of every lit
+      // program's key (USE_SHADOWMAP, the shadow-casting light count), so the
+      // touch that starts a match asked for a second, shadowless copy of every
+      // shader in view, and the end of the descent asked for the shadowed ones
+      // back. qa/shaderwarm.mjs counted it on Skylark before this change: 10
+      // programs linked on the first frame after the touch and 1 more during
+      // the descent — a stall at the exact moment a child starts to play.
+      //
+      // The saving was never the switch; it was the shadow pass's draw calls.
+      // So the pass is skipped instead (the cadence below does not ask for it
+      // while introShadow is held) and the light's shadow intensity goes to 0,
+      // which three applies as mix(1.0, shadow, 0.0) = 1.0 — fully lit, the
+      // same pixels the shadowless programs drew — from the same programs the
+      // match itself uses. The stale map the idle left behind is never shown.
+      if (introShadow === null) { introShadow = sun.shadow.intensity; sun.shadow.intensity = 0; }
       if (introT <= 0 && introShadow !== null) {
-        renderer.shadowMap.enabled = introShadow; sun.castShadow = introShadow; introShadow = null;
+        sun.shadow.intensity = introShadow; introShadow = null;
+        renderer.shadowMap.needsUpdate = true;   // the first settled frame draws a current map
       }
       if (introT <= 0) { controlsLive = true; document.body.classList.remove('intro'); handHold = 0.45; }
       if (introT <= 0 && firstRun && !dragTaught) {
@@ -16584,12 +16864,20 @@ function animate() {
   // Never while anything is animating for real: the intro, the outro, a match.
   // menuMode is false through all of those by construction.
   const drawThisFrame = !menuMode || !menuOptim || (shadowFrame % 2) === 0;
-  if (shadowFrame++ % shadowEvery === 0) renderer.shadowMap.needsUpdate = true;
+  // (not during the opening move: it borrows the shadows — see introShadow)
+  if (shadowFrame++ % shadowEvery === 0 && introShadow === null) renderer.shadowMap.needsUpdate = true;
   // …and NOTHING at all while the menu is a painting. `posterUp` is only ever
   // true with menuMode true and the opaque background up (see setPoster), and
   // the rAF still runs: the sim steps, the town walks, the drift advances, so
   // the frame the poster comes down on is a live one, not a stale buffer.
   if (posterUp || !drawThisFrame) { requestAnimationFrame(animate); return; }
+  // THE WARM FRAME rides the first drawn frame of an armed match (see
+  // warmShaders): in the same task as the real frame below, so the picture of
+  // representatives it leaves on the canvas is drawn over before any of it can
+  // be presented.
+  // (a warm is an optimisation: if one ever throws, the match plays on cold
+  // rather than the loop dying on this line)
+  if (warmDue) { const w = warmDue; warmDue = null; try { warmShaders(w); } catch (e) { console.warn('warm frame skipped', e); } }
   // …through the composer only on the rungs that can afford it. applyQuality
   // owns bloomOn, so the adapter switching rungs switches the glow with it.
   if (bloomOn) {
@@ -16617,4 +16905,12 @@ else {
 // the debug API goes live only now — see the note on _dbg's declaration
 _dbgLive = true;
 Object.assign(window, _dbgStore);
+// THE BOOT WARM — every program the island, the family, the forms and the
+// effects will need, compiled and linked here, behind the loading cover, where
+// a child is already waiting and nothing is moving. On the phone the menu is a
+// poster and draws nothing, so without this the first frame to need any of
+// them would be the first frame of the match. A first launch that armed its
+// match during boot is covered by the same frame.
+try { warmShaders('boot'); } catch (e) { console.warn('boot warm skipped', e); }
+warmDue = null;
 animate();
