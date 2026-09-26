@@ -83,6 +83,21 @@
 //      units of the plaza centre (6107, 4349), with an eat radius >= every
 //      other static edible's — so beginMatch's heroProp (the largest radius)
 //      resolves to it.
+//
+// ── RECORDED (GOVERNOR rule 2), SEED 7, fresh builds, through the slot lock ──
+//   BEFORE, the airfield (branch build d9517be): FAIL, 10 bars —
+//     C' 169 flyable balloons, 33.1% docked at the edge (bar 60)
+//     D  spawn luma 0.471 (L1 0.60-0.72); cloud pixels 9.7%, 1.1%, 2.0%, 0.5%
+//        of the four frames (bar 45); cloud median 0.689, 0.716 and 0.720 at
+//        the spawn, the north arm and the south-west arm (L2 0.74)
+//     E  no static edible tagged 'great bell' (the largest is r 18, the whale)
+//     (A' 85.2% and B 92.4% island-wide passed on the airfield already.)
+//   AFTER, the kingdom (this branch, 2026-09-26): PASS — A' 87.9% island-wide,
+//     the thinnest part the Cloud Market at 62.8%; B 81.4%; C' 44 flyable,
+//     100% docked at the edge, 45.5% standing; D spawn luma 0.632, cloud
+//     66.5%, 81.3%, 77.8%, 85.3% of the frames, cloud medians 0.759-0.781,
+//     nothing blown; E the Great Bell r 5.5, 0.0 from the plaza centre, the
+//     next largest r 5.2. qa/bellsheet.mjs lays the two runs side by side.
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 
 const argv = process.argv.slice(2);
