@@ -25,7 +25,7 @@ game; Capacitor wraps it in a native shell.
   iPhones; the app is iPhone-only, `TARGETED_DEVICE_FAMILY = 1`): menu, world
   picker, a match mid-devour, Lantern Night's market and bathhouse, Game Day,
   the shop framed on the legendary tier, the results screen, and (added at
-  launch, 2026-09-25) Skylark Field's balloon meet. It seeds a wallet and a
+  launch, 2026-09-25) world 6, Bellcloud Heights. It seeds a wallet and a
   play history first so the shop photographs the catalogue rather than an empty
   account, and it REFUSES to run until the art is vendored — screenshots of grey
   boxes would misrepresent the app in the other direction. Run it against
@@ -337,7 +337,7 @@ In Xcode:
   Outgrow your rivals, dodge the ones bigger than you, and end the world —
   adorably." Then: 3-minute matches, three to five rival voids to outgrow,
   **six worlds** — Maple Falls, Pirate Bay, Game Day, Lantern Night, Powder
-  Pass and Skylark Field — six evolution forms, rare & legendary skins,
+  Pass and Bellcloud Heights — six evolution forms, rare & legendary skins,
   trophies and ranks.
   (This said "two worlds", then "four worlds", then "five", each time a world
   late. The source of truth is `WORLD_ORDER` in `src/game/unlocks.ts` and it

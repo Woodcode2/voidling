@@ -2218,6 +2218,14 @@
           0 2px 10px rgba(0,0,0,0.95); }
       #worlds .wCard b { font-size: clamp(15px, 4.1vw, 20px); letter-spacing: 0.4px; font-weight: 700;
         line-height: 1.1; }
+      /* BELLCLOUD HEIGHTS is 17 characters; every other name is 13 or fewer.
+         At the shared size it broke in two at 360, 390, 430 and 1024 px, and
+         because .wBody is anchored to the bottom, "BELLCLOUD" sat a line above
+         the plate: qa/pickerfit.mjs read its contrast at 4.53:1 against a bar
+         of 4.5. Sized to its card instead it is one line at every width
+         qa/titlefit.mjs sweeps (13 px at 360, 15.5 at 430, 18 from 834) and
+         reads 8.8:1. The other five cards are untouched. */
+      #worlds .wCard[data-world="skylark"] b { font-size: clamp(12px, 3.6vw, 18px); }
       /* TWO LINES ARE ALWAYS RESERVED, even though every subtitle currently
          fits on one. The card body is bottom-anchored, so a subtitle that
          wraps does not push PLAY down — it pushes the TITLE up, and the row
@@ -3860,7 +3868,7 @@
              reason. -->
         <div class="wCard" data-world="skylark">
           <div class="wArt"></div><div class="wNum">WORLD 6</div>
-          <div class="wBody"><b>SKYLARK FIELD</b><span>BEFORE THEY ALL GO UP</span>
+          <div class="wBody"><b>BELLCLOUD HEIGHTS</b><span>RING THE GREAT BELL</span>
             <div class="wBest"></div><div class="wPips"></div><div class="wGo"><svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-play"/></svg> PLAY</div></div>
         </div>
       </div>

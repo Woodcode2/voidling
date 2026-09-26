@@ -71,19 +71,22 @@ export const EVENTS: SeasonEvent[] = [
   { id: 'snowday', world: 'powder', name: 'SNOW DAY', icon: '❄️',
     from: [12, 18], to: [1, 4], accent: 0xbfe4ff, flash: 'rgba(191,228,255,0.30)',
     line: 'all schools closed. all sledding mandatory.' },
-  // SKYLARK FIELD, and it fills the year's biggest hole: between the Moon
+  // World 6, and it fills the year's biggest hole: between the Moon
   // Festival on 21 February and the Regatta on 11 July there was nothing at
   // all, four and a half months of no season in a game that sells them.
   //
-  // THE NIGHT GLOW is what a balloon meet is actually famous for, and it is
-  // the one evening nobody flies: the envelopes stand tethered after dark and
-  // every burner on the field fires together on a count, so ninety-one
-  // balloons light up from the inside at once. May is right for it — the
-  // still evenings a glow needs, and far enough from the Regatta that the two
-  // summer seasons do not crowd each other.
-  { id: 'nightglow', world: 'skylark', name: 'THE NIGHT GLOW', icon: '🔥',
+  // EVENING CHIMES (BELLCLOUD HEIGHTS; the id stays 'nightglow' because it
+  // is a save key and the four seasonal stickers point at it): the one evening
+  // the big bell rests and every little bell on the island rings instead, one
+  // after another round the kingdom. Dates as they were: May's still evenings,
+  // far enough from the Regatta that the two summer seasons do not crowd.
+  // No "THE": at 18 characters the picker card's season chip ran to three
+  // lines at 375 px and covered the world's name completely in May (review of
+  // the words half, a Date faked to 2027-05-20); at 14 it is THE NIGHT GLOW's
+  // own length, which is what the card was laid out for.
+  { id: 'nightglow', world: 'skylark', name: 'EVENING CHIMES', icon: '🔔',
     from: [5, 16], to: [5, 31], accent: 0xffb347, flash: 'rgba(255,179,71,0.30)',
-    line: 'every burner on the field, on the count of three' },
+    line: 'every little bell on the island, one after another' },
 ];
 
 const EVENT_BY_ID = new Map(EVENTS.map((e) => [e.id, e]));

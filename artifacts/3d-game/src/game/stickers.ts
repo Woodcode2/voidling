@@ -339,45 +339,48 @@ const MOONFEST: Sticker[] = [
 ];
 
 const SKYLARK: Sticker[] = [
-  // WORLD 6. Twelve, the same count POWDER PASS carries, spread across all nine
-  // districts so no part of the field is a place with nothing in it. The voice
-  // is the field's own — dry, technical, and fond of the people it is about.
-  { id: 'whale-rosette', world: 'skylark', name: "The Whale's Rosette", where: 'The Launch Circle', biome: 'circle',
-    hint: 'Best special shape, eleven years running. She has never once been judged.', tier: 'legendary',
-    art: 'a large blue prize rosette with long ribbons pinned to a wicker balloon basket' },
-  { id: 'pyms-anemometer', world: 'skylark', name: "Mr Pym's Anemometer", where: 'The Tower', biome: 'tower',
-    hint: 'Accurate to a tenth of a knot. It has never been asked the right question.', tier: 'legendary',
-    art: 'a small brass cup anemometer spinning on top of a weathered wooden post' },
-  { id: 'first-skylark', world: 'skylark', name: 'The First Skylark', where: 'The Rough', biome: 'meadow',
-    hint: 'Up before the burners every morning, singing at nothing in particular.', tier: 'legendary',
-    art: 'a small brown skylark hovering above long meadow grass, wings blurred' },
-  { id: 'gretes-binoculars', world: 'skylark', name: "Grete's Binoculars", where: 'The Perimeter', biome: 'perimeter',
-    hint: 'She saw it first. She has mentioned this four times.', tier: 'rare',
-    art: 'a pair of old black binoculars hanging by their strap from a wooden fence post' },
-  { id: 'sheep-of-zero-nine', world: 'skylark', name: 'The Sheep Of Zero Nine', where: 'The Runway', biome: 'runway',
-    hint: 'Asked to move since 1968. Position unchanged.', tier: 'rare',
-    art: 'a single woolly sheep standing calmly on a mown grass runway' },
-  { id: 'rosette-board', world: 'skylark', name: 'The Rosette Board', where: 'The Hangars', biome: 'hangars',
-    hint: 'Thirty years of them. The committee reads it like a family album.', tier: 'rare',
-    art: 'a wooden board covered in dozens of faded coloured prize rosettes' },
-  { id: 'hares-form', world: 'skylark', name: "The Hare's Form", where: 'The Rough', biome: 'meadow',
-    hint: 'A dent in the long grass, exactly hare-shaped, recently vacated.', tier: 'rare',
-    art: 'a hare-shaped hollow pressed into a patch of long meadow grass' },
-  { id: 'franz-gloves', world: 'skylark', name: "Franz's Gloves", where: 'The Launch Field', biome: 'launchfield',
-    hint: 'He cannot find them. They are in his pocket. They are always in his pocket.', tier: 'common',
-    art: 'a pair of thick brown leather gauntlet gloves lying on mown grass' },
-  { id: 'last-bacon-roll', world: 'skylark', name: 'The Last Bacon Roll', where: 'Breakfast Row', biome: 'breakfast',
-    hint: 'Made at half past four. Still warm. Nobody will admit to wanting it.', tier: 'common',
-    art: 'a bacon roll on a paper napkin beside a large steel tea urn' },
-  { id: 'thirty-pence-teapot', world: 'skylark', name: 'The Thirty Pence Teapot', where: 'The Hangars', biome: 'hangars',
-    hint: 'Tea is thirty pence. It has been thirty pence since the flea market began.', tier: 'common',
-    art: 'a big dented aluminium teapot on a trestle table' },
-  { id: 'old-windsock', world: 'skylark', name: 'The Old Windsock', where: 'The Runway', biome: 'runway',
-    hint: 'Came down in the March gales. Nobody has been in a hurry about it.', tier: 'common',
-    art: 'a faded orange striped windsock lying on grass beside its fallen mast' },
-  { id: 'retrieve-map', world: 'skylark', name: 'The Retrieve Map', where: 'The Arrivals Field', biome: 'arrivals',
-    hint: 'Folded wrong for thirty years, and it has never once got anybody lost.', tier: 'common',
-    art: 'a creased paper road map folded badly on the bonnet of a green land rover' },
+  // WORLD 6, BELLCLOUD HEIGHTS. Twelve, the same count POWDER PASS carries,
+  // spread across all nine districts so no part of the kingdom is a place with
+  // nothing in it. The ids are the airfield's and NEVER change (save keys and
+  // art filenames; nothing found ever expires) — only what the card says
+  // changed. The hints are in the Town Crier's voice: ceremonial, and fond of
+  // the people it is about. docs/BELLCLOUD.md §9.8.
+  { id: 'whale-rosette', world: 'skylark', name: 'The First Bell Rope', where: 'The Bell Plaza', biome: 'circle',
+    hint: 'Plaited from a hundred cloud threads. Pulled once a year, gently.', tier: 'legendary',
+    art: 'a thick braided golden bell rope with a tasselled end, coiled on white stone' },
+  { id: 'pyms-anemometer', world: 'skylark', name: "Master Tolly's Hand Bell", where: 'The Castle Keep', biome: 'tower',
+    hint: 'He rings it before every proclamation, and after, and sometimes during.', tier: 'legendary',
+    art: 'a small polished brass hand bell with a wooden handle on a stone windowsill' },
+  { id: 'first-skylark', world: 'skylark', name: 'The First Skylark', where: 'The Cloud Meadows', biome: 'meadow',
+    hint: 'Sings above the clouds before the bell is rung. Nobody taught it the tune.', tier: 'legendary',
+    art: 'a small brown skylark hovering above soft white clouds, wings blurred' },
+  { id: 'gretes-binoculars', world: 'skylark', name: 'The Rainbow Chalk', where: 'The Rainbow Ring', biome: 'perimeter',
+    hint: 'Somebody redraws the ring every morning. Nobody has seen who.', tier: 'rare',
+    art: 'a box of pastel chalk sticks in rainbow colours on pale stone' },
+  { id: 'sheep-of-zero-nine', world: 'skylark', name: 'The Sheep On The Avenue', where: 'The Grand Avenue', biome: 'runway',
+    hint: 'Asked to move for the parade since the first festival. Position unchanged.', tier: 'rare',
+    art: 'a fluffy white sheep standing calmly on pale stone paving' },
+  { id: 'rosette-board', world: 'skylark', name: 'The Banner Of The First Festival', where: 'The Castle Yard', biome: 'hangars',
+    hint: 'Blue and gold, and older than the castle. The castle is very old.', tier: 'rare',
+    art: 'a faded blue and gold banner with a bell emblem hanging on a stone wall' },
+  { id: 'hares-form', world: 'skylark', name: "The Cloud Bunny's Burrow", where: 'The Cloud Meadows', biome: 'meadow',
+    hint: 'A bunny-shaped dent in the softest cloud on the island, still warm.', tier: 'rare',
+    art: 'a small rabbit-shaped hollow pressed into a soft white cloud' },
+  { id: 'franz-gloves', world: 'skylark', name: "The Gardener's Watering Can", where: 'The Cloud Gardens', biome: 'launchfield',
+    hint: 'For watering cloud trees. Nobody knows if it helps. It seems to help.', tier: 'common',
+    art: 'a small gold watering can on a white garden path' },
+  { id: 'last-bacon-roll', world: 'skylark', name: 'The Last Cloud Bun', where: 'The Cloud Market', biome: 'breakfast',
+    hint: 'Baked at dawn. Still warm. Nobody will admit to wanting it.', tier: 'common',
+    art: 'a round fluffy white bun with a swirl of pink icing on a paper napkin' },
+  { id: 'thirty-pence-teapot', world: 'skylark', name: 'The Castle Teapot', where: 'The Castle Yard', biome: 'hangars',
+    hint: 'Tea has been three pennies since the castle was built. The teapot remembers.', tier: 'common',
+    art: 'a round blue and white china teapot on a stone table' },
+  { id: 'old-windsock', world: 'skylark', name: 'The Paper Crown', where: 'The Grand Avenue', biome: 'runway',
+    hint: "Fell off in last year's parade. Still the best crown on the island.", tier: 'common',
+    art: 'a gold paper party crown lying on pale stone paving' },
+  { id: 'retrieve-map', world: 'skylark', name: "The Balloon Pilot's Map", where: 'The Balloon Dock', biome: 'arrivals',
+    hint: 'Every island on the trip, and a big X on this one.', tier: 'common',
+    art: 'a folded paper map of little floating islands with a red X, on a wicker basket rim' },
 ];
 
 const SNOWDAY: Sticker[] = [
@@ -400,21 +403,22 @@ const SNOWDAY: Sticker[] = [
 ];
 
 const NIGHTGLOW: Sticker[] = [
-  // SKYLARK FIELD's season. The night glow is the real thing a balloon meet is
-  // famous for: nobody flies, the envelopes stand tethered after dark and every
-  // burner fires together on a count. Four, as every other season carries four.
-  { id: 'glow-baton', world: 'skylark', event: 'nightglow', name: "The Glow Conductor's Baton", where: 'The Launch Circle', biome: 'circle',
-    hint: 'Ninety-one burners, on the count of three. He has never needed a second go.', tier: 'legendary',
-    art: 'a slim white conductor baton resting on the rim of a wicker balloon basket' },
-  { id: 'tethered-whale', world: 'skylark', event: 'nightglow', name: 'The Whale, Lit', where: 'The Launch Field', biome: 'launchfield',
-    hint: 'She does not fly tonight. She glows, which the committee prefers.', tier: 'rare',
-    art: 'a whale shaped hot air balloon standing tethered and glowing from within at night' },
-  { id: 'glow-programme', world: 'skylark', event: 'nightglow', name: 'The Night Glow Programme', where: 'Breakfast Row', biome: 'breakfast',
-    hint: 'Sixpence. Lists every balloon in the order they will light.', tier: 'common',
-    art: 'a folded paper programme with a hot air balloon printed on the cover' },
-  { id: 'last-burner', world: 'skylark', event: 'nightglow', name: 'The Last Burner', where: 'The Tower', biome: 'tower',
-    hint: 'Fires one beat after the rest, every year, by somebody who cannot count.', tier: 'common',
-    art: 'a single hot air balloon burner firing a bright flame upward against a dark sky' },
+  // BELLCLOUD HEIGHTS' season, THE EVENING CHIMES (the season id stays
+  // 'nightglow', and so do these four sticker ids): the one evening the big
+  // bell rests and every little bell on the island rings instead, one after
+  // another. Four, as every other season carries four.
+  { id: 'glow-baton', world: 'skylark', event: 'nightglow', name: "The Chime Master's Baton", where: 'The Bell Plaza', biome: 'circle',
+    hint: 'Every little bell on the island, on the count of three.', tier: 'legendary',
+    art: "a slim white conductor's baton resting on white stone beside a small gold bell" },
+  { id: 'tethered-whale', world: 'skylark', event: 'nightglow', name: 'The Balloon, Lit', where: 'The Cloud Gardens', biome: 'launchfield',
+    hint: 'She does not fly tonight. She glows, which the Crier prefers.', tier: 'rare',
+    art: 'a striped hot air balloon standing tethered and glowing from within at dusk' },
+  { id: 'glow-programme', world: 'skylark', event: 'nightglow', name: 'The Evening Chimes Programme', where: 'The Cloud Market', biome: 'breakfast',
+    hint: 'Lists every bell on the island in the order it will ring.', tier: 'common',
+    art: 'a folded paper programme with a small gold bell printed on the cover' },
+  { id: 'last-burner', world: 'skylark', event: 'nightglow', name: 'The Last Chime', where: 'The Castle Keep', biome: 'tower',
+    hint: 'Rings one beat after the rest, every year, by somebody who cannot count.', tier: 'common',
+    art: 'a single small brass bell swinging on a post against a dusk sky' },
 ];
 
 export const STICKERS: Sticker[] = [

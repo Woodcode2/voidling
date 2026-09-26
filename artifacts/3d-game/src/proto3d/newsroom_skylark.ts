@@ -1,5 +1,9 @@
 // ══════════════════════════════════════════════════════════════════════════
-//  NEWSROOM — SKYLARK FIELD, the desk whose instruments are working perfectly
+//  NEWSROOM — BELLCLOUD HEIGHTS, the Town Crier and his Festival Programme
+//
+//  (World 6. The internal id is still 'skylark' — the file name, the exports,
+//  SKYLARK_BRAND and the district ids are save keys and probe arguments, so
+//  only what a child reads was renamed. docs/BELLCLOUD.md §9.4.)
 //
 //  THE CONCEIT, AND WHY IT IS NOT THE OTHER FIVE
 //  ---------------------------------------------
@@ -8,34 +12,38 @@
 //  Lantern Night has a recording that cannot perceive damage, only hospitality.
 //  Powder Pass has a closures desk that will not be hurried.
 //
-//  SKYLARK FIELD has MR PYM, the Balloonmeister, on the tower balcony, and his
-//  denial is TECHNICAL. He is not covering, not hoping, not refusing to look.
-//  He has instruments, they are excellent, and they are answering the wrong
-//  question with total confidence. He processes the void as CONDITIONS — a
-//  meteorological feature and a surface obstruction — and files it under the
-//  only headings the briefing form has.
+//  BELLCLOUD HEIGHTS has MASTER TOLLY, the Town Crier, with a hand bell and a
+//  scroll — the Festival Programme — and his denial is CEREMONIAL. He can only
+//  do two things with the world: read something OFF the programme, or proclaim
+//  something ONTO it. So the void is proclaimed a festival visitor, then a
+//  float, then part of the Ringing, and everything it eats is proclaimed
+//  "gone up early". Nothing is ever lost on Bellcloud. It is only crossed off.
 //
-//  AND THE JOKE IS WIRED TO THE PLAYER'S OWN PROGRESS, which no other newsroom
-//  in this game manages. As the child eats, the field gets flatter, emptier and
-//  clearer. So Pym's instruments keep reporting that conditions are IMPROVING,
-//  and by his own criteria he is RIGHT. At tier 2 he declares the finest flying
-//  conditions in the history of the meet, from the last standing structure on
-//  the airfield, and every word of it is true.
+//  AND THE JOKE IS WIRED TO THE PLAYER'S OWN PROGRESS, as the old desk's was.
+//  As the child eats, the kingdom empties and the programme gets SHORTER. So
+//  at tier 2 he proclaims the festival running ahead of schedule — the
+//  quickest in the kingdom's history — and by his own scroll he is right.
 //
-//  HE NEVER BREAKS FORMAT. A briefing has a shape — wind, cloud base, notams,
-//  have a good flight — and he reads it to the end every time. The sign-off
-//  writes the everybody-is-fine rule for free: all crews accounted for.
+//  HE NEVER BREAKS FORMAT. Every line opens or closes like a proclamation, and
+//  "Oyez" is allowed. The sign-off writes the everybody-is-fine rule for free:
+//  every visitor is counted into a balloon.
 //
-//  THE RULE ABOUT THE VOID. This desk covers ONE thing: a feature on the field.
-//  Nobody here can know that some OTHER void has a name, so no line refers to a
-//  rival by name; if a line needs a second one it says "a second feature". The
-//  same rule the other five newsrooms carry, for the same reason — the ticker
-//  is diegetic and the leaderboard is not.
+//  THE LAST STOP. This is the last island of the trip and its festival is the
+//  Ringing of the Great Bell, so "the last stop", "the summit" and "every
+//  island on the trip" are in. Nobody the game has not introduced yet is named
+//  here: a ticker that names a character the child has never met is a leak,
+//  the same class as a line naming a rival.
+//
+//  THE RULE ABOUT THE VOID. This desk covers ONE thing: a visitor at the
+//  festival. Nobody here can know that some OTHER void has a name, so no line
+//  refers to a rival by name; if a line needs a second one it says "a second
+//  visitor". The same rule the other five newsrooms carry, for the same reason
+//  — the ticker is diegetic and the leaderboard is not.
 //
 //  TEMPLATES. {M} is the last thing eaten, {D} the district, {P} the percent
 //  devoured, {R} the percent still standing, {F} the player's form, {S} the
-//  seconds left. Every one is real live state, so the briefing is reading the
-//  child's own morning back to them as weather.
+//  seconds left. Every one is real live state, so the Crier is reading the
+//  child's own festival back to them off the programme.
 // ══════════════════════════════════════════════════════════════════════════
 import { mealKind, type MealKind } from './newsroom';
 
@@ -58,360 +66,359 @@ export interface SkylarkCtx {
   devouredPct: number;
   form: string;
   secondsLeft: number;
-  /** accepted and ignored, exactly as the tower ignores them: Pym is reading a
-   *  briefing form and the form has no box for another void's name. Declared so
-   *  the shared call site type-checks; never read. */
+  /** accepted and ignored, exactly as the Crier ignores them: the programme
+   *  has no line for another void's name. Declared so the shared call site
+   *  type-checks; never read. */
   rivalName?: string;
   rivalLead?: number;
-  /** PHASE 0. First light, the crews are rigging, and nothing has arrived. */
+  /** PHASE 0. Festival morning: bunting going up, and nothing has arrived. */
   morning?: boolean;
 }
 
-/** Per-tier badge. The desk does not change — its certainty does not either. */
+/** Per-tier badge. The desk does not change — its ceremony does not either. */
 export const SKYLARK_BRAND: [string, string, string] = [
-  '🎈 THE MET BALLOON',
-  '📋 FIELD BRIEFING',
-  '📻 TOWER, TO ALL CREWS',
+  '🔔 THE BELLCLOUD CRIER',
+  '📜 BY ROYAL PROCLAMATION',
+  '🔔 OYEZ!! OYEZ!!',
 ];
 
 // ── the sign-on ────────────────────────────────────────────────────────────
 // The first thing anybody hears. It has to establish the whole premise in one
-// line: it is barely light, the air is dead calm, and a hundred balloons are
-// about to go up.
+// line: a festival on the clouds, a very big bell, and a man with a scroll.
 const SIGN_ON: string[] = [
-  'Good morning, Skylark Field. Wind calm, cloud base high, we fly.',
-  'Good morning! Surface wind two knots. That is as still as it gets.',
-  'Good morning, crews. The met balloon went straight up and stayed up.',
-  'Good morning, Skylark Field. Ninety-one entries and all of them here.',
-  'Good morning! Sunrise in nineteen minutes. Briefing is on the balcony.',
-  'Good morning, crews. Dew on everything, no wind at all, perfect.',
-  'Good morning, Skylark Field. The sheep are on 09 as usual.',
-  'Good morning! Mr Pym has the tower and the tea urn is on.',
+  'Oyez, oyez! The Festival of the Great Bell is open. Mind the edges.',
+  'Good morning, Bellcloud Heights! Bunting up, balloons in, bell polished.',
+  'Oyez! This is the last stop of the trip, and the best festival of the year.',
+  'Good morning, everybody. The Crier has the programme, and it is long.',
+  'Hear ye, hear ye, the Ringing of the Great Bell is today, at the very end.',
+  'Oyez, oyez, and welcome to the very top of the sky.',
+  'Good morning! Every island on the trip has sent a balloon.',
+  'By order of the programme, the festival begins now, and in order.',
 ];
 
-// ── PHASE 0: the ordinary morning, before anything arrives ────────────────
+// ── PHASE 0: the ordinary festival morning, before anything arrives ───────
 const MORNING: string[] = [
-  'Crews are rigging on the launch field. Four people to a basket.',
-  'Fans running, which is the loudest this field ever gets.',
-  'A trailer has arrived late and been waved to the far end.',
-  'Envelopes are coming out of their bags all down the row.',
-  'Bacon van open, and the queue is already visible from the tower.',
-  'Grete has laid her crown line out to the full thirty metres.',
-  'Somebody has tested a burner. Everybody looked up.',
-  'The sheep have been asked to move. The sheep have not moved.',
-  'Cloud base four thousand and lifting, with nothing in the notams.',
-  'Franz cannot find his gloves. Franz has his gloves.',
-  'Flea market open in hangar two, and tea is thirty pence.',
-  'Windsock hanging straight down, which is the whole point.',
-  'A dog has been round every basket on the field, once, politely.',
-  'Model aircraft club set up, with nothing at all to fly into.',
-  'Passengers are being walked out to their numbers.',
-  'Fire tender polished again. It has still never been used.',
-  'Met balloon away, going straight up, which is ideal.',
-  'Chairman of the meet reminds crews that the far hedge is not ours.',
-  'A gull has taken something from the doughnut trailer.',
-  'First light on the tower glazing, nineteen minutes before sunrise.',
-  'Old Meg the tractor is out. Old Meg is always out.',
-  'Rosette board hung, thirty years of them.',
-  'Crown lines out, mouths open, fans on, and this is the good bit.',
+  'Balloons are docking all along the edge. Every island sent somebody.',
+  'The cloud sheep have been asked to leave the Grand Avenue.',
+  'Master Tolly has polished the Great Bell, and is now polishing it again.',
+  'Cake carts open. The queue already reaches the Rainbow Ring.',
+  'Has anybody seen the bell rope? It was here a minute ago.',
+  'Bunting is going up on every tower in the Castle Yard.',
+  'The Rainbow Ring has been chalked fresh, in all five colours.',
+  'Item one on the programme is to arrive, and everybody has managed it.',
+  'Bell Wardens are counting the little bells, of which there are a great many.',
+  'A balloon from very far away has docked, and everybody waved.',
+  'Cloud buns are out of the oven and the bakers are guarding them.',
+  'Flags up on the Castle Keep, and they are mostly gold.',
+  'Fountains in the Bell Plaza have been switched to sparkly.',
+  'Somebody has hung a small bell on a cloud tree, and it is lovely.',
+  'Item two on the programme: admire the Great Bell. Please queue for admiring.',
+  'A sky kid has asked when the bell rings. At the end, as it always does.',
+  'Banner parade rehearsing in the Castle Yard, very slowly.',
+  'Tea is three pennies at the Cloud Market, as it has always been.',
+  'All the cloud sheep have been counted, and all of them were there.',
+  'Visitors are asked to stay on the clouds and off the edges, please.',
+  'Master Tolly has read the programme aloud once and will read it again.',
+  'Is it windy up here? It is never windy up here.',
+  'Bell posts polished, lanterns lit, bunting straight, and nearly ready.',
 ];
 
 // ── TIER 0 · DOUBT ─────────────────────────────────────────────────────────
-// He notes a large violet feature moving across the field at four knots,
-// observes that it was not forecast, and declares conditions good. No "!".
+// A round violet something is at the festival and it is not on the programme.
+// He does not deny it; he looks it up, fails to find it, and welcomes it
+// anyway, because every visitor is welcome. No "!".
 const T0_GENERAL = [
-  'A large violet feature is crossing the field at about four knots.',
-  'The feature was not forecast. Conditions otherwise remain good.',
-  'Logging a surface obstruction of unusual colour.',
-  'Nothing in this morning\'s notams mentions a violet feature.',
-  'Visibility unlimited, with one obstruction, moving, low.',
-  'Met balloon released again for a second opinion.',
-  'A {F} has been observed on the launch field. Conditions are good.',
-  'The instruments show nothing unusual. The instruments are excellent.',
-  'Wind still calm, the feature not affecting the wind.',
-  'Crews are asked to note a moving obstruction and carry on rigging.',
-  'Round, violet, and about {P} percent of the field wide.',
-  'Cloud base unchanged. Surface wind unchanged. One new item.',
-  'It ate {M}. That is a surface change, not a weather change.',
-  'A new column has been opened on the form for this.',
-  'Is the feature forecast? The desk thinks not.',
-  'Grete reports the feature is nearer than it was. Noted, thank you.',
-  'Conditions at {D} remain suitable for launch.',
-  'Tower has it in sight from here and is not concerned.',
-  'A second met balloon has confirmed the first met balloon.',
-  'It took {M} off the grass without slowing.',
-  'The obstruction has no registration, and the desk has asked twice.',
-  'Nothing has changed except the number of things on the field.',
+  'A small violet visitor has arrived. It is not on the programme.',
+  'Is the {F} a festival float? The Crier is checking the scroll.',
+  'It ate {M}. The Crier has crossed that off the programme.',
+  'The {F} at {D} is now on the programme, in pencil.',
+  'A visitor of an unusual colour has been welcomed to the festival.',
+  'The violet visitor has no ticket, and tickets are free anyway.',
+  'By proclamation, all visitors are welcome, including very round ones.',
+  'Every visitor on the scroll has a name, and this one has none.',
+  'Something round and violet is admiring the cloud trees up close.',
+  'One violet visitor has been added to the programme, in small letters.',
+  'It took {M} and the Crier has written that down, neatly.',
+  'The visitor is about {P} percent of the kingdom wide. Welcome, visitor.',
+  'Everything is ready for the Ringing, with one extra guest.',
+  'Nothing on the programme mentions a visitor that eats the programme.',
+  'Is it part of the festival? The scroll does not say that it is not.',
+  'A Bell Warden reports the visitor is nearer than it was. Noted.',
+  'Festivities continue at {D}, with the visitor in attendance.',
+  'Oyez. A visitor is tasting a little of everything, which is allowed.',
+  'The cake carts report a very round customer with no pennies.',
+  'Master Tolly rang his bell at it, politely. It ate {M}.',
+  'One visitor, violet and hungry, not yet proclaimed anything at all.',
+  'The programme is exactly as long as it was this morning. Mostly.',
 ];
 
 // ── TIER 1 · ALARM ─────────────────────────────────────────────────────────
-// He believes it now, and it changes nothing, because his criteria have not
-// changed. The theory stops and the advice starts, in the same voice. One "!".
+// He proclaims it part of the festival, and from then on everything it eats is
+// simply "gone up early". The festival is running ahead of schedule. One "!".
 const T1_GENERAL = [
-  'Feature confirmed, and the launch window is extended.',
-  'Crews are asked to keep it on their left and continue.',
-  'It has taken {M}. The desk has amended the plate.',
-  'Revised: the obstruction is mobile, growing, and still not forecast.',
-  'Conditions remain within limits that do not mention this.',
-  'Now {P} percent of the field. Wind still calm.',
-  'Launch is delayed for those affected. That is most of you.',
-  'Mr Pym asks crews to rig away from it. Rig away from it, please.',
-  'No further entries are being taken for this morning.',
-  'How large is the {F} now? Larger than the last reading.',
-  'It ate {M} and the desk has crossed it off the entry list.',
-  'Far end of {D} is no longer available for launch.',
-  'Everything is still legal. Everything is still calm. Please rig.',
-  'Met balloon went up and did not come down anywhere.',
-  'Crews on the north row: bring your kit in, not out.',
-  'The obstruction is between the tower and the whale. Noted.',
-  'Recording the feature every four minutes from now.',
-  'Franz has moved his basket twice. Franz is asked to move it again.',
-  'Amended the plate for the third time this hour!',
-  'Conditions are, on the desk\'s own criteria, improving.',
-  'It took {M}. The field is flatter than it was, which helps.',
-  'Passengers are asked to stay with their crews for now.',
+  'By royal proclamation, the {F} is now part of the festival!',
+  'The festival is running ahead of schedule! Well ahead.',
+  'It took {M} from {D}. Gone up early!',
+  'Oyez! {P} percent of the kingdom has been proclaimed finished.',
+  'The {F} is now a festival float, and it floats beautifully.',
+  'Items four to nine on the programme have all gone up early.',
+  'Master Tolly is crossing things off faster than he can read them.',
+  'How big is the {F} now? Bigger than the last proclamation said.',
+  'It ate {M}, which was on the programme for this afternoon.',
+  'Everything it eats is now listed as gone up early, which is tidy.',
+  'Visitors are asked to make room for the float, and then more room.',
+  'The scroll is getting shorter, which the Crier calls efficient!',
+  'Master Tolly has proclaimed the float very welcome, and a bit big.',
+  'Balloons are filling at the dock, in good time and in good order.',
+  'Bell Wardens are walking everybody to the balloons, one ring each.',
+  'It took {M}. The programme is amended, in gold ink.',
+  'Far end of {D} is now proclaimed complete.',
+  'Banner parade moved up the programme, and then off the end of it.',
+  'Nobody has ever seen a festival go this quickly, and the scroll agrees.',
+  'At {P} percent of the kingdom, the float is still very welcome.',
+  'Please keep the float on your left and a balloon on your right!',
+  'All little bells are to be rung early, by order, just in case.',
 ];
 
 // ── TIER 2 · PANIC, WHICH IS NOT PANIC ─────────────────────────────────────
-// Broadcasting from the balcony, the last standing thing on the airfield, he
-// declares the finest flying conditions in the history of the meet — and by his
-// own criteria he is right. "!!" or nothing, never a lone "!".
+// From the Keep balcony, the last tower on the island, he proclaims the
+// quickest festival in the kingdom's history — and by his own scroll he is
+// right. Everybody is in a balloon. "!!" or nothing, never a lone "!".
 const T2_GENERAL = [
-  'Visibility unlimited in all directions!! Nothing is in the way.',
-  'The desk reports the finest flying conditions in the meet\'s history.',
-  'Every obstruction has been removed from the field, every one.',
-  '{R} percent of the field remains and all of it is clear.',
-  'Conditions are perfect!! There is nothing left to fly around.',
-  'Plate is now a blank sheet, which is technically ideal.',
-  '{S} seconds of the window remain!! Crews to the high ground.',
-  'It ate {M}!! The obstruction count is falling rapidly.',
-  'All crews to the far hedge, please. Bring nothing. Bring people.',
-  'Only the tower is left on the plate, and the desk is in it.',
-  'The met balloon has nowhere left to be released from.',
-  'This is the tower. Everybody who is up is up. Everybody else, walk.',
-  '{P} percent of Skylark Field has been cleared for takeoff!!',
-  'Out of columns, and now using the back of the form.',
-  'Wind calm. Cloud base high. Field: gone. Have a good flight.',
-  'Nothing is obstructing anything!! The desk wishes to note that.',
-  '{S} seconds!! Do not go back for a basket. Go to the hedge.',
-  'Whale is airborne, and so is nearly everybody else.',
-  'The last of {D} has gone, logged as excellent conditions.',
-  'Everyone is accounted for and most of them are above us.',
+  'The festival has never finished this quickly!! A record for the scroll.',
+  '{R} percent of the kingdom remains, and all of it is very tidy.',
+  'It ate {M}!! One item left on the programme: the Bell.',
+  '{S} seconds!! Everybody into a balloon. Bring nothing but a smile.',
+  'Only the Great Bell is left on the scroll, and Master Tolly is near it.',
+  'The whole programme has gone up early!! Everybody is in a balloon.',
+  'The Crier proclaims the kingdom finished, and a little bit eaten.',
+  'Oyez, oyez!! The festival is ahead of schedule by a whole afternoon.',
+  'All balloons are up, and everybody in them is waving.',
+  '{S} seconds of festival remain!! The Crier is reading very fast.',
+  'The scroll is one line long now, and the Crier is proud of it.',
+  'Every cottage on the island has gone up early, every single one.',
+  'By proclamation, the float is now the festival. Congratulations, float.',
+  '{P} percent of Bellcloud Heights is finished!! The quickest year ever.',
+  'Bell Wardens have counted everybody into the balloons, twice.',
+  'Nothing left to cross off but the ink!! The Crier is delighted.',
+  '{S} seconds!! Please do not go back for your hat, even the cloud one.',
+  'The programme allowed all day for this, and it has not needed all day.',
+  'Everyone is safe in a balloon and most of them are cheering.',
+  'The last of {D} has gone up early, well ahead of schedule.',
 ];
 
 // ── the districts ──────────────────────────────────────────────────────────
 const T0_BY_DIST: Record<SkDist, string[]> = {
   launchfield: [
-    'Rigging continues on the launch field. Ninety envelopes, all out.',
-    'Launch field reports one violet item among the balloons.',
-    'Crews on the launch field are asked to keep their lines short.',
+    'The Cloud Gardens are in full bloom, and one bloom is violet and moving.',
+    'Gardeners report a round visitor sniffing the cloud trees.',
+    'Cottages in the Cloud Gardens have their best curtains up today.',
   ],
   arrivals: [
-    'A trailer in the arrivals field has been asked to reposition.',
-    'Arrivals is full, and the desk is turning nobody away.',
-    'Envelopes are still coming out of bags down at arrivals.',
+    'The Balloon Dock is full. One visitor arrived without a balloon.',
+    'Basket carts at the dock are being unloaded in the usual order.',
+    'Dock guides are welcoming every visitor, including the violet one.',
   ],
   runway: [
-    'Runway clear except for the sheep and one other item.',
-    'Zero-nine is unobstructed apart from a moving violet feature.',
-    'Centreline visible for its whole length. Mostly.',
+    'The Grand Avenue is clear, except for the cloud sheep and a visitor.',
+    'Lanterns on the Grand Avenue are lit all the way to the Bell.',
+    'Is anybody moving the cloud sheep off the avenue? Nobody is.',
   ],
   circle: [
-    'Whale is laid out on the launch circle and is enormous.',
-    'The launch circle is reserved for the whale and remains so.',
-    'Ground crew are walking the whale\'s seams as they do every year.',
+    'The Great Bell hangs in its arch, polished twice and gleaming.',
+    'The Bell Plaza is reserved for the Ringing, and for admiring.',
+    'Bell Wardens are walking the plaza, checking the rope is still a rope.',
   ],
   perimeter: [
-    'Marshals on the perimeter report a violet item passing post four.',
-    'Perimeter track is open to marshals and to nobody else.',
-    'Post six has called in something round. Thank you, post six.',
+    'The Rainbow Ring has five colours today, and one visitor of a sixth.',
+    'Pennants on the Rainbow Ring are all flying the right way up.',
+    'Somebody has redrawn the Rainbow Ring. Nobody saw who.',
   ],
   tower: [
-    'Tower has the feature in sight and is entirely comfortable.',
-    'Met hut confirms the instruments are working perfectly.',
-    'Briefing continues on the balcony. All are welcome.',
+    'The Castle Keep has the visitor in sight and has waved.',
+    'Master Tolly is on the Keep balcony with the scroll, reading.',
+    'The Keep is ready to ring in the next proclamation.',
   ],
   hangars: [
-    'Flea market in hangar two reports brisk trade.',
-    'Hangar one has closed its door, which it has not done in years.',
-    'The model aircraft club is watching something and not flying.',
+    'The craft market in the Castle Yard reports brisk trade.',
+    'Both gatehouses in the Castle Yard are open, as every festival.',
+    'A visitor has admired the banners in the Castle Yard very closely.',
   ],
   breakfast: [
-    'Breakfast Row is serving. The queue has not shortened.',
-    'Bacon van reports a large violet customer. It did not order.',
-    'Two hundred people are eating and one of them is not.',
+    'The Cloud Market is serving. The queue has not got shorter.',
+    'A cake cart reports a very round customer. Cake is free today.',
+    'Everybody at the Cloud Market is eating cake, and one visitor more.',
   ],
   meadow: [
-    'The rough is quiet. Skylarks up, hare out, fence still broken.',
-    'Nothing to report from the far side of the field. Nothing at all.',
-    'Old windsock mast is still lying where it fell.',
+    'The Cloud Meadows are quiet. Skylarks up, bunnies out, all well.',
+    'Nothing to proclaim from the far meadows. Nothing at all.',
+    'The old columns in the meadows are still, as ever, broken.',
   ],
 };
 
 const T1_BY_DIST: Record<SkDist, string[]> = {
   launchfield: [
-    'Launch field has lost its north row. The rest are rigging.',
-    'Crews on the launch field: leave the kit and walk, please.',
-    'Half the envelopes on the field are now on the wrong side of it.',
+    'The Cloud Gardens have lost a lane of cottages. They went up early.',
+    'Gardeners are asked to leave the watering cans and walk to the dock.',
+    'Half the cloud trees in the gardens are now down as gone up early.',
   ],
   arrivals: [
-    'Arrivals is closed. Everything in it has been accounted for.',
-    'Trailers at arrivals are empty, and the desk is glad of it.',
-    'Nobody else is coming in. The gate has been left open anyway.',
+    'The Balloon Dock is filling up fast, and nobody is pushing!',
+    'Balloons are filling at the dock. Everybody gets a basket.',
+    'Nobody else is docking today. The dock is only for leaving now.',
   ],
   runway: [
-    'Zero-nine is obstructed. The sheep have finally moved.',
-    'Runway is no longer available for anything.',
-    'Both thresholds of one-five have gone. That is unusual.',
+    'The Grand Avenue is now very grand and has nothing on it.',
+    'The cloud sheep have finally moved off the avenue. Oyez!',
+    'Lanterns on the Grand Avenue have gone up early, in a neat row.',
   ],
   circle: [
-    'The whale is inflating. The desk advises crews to stand clear!',
-    'Tether pins are being pulled on the launch circle.',
-    'The whale is standing up and everybody has stopped to look.',
+    'Nobody is to touch the Great Bell before the Ringing. Nobody!',
+    'Bell Wardens are standing very close to the Great Bell today.',
+    'Both plaza fountains have gone up early. The Bell remains.',
   ],
   perimeter: [
-    'Marshals are walking the perimeter inward, which is new.',
-    'Posts four through eight are no longer answering.',
-    'Shortest way to the hedge is the perimeter track. Use it.',
+    'The Rainbow Ring is the quickest way to the dock. Use all five colours.',
+    'Pennants on the ring are going up early, one colour at a time.',
+    'Walkers on the Rainbow Ring are asked to keep moving, cheerfully!',
   ],
   tower: [
-    'Tower is still broadcasting and intends to keep doing so.',
-    'Met hut has been logged as a former structure.',
-    'Mr Pym is on the balcony and will not be coming down yet.',
+    'The Castle Keep is still proclaiming and intends to keep doing so.',
+    'A turret beside the Keep has been proclaimed gone up early.',
+    'Master Tolly is on the balcony and will not be coming down yet.',
   ],
   hangars: [
-    'Hangar two has gone and the flea market with it. Nobody was in it.',
-    'The tractors have been moved. The tractors moved themselves.',
-    'Rosette board is safe. Somebody carried it out.',
+    'The craft market in the Castle Yard has packed up for the dock.',
+    'A gatehouse has gone up early. Nobody was in it, which was sensible.',
+    'The banners in the Castle Yard are safe! Somebody carried them out.',
   ],
   breakfast: [
-    'Breakfast Row is serving from the far end only.',
-    'Coffee horsebox towed to the hedge, still serving.',
-    'The bacon van has gone. The bacon van fed everybody first.',
+    'The Cloud Market is serving from the far end only.',
+    'A cake cart has been towed to the dock, still serving.',
+    'The last cake cart has gone, but everybody was fed first.',
   ],
   meadow: [
-    'Everybody is walking through the rough. Keep walking.',
-    'That hare went the same way an hour ago and had the right idea.',
-    'Skylarks are up. That is the last normal thing on the field.',
+    'Everybody in the Cloud Meadows is walking to the balloons. Keep walking.',
+    'The cloud bunnies went the same way an hour ago, and had the right idea.',
+    'Skylarks are up and singing, the most ordinary thing on the island.',
   ],
 };
 
 const T2_BY_DIST: Record<SkDist, string[]> = {
   launchfield: [
-    'The launch field is clear!! There is nothing left on it.',
-    'Everything that was on the launch field is above the launch field.',
-    'Ninety envelopes, ninety crews, and not one of them still here.',
+    'The Cloud Gardens are finished!! Every cottage has gone up early.',
+    'Everything that was in the gardens is now far above the gardens.',
+    'Ninety garden plots, ninety gardeners, and all of them in balloons.',
   ],
   arrivals: [
-    'Arrivals has gone. Nobody was in arrivals. That was the plan.',
-    'A gate is standing in a field with no field behind it!!',
-    'Ticket caravan has gone, and it never did take any money.',
+    'The Balloon Dock is empty because every balloon is up!! Well done.',
+    'A dock is standing on a cloud with nothing left to dock.',
+    'The ticket wagon has gone up early. It never did charge anybody.',
   ],
   runway: [
-    'All three runways are unobstructed!! There are no runways.',
-    'Zero-nine has gone. The sheep are up on the hedge, counted.',
-    'Concrete is confirmed as no longer a factor.',
+    'The Grand Avenue is clear all the way to the Bell!! Nothing else is.',
+    'The cloud sheep are in a balloon of their own, all counted.',
+    'The avenue is proclaimed finished, lanterns and all.',
   ],
   circle: [
-    'The whale is going!! The whole field is going up with her.',
-    'Launch circle is empty and the whale is over the hedge.',
-    'She lifted at {S} seconds and took the last of the pins with her.',
+    'The Great Bell is the last thing on the scroll!! Hold your ears.',
+    'Only the Bell stands in the Bell Plaza now, shining.',
+    'Bell Wardens have left the plaza with {S} seconds to spare.',
   ],
   perimeter: [
-    'Perimeter is gone, and the marshals are at the hedge, counted.',
-    'All posts accounted for!! Every wand, every marshal, every one.',
-    'Track went last, which is fitting, since it drew the outline.',
+    'The Rainbow Ring has gone up early, all five colours of it!!',
+    'All pennants accounted for!! Every flag, every Warden, every one.',
+    'The ring went last, which is fitting, since it drew the outline.',
   ],
   tower: [
-    'The tower is the last item on the plate!! The desk is still in it.',
-    'This is the tower. This is the tower. Everyone is up or out.',
-    'Mr Pym has read the whole briefing including the forecast.',
+    'The Keep is the last tower on the scroll!! The Crier is still in it.',
+    'This is the Keep. Everybody is up, or on their way up.',
+    'Master Tolly has read the whole programme, including the thank-yous.',
   ],
   hangars: [
-    'The hangars have gone!! The rosettes are on the hedge, all of them.',
-    'Both sheds are clear and were clear before they went.',
-    'Somebody saved thirty years of rosettes and the desk is moved.',
+    'The Castle Yard has gone up early!! The banners are in a balloon.',
+    'Both gatehouses are finished, and both were empty when they went.',
+    'Somebody saved every banner in the Castle Yard, and the Crier is moved.',
   ],
   breakfast: [
-    'Breakfast Row has gone and everybody had eaten. Everybody.',
-    'The last cup of tea on Skylark Field was poured on the hedge!!',
-    'Urn is up the hill with the crowd, still warm.',
+    'The Cloud Market has gone up early, and everybody had eaten. Everybody.',
+    'The last cloud bun on Bellcloud Heights went up in a balloon!!',
+    'The tea urn is in a balloon with the bakers, still warm.',
   ],
   meadow: [
-    'Rough has gone, and everybody who was in it is on the hedge.',
-    'The skylarks went up first!! They always did know best.',
-    'The hare is fine. Somebody checked. Somebody actually checked.',
+    'The meadows have gone, and everybody who was in them is in a balloon.',
+    'The skylarks went up first!! They always do know best.',
+    'The cloud bunnies are fine. Somebody checked. Somebody actually checked.',
   ],
 };
 
 // ── WHAT IT JUST ATE ──────────────────────────────────────────────────────
-// ctx.lastMeal is free text from the call site and never names a balloon: the
-// game tags HOUSE and CAR and sizes the rest, so four buckets is the whole
-// vocabulary. The classifier is the Bugle's, imported rather than copied.
-// The desk's angle on all four: it is an obstruction, it has been removed, and
-// removal is an improvement.
+// ctx.lastMeal is free text from the call site: the game tags HOUSE and CAR and
+// sizes the rest, so four buckets is the whole vocabulary. The classifier is
+// the Bugle's, imported rather than copied. The Crier's angle on all four: it
+// was on the programme, it has gone up early, and that is ahead of schedule.
 const MEAL_HOUSE: Pools = [[
-  'A structure has been removed from the field. Conditions improve.',
-  'One building struck off the plate.',
-  '{M} has gone, and the sightline is better for it.',
-  'One less thing to fly around, which is the desk\'s whole job.',
+  'A cloud cottage has been proclaimed a holiday home, elsewhere.',
+  'One cottage has gone up early, and the programme is amended.',
+  '{M} has gone, and the view of the Bell is better for it.',
+  'Is a cottage allowed to leave during the festival? Apparently so.',
 ], [
-  'Another structure has gone. The plate is getting simpler!',
-  'Building count amended. Downward.',
-  'It ate {M}. Obstruction removed. Conditions improving.',
-  'That was a shed. The desk logged it as a shed and now logs nothing.',
+  'Another cottage has gone up early. The scroll is getting simpler!',
+  'Cottage count amended, downward.',
+  'It ate {M}. Proclaimed finished, with thanks.',
+  'That was a market stall, and the Crier has crossed it off in gold ink.',
 ], [
-  'Every structure on the field is now clear!! Every single one.',
-  'Building count is zero, which the desk finds remarkable.',
-  'It ate {M}!! Nothing tall remains except this tower.',
+  'Every cottage on the island has gone up early!! Every single one.',
+  'Cottage count is zero, which the Crier finds remarkable.',
+  'It ate {M}!! Nothing with a roof remains but the Keep.',
 ]];
 
 const MEAL_CAR: Pools = [[
-  'A vehicle has been removed from the grass. Noted, thank you.',
-  'One trailer fewer at arrivals. The desk was not using it.',
-  '{M} has gone from the verge. The verge is clearer.',
-  'One vehicle removed, and no injuries.',
+  'A cart has left the Balloon Dock. Noted, with thanks.',
+  'One basket cart fewer at the dock, and it was empty.',
+  '{M} has gone from the dock, and the dock is roomier.',
+  'One cart removed, and everybody is fine.',
 ], [
-  'Another vehicle has gone. The spectator band is thinning nicely.',
-  'It took {M}. The desk has stopped counting the vehicles.',
-  'Old Meg is fine. Old Meg is always fine.',
-  'Retrieve crews have nothing to retrieve with!',
+  'Another cart has gone up early. The dock is very roomy now.',
+  'It took {M}. The Crier has stopped counting carts.',
+  'The cake carts are fine, because the cake carts are in a balloon.',
+  'The ticket wagon has nothing left to carry!',
 ], [
-  'All vehicles are clear of the field!! The desk confirms it.',
+  'All carts are proclaimed finished!! The Crier confirms it.',
   'It ate {M}!! Nobody was in it. Nobody has been in anything.',
-  'Car park is a field again, and then it is not a field.',
+  'The dock is a cloud again, and then it is not even that.',
 ]];
 
 const MEAL_BIG: Pools = [[
-  'A large item has been removed. Sightlines materially improved.',
-  '{M} has gone and the desk can now see the far hedge.',
-  'Biggest obstruction on the plate has been struck off.',
-  'One large item removed. The desk considers that progress.',
+  'A large item has gone up early, and the view is much improved.',
+  '{M} has gone and the Crier can now see the far edge.',
+  'The biggest item on the programme has been crossed off.',
+  'One large item removed, which the Crier considers progress.',
 ], [
-  'It ate {M}. That was the largest thing on the field!',
-  'Lost the main reference point. Conditions good.',
-  'Something very large has gone. The instruments did not flinch.',
-  'Plate is down to small items, which is an improvement.',
+  'It ate {M}. That was one of the biggest things up here!',
+  'A whole turret has gone up early, and the flag went with it.',
+  'Something very large has gone. The Crier did not drop his bell.',
+  'The programme is down to small items, which is an improvement.',
 ], [
-  'The largest items are all clear!! Visibility is now total.',
-  'It ate {M}!! The desk has never had a cleaner field.',
-  'Nothing large remains. Nothing medium remains either.',
+  'The largest items are all finished!! The view is now total.',
+  'It ate {M}!! The Crier has never had a tidier kingdom.',
+  'Nothing large remains, and nothing medium remains either.',
 ]];
 
 const MEAL_SMALL: Pools = [[
-  'A small item has left the inventory. The desk has noted it.',
-  'It took {M}. The desk is recording these individually.',
-  'Something small has gone from {D}. Conditions unchanged.',
-  'Minor removal logged, and no change to the wind.',
+  'A small item has left the programme. The Crier has noted it.',
+  'It took {M}. The Crier is proclaiming these one at a time.',
+  'Something small has gone from {D}, and the festival carries on.',
+  'A little thing went up early, and nobody minded.',
 ], [
-  'Another small item. The desk has started a second column!',
-  'It ate {M}. The list is getting shorter rather than longer.',
-  'Small items are going faster than the desk can write.',
-  'Grete has stopped reporting them. The desk understands.',
+  'Another small item. The Crier has started a second scroll!',
+  'It ate {M}, and the list gets shorter, not longer.',
+  'Small items are going faster than the Crier can proclaim them.',
+  'The Bell Wardens have stopped reporting them. The Crier understands.',
 ], [
-  'The small items are all gone!! There is nothing to itemise.',
-  'It ate {M}!! The desk has closed the inventory entirely.',
-  'Every item on the form has been struck through.',
+  'The small items are all gone!! There is nothing left to list.',
+  'It ate {M}!! The Crier has rolled up the second scroll.',
+  'Every item on the programme has been crossed through.',
 ]];
 
 const BY_MEAL: Record<MealKind, Pools> = {
@@ -423,55 +430,56 @@ const BY_MEAL: Record<MealKind, Pools> = {
 //  Those SIX and no others. Never open a line with {D} or {M}: both arrive
 //  lower case and a sentence starts with a capital.
 const LIVE: Pools = [[
-  'The {F} at {D} is logged as a surface obstruction.',
-  'A {F} is on the field and has not filed a flight plan.',
-  'Calling it a {F}, and the desk does not enjoy the word.',
-  'Conditions at {D}: calm, clear, one {F}.',
-  'A {F} is moving at walking pace and is not forecast.',
-  '{P} percent of the field is now feature. Wind still calm.',
-  'A {F} has been offered a briefing and did not attend.',
-  'The met balloon and the {F} are both violet. Unrelated.',
-  'Passengers at {D} are asked not to approach the {F}.',
-  'No registration and no slot have been assigned to the {F}.',
-  'Grete says the {F} is nearer. Grete has said that four times.',
+  'The {F} at {D} is proclaimed a festival visitor.',
+  'A {F} is at the festival and was not on the guest list.',
+  'Calling it a {F}, and the Crier likes the word.',
+  'At {D}: bunting, cake, and one {F}.',
+  'A {F} is moving at walking pace and is not on the programme.',
+  'About {P} percent of the kingdom has now met the {F}.',
+  'A {F} has been offered a programme and ate the programme.',
+  'The {F} and the Great Bell have both drawn a crowd today.',
+  'Visitors at {D} are asked to let the {F} through.',
+  'No ticket has been issued to the {F}, and none was needed.',
+  'Is the {F} enjoying the festival? It seems to be.',
 ], [
-  'The {F} at {D} is larger than at the last reading.',
-  'It ate {M}. The desk has amended the plate accordingly.',
-  'The {F} is now {P} percent of Skylark Field.',
-  'Crews are asked to keep the {F} on their left!',
-  'Measured the {F} this morning and the tape ran out.',
-  'Conditions at {D} are, by the desk\'s own criteria, improving.',
-  '{R} percent of the field is still available for launch.',
-  'A {F} has not requested clearance and has not needed it.',
-  'It took {M} from {D} without slowing.',
-  'Logging the {F} every four minutes now.',
-  'Mr Pym has revised the entry list down to those who are up.',
+  'The {F} at {D} is bigger than last proclaimed.',
+  'It ate {M}. The programme has been amended accordingly.',
+  'The {F} is now {P} percent of Bellcloud Heights.',
+  'Please keep the {F} on your left and the Bell on your right!',
+  'Master Tolly measured the {F} this morning and the ribbon ran out.',
+  'All of {D} is, by the Crier\'s scroll, ahead of schedule.',
+  '{R} percent of the kingdom is still on the programme.',
+  'A {F} has not asked to join the parade and has joined it anyway.',
+  'It took {M} from {D} and did not slow down.',
+  'Proclaiming the {F} every four minutes now.',
+  'Master Tolly has moved the Ringing up the programme, just in case.',
 ], [
-  'The {F} is {P} percent of the field!! Visibility unlimited.',
-  '{S} seconds of the window remain!! Everybody to the hedge.',
-  'It ate {M}!! The plate is nearly a blank sheet.',
-  'The {F} has cleared {D} entirely.',
-  '{R} percent remains and the desk is standing on most of it.',
-  'A {F} the size of the field is, technically, the field.',
-  '{S} seconds!! Walk. Do not carry anything. Walk.',
-  'The desk logs the {F} as terrain and closes the column.',
-  'It has taken {D}!! Nothing there is obstructing anything now.',
+  'The {F} is {P} percent of the kingdom!! A festival record.',
+  '{S} seconds of festival remain!! Everybody to the balloons.',
+  'It ate {M}!! The programme is nearly a blank scroll.',
+  'The {F} has finished {D} entirely.',
+  '{R} percent remains and the Crier is standing on most of it.',
+  'A {F} the size of the festival is, by proclamation, the festival.',
+  '{S} seconds!! Walk to a balloon. Do not carry anything. Walk.',
+  'The Crier proclaims the {F} scenery and rolls up the scroll.',
+  'It has taken {D}!! Everything there has gone up early.',
 ]];
 
 // ── the sign-off ───────────────────────────────────────────────────────────
-// ONCE, AND LAST. He finishes the briefing, including the forecast, because he
-// always does — and the everybody-is-fine rule writes itself.
+// ONCE, AND LAST. He reads the programme to the end, including the thank-yous,
+// because he always does — and the everybody-is-fine rule writes itself. No
+// line here claims the Great Bell has gone: this airs whether or not she ate it.
 const SIGN_OFF: string[] = [
-  'All crews accounted for. Ninety-one balloons airborne. A record.',
-  'That is the briefing. Wind calm, cloud base high, have a good flight.',
-  'Every entry is up, over the hedge, or walking. Nobody is missing.',
-  'Meet is closed. The committee wishes to note the attendance.',
-  'Tomorrow: light winds, high cloud, and no field at all. Goodnight.',
-  'Thanks to the marshals, who counted everybody. Twice.',
-  'Skylark Field flew ninety-one this morning, which has never happened.',
-  'Mr Pym has read the forecast to the end. He always does.',
-  'The sheep are on the hedge. The sheep are, as ever, unbothered.',
-  'Good morning, and thank you. Conditions were perfect throughout.',
+  'That was the last stop. Everybody back in the balloons, please.',
+  'Oyez, oyez. The festival is over, and it was the best one yet.',
+  'The Crier proclaims the festival finished. It finished itself first.',
+  'All visitors accounted for. Every balloon up. A record.',
+  'That is the programme, and thank you all for coming!',
+  'Every visitor is up, away, or waving, and nobody is missing.',
+  'The festival is closed, and the Crier wishes to note the attendance.',
+  'Next year: the same festival, and possibly a new bell. Goodnight.',
+  'Thanks to the Bell Wardens, who counted everybody. Twice.',
+  'Master Tolly has read the programme to the very end, as he always does.',
 ];
 
 // ── the pools, per tier ────────────────────────────────────────────────────
@@ -480,7 +488,7 @@ const BY_DIST: [Record<SkDist, string[]>, Record<SkDist, string[]>, Record<SkDis
   [T0_BY_DIST, T1_BY_DIST, T2_BY_DIST];
 
 let signedOn = false;
-let signedOff = false;   // the tower has finished the briefing; it does not restart
+let signedOff = false;   // the Crier has finished the programme; it does not restart
 /** How many headlines back the ticker remembers. Fourteen, as the other five
  *  newsrooms settled on after qa/newsfeed.mjs caught a world repeating itself
  *  inside one 26-card match. */
@@ -541,11 +549,15 @@ function air(line: string): string {
   return out;
 }
 
+/** What a child reads for each skRegionAt id. The ids are the airfield's and
+ *  stay (they key the crowd's dress codes and the sticker biomes); the names
+ *  are the kingdom's. The longest, "the Cloud Meadows" and "the Cloud
+ *  Gardens" at 17, is what qa/newsstyle.mjs fills {D} with at worst case. */
 const DIST_NAME: Record<SkDist, string> = {
-  circle: 'the launch circle', runway: 'the runway', perimeter: 'the perimeter',
-  launchfield: 'the launch field', arrivals: 'the arrivals field',
-  tower: 'the tower', hangars: 'the hangars', breakfast: 'Breakfast Row',
-  meadow: 'the rough',
+  circle: 'the Bell Plaza', runway: 'the Grand Avenue', perimeter: 'the Rainbow Ring',
+  launchfield: 'the Cloud Gardens', arrivals: 'the Balloon Dock',
+  tower: 'the Castle Keep', hangars: 'the Castle Yard', breakfast: 'the Cloud Market',
+  meadow: 'the Cloud Meadows',
 };
 
 function fill(t: string, c: SkylarkCtx): string {
@@ -567,15 +579,15 @@ const usable = (t: string, c: SkylarkCtx): boolean =>
 
 /** One headline. The sign-on is guaranteed first; after that it is a weighted
  *  pick across four pools — the district's own lines, what the void just ate,
- *  the live templated lines, and the general briefing — biased toward the part
- *  of the field the child is standing on, which is the whole reason this file
- *  is per-district. */
+ *  the live templated lines, and the general programme — biased toward the
+ *  part of the kingdom the child is standing in, which is the whole reason
+ *  this file is per-district. */
 export function pickSkylarkNews(ctx: SkylarkCtx, rnd: () => number = Math.random): string {
   if (!signedOn) {
     signedOn = true;
     return air(SIGN_ON[Math.floor(rnd() * SIGN_ON.length)]);
   }
-  // PHASE 0. First light, crews rigging, no feature, no live state, no tokens.
+  // PHASE 0. Festival morning, bunting going up, no visitor, no live state, no tokens.
   if (ctx.morning) {
     const fresh = MORNING.filter((l) => !recent.includes(l));
     let src = fresh.length ? fresh : MORNING;
@@ -588,8 +600,8 @@ export function pickSkylarkNews(ctx: SkylarkCtx, rnd: () => number = Math.random
   }
   const tier = Math.max(0, Math.min(2, ctx.tier)) as NewsTier;
   // ONCE, AND LAST. Tier 2 can arrive with most of the match still to run, far
-  // too early to finish a briefing, so the sign-off waits for the endgame and
-  // taking it closes the tower for the match.
+  // too early to finish the programme, so the sign-off waits for the endgame
+  // and taking it closes the Crier's scroll for the match.
   if (tier === 2 && !signedOff && ctx.secondsLeft <= 26 && rnd() < 0.45) {
     signedOff = true;
     return air(SIGN_OFF[Math.floor(rnd() * SIGN_OFF.length)]);
@@ -646,197 +658,203 @@ export function pickSkylarkNews(ctx: SkylarkCtx, rnd: () => number = Math.random
 //  pym, kid. A driver talks like crew and a photographer like a tourist, so
 //  neither has a key of its own. Same shape as MAPLE_VOICE_* and GAMEDAY_
 //  VOICE_*, selected per world in createLife and never merged into the module
-//  tables — before these existed the whole field fell through to Maple's pools
+//  tables — before these existed the whole world fell through to Maple's pools
 //  and a balloon crew at first light said "bin day tomorrow!".
 //
-//  AMBIENT is the ordinary morning: cold feet, a queue, a thing about to leave
-//  the ground. PANIC is the void arriving, "!!" like every other world's
-//  screams. Nothing here that a 4+ rating would flag: no drink, nobody hurt,
-//  everybody makes the hedge. A bubble is one line on a phone, so nothing
-//  gets to be a sentence and a half.
+//  The keys are the airfield's roles and they stay (qa/jobs.mjs and
+//  qa/purpose.mjs are green on them); who wears each one is the kingdom's
+//  (docs/BELLCLOUD.md §7.2): 'marshal' is a Bell Warden, 'pym' is Master
+//  Tolly the Town Crier, 'tea' a baker, 'van' a cart keeper, 'spectator' the
+//  Heights folk with their wings and cloud hats.
+//
+//  AMBIENT is the ordinary festival: a queue, a bun, a bell that has not rung
+//  yet. PANIC is the void arriving, "!!" like every other world's screams.
+//  Nothing here that a 4+ rating would flag: no drink, nobody hurt, everybody
+//  gets to a balloon. A bubble is one line on a phone, so nothing gets to be a
+//  sentence and a half.
 export const SKYLARK_VOICE_AMBIENT: Record<string, string[]> = {
-  // four to a basket, and every one of them has done this since they were nine
+  // the balloon crews who flew the visitors in, four to a basket
   crew: [
-    'hold it — hold it — GO', 'crown line! who has the crown line?',
-    'fan on. mind your feet.', 'four to a basket, always four',
-    'she is standing up nicely', 'that is the last of the pegs',
-    'burner check. everybody back.', 'mouth open — keep it open',
-    'tail line to me, please', 'wet grass, dry envelope, good',
-    'we rigged her in eleven minutes', 'north row is nearly up',
+    'hold the basket. hold it. good.', 'four to a basket, always four',
+    'mind the mooring line, please', 'she docked like a feather',
+    'tie her off to the gold post', 'we flew in from the far islands',
+    'burner check. everybody back.', 'last island of the trip. the best one.',
+    'clouds are softer than grass, landing', 'north row is nearly docked',
+    'we came all this way for the BONG', 'dry cloud, dry envelope, good',
   ],
-  // clipboard, leather jacket, thirty years, still nervous before every lift
+  // the pilots: thirty years of islands and still nervous before every lift
   pilot: [
-    'wind calm. cloud base high.', 'I have never seen it this still',
-    'briefing said 030 and I believe it', 'passengers to their numbers',
-    'thirty years and still nervous', 'one more burner test, then we go',
-    'we lift when the tower says', 'do not step on the crown line',
-    'the sheep are on the runway again', 'my envelope is older than you',
+    'wind calm. sky high. we are here.', 'never landed on a cloud this soft',
+    'passengers, mind the edge', 'thirty years and still amazed',
+    'we lift when the bell has rung', 'do not step on the mooring line',
+    'the sheep are on the avenue again', 'my envelope is older than you',
+    'best view on the whole trip', 'last stop. everybody out for cake.',
   ],
-  // hi-vis, a paddle, a numbered post, and the whole field behind a rope
+  // the Bell Wardens: royal blue, a gold sash, and a rope nobody may pull
   marshal: [
-    'keep behind the rope, please', 'post four to tower. all quiet.',
-    'behind the rope. thank you.', 'not there. THERE. thank you.',
-    'post six has a dog. again.', 'twenty-two posts, all walked',
-    'mind the crown line, sir', 'hi-vis on, wand up, counting',
-    'that is a tether, not a bench', 'tower says stand by. so stand by.',
+    'mind the bell rope, please', 'one ring each. ONE.',
+    'behind the gold line, thank you', 'no touching the Great Bell. not yet.',
+    'twelve bell posts, all polished', 'Warden four to the Keep. all quiet.',
+    'the rope is not a swing, young man', 'wings in, please, it is busy',
+    'it rings at the end. everybody knows.', 'this way to the plaza. this way.',
   ],
-  // blue overalls, a bucket, a bubble wand: the kids follow the bubbles and
-  // stay off the kit, which is the entire reason for the wand
+  // cloud sweepers: white overalls, a bucket, a bubble wand. The kids follow
+  // the bubbles and stay off the bell, which is the entire reason for the wand
   cleaner: [
-    'wet wipes do nothing on dew', 'a hundred baskets, one bucket',
-    'bubbles keep the kids off the kit', 'mud on the tower step again',
-    'somebody dropped a rosette', 'this broom is older than the meet',
-    'sweep it wet, sweep it twice', 'the kids follow the bubbles, see',
-    'nobody wipes their boots. nobody.', 'that is not litter, that is a glove',
+    'you cannot sweep a cloud. I try.', 'a hundred baskets, one bucket',
+    'bubbles keep the kids off the bell', 'crumbs on the Rainbow Ring again',
+    'somebody dropped a pennant', 'this broom is older than the Keep',
+    'sweep it soft, sweep it twice', 'the kids follow the bubbles, see',
+    'nobody wipes their feet. on a CLOUD.', 'that is not litter, that is a wing',
   ],
-  // the urn. thirty pence, and it has been thirty pence for a long time
+  // the bakers: a white apron, a toque, a tray, and the oven is always on
   tea: [
-    'tea is thirty pence. still.', 'urn is on. urn is always on.',
-    'milk first, and I will not argue', 'bacon van is that way, love',
-    'two sugars for the pilots', 'my flask is older than the tower',
-    'sit down, you look frozen', 'the crews drink it by the gallon',
-    'somebody has taken my tray again', 'tea, then the sunrise. that order.',
+    'cloud buns, still warm', 'tea is three pennies. still.',
+    'the oven is on. the oven is always on.', 'pink icing or white? both.',
+    'two buns for the Wardens', 'my tray is older than the castle',
+    'sit down, you look puffed out', 'the crews eat buns by the basket',
+    'somebody has taken my tray again', 'buns, then the Ringing. that order.',
   ],
-  // the bacon van hatch, open before the birds
+  // the cart keepers at the Cloud Market, hatch open before the skylarks
   van: [
-    'bacon or egg, love? both?', 'queue is to the fence. lovely.',
-    'the tower has a standing order', 'thirty rolls in the first hour',
-    'ketchup is at the end. THE END.', 'we open before the birds',
-    'that pilot has had four', 'doughnuts are twenty minutes',
+    'cake or bun, love? both?', 'queue is to the Rainbow Ring. lovely.',
+    'the Keep has a standing order', 'thirty cakes in the first hour',
+    'sprinkles are at the end. THE END.', 'we open before the skylarks',
+    'that pilot has had four', 'fresh cakes in twenty minutes',
     'mind the step. everybody says it.', 'the crews eat like the sheep',
   ],
-  // red jacket, a placard on a stick, a group that will not keep together
+  // the dock guides: royal blue, a flag on a stick, a group that wanders off
   guide: [
-    'this way, please. THIS way.', 'that one is the whale. the big one.',
-    'ninety-one entries this year', 'follow the flag. I have the flag.',
-    'no, that is a windsock. same idea.', 'the balcony is the tower. yes.',
-    'keep together. we lose one a year.', 'and that is Old Meg. the tractor.',
-    'four people lift a balloon. four.', 'the meadow is the sheep\'s. by law.',
-    'photos at the circle, then tea',
+    'this way, please. THIS way.', 'that is the Great Bell. the big one.',
+    'visitors from every island this year', 'follow the flag. I have the flag.',
+    'that is a turret. a tower, but round.', 'the balcony is the Keep. yes.',
+    'keep together. clouds are big.', 'and that is the Crier. very loud.',
+    'the bell rings once. at the end.', 'the meadows are the sheep\'s. by law.',
+    'photos at the plaza, then cake',
   ],
-  // bright coat, wet feet, a camera, and the same question all morning
+  // visitors from the other islands on the trip, dressed for the postcard
   tourist: [
-    'is that one going next?', 'is it going up? is it going up?',
-    'the big one is a whale. a WHALE.', 'we drove from Kettering for this',
-    'you can hear the burner from here', 'no, THAT one. with the stripes.',
-    'my feet are soaked and I love it', 'which one is the whale? oh.',
-    'they said sunrise. where is it?', 'that is a good photo. that one.',
-    'I want the balloon-shaped one', 'four hundred photos and it is not up',
+    'is that the bell? is THAT the bell?', 'we came from the snowy island for this',
+    'you can see every island from here', 'no, THAT one. with the gold roof.',
+    'my feet are in a CLOUD and I love it', 'which one is the Great Bell? oh.',
+    'they said it rings. when does it ring?', 'that is a good photo. that one.',
+    'I want a hat made of cloud', 'four hundred photos and no BONG yet',
+    'is the castle real? it is REAL.', 'the sheep are so soft',
   ],
-  // the caravan at the gate: programmes, wristbands, no refunds, it is a field
+  // the ticket wagon at the dock: programmes, wristbands, and it is all free
   ticket: [
     'programme? it has a map in it.', 'wristband on. no, the OTHER wrist.',
-    'parking is the field. all of it.', 'ninety-one entries. it is on the board.',
-    'gates opened at five. FIVE.', 'children free. dogs on leads.',
-    'the whale goes last. it says so.', 'have you got a wristband? lovely.',
-    'tea is that way, whale is THAT way', 'no refunds. it is a field.',
+    'docking is the edge. all of it.', 'every island sent somebody. see?',
+    'gates opened at dawn. DAWN.', 'children free. sheep free.',
+    'the bell rings last. it says so.', 'have you got a wristband? lovely.',
+    'cake is that way, bell is THAT way', 'no refunds. it is a cloud.',
   ],
-  // forty ewes on runway 09 since March, and a crook that has never been needed
+  // cloud shepherds: a white smock, a crook, and forty sheep made of cloud
   shepherd: [
-    'the sheep have not moved. no.', 'runway is grass. sheep eat grass.',
-    'asked them nicely. twice.', 'they have been on 09 since March',
-    'the dog is not interested either', 'ninety balloons and they never look up',
-    'they will move when they move', 'thirty years, same forty ewes',
-    'one of them likes the burner noise', 'tower can ask them itself',
+    'the sheep have not moved. no.', 'they move when they move. clouds.',
+    'asked them nicely. twice.', 'they have been on the avenue all year',
+    'the dog is not interested either', 'they never look up. they ARE up.',
+    'forty sheep, all fluffy, all here', 'one of them likes the bell',
+    'the Crier can ask them himself', 'you cannot shear a cloud. I tried.',
   ],
-  // flask, chair, fence. the same square of grass every year since their dad
+  // the Heights folk: pastel robes, new wings, a cloud hat, the same spot
   spectator: [
-    'we come every year. every year.', 'this is the good bit. the standing up.',
-    'flask, chair, fence. sorted.', 'that one is called Grete. I asked.',
-    'we stand here. we always stand here.', 'you hear the burner before you see it',
-    'she is going up. she is. wait.', 'my dad brought me. I bring them.',
-    'best morning of the year, this', 'the whale is worth the wait',
-    'programme says sunrise. nine minutes.',
+    'best festival of the year, this', 'I have come for the BONG',
+    'my wings are new. do you like them?', 'we come every year. every year.',
+    'this is the good bit. the waiting.', 'hat, wings, bun. sorted.',
+    'we stand here. we always stand here.', 'you hear the bell before you see it',
+    'my dad brought me. I bring them.', 'the whole sky comes to this one',
+    'programme says bell at the end. always.',
   ],
-  // the Balloonmeister, off the balcony, in the voice of the briefing
+  // Master Tolly, the Town Crier, off the balcony, in the voice of the scroll
   pym: [
-    'wind calm. cloud base high. we fly.', 'crews to your numbers, please',
-    'that was not in the notams', 'the instruments are excellent',
-    'sunrise in eleven minutes', 'conditions are, frankly, ideal',
-    'the sheep are being asked to move', 'met balloon away. straight up. good.',
-    'ninety-one entries. all present.', 'briefing in four minutes. balcony.',
-    'have a good flight. all of you.',
+    'oyez! oyez! bell at the end!', 'that is not on the programme',
+    'visitors to the plaza, please', 'the scroll is excellent',
+    'the Ringing is at the end, as ever', 'the festival is, frankly, ideal',
+    'the sheep are being asked to move', 'every island is here. all present.',
+    'proclamation in four minutes. balcony.', 'have a lovely festival. all of you.',
+    'oyez. it means listen.',
   ],
-  // an anorak, a bobble hat, a balloon on a string, and the whale
+  // sky kids: little wings, a cloud hat, a balloon on a string, and the bell
   kid: [
-    'the WHALE!', 'is it going up NOW?', 'I can hear the fire thing!',
-    'that one is MINE. I picked it.', 'my balloon! my balloon is red!',
-    'bubbles! BUBBLES!', 'can we go in the basket? can we?',
-    'the sheep looked at me', 'it is bigger than our HOUSE',
-    'I am not cold. I am NOT.', 'up up up up up!',
+    'the BELL!', 'can I ring it? can I?', 'the sheep are made of CLOUD',
+    'is it ringing NOW?', 'that balloon is MINE. I picked it.',
+    'my balloon! my balloon is red!', 'bubbles! BUBBLES!',
+    'I have wings! look! WINGS!', 'the castle is bigger than our HOUSE',
+    'I am not tired. I am NOT.', 'BONG BONG BONG BONG!',
   ],
 };
 
 export const SKYLARK_VOICE_PANIC: Record<string, string[]> = {
   crew: [
-    'DROP THE LINE!! LEAVE IT!!', 'get in the basket!! GET IN!!',
-    'leave the envelope!! RUN!!', 'it has the trailer!! GO!!',
-    'pull the pins!! PULL THEM!!', 'up!! we go up NOW!!',
-    'never mind the fan!! MOVE!!',
+    'CAST OFF!! LEAVE IT!!', 'get in the basket!! GET IN!!',
+    'leave the envelope!! GO!!', 'it has the cart!! GO!!',
+    'untie her!! UNTIE HER!!', 'up!! we go up NOW!!',
+    'to the balloons!! GO!!',
   ],
   pilot: [
-    'PULL THE PINS!! WE GO NOW!!', 'everybody in!! NOW!!',
-    'it is not in the notams!!', 'burn!! BURN!! full burn!!',
-    'leave the trailer!! LEAVE IT!!', 'up is the only way out!!',
+    'CAST OFF!! WE GO NOW!!', 'everybody in!! NOW!!',
+    'it is not on the programme!!', 'burn!! BURN!! full burn!!',
+    'leave the cart!! LEAVE IT!!', 'up is the only way!!',
   ],
   marshal: [
-    'BEHIND THE ROPE!! ALL OF YOU!!', 'to the hedge!! TO THE HEDGE!!',
-    'post four to tower!! it is HERE!!', 'walk!! do not run!! oh, RUN!!',
+    'BEHIND THE GOLD LINE!! ALL OF YOU!!', 'to the balloons!! TO THE BALLOONS!!',
+    'Warden four to the Keep!! it is HERE!!', 'walk!! do not run!! oh, RUN!!',
     'leave the rope!! LEAVE IT!!', 'this way!! THIS way!!',
     'I am counting you!! keep together!!',
   ],
   cleaner: [
     'MY BUCKET!! it ate my BUCKET!!', 'never mind the broom!! GO!!',
-    'it is eating the MESS!!', 'up the tower!! UP!!',
-    'leave it!! it is only litter!!', 'I just swept that!! I JUST—!!',
+    'it is eating the CRUMBS!!', 'up the Keep!! UP!!',
+    'leave it!! it is only a pennant!!', 'I just swept that cloud!! I JUST!!',
   ],
   tea: [
-    'THE URN!! save the URN!!', 'up the hill!! bring the flask!!',
-    'it drank the TEA!!', 'leave the cups!! LEAVE THEM!!',
-    'it has the bacon van!! oh no!!', 'everybody OUT of the queue!!',
+    'THE BUNS!! save the BUNS!!', 'to the balloons!! bring the tray!!',
+    'it ate the OVEN!!', 'leave the icing!! LEAVE IT!!',
+    'it has the cake cart!! oh no!!', 'everybody OUT of the queue!!',
   ],
   van: [
-    'CLOSE THE HATCH!! CLOSE IT!!', 'it ate the DOUGHNUT trailer!!',
-    'out the back!! OUT THE BACK!!', 'leave the rolls!! GO!!',
-    'up the hedge!! bring the tongs!!', 'thirty years of bacon!! GONE!!',
+    'CLOSE THE HATCH!! CLOSE IT!!', 'it ate the CAKE cart!!',
+    'out the back!! OUT THE BACK!!', 'leave the cakes!! GO!!',
+    'to the balloons!! bring the tongs!!', 'thirty years of cake!! GONE!!',
   ],
   guide: [
     'THIS WAY!! everybody THIS way!!', 'follow the FLAG!! FOLLOW IT!!',
     'it is not on the tour!! RUN!!', 'keep together!! keep TOGETHER!!',
-    'to the hedge!! do not stop for tea!!', 'I said we lose one every year!!',
+    'to the balloons!! never mind cake!!', 'hold on to your hat!! the CLOUD one!!',
   ],
   tourist: [
-    'it ate the BALLOON!!', 'is that part of it?! IS IT?!',
+    'it ate the BALLOON!!', 'that is NOT on the programme!!',
     'RUN!! no, the other way!!', 'take the photo!! no!! RUN!!',
-    'Kettering!! we are going BACK!!', 'it is going for the WHALE!!',
-    'up the hedge!! leave the bag!!',
+    'back to our island!! HOME!!', 'it is going for the BELL!!',
+    'into a balloon!! leave the bag!!',
   ],
   ticket: [
-    'NO WRISTBAND, NO— oh, just RUN!!', 'it ate the CARAVAN!!',
-    'gates are open!! GO THROUGH THEM!!', 'leave the float!! LEAVE IT!!',
+    'no wristband needed!! just RUN!!', 'it ate the WAGON!!',
+    'gates are open!! GO THROUGH THEM!!', 'leave the programmes!! LEAVE THEM!!',
     'the programme does not mention this!!', 'everybody OUT!! free of charge!!',
   ],
   shepherd: [
-    'the SHEEP!! it is at the SHEEP!!', 'come by!! COME BY!! oh, hedge!!',
-    'NOW they move!! now!!', 'up the bank!! all forty!! GO!!',
+    'the SHEEP!! it is at the SHEEP!!', 'come by!! COME BY!! oh, balloon!!',
+    'NOW they move!! now!!', 'into the basket!! all forty!! GO!!',
     'leave the crook!! LEAVE IT!!', 'get on, get on, GET ON!!',
   ],
   spectator: [
-    'MY CHAIR!! it has my CHAIR!!', 'up the hedge!! BRING THE FLASK!!',
+    'MY HAT!! it has my CLOUD HAT!!', 'to the balloons!! BRING THE BUNS!!',
     'every year!! never THIS!!', 'grab the kids!! GRAB THEM!!',
-    'it is not a balloon!! RUN!!', 'hold the fence!! no!! LET GO!!',
+    'it is not a float!! RUN!!', 'flap!! FLAP!! oh, they are pretend!!',
     'this way!! keep TOGETHER!!',
   ],
   // he does not break format even now; the register does
   pym: [
-    'ALL CREWS!! lift!! LIFT NOW!!', 'it is not forecast!! it is HERE!!',
-    'balcony!! everybody to the balcony!!', 'the instruments!! MY instruments!!',
-    'conditions have changed!! GO!!', 'everybody UP!! that is the briefing!!',
+    'OYEZ!! everybody to the balloons!!', 'not on the programme!! it is HERE!!',
+    'the Ringing is MOVED!! to NOW!!', 'the scroll!! MY scroll!!',
+    'the festival has changed!! GO!!', 'everybody UP!! by proclamation!!',
   ],
   kid: [
-    'it ate the WHALE!!', 'MUM!! it is coming!!',
+    'it ate the BELL!!', 'MUM!! it is coming!!',
     'my balloon!! MY BALLOON!!', 'run!! it is BIG!!',
-    'I want to go in the basket NOW!!', 'is it a balloon?! it is NOT!!',
-    'up the hedge!! carry me!!',
+    'I want to go in the basket NOW!!', 'is it a float?? it is NOT!!',
+    'into the balloon!! carry me!!',
   ],
 };

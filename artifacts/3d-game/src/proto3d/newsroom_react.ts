@@ -331,55 +331,56 @@ const POWDER: WorldReact = {
   ],
 };
 
-// SKYLARK FIELD reacts in MR PYM's voice, and his denial is the one that is
-// wired to the player's own progress: he processes the void as CONDITIONS — a
-// meteorological feature and a surface obstruction — and files it under the only
-// headings the briefing form has. As the child eats, the field gets flatter and
-// emptier, so his instruments correctly report things IMPROVING. He never breaks
-// format and he never panics, because panicking is not one of the boxes.
+// BELLCLOUD HEIGHTS (internal id 'skylark') reacts in MASTER TOLLY's voice, the
+// Town Crier, and his denial is CEREMONIAL: he can only read a thing off the
+// Festival Programme or proclaim it onto it. So the void is a festival visitor,
+// then a float, and whatever it eats has "gone up early". As the child eats,
+// the programme gets shorter and the festival runs ahead of schedule, which by
+// his own scroll is excellent news. He never breaks format and he never
+// panics, because panicking is not on the programme. docs/BELLCLOUD.md §9.5.
 const SKYLARK: WorldReact = {
   landmark: [
-    '{X} is no longer an obstruction.',
-    'Chart amended: {X} is no longer shown.',
-    'We have lost {X}. Conditions improve.',
-    '{X} was on the briefing. It is not now.',
-    'Obstruction {X} cleared. Thank you.',
+    '{X} has been proclaimed finished.',
+    '{X} has gone up early for the Ringing.',
+    'The Crier has crossed off {X}. With thanks.',
+    '{X} was on the programme. It is not now.',
+    'Oyez. {X} has left the festival early.',
   ],
   beat: [
-    [ // filling the balloons
-      'Inflation is under way. The desk can hear it from here.',
-      'Four crew to a basket, and the basket is winning.',
-      'A fan has been started. Another fan has been started.',
-      'The field is filling up nicely.',
+    [ // the festival is open
+      'The festival opened, and the visitor went straight to the cake.',
+      'Bunting up, bells out, and one violet guest already eating the bunting.',
+      'Every little bell rang once. The visitor looked very interested.',
+      'The Crier proclaimed the festival open. The visitor agreed.',
     ],
-    [ // burner test
-      'Burner checks complete. All eyebrows present and correct.',
-      'A burn has been heard. The sheep did not look up.',
-      'The flames are the only warm thing on this field.',
-      'Somebody has tested a burner twice.',
+    [ // balloons arriving from every island
+      'A balloon docked right beside the visitor and took off again, sensibly.',
+      'Visitors from every island are arriving. One of them came early, and round.',
+      'The dock is full of balloons, and nobody is parked near the violet one.',
+      'Baskets are landing all along the edge. One landed in the visitor.',
     ],
-    [ // the sheep are on the runway
-      'The sheep are on 09. The sheep are always on 09.',
-      'Marshals report the sheep are aware and unmoved.',
-      'A sheep has crossed the centreline twice.',
-      'The sheep have right of way by long tradition.',
+    [ // the cloud sheep are on the avenue
+      'The cloud sheep are on the Grand Avenue. They are always on it.',
+      'Bell Wardens report the sheep have seen the visitor and are unmoved.',
+      'A cloud sheep has walked right round the visitor, twice.',
+      'The sheep have right of way on the avenue, by very old tradition.',
     ],
-    [ // the whale goes up
-      'G-WAIL is standing. The whole field has stopped to look.',
-      'The whale has an eye and the eye is enormous.',
-      'Tether pins are coming out. Stand clear, please.',
-      'She is going, and ninety balloons are going with her.',
+    [ // the balloons are lifting
+      'Every balloon at the dock is lifting, and the sky is filling up.',
+      'The balloons are going up, and everybody is in one.',
+      'Baskets up, bunting waving, and the kingdom getting lighter.',
+      'They are lifting one after another. The visitor is watching.',
     ],
   ],
   evolve: [
-    'The feature is now classified {F}.',
-    'Conditions have changed to {F}. Conditions remain good.',
-    'The desk has upgraded the feature to {F}.',
+    'The visitor has been re-proclaimed a {F}.',
+    'The Crier proclaims the visitor a {F}. The scroll agrees.',
+    'Oyez. The visitor is now officially a {F}.',
   ],
   rivalGone: [
-    'One feature has absorbed the other.',
-    'The field is down to a single feature. The desk calls that tidy.',
-    'Two features met over 27. One came back looking pleased.',
+    'One visitor has absorbed the other. The scroll is simpler now.',
+    'The festival is down to a single visitor. The Crier calls that tidy.',
+    'Two visitors met on the avenue. One came back looking pleased.',
   ],
 };
 
@@ -478,15 +479,16 @@ export const MID_REACT: Record<string, string[]> = {
   ],
   'skylark.burner': BY_WORLD.skylark.beat[1],
   'skylark.sheep': BY_WORLD.skylark.beat[2],
+  // BELLCLOUD HEIGHTS: the banner parade and the cake carts (the ids are kept)
   'skylark.crown': [
-    'A crown line is out to its full thirty metres and held.',
-    'The line went slack. It has been retrieved.',
-    'Everybody is holding a rope and looking the same way.',
+    'The banner parade marched straight past the visitor, very proudly.',
+    'The longest banner has gone in, and the parade is shorter now.',
+    'Everybody is holding a banner and looking the same way.',
   ],
   'skylark.bacon': [
-    'The queue at the bacon van is visible from the tower.',
-    'Breakfast Row reports brisk trade and one missing bin.',
-    'A gull has taken something. The desk will not say what.',
+    'The queue at the cake carts can be seen from the Keep.',
+    'The Cloud Market reports brisk trade and one missing cart.',
+    'A skylark has taken a crumb. The Crier will not say whose.',
   ],
   'powder.lake': BY_WORLD.powder.beat[1],
   'powder.contest': BY_WORLD.powder.beat[2],
