@@ -783,9 +783,24 @@ const SUITE = [
   // the NOMS pill off his face, the beat's colour on the numbers. Measured
   // 8/8 BAD on the pre-fix build, 8/8 PASS after. Quality + live until a
   // second green reading promotes it to push.
+  // 2026-09-25, the owner: the pill "is always there next to the void ... put
+  // that on the top screen somewhere, like in a corner". (i) and (j) grade the
+  // count in a top corner, clear of the clock, goal chip, coins and pause, at
+  // 430/390/360 wide: FAIL 2 of 10 on the build with the pill beside him
+  // (0/119 frames in a corner, its centre 437px down), 10/10 after.
   { id: 'nomstream', tier: 'feel', profiles: ['live', 'quality'], timeout: 3000,
     cmd: ['node', 'qa/nomstream.mjs', PORT], verdict: pf,
-    why: 'one number stream a child can read, and an eating chain she can see and hear pay out' },
+    why: 'one number stream a child can read, and an eating chain she can see and hear pay out — its count in a top corner, not beside him' },
+
+  // The owner, 2026-09-25, on his own iPhone recording: the growth bar is
+  // "janky ... like little blocks that get added". A bite spree on the game's
+  // own clock, the fill read every rendered frame as a share of its track.
+  // On the stepping build: still for 92.1% of the time it was travelling, and
+  // one frame carried 2.34 median payments per 50 ms — FAIL 2 of 5.
+  // Quality + live until a second green reading promotes it.
+  { id: 'barglide', tier: 'feel', profiles: ['live', 'quality'], timeout: 1800,
+    cmd: ['node', 'qa/barglide.mjs', PORT, 'maple'], verdict: pf,
+    why: 'the growth bar glides while she eats instead of adding itself in blocks — it keeps moving through a spree, no single frame lands half a payment, it never runs past what it has been paid, and a form change still fills to the brim and snaps (the owner: "it\'s not like smooth progression. It\'s like little blocks that get added")' },
 
   // The pre-merge review and its verify pass: a pause holds the chain, the
   // reduced-motion number stays up long enough to read, and the end beat

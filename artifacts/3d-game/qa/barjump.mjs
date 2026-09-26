@@ -2,6 +2,21 @@
 //
 //   node qa/barjump.mjs [port] [world]
 //
+// ── SUPERSEDED 2026-09-25, AND IT NOW FAILS ON PURPOSE ──────────────────────
+// This bar asked for the steps. The owner, on his own iPhone recording, asked
+// for the opposite of what they looked like: "the progress bar on the bottom
+// ... it's like janky. It's not like smooth progression. It's like little
+// blocks that get added." The ledger this probe was written for still stands —
+// the bar is still PAID only when a flying number lands, never by the clock —
+// but what is DRAWN now glides after the ledger (prototype3d.ts gSpring), so
+// the fill is written on every frame it moves, in small increments, and the
+// statistic below (share of travel in width writes of 1.5px or more) reads a
+// glide as "sub-pixel creep driven by the clock". That verdict would be wrong:
+// it counts style writes, and a glide is many writes paying for one bite. It
+// is not in the gate. qa/barglide.mjs grades the bar as it is drawn, on the
+// game's clock, and holds the half of this probe that still matters — the
+// fill never moves past what eating has paid for.
+//
 // The owner, on hole.io: "when you eat like points are going into the bar."
 //
 // Ours crawled. The fill was written from formProgress(radius) every frame, and

@@ -3519,7 +3519,7 @@ const _dbg = new Proxy(_dbgStore, {
   __settleCam: (frames?: number) => void;
   __forceEvolve: () => void;
   __law: () => Record<string, number | boolean>;
-  __barDbg: () => { gShown: number; gDebt: number; gBiteK: number; pays: number; rect: number | null };
+  __barDbg: () => { gShown: number; gDebt: number; gBiteK: number; pays: number; rect: number | null; gDisp: number; gVel: number; gBrimT: number };
   __bubStats: () => { launched: number; landed: number; displaced: number; noTarget: number };
   __eatFloat: () => { t: number; pts: number };
   __news: () => void;
@@ -3902,14 +3902,15 @@ _dbg.__forceEvolve = () => { _forceEvolve = true; };
 const _law: Record<string, number | boolean> = {};
 _dbg.__law = () => ({ ..._law });
 let _payN = 0;
-// QA: the growth bar's ledger. gShown is what the bar DISPLAYS, gDebt is what
+// QA: the growth bar's ledger. gShown is what the bar has been PAID (gDisp is
+// what it draws, gliding after it; gBrimT the form-change hold), gDebt is what
 // it owes, and `pays` counts the payouts that have actually landed. This is
 // what settled whether the bar was broken or merely slow: a probe reported the
 // bar never moving, and reading these showed pays going 0 -> 1 with gShown
 // stepping 0 -> 0.1576 in a single write. The bar was fine; the probe had eaten
 // everything within reach of a void that never moves, and a bar with nothing to
 // pay out looks exactly like a bar that cannot pay out.
-_dbg.__barDbg = () => ({ gShown, gDebt, gBiteK, pays: _payN, rect: gRect ? gRect.width : null });
+_dbg.__barDbg = () => ({ gShown, gDebt, gBiteK, pays: _payN, rect: gRect ? gRect.width : null, gDisp, gVel, gBrimT });
 // QA: the flying numbers' own tally — launched vs landed separates a flush
 // that never fired from a flight that never arrived. See bubbles.flightStats.
 _dbg.__bubStats = () => bubbles.flightStats();
@@ -6142,6 +6143,11 @@ const hungerLbl = el('hungerlbl');
 const evolveEl = el('evolve'), endEl = el('end'), endHd = el('endHd'), endSub = el('endSub'), endList = el('endList');
 const wayEl = el('wayfind');
 const nomsEl = el('noms');
+// the badge's parts are built once in index.html and never re-templated: its
+// coin (which wears the tier and the bump), the count, and a beat's tag
+const nomsCEl = nomsEl.querySelector('.nC') as HTMLElement;
+const nomsNEl = nomsEl.querySelector('.nN') as HTMLElement;
+const nomsXEl = nomsEl.querySelector('.nX') as HTMLElement;
 const bannerEl = el('banner'), hungerEl = el('hunger'), hungerFill = hungerEl.querySelector('.fill') as HTMLElement;
 let prevHunger = 0;
 
@@ -7921,11 +7927,59 @@ const formProgress = (r: number) => {
   const lo = Math.max(FORM_MIN[st], 1), hi = FORM_MIN[st + 1] ?? R_CAP;
   return THREE.MathUtils.clamp((r * r - lo * lo) / Math.max(1e-4, hi * hi - lo * lo), 0, 1);
 };
-// the pips: every form still ahead, drawn on the track once per evolution
+// the pips: every form still ahead, drawn on the track once per evolution.
+// -1 means "no band painted yet this match": beginMatch puts it back, so the
+// first paint of a rematch is a RESET (snap to the empty bar) and not a
+// level-up — it used to be read as a crossing from the last match's form, and
+// fill a brand-new bar to the brim before dropping it to zero.
 let gPipStage = -1;
-function paintGrowth(r: number) {
+/** ── THE BAR GLIDES; IT DOES NOT ADD ITSELF IN BLOCKS ───────────────────────
+ *  The owner, 2026-09-25, on his own iPhone recording: "the progress bar on the
+ *  bottom ... it's like janky. It's not like smooth progression. It's like
+ *  little blocks that get added." It was: the fill was written straight from
+ *  the ledger (gShown), which moves only when a flying number lands, and a
+ *  0.12 s width transition carried each payment across — a step, then nothing
+ *  until the next number, then a step. qa/barglide.mjs read it standing still
+ *  for most of every spree and landing a whole payment inside one 50 ms slice.
+ *
+ *  So the DRAWN value (gDisp) now follows the ledger every frame on a
+ *  critically damped spring — the fastest ease that never overshoots — solved
+ *  exactly per step, so a 60 Hz phone and a 20 Hz one trace the same curve:
+ *  stepped at 20, 60 and 1000 Hz, all three stand at 0.7127 of a payment 0.5 s
+ *  after it lands. The ledger is untouched: the number still flies into the
+ *  head of the fill and the head still punches as it lands (gbarPay), and the
+ *  fill then surges forward from there instead of jumping. At GBAR_W 5 a
+ *  payment is half crossed in 0.34 s and nine-tenths in 0.78 s; the bank paid
+ *  every 0.55-0.65 s through qa/barglide.mjs's spree, so the next payment
+ *  arrives while the last is still gliding and the bar keeps moving for as
+ *  long as she keeps eating.
+ *
+ *  Two things do not glide. A FORM CHANGE fills to the brim, holds there, and
+ *  GBAR_BRIM after the crossing SNAPS to the new band — the level-up; a
+ *  glide there would drag the fill backwards across the whole track under the
+ *  evolve ceremony. And a RESET (a new match) snaps to empty. */
+const GBAR_W = 5;          // rad/s — the ledger-following spring
+const GBAR_BRIM = 0.12;    // s of frame time from a form change to the snap
+const GBAR_BRIM_FILL = 0.06;   // …the first half of it filling to 100%, the rest held full
+let gDisp = 0, gVel = 0, gBrimT = 0, gBrimFrom = 0;
+/** One exact step of a critically damped spring toward `to` over `h` seconds,
+ *  on gDisp/gVel. Velocity pointing AWAY from the target is dropped first (a
+ *  ledger that moves down — a demotion's debt — must not be climbed past), and
+ *  a step that would cross the target lands on it: the drawn bar can never run
+ *  ahead of what it has been paid. */
+function gSpring(to: number, w: number, h: number): void {
+  const x = gDisp - to;
+  if (x * gVel > 0) gVel = 0;
+  const e = Math.exp(-w * h), c = gVel + w * x;
+  const nx = (x + c * h) * e;
+  gVel = (gVel - w * c * h) * e;
+  if (nx * x < 0 || (Math.abs(nx) < 1e-4 && Math.abs(gVel) < 1e-3)) { gDisp = to; gVel = 0; }
+  else gDisp = to + nx;
+}
+function paintGrowth(r: number, dt: number) {
   const st = stageFor(r);
   if (st !== gPipStage) {
+    const reset = gPipStage < 0;
     gPipStage = st;
     gNowEl.textContent = FORMS[st];
     const nxt = FORMS[st + 1];
@@ -7935,22 +7989,13 @@ function paintGrowth(r: number) {
     // "three more to go" is the thing a child wants off this bar
     // ── A BAND CHANGE IS NOT A 377px SLIDE BACKWARDS ─────────────────────
     // formProgress restarts at zero at every rung, so the crossing authors
-    // ~99.7% -> ~0% in ONE write — and `transition: width 0.12s linear` then
-    // slides the fill backwards across nearly the whole track, underneath the
-    // evolve ceremony, at all five crossings. Fill it to the brim, hold a beat
-    // so the child sees it complete, then SNAP to the new band with the
-    // transition suppressed for that one write.
-    gFillEl.style.width = '100%'; lastGw = '100%';
-    const bandTo = st;
-    setTimeout(() => {
-      if (gPipStage !== bandTo) return;          // another crossing overtook us
-      gShown = formProgress(voidling.radius); gDebt = 0;
-      gFillEl.style.transition = 'none';
-      const w = `${(gShown * 100).toFixed(2)}%`;
-      gFillEl.style.width = w; lastGw = w;
-      void gFillEl.offsetWidth;
-      requestAnimationFrame(() => { gFillEl.style.transition = ''; });
-    }, 120);
+    // ~99.7% -> ~0% in ONE step — and anything that eases the fill would then
+    // slide it backwards across nearly the whole track, underneath the evolve
+    // ceremony, at all five crossings. Fill it to the brim, hold a beat so the
+    // child sees it complete, then SNAP to the new band (below). A reset has no
+    // brim to show: it snaps at once.
+    if (reset) { gShown = formProgress(r); gDebt = 0; gDisp = gShown; gVel = 0; gBrimT = 0; }
+    else { gBrimT = GBAR_BRIM; gBrimFrom = gDisp; gVel = 0; }
     for (const p of Array.from(gTrackEl.querySelectorAll('.gPip'))) p.remove();
     const left = FORMS.length - 1 - st;
     for (let i = 1; i < left; i++) {
@@ -7961,26 +8006,41 @@ function paintGrowth(r: number) {
     }
   }
   // Both of these ran unconditionally every frame. The metre label changes a
-  // few dozen times a MATCH and the bar width only while growing, so the
+  // few dozen times a MATCH and the bar width only while it is moving, so the
   // guards turn a permanent 60Hz pair of style/layout invalidations into a
   // write on the frames that actually differ. (The bar keeps `width` rather
   // than switching to a compositor transform: .gFill carries a 3-stop gradient
-  // and a travelling sheen, and scaleX would squeeze both — a visual change to
-  // an element the owner has already signed off, for a cost that is now
-  // change-gated anyway.)
+  // and a head, and scaleX would squeeze both — a visual change to an element
+  // the owner has already signed off.)
   const gm = `${Math.round(r * 1.6)}m`;
   if (gm !== lastGm) { lastGm = gm; gMEl.textContent = gm; }
-  // …and the fill is no longer written from the truth. It is written from
-  // gShown, which only a bite moves. Keep the SIGN on the debt: a within-band
-  // downward move has to be payable too, or a demotion would leave the bar
-  // stranded above where the void actually is.
-  gDebt = formProgress(r) - gShown;
-  const gw = `${(gShown * 100).toFixed(2)}%`;
+  if (gBrimT > 0) {
+    // an ease-out to 100% and then held there, so the band is seen COMPLETE
+    // before it snaps. The 0.12 s used to be a wall-clock setTimeout racing a
+    // 0.12 s width transition, so the fill met the brim at the instant it left
+    // it — and on this renderer's one frame a second it was never drawn full
+    // at all: qa/barglide.mjs's trace went 52.3% -> 66.7% across a crossing.
+    gBrimT -= dt;
+    const u = Math.min(1, (GBAR_BRIM - gBrimT) / GBAR_BRIM_FILL);
+    gDisp = gBrimFrom + (1 - gBrimFrom) * (1 - (1 - u) * (1 - u));
+    if (gBrimT <= 0) {
+      // the snap: the new band's truth, drawn and paid at once, from rest
+      gBrimT = 0; gShown = formProgress(voidling.radius); gDebt = 0; gDisp = gShown; gVel = 0;
+    }
+  } else {
+    // The ledger is still paid only by a bite (gbarPay). Keep the SIGN on the
+    // debt: a within-band downward move has to be payable too, or a demotion
+    // would leave the bar stranded above where the void actually is.
+    gDebt = formProgress(r) - gShown;
+    if (gDisp !== gShown || gVel !== 0) gSpring(gShown, GBAR_W, dt);
+  }
+  const gw = `${(gDisp * 100).toFixed(2)}%`;
   if (gw !== lastGw) { lastGw = gw; gFillEl.style.width = gw; }
 }
-/** Pay the whole outstanding debt in one step, and punch the head of the bar
- *  while it lands. Graded: a meal over half the void's own size gets the
- *  brighter punch, the same threshold every other eat cue in this file uses. */
+/** Pay the whole outstanding debt into the ledger, and punch the head of the
+ *  bar while it lands. The fill then glides there (gSpring above). Graded: a
+ *  meal over half the void's own size gets the brighter punch, the same
+ *  threshold every other eat cue in this file uses. */
 function gbarPay(): void {
   _payN++;
   gShown += gDebt;
@@ -8000,9 +8060,11 @@ let lastGm = '', lastGw = '';
  *  connect to anything they did — measured, roughly 20 width writes per second
  *  of sim, each one a fraction of a pixel.
  *
- *  gShown is what the bar DISPLAYS; the truth is what formProgress says. The
- *  gap between them is gDebt, and it is paid in one step when a bite lands.
- *  paintGrowth may never advance gShown — only gbarPay() does. */
+ *  gShown is what the bar has been PAID; the truth is what formProgress says.
+ *  The gap between them is gDebt, and it is paid in one step when a bite
+ *  lands. paintGrowth may never advance gShown — only gbarPay() does (and the
+ *  snap after a form change). What is DRAWN is gDisp, which glides after
+ *  gShown — see gSpring; drawing gShown itself is what made the blocks. */
 let gShown = 0, gDebt = 0, gBiteK = 0;
 /** The bar's track rect, cached. THE STALE-RECT TRAP: #growth is display:none
  *  on the menu and whenever it carries .off, so a rect read outside a match is
@@ -8030,7 +8092,9 @@ function gBarTarget(): { x: number; y: number } | null {
   // launch (~2/s at the payout rate) and stops entirely the moment it succeeds.
   if (!gRect) refreshGRect();
   if (!gRect) return null;
-  return { x: gRect.left + gRect.width * Math.min(1, Math.max(0, gShown)), y: gRect.top + gRect.height / 2 };
+  // the head as it is DRAWN, which is where the child's eye is — the ledger
+  // runs ahead of it while the fill glides
+  return { x: gRect.left + gRect.width * Math.min(1, Math.max(0, gDisp)), y: gRect.top + gRect.height / 2 };
 }
 
 // rank ladder (hole.io placement points: 20/10/5/2/1) + daily streak
@@ -9296,7 +9360,7 @@ let combo = 0, comboT = 0, chompCd = 0;
  *  Research governor G6. `combo` has always counted an unbroken eating chain
  *  and paid a multiplier on it, and a child could see none of it: the chain
  *  showed up as a decimal ('COMBO ×1.5') on every fifth bite and lapsed in
- *  silence. It is now a pill beside the void from five links, a crown at every
+ *  silence. It is now a badge in the top-left corner from five links, a crown at every
  *  tenth, and a cash-in when it ends — '14 NOMS! +420', the chain's own total.
  *  chainPts is that total. It is a RECAP of points already scored, never a
  *  bonus on top: the race economy is tuned on playerScore and stays untouched.
@@ -9353,47 +9417,40 @@ function nomCash(): void {
   gBiteK = Math.max(gBiteK, EAT_TICK_BIG);
   gbarPay();
 }
-/** ── THE NOMS PILL ─────────────────────────────────────────────────────────
- *  Beside the void, never on his face: placed off the edge of the disc from
- *  the SAME face box the bubbles dodge (bubbles.formBox(), refreshed by
- *  bubbles.update() just before this runs), on whichever side has room, and
- *  under the face when the disc fills the screen. Teal from five, gold from
- *  ten, rainbow from twenty. No ring, no fuse, nothing that drains. Every DOM
- *  write is change-gated, like the wayfinder's. */
-let nomsOn = false, nomsHtml = '', nomsTier = '', nomsSide = '', nomsLX = -1, nomsLY = -1;
+/** ── THE NOMS BADGE ────────────────────────────────────────────────────────
+ *  A HUD chip pinned in the top-left corner. It was a pill placed beside the
+ *  void every frame, off the edge of his disc; the owner, 2026-09-25, on his
+ *  own recording: "the noms on the side. I think that's a cool idea, but ...
+ *  it's always there next to the void ... it just takes real estate space.
+ *  What if we put that on the top screen somewhere, like in a corner". So the
+ *  count lives where the other numbers live, the crowns ('10 NOMS!') and the
+ *  cash-in still pop over him, and nothing of the chain stands beside him.
+ *
+ *  Where it stands is the stylesheet's business alone (index.html #noms):
+ *  there is no per-frame projection and no position write any more. Teal from
+ *  five, gold with a crown from ten, rainbow from twenty, and the count bumps
+ *  on every link. No ring, no fuse, nothing that drains. Every DOM write is
+ *  change-gated. */
+let nomsOn = false, nomsN = -1, nomsX = '', nomsTier = '';
 function paintNoms(): void {
-  const fb = bubbles.formBox();
-  if (combo < 5 || !started || ended || paused || outroT > 0 || !fb.on) {   // the whistle ends the chain's show too
-    if (nomsOn) { nomsOn = false; nomsEl.classList.remove('on'); }
+  if (combo < 5 || !started || ended || paused || outroT > 0) {   // the whistle ends the chain's show too
+    if (nomsOn) { nomsOn = false; nomsN = -1; nomsEl.classList.remove('on'); }
     return;
   }
-  const tag = feverMult > 1 ? `<b>×${Math.round(feverMult)}</b>` : '';
-  const html = `${combo} NOMS${tag}`;
-  if (html !== nomsHtml) { nomsHtml = html; nomsEl.innerHTML = html; }
+  if (combo !== nomsN) {
+    // Two identical keyframes, alternated: changing the animation's NAME
+    // restarts it, so the bump replays on every link without the forced
+    // layout that removing and re-adding one class would need.
+    nomsNEl.textContent = String(combo);
+    const ab = combo % 2 ? 'ba' : 'bb';
+    nomsCEl.classList.remove(ab === 'ba' ? 'bb' : 'ba');
+    nomsCEl.classList.add(ab);
+    nomsN = combo;
+  }
+  const x = feverMult > 1 ? `×${Math.round(feverMult)}` : '';
+  if (x !== nomsX) { nomsX = x; nomsXEl.textContent = x; }
   const tier = combo >= 20 ? '3' : combo >= 10 ? '2' : '1';
   if (tier !== nomsTier) { nomsTier = tier; nomsEl.dataset.tier = tier; }
-  // width is estimated from the string, not measured: a read after the write
-  // above would force a layout every time the count ticks
-  const estW = 26 + 9.6 * (`${combo} NOMS`.length) + (tag ? 30 : 0), estH = 30;
-  const W = window.innerWidth, H = window.innerHeight, gap = 8;
-  let x = fb.cx + fb.rx * 0.9 + gap, y = fb.cy - fb.ry * 0.15, side = '';
-  if (x + estW > W - 8) {
-    x = fb.cx - fb.rx * 0.9 - gap; side = 'lft';
-    if (x - estW < 8) { x = fb.cx; y = fb.bottom + gap + estH / 2; side = 'mid'; }
-  }
-  y = Math.min(H - 190, Math.max(220, y));
-  // …and if the clamp pushed it back over his face, it waits for room
-  const l = side === 'lft' ? x - estW : side === 'mid' ? x - estW / 2 : x;
-  if (l < fb.right && l + estW > fb.left && y - estH / 2 < fb.bottom && y + estH / 2 > fb.top) {
-    if (nomsOn) { nomsOn = false; nomsEl.classList.remove('on'); }
-    return;
-  }
-  if (side !== nomsSide) { nomsSide = side; nomsEl.className = side; if (nomsOn) nomsEl.classList.add('on'); }
-  if (Math.abs(x - nomsLX) > 0.5 || Math.abs(y - nomsLY) > 0.5) {
-    nomsLX = x; nomsLY = y;
-    nomsEl.style.left = `${x.toFixed(1)}px`;
-    nomsEl.style.top = `${y.toFixed(1)}px`;
-  }
   if (!nomsOn) { nomsOn = true; nomsEl.classList.add('on'); }
 }
 /** tClock at the last bite of ANY kind. The score floor is about to be gated
@@ -10298,6 +10355,7 @@ function beginMatch(solo = false) {
   lookUpAt = -1; lookUpT = -1;
   drumCueT = 0; clearBeatLoot();
   feverMult = 1; feverT = 0; lastR = voidling.radius; matchEaten = 0; lastEatAt = -99; gShown = 0; gDebt = 0; gBiteK = 0; signedOn = false;
+  gDisp = 0; gVel = 0; gBrimT = 0; gPipStage = -1;   // the bar's first paint this match is a reset, not a level-up
   gRect = null; setTimeout(refreshGRect, 0);   // the bar is display:none until the match paints it
   // ── THE HERO WAS ASLEEP BEFORE THE MATCH BEGAN ────────────────────────────
   // `sleepy` fires at `tClock - lastInput > 8`, and tClock is WALL time since
@@ -16351,7 +16409,7 @@ function animate() {
   // match has started, where no sheet is up.)
   const gOn = started && !ended && !paused;
   growthEl.classList.toggle('off', !gOn);
-  if (gOn) paintGrowth(R);
+  if (gOn) paintGrowth(R, dt);
 
   // ── THE MENU THEME FOLLOWS THE MENU ─────────────────────────────────────
   // Driven off `body.menu` rather than wired into each screen, because the menu
