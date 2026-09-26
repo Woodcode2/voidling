@@ -28,9 +28,26 @@ import type { EatVoice } from './eatvoice';
 
 type Ctx = AudioContext;
 
+/** BELLCLOUD HEIGHTS' Great Bell (bellStrike): [ratio to C4, level, long
+ *  decay in seconds] — docs/BELLCLOUD.md §5.6's stack, re-balanced: at the
+ *  spec's levels (prime 1.0 over a 0.8 nominal) the prime, hum, tierce and
+ *  fifth — all under 500 Hz — carried most of the first second, so a phone
+ *  would have played the small bells and not the big one. The nominal (523
+ *  Hz) leads now and the four under it are turned down; qa/bellsound.mjs
+ *  measures the result (S1-S3). */
+const BELL_PARTIALS: [number, number, number][] = [
+  [0.5, 0.15, 6.0], [1, 0.45, 5.0], [1.2, 0.35, 3.6], [1.5, 0.28, 3.0],
+  [2, 1.0, 4.2], [2.5, 0.3, 2.2], [3, 0.35, 2.0], [4.2, 0.2, 1.4],
+];
+/** the Great Bell's level: a partial of level 1 plays at this gain */
+const BELL_VOL = 0.08;
+
 export interface Audio3D {
   /** SKYLARK FIELD's burner on demand (the ascension's telegraph pulse) */
   skBurnerHit(): void;
+  /** BELLCLOUD HEIGHTS: the Great Bell, eaten — one long strike of a big bell
+   *  with the festival's small bells answering it */
+  greatBell(): void;
   pop(combo: number, mealR?: number, voidR?: number): void;   // eat — pitch rises with combo, deepens with WHAT WAS EATEN
   gulp(): void;                    // GULP whoosh
   rocket(): void;                  // ROCKET BITE zip
@@ -1212,6 +1229,15 @@ export function createAudio(): Audio3D {
       eatGrain(d, t, 'bandpass', 1800, 0.7, 0.24, v, 700, 0.015);
       eatGrain(d, t + 0.02, 'bandpass', 5200, 2, 0.03, v * 0.25);
     },
+    // BELLS (BELLCLOUD HEIGHTS: the Great Bell, the bell shrines and the bell
+    // posts): a small bell's ding — a glock on E6 give or take two semitones,
+    // and its fifth a hair behind at half the level. The landmark rule would
+    // make the Great Bell crumble; a bell never rustles or crumbles.
+    ding: (d, t, v) => {
+      const f = 1318.5 * 2 ** (((eatRand() * 2 - 1) * 2) / 12);
+      glock(d, f, t, 0.6, v);
+      glock(d, f * 1.5, t + 0.06, 0.4, v * 0.5);
+    },
   };
   // ── THE LEVELS, CALIBRATED — qa/eatvoice.mjs (c), qa/_eatspread.mjs ──────
   // Each voice's gain, set on its LOUDEST take: at a car's meal (mealR 1.3 on
@@ -1224,6 +1250,11 @@ export function createAudio(): Audio3D {
   const EAT_LEVEL: Record<EatVoice, number> = {
     meep: 0.0049, wheee: 0.0158, baa: 0.014, quack: 0.0182, crumble: 0.115,
     rustle: 0.064, crinkle: 0.0153, squeak: 0.0295, poof: 0.0575,
+    // BELLCLOUD HEIGHTS' bells. Started at crinkle's 0.0153 (the same glock)
+    // and measured by qa/eatvoice.mjs (c) at only 0.7-0.8 dB under the pop:
+    // ding plays its glock at the full level plus a fifth at half, where
+    // crinkle's ping is 0.45 of it. 7 dB down from there.
+    ding: 0.0066,
   };
   /** eatSizeK at the meal the table above was calibrated on (mealR 1.3, a
    *  2.5 void): each voice's envelope is run at this level and scaled after
@@ -2456,6 +2487,20 @@ export function createAudio(): Audio3D {
         dTone(dest, t + off, d, 'sine', vol * v, 196.0 * m, 0, 0, 0.004);
       }
     }
+  }
+  /** BELLCLOUD HEIGHTS' GREAT BELL — one strike. A church-bell stack on C4
+   *  (261.63 Hz): hum, prime, the 1.2x tierce that makes it a BELL, fifth,
+   *  nominal, and three upper partials, plus a 15 ms band-passed strike at
+   *  2 kHz. Nothing under 120 Hz (the hum is 130.8). `long` is the eaten bell
+   *  (the full decays and the festival's small bells answering at +0.45 s);
+   *  short scales every decay by 0.4, for the end whistle, so the end card's
+   *  motif is not buried. The levels put most of the first second's energy
+   *  above 500 Hz, where a phone speaker can play it — see BELL_PARTIALS. */
+  function bellStrike(dest: AudioNode, t: number, long: boolean) {
+    const k = long ? 1 : 0.4;
+    for (const [m, v, d] of BELL_PARTIALS) dTone(dest, t, d * k, 'sine', BELL_VOL * v, 261.63 * m, 0, 0, 0.004);
+    nHit(dest, t, 0.015, BELL_VOL * 0.8, 'bandpass', 2000, 1.2);
+    if (long) windChime(dest, t + 0.45, BELL_VOL * 0.5);
   }
   function cockerel(dest: AudioNode, t: number, vol: number) {
     const c = ctx; if (!c) return;
@@ -4313,6 +4358,14 @@ export function createAudio(): Audio3D {
      *  sync with a balloon's telegraph pulse. Silent until the world's bus
      *  exists, which is the moment the music starts. */
     skBurnerHit() { const c = ctx; if (!c) return; skBurner(c.currentTime + 0.02, 0.24); },
+    greatBell() {
+      const c = ensure(); if (!c || !master) return;
+      logEv('greatBell');
+      duckMusic(6, 2.4);
+      // on master, NOT the eat bus: the eat bus has a 300 Hz floor, and the
+      // bell's hum and prime are what make it a big bell on headphones
+      bellStrike(master, c.currentTime + 0.01, true);
+    },
     startMusic() {
       // prefetch the recorded kit so the very first gulp is the real sample.
       // (This used to sit AFTER the pirate early-return, so the resort was the
@@ -5040,9 +5093,10 @@ export function createAudio(): Audio3D {
         nHit(m, t, 0.7, 0.05, 'highpass', 5200, 0.7, 0, 0.01);
         glock(m, 1567.98, t + 0.7, 1.0, 0.1); glock(m, 2093.0, t + 0.85, 1.2, 0.09);
       } else if (isSkylark()) {
-        // the burner's whoosh, then the chime of a balloon touching down
-        grain(1100, 0.7, 0.55, 0.12); grain(2000, 0.8, 0.45, 0.08, 0.06);
-        for (const [k, f] of [1174.66, 1396.91, 1760.0].entries()) glock(m, f, t + 0.5 + k * 0.12, 1.1, 0.09);
+        // BELLCLOUD HEIGHTS: the festival ends when the Great Bell tolls — a
+        // short strike of the same bell (on dot 3 eating the bell ends the
+        // match, and this is its only BONG)
+        bellStrike(m, t, false);
       } else {
         // the town-hall bell, pitched at C5 — well above the 196 Hz clock that
         // strikes the hours, because a phone speaker gives up below ~500 Hz and

@@ -1,4 +1,4 @@
-// ── SKYLARK FIELD'S GEOMETRY, CHECKED ───────────────────────────────────────
+// ── BELLCLOUD HEIGHTS' GEOMETRY, CHECKED (world 6, internal id 'skylark') ──
 //
 //   node qa/airfield.mjs
 //
@@ -18,6 +18,18 @@
 //   · the perimeter track was specified as a closed loop, and gameday.ts
 //     records what happens when one is not closed: a 609-unit hole due east of
 //     its bowl, because distToPath does not join the last point to the first.
+//
+// ── RETRACTION (GOVERNOR rule 3b), 2026-09-25: A's FIRST HALF ─────────────
+// The airfield became BELLCLOUD HEIGHTS, a kingdom on the clouds
+// (docs/BELLCLOUD.md). No numerals are painted any more — the threshold
+// designators were the airfield's statement and the kingdom has no numbers on
+// its ground — so "every designator matches its bearing" now checks a label
+// nobody sees. It is retired. The strips are the Grand Avenue (03/21, live)
+// and the Old Stone Ways (09/27, 15/33); A keeps its second half, renamed
+// "every avenue stays on the island". B (the ring — now the Rainbow Ring —
+// closes), C (the Bell Plaza sits on the avenues' crossing: the Great Bell is
+// placed on LAUNCH), D, E and F are unchanged. The internal names (RWY03,
+// PERIMETER, LAUNCH) are the source's and stay.
 //
 // No browser, no port, no build. Reads the source, does the arithmetic.
 import fs from 'node:fs';
@@ -52,20 +64,18 @@ const hdg = (a, b) => (Math.atan2(b[0] - a[0], -(b[1] - a[1])) * 180 / Math.PI +
 let bad = 0;
 const ok = (cond, msg) => { console.log(`  ${cond ? 'ok  ' : 'FAIL'} ${msg}`); if (!cond) bad++; };
 
-console.log(`SKYLARK FIELD — ${LAND.length}-point coast, ${PERIMETER.length}-point perimeter`);
+console.log(`BELLCLOUD HEIGHTS (skylark) — ${LAND.length}-point coast, ${PERIMETER.length}-point Rainbow Ring`);
 const xs = LAND.map((p) => p[0]), ys = LAND.map((p) => p[1]);
 console.log(`  ${Math.max(...xs) - Math.min(...xs)} x ${Math.max(...ys) - Math.min(...ys)} world units\n`);
 
-console.log('A. every designator is the truth about its own bearing');
+console.log('A. every avenue stays on the island (the designator half is retired — see the header)');
 const MARGIN = 150;
 for (const [name, pts, half] of RWY) {
   const [a, b] = [pts[0], pts[pts.length - 1]];
   const h = hdg(a, b);
-  const want = Number(name.split('/')[0]), wantRec = Number(name.split('/')[1]);
-  const got = Math.round(h / 10) % 36 || 36, rec = Math.round(((h + 180) % 360) / 10) % 36 || 36;
-  ok(got === want && rec === wantRec,
-    `${name} is drawn at ${h.toFixed(1)}°, which reads ${String(got).padStart(2, '0')}/${String(rec).padStart(2, '0')}`);
-  // and the whole strip, both edges, every 100 units, stays on the island
+  const label = LIVE.has(name) ? 'the Grand Avenue' : 'an Old Stone Way';
+  console.log(`  ·    ${name} (${label}) runs at ${h.toFixed(1)}°`);
+  // the whole strip, both edges, every 100 units, stays on the island
   const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
   const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L, px = -uy, py = ux;
   let worst = Infinity, at = null;
@@ -79,7 +89,7 @@ for (const [name, pts, half] of RWY) {
   ok(worst >= MARGIN, `${name}'s ${half * 2}-wide strip stays on the island — worst clearance ${worst.toFixed(0)} at (${at})`);
 }
 
-console.log('\nB. the perimeter track is a ring, not an arc');
+console.log('\nB. the Rainbow Ring (the perimeter) is a ring, not an arc');
 const first = PERIMETER[0], last = PERIMETER[PERIMETER.length - 1];
 ok(first[0] === last[0] && first[1] === last[1],
   `it closes: first ${JSON.stringify(first)} === last ${JSON.stringify(last)}`);
@@ -89,7 +99,7 @@ const halfP = num('PERIMETER_HALF');
 const tight = PERIMETER.filter(([x, y]) => clear(x, y) < halfP);
 ok(tight.length === 0, `the ${halfP * 2}-wide track never hangs off the coast${tight.length ? ` — ${tight.length} point(s) do, e.g. (${tight[0]})` : ''}`);
 
-console.log('\nC. the launch circle is where the runways actually cross');
+console.log('\nC. the Bell Plaza (the launch circle, where the Great Bell stands) is where the avenues actually cross');
 const X = (p, q, r, s) => { const a1 = q[1] - p[1], b1 = p[0] - q[0], c1 = a1 * p[0] + b1 * p[1]; const a2 = s[1] - r[1], b2 = r[0] - s[0], c2 = a2 * r[0] + b2 * r[1]; const d = a1 * b2 - a2 * b1; return d === 0 ? null : [(b2 * c1 - b1 * c2) / d, (a1 * c2 - a2 * c1) / d]; };
 const cross = X(RWY[0][1][0], RWY[0][1][1], RWY[2][1][0], RWY[2][1][1]);
 const dCross = Math.hypot(cross[0] - LAUNCH.cx, cross[1] - LAUNCH.cy);
@@ -133,7 +143,7 @@ const placeable = (x, y, clear = 30) => {
   return true;
 };
 /** how much room each district needs, in sampled cells at a 25-unit grid.
- *  `circle` is exempt: it IS an exclusion zone — the whale's precinct is
+ *  `circle` is exempt: it IS an exclusion zone — the Great Bell's plaza is
  *  authored inside it and nothing is ever scattered there. */
 const ROOM = { launchfield: [0.55, 2000], arrivals: [0.45, 700], tower: [0.35, 500],
   hangars: [0.35, 300], breakfast: [0.35, 300], meadow: [0.20, 2000] };
@@ -156,6 +166,6 @@ for (const [, id, name, , polyTxt] of regions) {
 }
 
 console.log(bad
-  ? `\nFAIL — airfield: ${bad} thing(s) SKYLARK FIELD claims about itself are not true`
-  : `\nPASS — airfield: every runway means its own number, the ring closes, and nothing is drawn off the island`);
+  ? `\nFAIL — airfield: ${bad} thing(s) BELLCLOUD HEIGHTS claims about itself are not true`
+  : `\nPASS — airfield: every avenue stays on the island, the Rainbow Ring closes, the Bell Plaza sits on the crossing, and nothing is drawn off the island`);
 if (bad) process.exitCode = 1;

@@ -727,7 +727,9 @@ export type Hat = 'tricorn' | 'bandana' | 'captain' | 'sun' | 'visor' | 'snorkel
   // ── MAPLE FALLS. From the play camera a hat is 60% of a person's footprint,
   // so a town of jobs needs a town of hats: the straw brim IS the farmer, the
   // shako plume IS the marching band, the hood IS the teenager.
-  | 'straw' | 'hood' | 'helmet' | 'shako' | 'postal';
+  | 'straw' | 'hood' | 'helmet' | 'shako' | 'postal'
+  // BELLCLOUD HEIGHTS: the sky folk's cloud-puff hat
+  | 'cloud';
 export type Prop = 'juice' | 'clipboard' | 'tray' | 'ball' | 'detector' | 'selfie'
   // MAPLE FALLS props. `placard` is the loudest object in the town — it is the
   // only thing an adult holds that is visible from directly overhead, which is
@@ -737,7 +739,9 @@ export type Prop = 'juice' | 'clipboard' | 'tray' | 'ball' | 'detector' | 'selfi
   // SKYLARK FIELD props. A dawn crowd is anoraks on wet grass, and from 46°
   // up an anorak is an anorak — the hand is the only place a job can live.
   | 'rope' | 'paddle' | 'bubblewand' | 'bucket' | 'broom' | 'camera' | 'crook'
-  | 'balloon';
+  | 'balloon'
+  // BELLCLOUD HEIGHTS: the Bell Wardens' and the Town Crier's hand bell
+  | 'handbell';
 // HAIR is the single most important surface at a top-down camera — it is the
 // only thing you see of most people. Nine silhouettes, fourteen colours.
 export type Hair = 'short' | 'buzz' | 'bob' | 'long' | 'bun' | 'pony' | 'curly' | 'braids' | 'bald';
@@ -766,6 +770,9 @@ interface PersonOpts {
   // balloon is picked per kid by the cast, and the accent is already spoken
   // for by the placard/pompom path (`_propCol`). Only `balloon` reads it.
   propCol?: number;
+  // BELLCLOUD HEIGHTS: little wings on the back, in this colour (absent means
+  // none). Welded into the body mesh, so they cost no draw call.
+  wings?: number;
 }
 
 // ── part builders. Each pushes GEOMETRY into `out`; the caller welds the list
@@ -880,6 +887,13 @@ function hatParts(out: Geo[], kind: Hat, col: number): void {
   } else if (kind === 'toque') {
     out.push(pc(B.cyl, WHITE, 0, 0.36, 0, 0.90, 0.54, 0.90));
     out.push(pc(B.sphS, WHITE, 0, 0.64, 0, 0.72));
+  } else if (kind === 'cloud') {
+    // BELLCLOUD HEIGHTS: three puffs of cloud, a RIGID TIP of -0.5 — authored
+    // at (0, 0.44, -0.08) and (±0.34, 0.36, -0.12), each centre turned -0.5
+    // about the head origin (the table above), so the front puff clears the
+    // brow the way the toque does. Tinted by hatCol: white, pale pink, sky.
+    out.push(pc(B.sphS, col, 0, 0.348, -0.281, 0.62, 0.62, 0.62, -0.5));
+    for (const sx of [-0.34, 0.34]) out.push(pc(B.sphS, col, sx, 0.258, -0.278, 0.44, 0.44, 0.44, -0.5));
   } else if (kind === 'bellhop') {
     out.push(pc(B.cyl, col, 0, 0.30, 0, 0.92, 0.34, 0.92));
     out.push(pc(B.cyl, GOLD, 0, 0.15, 0, 0.96, 0.10, 0.96));
@@ -1106,6 +1120,13 @@ function propParts(out: Geo[], kind: Prop, s: number, col?: number): void {
     // the anorak — the one place on a hi-vis person that is not yellow.
     out.push(pc(B.tube, 0x8a8f9c, 0.06 * s, -0.95 * s, 0.26 * s, 0.07 * s, 0.55 * s, 0.07 * s, 0.3));
     out.push(pc(B.disc, 0xff7a1a, 0.06 * s, -0.40 * s, 0.43 * s, 0.60 * s, 0.06 * s, 0.60 * s, Math.PI / 2 + 0.3));
+  } else if (kind === 'handbell') {
+    // BELLCLOUD HEIGHTS: a wooden handle in the fist and a gold bell at its
+    // end, raised and held OUT like the bubble wand so the bell clears the
+    // shoulder and reads from above as a gold dot
+    out.push(pc(B.tube, 0x8a5a30, 0.12 * s, -0.80 * s, 0.20 * s, 0.06 * s, 0.40 * s, 0.06 * s, 0, 0, -0.35));
+    out.push(pc(B.taper, 0xf2c14e, 0.23 * s, -0.52 * s, 0.20 * s, 0.34 * s, 0.34 * s, 0.34 * s, 0, 0, Math.PI - 0.35));
+    out.push(pc(B.dot, 0xf2c14e, 0.18 * s, -0.66 * s, 0.20 * s, 0.14 * s));
   } else if (kind === 'bubblewand') {
     // held up and OUT — the ring has to clear the shoulder to show from above
     out.push(pc(B.tube, WHITE, 0.18 * s, -0.55 * s, 0.20 * s, 0.035 * s, 1.00 * s, 0.035 * s, 0, 0, -0.35));
@@ -1184,15 +1205,18 @@ const LN_MOSS = 0x3f6a48;
 const LN_PLUM = 0x5a2f52;
 const LN_GOLD = 0xd9a24a;
 const LN_PAPER = 0xd8cdb6;
-// SKYLARK FIELD's three crew colours. A crew's overalls take one of these by
-// `side` (see makeCast `crew`), so the two people under an envelope read as
-// THAT balloon's from 46 degrees up. Hi-vis is for the marshals and the slab;
-// the trouser pool is mud-coloured on purpose — the first pass used Maple's
-// blues and the field looked like a school trip, not a workforce at six a.m.
+// BELLCLOUD HEIGHTS (world 6, id 'skylark'): the sky folk's colours. The
+// visiting balloon crews keep their three crew colours — a crew's overalls take
+// one by `side` (see makeCast `crew`), so the two people under an envelope read
+// as THAT balloon's from 46 degrees up. The kingdom's own people dress in
+// whites, sky blues, royal blue and gold, rose, lilac and mint; the airfield's
+// hi-vis and mud trousers are gone (the royal blue and the gold took their
+// places, and SK_SOFT the mud's).
 const SK_BLUE = 0x2f6fd0, SK_RED = 0xd8443a, SK_GREEN = 0x3a9a5a;
 const SK_CREW = [SK_RED, SK_BLUE, SK_GREEN];
-const SK_HIVIS = 0xffd23f, SK_ORANGE = 0xff7a1a, SK_CREAM = 0xf0e6d2;
-const SK_MUD = [0x2a2a34, 0x3a4a6a, 0x4a4034, 0x5a5a64];
+const SK_ROYAL = 0x2f5fc8, SK_GOLD = 0xf2c14e, SK_CREAM = 0xf0e6d2;
+const SK_SOFT = [0xeef2fa, 0xd8e2f4, 0xf2e6da, 0xe8dcf2];
+const SK_SKY = 0xa9cff2, SK_ROSE = 0xf3b5c4, SK_LILAC = 0xc9b8f0, SK_MINT = 0xa6e3c3;
 const OUTFIT: Record<string, Fit> = {
   // ── LANTERN NIGHT. Deep, saturated, low-value colours: at night a pale
   // costume blows out under a lantern pool and everything mid-grey vanishes
@@ -1271,33 +1295,32 @@ const OUTFIT: Record<string, Fit> = {
     hat: 'cap', hatOdds: 0.8, wear: ['jersey', 'jersey', 'tee'], shoe: ['shoe'] },
   treeline: { shirt: [GD_HOME_A, GD_HOME_A, GD_GOLD, 0x4a7a58, 0xf0e6d2, GD_AWAY], pants: [0x4a4034, 0x3a4a6a, 0x2a2a34],
     hat: 'beanie', hatOdds: 0.5, wear: ['hoodie', 'open', 'tee'], shoe: ['boot', 'shoe'] },
-  // ── SKYLARK FIELD. Keyed by skylark.ts's SkBiome ids. Without these ten,
-  // every adult on the field fell through to OUTFIT.cozy and a six-a.m. balloon
-  // meet came out in Maple's suburban pastels. Dawn, wet grass, early autumn:
-  // anoraks and fleeces over mud-coloured trousers, boots wherever the ground
-  // is grass, crew colours wherever a crew works and hi-vis wherever a vehicle
-  // moves — so a district reads as its job from the play camera before anyone
-  // is close enough to show a prop.
-  launchfield: { shirt: [SK_BLUE, SK_RED, SK_GREEN, SK_CREAM, SK_BLUE, SK_RED, SK_GREEN], pants: SK_MUD,
-    hat: 'cap', hatOdds: 0.6, wear: ['dungarees', 'hoodie', 'open', 'tee'], shoe: ['boot', 'boot', 'shoe'] },
-  arrivals: { shirt: [SK_BLUE, SK_RED, SK_GREEN, SK_CREAM, SK_HIVIS, SK_ORANGE], pants: SK_MUD,
-    hat: 'cap', hatOdds: 0.5, wear: ['hoodie', 'open', 'tee', 'dungarees'], shoe: ['boot', 'shoe'] },
-  breakfast: { shirt: [SK_CREAM, 0xffffff, SK_RED, 0x4a7a8a, 0x8a4a5a, SK_BLUE], pants: SK_MUD,
-    hat: 'beanie', hatOdds: 0.3, wear: ['apron', 'apron', 'hoodie', 'open', 'tee'], shoe: ['shoe', 'boot'] },
-  hangars: { shirt: [0x4a7a8a, 0x5a6a3a, 0x3a4a6a, SK_CREAM, SK_GREEN, 0x8a4a5a], pants: SK_MUD,
-    hat: 'beanie', hatOdds: 0.55, wear: ['hoodie', 'hoodie', 'open', 'dungarees'], shoe: ['boot', 'shoe'] },
-  tower: { shirt: [0xffffff, 0xdfe8ee, 0x2a3a6a, 0x1f2a4a, 0x6b4a33], pants: [0x24242e, 0x2a2a34, 0x3a3f4d],
-    hat: 'cap', hatOdds: 0.4, wear: ['blazer', 'blazer', 'tee', 'uniform'], shoe: ['shoe'] },
-  meadow: { shirt: [0x4a7a8a, 0x8a4a5a, 0x5a6a3a, 0x3a4a6a, SK_CREAM, 0xff8a3a], pants: SK_MUD,
-    hat: 'beanie', hatOdds: 0.5, wear: ['hoodie', 'hoodie', 'open', 'tee'], shoe: ['boot', 'boot', 'shoe'] },
-  perimeter: { shirt: [0x4a7a8a, 0x8a4a5a, 0x5a6a3a, 0x3a4a6a, SK_HIVIS, SK_CREAM], pants: SK_MUD,
-    hat: 'beanie', hatOdds: 0.5, wear: ['hoodie', 'hoodie', 'open', 'tee'], shoe: ['boot', 'boot', 'shoe'] },
-  slab: { shirt: [SK_HIVIS, SK_ORANGE, SK_HIVIS, SK_BLUE, 0xe8702a], pants: [0x2a2a34, SK_BLUE, 0xe8702a, 0x3a3a3a],
-    hat: 'cap', hatOdds: 0.6, wear: ['dungarees', 'dungarees', 'tee', 'hoodie'], shoe: ['boot'] },
-  circle: { shirt: [SK_HIVIS, SK_ORANGE, SK_BLUE, SK_CREAM, 0xe8702a], pants: [0x2a2a34, SK_BLUE, 0x3a3a3a],
-    hat: 'cap', hatOdds: 0.5, wear: ['dungarees', 'tee', 'hoodie', 'open'], shoe: ['boot', 'shoe'] },
-  runway: { shirt: [SK_HIVIS, SK_HIVIS, SK_ORANGE, SK_BLUE, 0xe8702a], pants: [0x2a2a34, SK_BLUE, 0xe8702a],
-    hat: 'cap', hatOdds: 0.65, wear: ['dungarees', 'dungarees', 'tee'], shoe: ['boot'] },
+  // ── BELLCLOUD HEIGHTS. Keyed by skylark.ts's SkBiome ids. Without these ten,
+  // every adult fell through to OUTFIT.cozy and came out in Maple's suburb.
+  // A festival day on the clouds: robes, dresses, tees and aprons in whites,
+  // sky blues, royal blue and gold, rose, lilac and mint, and shoes, not
+  // boots. Every role keeps its own look on top of this (castFor); these are
+  // the district's default.
+  launchfield: { shirt: [0xffffff, SK_SKY, SK_ROSE, SK_MINT, SK_LILAC, SK_CREAM], pants: SK_SOFT,
+    hat: 'sun', hatOdds: 0.25, wear: ['robe', 'dress', 'tee', 'apron'], shoe: ['shoe'] },
+  arrivals: { shirt: [SK_BLUE, SK_RED, SK_GREEN, SK_CREAM, SK_SKY, SK_ROYAL], pants: SK_SOFT,
+    hat: 'cap', hatOdds: 0.4, wear: ['tee', 'open', 'tee', 'dress'], shoe: ['shoe'] },
+  breakfast: { shirt: [SK_CREAM, 0xffffff, SK_ROSE, SK_MINT, SK_SKY, SK_GOLD], pants: SK_SOFT,
+    hat: 'sun', hatOdds: 0.2, wear: ['apron', 'apron', 'dress', 'tee'], shoe: ['shoe'] },
+  hangars: { shirt: [SK_ROYAL, SK_GOLD, 0xffffff, SK_LILAC, SK_SKY, SK_ROSE], pants: SK_SOFT,
+    hat: 'sun', hatOdds: 0.25, wear: ['robe', 'dress', 'apron', 'tee'], shoe: ['shoe'] },
+  tower: { shirt: [0xffffff, SK_ROYAL, SK_ROYAL, SK_GOLD, SK_SKY], pants: [0xeef2fa, SK_ROYAL, 0xd8e2f4],
+    hat: 'cap', hatOdds: 0.3, wear: ['robe', 'blazer', 'robe', 'uniform'], shoe: ['shoe'] },
+  meadow: { shirt: [0xffffff, SK_SKY, SK_LILAC, SK_MINT, SK_ROSE, SK_CREAM], pants: SK_SOFT,
+    hat: 'sun', hatOdds: 0.3, wear: ['robe', 'dress', 'tee', 'tee'], shoe: ['shoe'] },
+  perimeter: { shirt: [SK_ROSE, SK_GOLD, SK_MINT, SK_SKY, SK_LILAC, 0xffffff], pants: SK_SOFT,
+    hat: 'sun', hatOdds: 0.3, wear: ['dress', 'robe', 'tee', 'tee'], shoe: ['shoe'] },
+  slab: { shirt: [SK_ROYAL, SK_GOLD, 0xffffff, SK_SKY, SK_LILAC], pants: SK_SOFT,
+    hat: 'cap', hatOdds: 0.3, wear: ['robe', 'tee', 'dress'], shoe: ['shoe'] },
+  circle: { shirt: [0xffffff, SK_GOLD, SK_ROYAL, SK_SKY, SK_ROSE], pants: SK_SOFT,
+    hat: 'sun', hatOdds: 0.3, wear: ['robe', 'dress', 'tee', 'open'], shoe: ['shoe'] },
+  runway: { shirt: [SK_ROYAL, SK_GOLD, 0xffffff, SK_SKY, SK_ROSE], pants: SK_SOFT,
+    hat: 'sun', hatOdds: 0.3, wear: ['robe', 'dress', 'tee'], shoe: ['shoe'] },
 };
 
 // ══ THE ELECTION ═════════════════════════════════════════════════════════════
@@ -1566,6 +1589,13 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
     bp.push(pc(B.ring, pick([0xff8a3a, 0xff5d7e, 0x35d6f0]), 0, 0.34 * th, 0, 2.3, 2.3, 2.3, Math.PI / 2));
   if (o?.rucksack || (fit.pack && Math.random() < 0.7))
     bp.push(pc(B.box, pick([0xc4693a, 0x4a7a9a, 0x8a5cb8]), 0, 0.62 * th, -0.40 * gr, 0.62, 0.62 * th, 0.28));
+  // BELLCLOUD HEIGHTS: two little wings on the back, swept back and tipped up,
+  // reaching past the shoulders so they read from 46 degrees up. Flattened
+  // spheres, lying broad side UP (0.62 out, 0.14 thick, 0.36 deep), because a
+  // wing standing on its edge is a line from above. No draw here: a person
+  // without wings takes exactly the numbers they always took.
+  if (o?.wings !== undefined) for (const sx of [-1, 1])
+    bp.push(pc(B.sphS, o.wings, sx * 0.58 * gr, 0.98 * th, -0.30 * gr, 0.62, 0.14, 0.36, 0, sx * 0.5, sx * 0.35));
   if (o?.parrot) parrotParts(bp, Math.random() < 0.5 ? -1 : 1, th);
   const body = new THREE.Group(); body.position.y = bd.hipY;
   body.add(weld(bp)); g.add(body);
@@ -1762,7 +1792,9 @@ export type Role = 'guest' | 'rich' | 'robe' | 'kid' | 'waiter' | 'bellhop' | 'l
   // cast 358 people with none of this and the crowd was a suburb on a runway.
   // Fourteen roles, no new mesh parts: each is the existing kit in a uniform,
   // and the hands they carry are propParts's (rope, paddle, bubblewand,
-  // bucket, broom, camera, crook, balloon).
+  // bucket, broom, camera, crook, balloon). Since 2026-09-25 world 6 is
+  // BELLCLOUD HEIGHTS: the same fourteen roles, re-dressed as sky folk, with
+  // the cloud hat, little wings and the hand bell added to the kit.
   | 'crew' | 'pilot' | 'marshal' | 'cleaner' | 'tealady' | 'vancrew' | 'guide'
   | 'tourist' | 'photographer' | 'ticket' | 'driver' | 'shepherd' | 'spectator' | 'pym';
 
@@ -1774,9 +1806,13 @@ const KID_PANTS = [0x2f6fe0, 0xff5470, 0x2ab8d8, 0x66de93, 0xffb347];
 // the town and the game-day children all change clothes.
 const SK_IDS = new Set(['launchfield', 'arrivals', 'breakfast', 'hangars', 'tower',
   'meadow', 'perimeter', 'slab', 'circle', 'runway']);
-// a skylark kid's party balloon and bobble hat come in the envelope colours,
-// so a child on the bank matches the thing she is looking at
-const SK_KID_COLS = [SK_RED, SK_BLUE, SK_HIVIS, SK_GREEN, 0xff5d7e];
+// a sky kid's party balloon comes in the envelope colours, so a child on the
+// cloud matches the balloons she is looking at
+const SK_KID_COLS = [SK_RED, SK_BLUE, SK_GOLD, SK_GREEN, 0xff5d7e];
+/** the cloud hat's three tints: white, pale pink, pale sky */
+const SK_CLOUD_HATS = [0xffffff, 0xfbe2ea, 0xe2effb];
+/** a sky person's wings: white or pale gold */
+const SK_WINGS = [0xffffff, 0xfff0cc];
 
 // `side` is the CAMPAIGN COLOUR this person is wearing — DINKLE or HOLLIS.
 // Callers pass their block's allegiance so a whole street reads as one camp;
@@ -1799,23 +1835,24 @@ function castFor(role: Role, dress: string, side?: number): THREE.Group {
   const camp = (): number => (_camp ??= FAIR_COLS[Math.floor(Math.random() * FAIR_COLS.length)]);
   switch (role) {
     case 'kid': {
-      // SKYLARK FIELD: six in the morning on wet grass in September. Nobody is
-      // swimming, so no swimsuit, no armbands, no rubber ring — an anorak, a
-      // bobble hat and a party balloon on a string in one of the envelope
-      // colours, which is the child-sized version of the crowd's own look-up.
-      // Branched BEFORE the first draw below so the resort, the town and the
-      // game-day kids keep their Math.random sequence byte for byte.
+      // BELLCLOUD HEIGHTS: SKY KIDS on festival day. Wings on half of them, a
+      // cloud hat on three in ten, and a party balloon on a string in one of
+      // the envelope colours on about a third — the child-sized version of the
+      // crowd's own look-up. Branched BEFORE the first draw below so the
+      // resort, the town and the game-day kids keep their Math.random
+      // sequence byte for byte.
       if (SK_IDS.has(dress)) {
         const bal = Math.random() < 0.35;
+        const winged = Math.random() < 0.5;
         return makePerson(dress, undefined, {
           kid: true, shirt: pick(KID_SHIRT), pants: pick(KID_PANTS), accent: pick(KID_SHIRT),
-          wear: pick(['hoodie', 'hoodie', 'tee'] as Wear[]),
+          wear: pick(['dress', 'tee', 'tee'] as Wear[]),
           pattern: pick(['stripe', 'twotone', 'plain', 'plain'] as Pattern[]),
-          shoe: pick(['boot', 'boot', 'shoe'] as Shoe[]),
+          shoe: 'shoe',
           hair: pick(['curly', 'bob', 'pony', 'short', 'braids', 'buzz'] as Hair[]),
-          hat: Math.random() < 0.6 ? 'beanie' : null, hatCol: pick(SK_KID_COLS),
-          rucksack: Math.random() < 0.2,
+          hat: Math.random() < 0.3 ? 'cloud' : null, hatCol: pick(SK_CLOUD_HATS),
           prop: bal ? 'balloon' : undefined, propCol: bal ? pick(SK_KID_COLS) : undefined,
+          wings: winged ? pick(SK_WINGS) : undefined,
         });
       }
       // a child is not a shrunk adult: short limbs, round barrel, big head, and
@@ -2056,126 +2093,129 @@ function castFor(role: Role, dress: string, side?: number): THREE.Group {
         prop: Math.random() < 0.3 ? 'leaflets' : undefined,
       });
 
-    // ══ SKYLARK FIELD ═════════════════════════════════════════════════════
+    // ══ BELLCLOUD HEIGHTS (world 6, id 'skylark'; SKYLARK FIELD until
+    // 2026-09-25 — the role ids are the airfield's and stay) ════════════════
     // Every case below was checked against one question: standing in a crowd
     // of its own district at the play camera's 46 degrees, what is the ONE
-    // thing that says the job? Crew: the overalls' colour. Marshal: hi-vis
-    // under a white cap. Cleaner: a yellow bucket. Guide: a placard. Shepherd:
-    // a crook taller than the head. If that thing is a prop it is welded into
-    // the arm mesh — no role here costs a draw call the resort's did not.
+    // thing that says the job? Crew: the overalls' colour. Bell Warden
+    // ('marshal'): a gold cap over royal blue. Cloud sweeper: a bucket. Guide:
+    // a placard. Shepherd: a crook taller than the head. If that thing is a
+    // prop it is welded into the arm mesh — no role here costs a draw call the
+    // resort's did not.
     case 'crew': {
       // one of three crews, by `side`, so the two people under an envelope
       // wear its colour; the white tee under the bib is what keeps three dark
       // overalls from reading as one crew from above
+      // (BELLCLOUD HEIGHTS: a visiting balloon crew at the dock — the job is
+      // unchanged, the boots are shoes on the cloud)
       const c = SK_CREW[(side ?? Math.floor(Math.random() * 3)) % 3];
       return makePerson(dress, undefined, {
-        shirt: 0xffffff, pants: c, accent: c, wear: 'dungarees', shoe: 'boot', pattern: 'plain',
+        shirt: 0xffffff, pants: c, accent: c, wear: 'dungarees', shoe: 'shoe', pattern: 'plain',
         hat: Math.random() < 0.7 ? 'cap' : null, hatCol: c, prop: 'rope',
         hair: pick(['short', 'buzz', 'pony', 'bun', 'curly'] as Hair[]),
       });
     }
     case 'pilot':   // brown leather, cream trousers, and the cap is never off
       return makePerson(dress, undefined, {
-        shirt: 0x6b4a33, pants: SK_CREAM, accent: 0x4a3222, wear: 'blazer', shoe: 'boot', pattern: 'plain',
+        shirt: 0x6b4a33, pants: SK_CREAM, accent: 0x4a3222, wear: 'blazer', shoe: 'shoe', pattern: 'plain',
         hat: 'cap', hatCol: pick([0x4a3222, 0x24242e, SK_CREAM]), glasses: Math.random() < 0.5,
         prop: 'clipboard',
       });
     case 'marshal':
-      // hi-vis under a WHITE cap. The cap is the marshal from directly above —
-      // a hi-vis tee on its own is a tourist in yellow at the top of the
-      // camera's travel — and the paddle is the marshal from the side. The
-      // stripe pattern in pale grey is the reflective banding.
+      // BELL WARDENS. Royal blue with a gold sash under a GOLD cap: the cap is
+      // the warden from directly above, and the hand bell is the warden from
+      // the side. (The role id stays 'marshal': qa/jobs.mjs counts it.)
       return makePerson(dress, undefined, {
-        shirt: pick([SK_HIVIS, SK_ORANGE]), pants: 0x2a2a34, accent: 0xd8d4cc, wear: 'tee', shoe: 'boot',
-        pattern: 'stripe', hat: 'cap', hatCol: 0xffffff, prop: 'paddle',
+        shirt: SK_ROYAL, pants: 0xeef2fa, accent: SK_GOLD, wear: 'tee', shoe: 'shoe',
+        pattern: 'sash', hat: 'cap', hatCol: SK_GOLD, prop: 'handbell',
       });
     case 'cleaner':
-      // blue overalls, yellow at the shoulders and a yellow bucket at the hip.
-      // Half of them sweep instead of blowing bubbles — that is the half the
-      // kids do not follow
+      // CLOUD SWEEPERS: white overalls over a sky-blue top, a bucket at the
+      // hip. Half of them sweep instead of blowing bubbles (bubbles belong on
+      // clouds) — that is the half the kids do not follow
       return makePerson(dress, undefined, {
-        shirt: 0xf2c623, pants: SK_BLUE, accent: 0xf2c623, wear: 'dungarees', shoe: 'boot', pattern: 'plain',
+        shirt: SK_SKY, pants: 0xffffff, accent: SK_SKY, wear: 'dungarees', shoe: 'shoe', pattern: 'plain',
         hat: null, prop: side === 1 ? 'broom' : 'bubblewand', propL: 'bucket',   // side 1 sweeps (mode 8); the wand half blows bubbles
       });
-    case 'tealady':   // a white apron over a floral dress, a headscarf, the urn's pot
+    case 'tealady':   // BAKERS: a white apron over pastel, the toque, a tray of cloud buns
       return makePerson(dress, undefined, {
-        shirt: pick([0x7a5a8a, 0x5a7a6a, 0x8a4a5a, 0x4a6a8a]), pants: pick([0x3a3a44, 0x5a4a3a]),
-        accent: 0xffffff, wear: 'apron', pattern: 'floral', shoe: 'shoe',
-        hat: 'bandana', hatCol: pick([SK_RED, SK_BLUE, 0xf0c050, SK_CREAM]),
-        prop: Math.random() < 0.5 ? 'coffeepot' : 'tray', hair: pick(['bun', 'bun', 'bob', 'curly'] as Hair[]),
+        shirt: pick([SK_ROSE, SK_MINT, SK_SKY, SK_LILAC]), pants: pick(SK_SOFT),
+        accent: 0xffffff, wear: 'apron', pattern: 'plain', shoe: 'shoe',
+        hat: 'toque', prop: 'tray', hair: pick(['bun', 'bun', 'bob', 'curly'] as Hair[]),
       });
-    case 'vancrew':   // the bacon van: white coat, paper hat, a tray for the tower
+    case 'vancrew':   // CART KEEPERS: a striped apron and a tray, at the cake cart's hatch
       return makePerson(dress, undefined, {
-        shirt: 0xffffff, pants: pick([0x2a2a34, 0x3a4a6a]), accent: pick([SK_RED, SK_BLUE, 0xe4e0d6]),
-        wear: 'apron', shoe: 'shoe', pattern: 'plain', hat: 'toque', prop: 'tray',
+        shirt: pick([SK_ROSE, SK_SKY, SK_MINT]), pants: pick(SK_SOFT), accent: 0xffffff,
+        wear: 'apron', shoe: 'shoe', pattern: 'stripe', hat: null, prop: 'tray',
       });
     case 'guide':
-      // the placard takes the accent, so the sign over a guide's head is the
-      // one white rectangle in a field of colour; the red jacket is for the
-      // conga behind to follow
+      // DOCK GUIDES. The placard takes the accent, so the sign over a guide's
+      // head is the one white rectangle in a field of colour; the royal-blue
+      // jacket is for the visitors behind to follow
       return makePerson(dress, undefined, {
-        shirt: SK_RED, pants: 0x2a2a34, accent: 0xffffff, wear: 'blazer', shoe: 'shoe', pattern: 'plain',
-        hat: Math.random() < 0.3 ? 'cap' : null, hatCol: SK_RED, prop: 'placard', lanyard: true,
+        shirt: SK_ROYAL, pants: 0xeef2fa, accent: 0xffffff, wear: 'blazer', shoe: 'shoe', pattern: 'plain',
+        hat: Math.random() < 0.3 ? 'cap' : null, hatCol: SK_GOLD, prop: 'placard', lanyard: true,
       });
     case 'tourist':
-      // bright coats and a sunhat on a cold morning: a tourist is the person
-      // dressed for the postcard rather than the field. Three looks — hooded,
-      // open coat, bare-headed — and half carry the camera the look-up flashes
+      // VISITORS FROM THE OTHER ISLANDS: bright coats and a sunhat — they
+      // dressed for the postcard. Three looks — hooded, open coat, bare-headed
+      // — and half carry the camera the look-up flashes
       return makePerson(dress, undefined, {
-        shirt: pick([0xff8a3a, 0x35d6f0, 0xffd23f, 0xb875ff, 0x7be8b0]), pants: pick(SK_MUD),
+        shirt: pick([0xff8a3a, 0x35d6f0, 0xffd23f, 0xb875ff, 0x7be8b0]), pants: pick(SK_SOFT),
         accent: pick([0xffffff, INK, 0x2a2a34]), wear: pick(['hoodie', 'hoodie', 'open'] as Wear[]),
-        shoe: pick(['shoe', 'boot'] as Shoe[]), pattern: 'plain',
+        shoe: 'shoe', pattern: 'plain',
         hat: Math.random() < 0.5 ? 'sun' : null, hatCol: pick([0xf6e3b8, SK_CREAM, 0x8a7a5a]),
         hair: pick(['short', 'bob', 'long', 'bun', 'pony', 'curly', 'bald', 'buzz'] as Hair[]),
         glasses: Math.random() < 0.3, rucksack: Math.random() < 0.4,
         prop: Math.random() < 0.5 ? 'camera' : undefined,
       });
-    case 'photographer':   // khaki vest, cap, and the camera never leaves the face
+    case 'photographer':   // a visitor: khaki vest, cap, and the camera never leaves the face
       return makePerson(dress, undefined, {
-        shirt: 0x8a8a5a, pants: 0x2a2a34, accent: 0x5a5a3a, wear: 'open', shoe: 'boot', pattern: 'plain',
+        shirt: 0x8a8a5a, pants: 0x2a2a34, accent: 0x5a5a3a, wear: 'open', shoe: 'shoe', pattern: 'plain',
         hat: 'cap', hatCol: pick([0x4a4a3a, INK]), prop: 'camera', rucksack: Math.random() < 0.5,
         hair: pick(['short', 'buzz', 'pony', 'bald'] as Hair[]),
       });
-    case 'ticket':   // the caravan at the gate: navy top to toe, leaflets out
+    case 'ticket':   // a DOCK GUIDE at the ticket wagon: royal blue and gold, leaflets out
       return makePerson(dress, undefined, {
-        shirt: 0x1f2a4a, pants: 0x24242e, accent: 0xf0c050, wear: 'blazer', shoe: 'shoe', pattern: 'plain',
-        hat: 'cap', hatCol: 0x1f2a4a, prop: 'leaflets', lanyard: Math.random() < 0.6,
+        shirt: SK_ROYAL, pants: SK_ROYAL, accent: SK_GOLD, wear: 'blazer', shoe: 'shoe', pattern: 'plain',
+        hat: 'cap', hatCol: SK_GOLD, prop: 'leaflets', lanyard: Math.random() < 0.6,
       });
     case 'driver': {
-      // a boiler suit is dungarees with the tee the same colour as the bib —
-      // one colour from collar to boot, which is what stops it being a farmer
+      // a visiting balloon crew's driver: a boiler suit is dungarees with the
+      // tee the same colour as the bib — one colour from collar to shoe
       const bs = pick([0xe8702a, SK_BLUE]);
       return makePerson(dress, undefined, {
-        shirt: bs, pants: bs, accent: bs, wear: 'dungarees', shoe: 'boot', pattern: 'plain',
+        shirt: bs, pants: bs, accent: bs, wear: 'dungarees', shoe: 'shoe', pattern: 'plain',
         hat: 'cap', hatCol: pick([INK, bs]), prop: 'tape',
       });
     }
-    case 'shepherd':   // tweed, a flat cap, and a crook taller than he is
+    case 'shepherd':   // CLOUD SHEPHERDS: a white smock, a straw hat and the crook
       return makePerson(dress, undefined, {
-        shirt: 0x7a6a4a, pants: 0x4a4034, accent: 0x5a4a34, wear: 'blazer', shoe: 'boot', pattern: 'plain',
-        hat: 'cap', hatCol: 0x6a5a3a, prop: 'crook', hair: pick(['short', 'bald', 'buzz'] as Hair[]),
+        shirt: 0xffffff, pants: pick(SK_SOFT), accent: SK_SKY, wear: 'robe', shoe: 'shoe', pattern: 'plain',
+        hat: 'sun', hatCol: 0xf6e3b8, prop: 'crook', hair: pick(['short', 'bald', 'buzz'] as Hair[]),
       });
-    case 'spectator':
-      // the bank: muted anoraks, a bobble hat, a hot drink. Deliberately the
-      // dullest people on the field — they are what the balloons are bright
-      // against, and the clap on the look-up cue is what makes them a crowd
+    case 'spectator': {
+      // HEIGHTS FOLK, the locals, in pastel robes and dresses: wings on six in
+      // ten, a cloud hat on four in ten. The clap on the look-up cue is what
+      // makes them a crowd.
+      const winged = Math.random() < 0.6;
       return makePerson(dress, undefined, {
-        shirt: pick([0x4a7a8a, 0x8a4a5a, 0x5a6a3a, 0x3a4a6a]), pants: pick(SK_MUD),
-        accent: pick([0x2a2a34, 0xffffff, 0xf0c050]), wear: 'hoodie', shoe: pick(['boot', 'shoe'] as Shoe[]),
-        pattern: 'plain', hat: Math.random() < 0.5 ? 'beanie' : null,
-        hatCol: pick([SK_RED, SK_BLUE, 0xf0c050, SK_GREEN, 0x5a5a64]),
+        shirt: pick([0xffffff, SK_SKY, SK_ROSE, SK_LILAC, SK_MINT, SK_GOLD]), pants: pick(SK_SOFT),
+        accent: pick([0xffffff, SK_GOLD, SK_ROYAL]), wear: pick(['robe', 'dress', 'robe'] as Wear[]), shoe: 'shoe',
+        pattern: 'plain', hat: Math.random() < 0.4 ? 'cloud' : null, hatCol: pick(SK_CLOUD_HATS),
         glasses: Math.random() < 0.25, prop: Math.random() < 0.3 ? 'juice' : undefined,
+        wings: winged ? pick(SK_WINGS) : undefined,
       });
+    }
     case 'pym':
-      // MR PYM, the Balloonmeister. White shirt, no hat, glasses, a megaphone:
-      // the only person on the field dressed for an office and the only one
-      // who never moves. The lanyard is the nearest thing in the kit to a tie.
-      // Grey — he has been deciding whether it is safe to fly since before
-      // the whale.
+      // MASTER TOLLY, THE TOWN CRIER. A royal-blue robe, a gold chain, glasses,
+      // white hair and a hand bell: the one person in the kingdom dressed for
+      // a proclamation, and the only one who never moves — at the foot of the
+      // Keep, facing the plaza. (The role id stays 'pym'.)
       return makePerson(dress, undefined, {
-        shirt: 0xffffff, pants: 0x2a2a34, accent: 0x2a2a34, wear: 'tee', shoe: 'shoe', pattern: 'plain',
-        hat: null, glasses: true, lanyard: true, prop: 'horn',
-        hair: pick(['short', 'bald'] as Hair[]), hairCol: pick([0x9a9aa4, 0xe8e2d8, 0x55555f]),
+        shirt: SK_ROYAL, pants: SK_ROYAL, accent: SK_GOLD, wear: 'robe', shoe: 'shoe', pattern: 'plain',
+        hat: null, glasses: true, necklace: true, prop: 'handbell',
+        hair: pick(['short', 'bald'] as Hair[]), hairCol: pick([0xe8e2d8, 0xf2f0ea]),
       });
     default:         // generic holidaymaker in whatever the district wears
       return makePerson(dress, undefined, {
@@ -5593,7 +5633,6 @@ export function createLife(
         if (!g) { g = (SKF.skBalloonStanding(cols) as THREE.Mesh).geometry; standGeo.set(k, g); }
         return g;
       };
-      let whaleGeo: THREE.BufferGeometry | null = null;
       const collect = () => {
         envs.length = 0;
         scene.traverse((o) => {
@@ -5629,7 +5668,9 @@ export function createLife(
       const begin = (e: Env) => {
         e.t = 0; e.m.userData.ptsMult = 1.5;   // worth more while it is saying goodbye
         if (e.stage === 1 || e.stage === 2 || e.stage === 4) {
-          e.m.geometry = e.stage === 4 ? (whaleGeo ??= (SKF.skWhaleStanding() as THREE.Mesh).geometry) : standing(e.cols);
+          // (stage 4 was the airfield's whale; BELLCLOUD HEIGHTS has none, so
+          // every envelope that stands up stands up as a balloon)
+          e.m.geometry = standing(e.cols);
           e.m.scale.y = 0.12; e.phase = 1;
         } else { e.phase = 2; fire(e); }
       };
@@ -5684,6 +5725,12 @@ export function createLife(
             begin(w);
           }
         }
+        // THE GREAT BELL HAS BEEN RUNG (BELLCLOUD HEIGHTS — prototype3d.ts sends
+        // this when the child eats it): every docked balloon lets go, the
+        // cascade spreading outward from the void, which is on the plaza. The
+        // 'whale' beat's clock (13 s after its card) still starts it if that
+        // comes first; whichever does, wins.
+        else if (n === 'bell' && live && !cascade) { cascade = true; cascadeAt = mt + 1.5; }
       });
       movers.push({ mesh: null as unknown as THREE.Object3D, update(dt, _t, vx, vz) {
         if (!live) return;

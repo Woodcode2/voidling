@@ -1,5 +1,17 @@
 // ══════════════════════════════════════════════════════════════════════════
-//  SKYLARK FIELD — the airfield's real geometry
+//  BELLCLOUD HEIGHTS (world 6, internal id 'skylark') — the island's geometry
+//
+//  2026-09-25: the airfield this file describes became BELLCLOUD HEIGHTS, a
+//  kingdom on the clouds (docs/BELLCLOUD.md). THE GEOMETRY STAYED, ALL OF IT,
+//  and so do the names below — the module, RWY03/09/15, PERIMETER, LAUNCH,
+//  the SkBiome ids — because three probes, the crowd's dress codes, the
+//  newsroom's district pools and the placement audit are keyed on them. What
+//  a child sees is renamed: the live runway 03/21 is THE GRAND AVENUE, the two
+//  disused slabs are THE OLD STONE WAYS, the perimeter track is THE RAINBOW
+//  RING, and the launch circle is THE BELL PLAZA, where the Great Bell stands
+//  on the avenues' crossing. The SK_REGIONS `name` strings carry the new
+//  district names. The notes below are the airfield's and say why the shape
+//  is what it is; read "runway" as avenue and "whale" as the Great Bell.
 //
 //  Maple Isle is a fat blob on a road grid. Pirate Bay is a hooked headland
 //  round a lagoon. Game Day is a lopsided plateau. Lantern Night is a waisted
@@ -153,7 +165,7 @@ export interface SkRegion { id: SkBiome; name: string; poly: Pt[]; density: numb
 // the crossing and the crossing is hers.
 export const SK_REGIONS: SkRegion[] = [
   // THE LAUNCH CIRCLE, first, so it owns the crossing outright.
-  { id: 'circle', name: 'THE LAUNCH CIRCLE', density: 0.6,
+  { id: 'circle', name: 'THE BELL PLAZA', density: 0.6,
     poly: [[7207,4349], [7060,4899], [6657,5302], [6107,5449], [5557,5302], [5154,4899], [5007,4349], [5154,3799], [5557,3396], [6107,3249], [6657,3396], [7060,3799]] },
 
   // THE LAUNCH FIELD. The hero district and the densest lawn in the game: the
@@ -162,7 +174,7 @@ export const SK_REGIONS: SkRegion[] = [
   // inflation. Density 1.5 — the same figure Powder gives its village — and
   // the only place in the world where the ratio of stages is hand-authored
   // rather than scattered.
-  { id: 'launchfield', name: 'THE LAUNCH FIELD', density: 1.5,
+  { id: 'launchfield', name: 'THE CLOUD GARDENS', density: 1.5,
     poly: [[4350, 6550], [5300, 6350], [6400, 6330], [7450, 6450], [8050, 6950],
            [8200, 7750], [8000, 8550], [7350, 9050], [6400, 9250], [5400, 9150],
            [4700, 8750], [4300, 8000], [4250, 7200]] },
@@ -178,7 +190,7 @@ export const SK_REGIONS: SkRegion[] = [
   // units, dead ahead down the old runway. Trailers nose-in along the slab,
   // tailgates down, envelopes half-dragged out of their bags, a ticket caravan
   // with one bulb on.
-  { id: 'arrivals', name: 'THE ARRIVALS FIELD', density: 1.1,
+  { id: 'arrivals', name: 'THE BALLOON DOCK', density: 1.1,
     poly: [[7000, 5300], [8250, 5300], [8500, 5750], [8250, 6200], [7000, 6200], [6850, 5750]] },
 
   // THE TOWER. The preserved control tower on the south-east shoulder,
@@ -186,20 +198,20 @@ export const SK_REGIONS: SkRegion[] = [
   // briefing caravan, the flagpole, the fire tender that has never been used
   // and the windsock mast. The Balloonmeister broadcasts from the balcony and
   // does not come down.
-  { id: 'tower', name: 'THE TOWER', density: 0.9,
+  { id: 'tower', name: 'THE CASTLE KEEP', density: 0.9,
     poly: [[8000, 6350], [8700, 6350], [9150, 6700], [9250, 7250], [8900, 7500],
            [8250, 7450], [7950, 6950]] },
 
   // THE HANGARS. Two curved-roof sheds behind the tower with their doors
   // half-slid open, running a Sunday flea market inside.
-  { id: 'hangars', name: 'THE HANGARS', density: 1.2,
+  { id: 'hangars', name: 'THE CASTLE YARD', density: 1.2,
     poly: [[8360, 7320], [8950, 7300], [9330, 7620], [9350, 8080], [9080, 8380],
            [8600, 8420], [8340, 8150], [8280, 7700]] },
 
   // BREAKFAST ROW. The food vans along the old taxiway spur. Every errand in
   // this world eventually comes here, which is what makes it the crowd's one
   // cross-district destination.
-  { id: 'breakfast', name: 'BREAKFAST ROW', density: 1.3,
+  { id: 'breakfast', name: 'THE CLOUD MARKET', density: 1.3,
     poly: [[7250, 4560], [7850, 4500], [8280, 4620], [8500, 4880], [8480, 5180],
            [8100, 5330], [7600, 5320], [7250, 5140], [7150, 4840]] },
 
@@ -208,7 +220,7 @@ export const SK_REGIONS: SkRegion[] = [
   // bites: wildflowers, skylarks, a hare, a collapsed windsock pole and the
   // fence nobody has mended. Dress it off distToEdge with a band, never with
   // scatterInRegion.
-  { id: 'meadow', name: 'THE ROUGH', density: 0.35, poly: SK_LAND_SMOOTH },
+  { id: 'meadow', name: 'THE CLOUD MEADOWS', density: 0.35, poly: SK_LAND_SMOOTH },
 ];
 
 /** THE ARRIVALS FIELD, on the wet grass 800 units off the 21 threshold — the

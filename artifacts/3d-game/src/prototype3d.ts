@@ -2021,9 +2021,29 @@ const WORLD_LIGHT: Record<WorldId, WorldLight> = {
   //
   // exposure 1.15, and the ceiling is the mascot's: above ~1.26 he stops being
   // one colour across the game, measured at 9.6 dE against a bar of 6.
-  skylark: { sun: 0xffc78e, sunI: 1.90, hemiSky: 0xe2d8f0, hemiGround: 0x7c8a5e, hemiI: 0.58,
-             off: [78, 60, -46], dusk: 0.80, normalBias: 0.15, exposure: 1.15,
-             fill: 0x8fa8e4, fillI: 0.62, fillOff: [-70, 52, 40] },
+  //
+  // ── BELLCLOUD HEIGHTS, 2026-09-25: the airfield became a cloud kingdom in a
+  // bright golden day (docs/BELLCLOUD.md §4). It keeps the one big idea above
+  // — the ONLY rig keyed from the east, so every shadow still rakes the other
+  // way — and raises the sun to [70, 95, -40], 49.7 degrees, warmed to gold.
+  // The ground is pearl cloud now, not grass; the hemisphere's ground bounce
+  // is bright lilac-white off cloud and the lamps are barely on (dusk 0.10).
+  //
+  // THE SPEC'S STARTING ROW READ GREY, and qa/skylarkfield.mjs D measured it:
+  // key 1.70, hemi 0.60, fill 0.55, exposure 1.05 put the spawn frame at luma
+  // 0.593 and the cloud pixels' median at 0.718-0.740 across its four frames,
+  // under L1's 0.60 and L2's 0.74 — a cloud kingdom at noon that reads
+  // overcast. One page load, the live rig scaled (qa/_scratch/lightsweep.mjs,
+  // spawn / north arm cloud median): exposure alone 1.12 -> 0.735 / 0.756,
+  // 1.18 -> 0.747 / 0.768; key x1.2 and hemi x1.3 at 1.05 -> 0.751 / 0.772;
+  // key and fill x1.1, hemi x1.2 at 1.15 -> 0.762 / 0.781, spawn luma 0.651,
+  // nothing blown. That last row is this one: key 1.87, fill 0.605, hemi
+  // 0.72, exposure 1.15 — the airfield's own shipped exposure, so the mascot
+  // stays where he was measured, under his ~1.26 ceiling.
+  // MEASURED ON THIS ROW: (pending — filled in from the runs)
+  skylark: { sun: 0xffe3a8, sunI: 1.87, hemiSky: 0xd2e6ff, hemiGround: 0xf0eaf2, hemiI: 0.72,
+             off: [70, 95, -40], dusk: 0.10, normalBias: 0.15, exposure: 1.15,
+             fill: 0xa9c6f2, fillI: 0.605, fillOff: [-70, 52, 40], bloomCut: 1.25 },
 };
 const LIGHT = WORLD_LIGHT[pickedWorld];
 
@@ -2128,17 +2148,12 @@ const HOURS: Record<WorldId, WorldHour[]> = {
     { name: 'last light', dusk: 1.0, sunK: 0.8, warm: 0.3 },
     { name: 'cold bright morning', dusk: 0.55, sunK: 1.14, warm: -0.12 },
   ],
-  // A BALLOON MEET IS A WEATHER STORY, so this world's hours are the three
-  // mornings a meet actually gets. Hour 0 is the shipped rig untouched, by
-  // construction.
+  // BELLCLOUD HEIGHTS: the festival's three kinds of day. Hour 0 is the
+  // shipped rig untouched, by construction. The names are internal.
   skylark: [
-    { name: 'first light', dusk: 0.80, sunK: 1, warm: 0 },
-    // the sun clears the horizon mid-match: the one hour in the game that gets
-    // WARMER as it goes, because that is what sunrise does
-    { name: 'sun on the deck', dusk: 0.58, sunK: 1.18, warm: 0.26 },
-    // the morning the meet nearly got called off. Flatter, cooler, and the
-    // Balloonmeister's instruments have never been happier about it
-    { name: 'low cloud', dusk: 0.92, sunK: 0.78, warm: -0.16 },
+    { name: 'festival morning', dusk: 0.10, sunK: 1, warm: 0 },
+    { name: 'golden afternoon', dusk: 0.30, sunK: 0.92, warm: 0.30 },
+    { name: 'bright noon', dusk: 0.00, sunK: 1.08, warm: -0.12 },
   ],
 };
 /** ── WHICH WORLDS' AUTHORED hemiI ACTUALLY REACHES A LIGHT ─────────────────
@@ -3027,13 +3042,19 @@ const LEVEL_SPEC: Record<WorldId, LevelSpec> = {
   // 11,104 at half · bell tower r 4.4 needs R 3.96 (~55%) · SET at 91 s (50%)
   powder: { eat: 9000, landmark: 'bell tower', landmarkR: 3.96, rank: 1, clear: 30,
     set: [{ kind: 'gild', n: 4, label: 'GOLD', icon: '💰' }, { kind: 'house', n: 4, label: 'CHALETS', icon: '🏡' }, { kind: 'snack', n: 40, label: 'SNACKS', icon: '🍿' }] },
-  // 32,020 at half · hangar r 5.5 needs R 4.95 (~73%) · SET at 39 s (22%)
-  // vans were 40 on the hunt's timing (39 s) but the island carries 98 and the
-  // family eats 40-50% of the board, so 40 would have been a race against the
-  // rubber band for the last few. 15 clears the 6N rule and the hunt reached it
-  // at 22 s.
-  skylark: { eat: 26500, landmark: 'hangar', landmarkR: 4.95, rank: 1, clear: 38,
-    set: [{ kind: 'gild', n: 6, label: 'GOLD', icon: '💰' }, { kind: 'car', n: 15, label: 'VANS', icon: '🚐' }, { kind: 'snack', n: 100, label: 'SNACKS', icon: '🍿' }] },
+  // BELLCLOUD HEIGHTS: the Great Bell r 5.5 needs R 4.95 (the hangar's figure,
+  // which the bell replaces as dot 3's landmark and the hero both).
+  // eat, clear and every set.n are PROVISIONAL — not re-measured on
+  // Bellcloud's food (qa/goalcurve.mjs has not been run on it). The set moves
+  // from VANS to HOUSES because there are no vans in the sky: the kingdom
+  // carries 78 house-like props and 30 car-tagged ones (qa/questable.mjs,
+  // SEED 7), so the 6N rule allows HOUSES up to 13 and VANS 15 would need 90.
+  // qa/levels.mjs (e) passes this row: the Great Bell resolves for dot 3 and
+  // dot 2's three kinds clear their supply rule. EAT carries the events
+  // change's re-scale (30,000 -> 26,500 on the airfield, measured without
+  // the x2/x3 windows) until goalcurve is run on the kingdom itself.
+  skylark: { eat: 26500, landmark: 'great bell', landmarkR: 4.95, rank: 1, clear: 38,
+    set: [{ kind: 'gild', n: 6, label: 'GOLD', icon: '💰' }, { kind: 'house', n: 10, label: 'HOUSES', icon: '🏠' }, { kind: 'snack', n: 100, label: 'SNACKS', icon: '🍿' }] },
 };
 
 /** The dot being played, or null. Non-null ONLY when a human chose a level —
@@ -6918,8 +6939,9 @@ const MED_BY_WORLD: Record<string, string[]> = {
   pirate:  ['evolve', 'combo', 'gold'],
   powder:  ['evolve', 'combo', 'gold'],
   lantern: ['evolve', 'combo', 'gold'],
-  // SKYLARK FIELD has 70 car-tagged props (the retrieve vehicles and the
-  // trailers at arrivals), so 'Rush Hour: eat 6 cars' clears comfortably.
+  // SKYLARK FIELD had 70 car-tagged props; BELLCLOUD HEIGHTS has 30 (the
+  // basket carts and the four cake carts, qa/questable.mjs, SEED 7),
+  // and 'Rush Hour: eat 6 cars' still clears — questable PASSES the pool.
   skylark: ['cars', 'evolve', 'combo'],
 };
 const HARD_BY_WORLD: Record<string, string[]> = {
@@ -6928,14 +6950,10 @@ const HARD_BY_WORLD: Record<string, string[]> = {
   lantern: ['houses', 'rival', 'big'],
   pirate:  ['cabanas', 'rival', 'big'],
   powder:  ['houses', 'rival'],
-  // ...and no 'houses' here. An airfield has two hangars, a tower and a row of
-  // stalls; qa/questable.mjs measured the house supply at TWO against a quest
-  // that asks for three, so with skylark absent from this table and falling
-  // through to `?? HARD_BY_WORLD.maple` a child was drawn an impossible board.
-  // That is the identical bug this table was created to end, one world later.
-  // Two chips rather than three, as POWDER PASS carries two, because an honest
-  // absence beats tagging a control tower as somebody's house.
-  skylark: ['rival', 'big'],
+  // BELLCLOUD HEIGHTS has houses now — cloud cottages and market stalls — so
+  // 'houses' is back (the airfield's house supply was TWO, which is why it was
+  // left out). qa/questable.mjs decides whether each chip can be cleared.
+  skylark: ['houses', 'rival', 'big'],
 };
 const MED_Q = MED_BY_WORLD[pickedWorld] ?? MED_BY_WORLD.maple;
 const HARD_Q = HARD_BY_WORLD[pickedWorld] ?? HARD_BY_WORLD.maple;   // easy rotates daily; 'solo' retired with the menu button
@@ -9858,6 +9876,8 @@ interface BitePay {
 // the ceremony's smug face spends on it.
 const BURP_ON = (() => { try { return new URLSearchParams(location.search).get('burp') === '1'; } catch { return false; } })();
 const BURP_AFTER = 0.45, BURP_CD = 20, BURP_STREAK = 3, BURP_STREAK_WIN = 5, EVO_CLEAR = 1.8;
+/** BELLCLOUD HEIGHTS: the Great Bell's burp waits for its BONG to bloom */
+const BELL_BURP_AFTER = 1.6;
 /** world seconds until the owed burp starts; -1 when none is owed */
 let burpWait = -1;
 /** tClock before which no burp may be owed */
@@ -10302,6 +10322,17 @@ function biteSinks(e: Edible, pay: BitePay) {
     pay.said = said ?? '-';
     if (said) logAudio(`eat:${said}`);
   } else if (pay.vc) pay.said = '-';
+  // ── BELLCLOUD HEIGHTS: THE GREAT BELL GOES DOWN. The whole island hears a
+  // BONG on the drop (G8: the reward lands on the drop, not on contact), every
+  // docked balloon lets go (life.ts's 'bell' cue) and the camera takes its
+  // four-second look up at a sky filling with them — a camera move, not shake.
+  // Not in the end beat: on dot 3 eating the bell IS the win, and the whistle
+  // is the bell there (audio3d's skylark whistle()).
+  if (pickedWorld === 'skylark' && e === heroProp && !beat && !ended) {
+    audio.greatBell();
+    life.cue('bell', voidState.x, voidState.z);
+    lookUpAt = matchElapsed() + 2.5;
+  }
   // The pop's pitch is the link THIS bite was (pay.combo), so the ladder now
   // climbs in the order meals go DOWN, not the order they were taken: a crumb
   // drains faster than a meal, so a crumb taken just after a meal can sink
@@ -10405,7 +10436,10 @@ function biteGulps(e: Edible, pay: BitePay) {
   if (!endBeat()) {
     voidling.afterBite(pay.bite);
     while (burpStreak.length && tClock - burpStreak[0] > BURP_STREAK_WIN) burpStreak.shift();
-    if (pay.treat || burpStreak.length >= BURP_STREAK) oweBurp(BURP_AFTER);
+    // (on BELLCLOUD HEIGHTS the Great Bell's burp waits for the bell's bloom:
+    // "BONG … burp")
+    if (pay.treat || burpStreak.length >= BURP_STREAK)
+      oweBurp(pickedWorld === 'skylark' && pay.id === heroProp?.mesh.id ? BELL_BURP_AFTER : BURP_AFTER);
   }
 }
 
@@ -10757,7 +10791,10 @@ function beginMatch(solo = false) {
   for (const e of edibles) {
     if (!e.mesh.userData.landmark) continue;
     if (!goalProp) goalProp = e;
-    if (goal?.n === 3) e.mesh.userData.reserved = true;
+    // …and on every dot for a landmark its world marks keepForPlayer — only
+    // BELLCLOUD HEIGHTS' Great Bell (island.ts): the summit of the trip, which
+    // a sibling must never ring first. No other world sets the flag.
+    if (goal?.n === 3 || e.mesh.userData.keepForPlayer) e.mesh.userData.reserved = true;
   }
   {
     const tl = document.querySelector('#titlecard .lvl');
@@ -11345,11 +11382,17 @@ const CARD_ART: Record<string, string> = {
   // (:6630), so a 404 leaves the painted dawn gradient in place. A change whose
   // worst case is the status quo and whose best case is the one blank card on
   // the world picker is not a change to sit on for a round.
-  skylark: '/assets/hf/hf_20260904_175218_7e696395-fbec-4ba2-a7a2-9b02e2b5bdf5.png',
   //
-  // The card is NOT blank meanwhile — CARD_FALLBACK carries skylark in its own
-  // dawn amber, balloon violet and morning blue, which is the whole reason that
-  // table exists. qa/worldreg.mjs prints this debt on every gate run.
+  // ── BELLCLOUD HEIGHTS, 2026-09-25: that card was the balloon meet — the
+  // runways, the whale on her side — and the world it showed is gone. The card
+  // is now the owner's own Bellcloud poster, the one MENU_ART carries: a small
+  // floating island to the same recipe, committed to public/, so it loads
+  // here and in production alike.
+  skylark: '/assets/hf/bellcloud_20260925.png',
+  //
+  // The card is never blank while it loads — CARD_FALLBACK carries skylark in
+  // the bell's gold and the sky's blue, which is the whole reason that table
+  // exists.
 };
 // A CARD IS NEVER BLANK. This set the background and hoped: if the file 404s —
 // which is exactly what every /assets/hf path does inside an iOS bundle that
@@ -11366,10 +11409,15 @@ const CARD_FALLBACK: Record<string, string> = {
   // lantern amber falling into an indigo night — the level's own two colours,
   // so a card that never loads its poster still says the right thing
   lantern: 'radial-gradient(ellipse at 50% 38%, #ffbe6a 0%, #d1452f 34%, #241436 68%, #0e1226 100%)',
-  // skylark is the only rig in the game keyed from the EAST: a dawn balloon
-  // meet, sun still low. Amber at the horizon, the balloons' violet above it,
-  // then the morning blue the fog colour is mixed from (0x232a52).
-  skylark: 'radial-gradient(ellipse at 50% 40%, #ffd6a0 0%, #c99ad8 30%, #6478c8 62%, #232a52 100%)',
+  // BELLCLOUD HEIGHTS: the bell's gold high in the middle, the day's blue
+  // round it, and the same deep evening the posters float in under the type.
+  // The spec's first row (#fff4d6 / #f2d488 26% / #8fc4ee 60% / #3a5fa8) was
+  // a daytime sky all the way down, and the card's type sits on this until
+  // the poster decodes. qa/pickerfit.mjs --atrest, on the words half merged
+  // with this one and the poster withheld: that row failed the tagline at
+  // 3.83:1 and the best line at 3.19:1 (bar 4.5); this one reads title 9.3,
+  // tagline 6.4, best 5.6. With the poster up: 11.0, 6.9, 7.5.
+  skylark: 'radial-gradient(ellipse at 50% 34%, #fff1c8 0%, #f0c050 18%, #5a7fcc 46%, #27306e 72%, #141a40 100%)',
 };
 function paintWorldCard(host: HTMLElement, id: string): void {
   host.style.backgroundSize = 'cover';
@@ -16669,7 +16717,10 @@ function animate() {
     //
     // Same five channels, same latch shape, same calm gating — the only new
     // thing here is that it fires for the right object.
-    if (goal && goal.n === 3 && goalProp && !goalCued && !goalProp.mesh.userData.eaten
+    // (not when the landmark IS the hero — BELLCLOUD HEIGHTS' Great Bell — whose
+    // cue above has already fired all five channels on this frame; on every
+    // other world goalProp !== heroProp, so this changes nothing there)
+    if (goal && goal.n === 3 && goalProp && !goalCued && !goalProp.mesh.userData.eaten && goalProp !== heroProp
         && goalProp.radius <= voidling.radius * EAT_RATIO) {
       goalCued = true;
       announce(`${LEVEL_SPEC[pickedWorld].landmark.toUpperCase()} — GO EAT IT!`);
@@ -16684,7 +16735,10 @@ function animate() {
       // congratulation for something a rival had just taken off the board —
       // on every hero world, including the one the copy was written for.
       // byPlayer is already tracked for the DEVOURED meter's you-vs-family split.
-      if (heroProp.mesh.userData.byPlayer) {
+      // (and not over the whistle: when the hero IS dot 3's landmark, eating
+      // it is the win on the spot and the end beat owns the moment — only on
+      // BELLCLOUD HEIGHTS, the one world where goalProp === heroProp)
+      if (heroProp.mesh.userData.byPlayer && !(goalProp === heroProp && endBeat())) {
         announce(COPY.heroGone); audio.voice('happy'); buzz(120);
         // …and the paper covers it, six seconds behind the banner. Same shape
         // as the beat reaction and for the same reason: the banner owns the

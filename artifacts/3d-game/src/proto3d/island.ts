@@ -734,7 +734,12 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     // band on the east horizon and it still belongs to the light rig, not to
     // the tint — the moment apricot spreads into the tint this becomes Game
     // Day's golden hour.
-    skylark: { tint: '#8c7fd6', tintA: 0.55, fog: 0x3a3a6c, bgI: 0.64 },
+    // BELLCLOUD HEIGHTS, 2026-09-25: the airfield became a kingdom on the
+    // clouds in a bright golden day. A day-blue tint, and a pale haze fog so
+    // the far arms and the cloud sea fade into bright air rather than navy
+    // (docs/BELLCLOUD.md §3.4). The 'color' composite keeps the painting's
+    // structure. The sky only shows in the look-up and the intro.
+    skylark: { tint: '#8cc3ef', tintA: 0.85, fog: 0xd3e3f3, bgI: 0.75 },
     pirate:  { tint: '#2f9fb5', tintA: 0.80, fog: 0x0e2237, bgI: 0.60 },   // sea-teal, daylit
     // GAME DAY WAS THE ONE WORLD NOBODY PHOTOGRAPHED, and it was the worst of
     // the five: flat bright magenta at the coast with not one star in it.
@@ -1019,9 +1024,10 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       // the LOW-contrast body in the game's set: at dawn the sky itself is the
       // brightest thing in frame, and a hot planet would fight the one thin
       // warm band this world is allowed.
+      // BELLCLOUD HEIGHTS: two daytime moons, a big warm one and a small sky one
       skylark: [
-        { d: 800, el: -58, az: AZ - 0.11, size: 124, hue: '#a9b8ee', dark: '#1b2044', bands: 4, glow: '#cdd8ff' },
-        { d: 680, el: -76, az: AZ + 0.11, size: 36, hue: '#ffcda0', dark: '#3a2416', glow: '#ffe3c4' },
+        { d: 800, el: -58, az: AZ - 0.11, size: 110, hue: '#fff1c8', dark: '#c9a860', glow: '#fff6dc' },
+        { d: 680, el: -76, az: AZ + 0.11, size: 34, hue: '#d8ecff', dark: '#6f8fb8', glow: '#eef6ff' },
       ],
       // an ice world with a bright ring, to match the aurora the poster set
       powder: [
@@ -1157,7 +1163,10 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   // violet energy halo off the island edge" and it is the 3D descendant of the
   // 2D game's sticker rim — it is what stops the island reading as a flat
   // cutout pasted on a flat sky. The job was never to remove it.
-  {
+  //
+  // BELLCLOUD HEIGHTS HAS NONE: a violet energy glow is the wrong edge for a
+  // kingdom on the clouds, and its cloud sea (below) is its edge instead.
+  if (WORLD_ID !== 'skylark') {
     const cv = document.createElement('canvas'); cv.width = cv.height = 512;
     const g = cv.getContext('2d')!;
     const grd = g.createRadialGradient(256, 256, 211, 256, 256, 256);
@@ -1180,6 +1189,74 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     halo.rotation.x = -Math.PI / 2; halo.position.y = -3;
     halo.position.x = (minX + maxX) / 2; halo.position.z = (minZ + maxZ) / 2;
     scene.add(halo);
+  } else {
+    // ── THE CLOUD SEA AND THE CLOUD LIP (BELLCLOUD HEIGHTS, §3.3) ──────────
+    // The island floats on a sea of low flat-shaded cloud puffs, and its coast
+    // is scalloped by a lip of white puffs — the poster's read. Decor, never
+    // place()d and never food: two InstancedMeshes, one draw call each, one
+    // material made once here. Placement is a hash of the cell, not a draw
+    // from any stream, so nothing seeded moves.
+    const hash = (n: number) => { const s = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return s - Math.floor(s); };
+    const mat = new THREE.MeshLambertMaterial({ color: 0xf5f2fb, flatShading: true });
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), scl = new THREE.Vector3();
+    const e = new THREE.Euler();
+    // the sea: a jittered 40-unit grid over a 1,400-unit square round the
+    // island, skipping every cell whose centre is on the island more than 20
+    // units in from the coast, so the rim can tuck its puffs under the edge
+    const cx3 = (minX + maxX) / 2, cz3 = (minZ + maxZ) / 2;
+    const sea: THREE.Matrix4[] = [];
+    let n = 0;
+    for (let gz = -700; gz < 700; gz += 40) for (let gx = -700; gx < 700; gx += 40) {
+      n++;
+      const x = cx3 + gx + (hash(n) - 0.5) * 30, z = cz3 + gz + (hash(n + 0.5) - 0.5) * 30;
+      const wx = x / SCALE + CX, wy = z / SCALE + CZ;
+      if (SK.onSkylarkLand(wx, wy) && SK.distToEdge(wx, wy) > 20 / SCALE) continue;
+      // radius 22-40: the spec's 18-34 left the space dome showing between
+      // puffs in the straight-down overview (qa/skylarkfield.mjs after1)
+      const r = 22 + hash(n + 0.25) * 18;
+      pos.set(x, -34 + hash(n + 0.75) * 12, z);
+      q.setFromEuler(e.set(0, hash(n + 0.125) * Math.PI * 2, 0));
+      scl.set(r, r * 0.40, r);
+      sea.push(m4.clone().compose(pos, q, scl));
+    }
+    // detail 1, 80 triangles a puff: the spec's 20-triangle icosahedron read as
+    // grey faceted boulders in the overview, not cloud. Still one draw call.
+    const seaMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), mat, sea.length);
+    sea.forEach((m, i) => seaMesh.setMatrixAt(i, m));
+    seaMesh.instanceMatrix.needsUpdate = true;
+    seaMesh.castShadow = false; seaMesh.receiveShadow = false;
+    seaMesh.name = 'cloudSea';
+    scene.add(seaMesh);
+    // the lip: a row of white puffs every 150 world units along the coast,
+    // half inside and half over the edge, and a smaller row 60 units inland
+    const ring = SK.SK_LAND_RING, lip: THREE.Matrix4[] = [];
+    let k = 0, carry = 0;   // walked by distance along the whole ring, not per segment
+    for (let i = 0; i < ring.length - 1; i++) {
+      const [x1, y1] = ring[i], [x2, y2] = ring[i + 1];
+      const L = Math.hypot(x2 - x1, y2 - y1);
+      if (L < 1e-6) continue;
+      const nx = -(y2 - y1) / L, ny = (x2 - x1) / L;
+      const inward = SK.onSkylarkLand((x1 + x2) / 2 + nx * 30, (y1 + y2) / 2 + ny * 30) ? 1 : -1;
+      let s = carry;
+      for (; s < L; s += 150) {
+        for (const [inset, big] of [[0, 1], [60, 0.6]] as const) {
+          k++;
+          const wx = x1 + (x2 - x1) * (s / L) + nx * inset * inward, wy = y1 + (y2 - y1) * (s / L) + ny * inset * inward;
+          const r = (2.5 + hash(k) * 2.0) * big;
+          pos.set(w(wx), 0.4, w(wy));
+          q.setFromEuler(e.set(0, hash(k + 0.5) * Math.PI * 2, 0));
+          scl.set(r, r * 0.7, r);
+          lip.push(m4.clone().compose(pos, q, scl));
+        }
+      }
+      carry = s - L;
+    }
+    const lipMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), mat, lip.length);
+    lip.forEach((m, i) => lipMesh.setMatrixAt(i, m));
+    lipMesh.instanceMatrix.needsUpdate = true;
+    lipMesh.castShadow = false; lipMesh.receiveShadow = true;
+    lipMesh.name = 'cloudLip';
+    scene.add(lipMesh);
   }
 
 
@@ -1618,6 +1695,141 @@ const QUIET_LEDGER: number[][] = [];
       g.fillStyle = 'rgba(150,150,164,0.42)'; g.fill();
       g.restore();
     }
+  }
+
+  // ══ BELLCLOUD HEIGHTS BAKE (world 6, id 'skylark') ═════════════════════
+  // The airfield never had a bake of its own: its ground was WORLD.meadow and
+  // the grain above, and the runways existed only as the numerals and lights
+  // standing on grass. The kingdom is a NEW branch, modelled on Powder's:
+  // pearl cloud, soft billows at patch scale (grain-scale blobs vanish at the
+  // play camera's magnification), a lilac rolled edge, and pale district floors
+  // separated by hue and value rather than chroma (docs/BELLCLOUD.md §3.2).
+  // Every colour goes through hex()/quiet(), so the 0.55 dial and
+  // qa/groundtruth.mjs's ledger see them. Math.random for the grain, as
+  // Powder's: unseeded and inside this branch, so no seeded stream moves. No
+  // clip path for the tiny ops.
+  if (WORLD_ID === 'skylark') {
+    const ppath = (pts: SK.Pt[], close = false) => {
+      g.beginPath();
+      g.moveTo(pxW(pts[0][0]), pyW(pts[0][1]));
+      for (const [x, y] of pts) g.lineTo(pxW(x), pyW(y));
+      if (close) g.closePath();
+    };
+    const PU = (pxW(1000) - pxW(0)) / 1000;   // canvas px per world unit
+    const stroke = (pts: SK.Pt[], width: number, style: string, close = false) => {
+      ppath(pts, close); g.strokeStyle = style; g.lineWidth = width * PU; g.stroke();
+    };
+    g.save();
+    g.lineCap = 'round'; g.lineJoin = 'round';
+
+    // 1. BASE — pearl cloud. Not paper white: ACES needs room above the ground
+    //    for the white walls and the gold.
+    g.fillStyle = hex(0xebe7f1); g.fillRect(0, 0, TEX, TEX);
+
+    // 2. BILLOWS — what makes it cloud rather than paper. Matched pairs of big
+    //    soft radial gradients at patch scale, 60-260 world units: a lilac
+    //    shade crescent offset WEST, then a warm highlight offset EAST, where
+    //    the key comes from. Same count and alpha each side.
+    const SHADE = quiet('rgba(190,180,222,0.20)'), SHADE0 = quiet('rgba(190,180,222,0)');
+    const LIGHT = quiet('rgba(255,248,236,0.22)'), LIGHT0 = quiet('rgba(255,248,236,0)');
+    const blob = (cx: number, cy: number, r: number, c0: string, c1: string) => {
+      const gr = g.createRadialGradient(cx, cy, 0, cx, cy, r);
+      gr.addColorStop(0, c0); gr.addColorStop(1, c1);
+      g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+    };
+    for (let i = 0; i < 900; i++) {
+      const x = Math.random() * TEX, y = Math.random() * TEX, r = rand(60, 260) * PU;
+      blob(x - r * 0.28, y, r, SHADE, SHADE0);
+      blob(x + r * 0.22, y - r * 0.06, r * 0.9, LIGHT, LIGHT0);
+    }
+
+    // 3. THE ROLLED EDGE — a lilac shade band in from the coast, so the cloud
+    //    curves over the edge (the island clip keeps only its inner half)
+    stroke(SK.SK_LAND_RING, 840, quiet('rgba(190,180,222,0.22)'), true);
+    stroke(SK.SK_LAND_RING, 420, quiet('rgba(180,168,214,0.16)'), true);
+
+    // 4. DISTRICT FLOORS — pale, low chroma, told apart by hue and value.
+    const REGION = (id: SK.SkBiome) => SK.SK_REGIONS.find((r) => r.id === id);
+    const floor = (id: SK.SkBiome, col: number) => {
+      const r = REGION(id); if (!r) return;
+      ppath(r.poly, true); g.fillStyle = hex(col); g.fill();
+    };
+    floor('launchfield', 0xe3f0e7);   // THE CLOUD GARDENS: a mint tint
+    floor('arrivals', 0xecdcc6);      // THE BALLOON DOCK: a pale plank deck
+    floor('tower', 0xe4dff0);         // THE CASTLE KEEP: lavender flagstones
+    floor('hangars', 0xe4dff0);       // THE CASTLE YARD: the same flags
+    floor('breakfast', 0xf2e1e5);     // THE CLOUD MARKET: rose cobbles
+    // the dock's plank lines, every 60 units along 090, and the yard's and the
+    // keep's flag joints — clipped to their own floors
+    const inside = (id: SK.SkBiome, draw: (b: [number, number, number, number]) => void) => {
+      const r = REGION(id); if (!r) return;
+      let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity;
+      for (const [x, y] of r.poly) { a = Math.min(a, x); b = Math.max(b, x); c = Math.min(c, y); d = Math.max(d, y); }
+      g.save(); ppath(r.poly, true); g.clip(); draw([a, b, c, d]); g.restore();
+    };
+    inside('arrivals', ([a, b, c, d]) => {
+      g.strokeStyle = quiet('rgba(170,140,110,0.22)'); g.lineWidth = Math.max(1, 6 * PU);
+      for (let y = c; y <= d; y += 60) { g.beginPath(); g.moveTo(pxW(a), pyW(y)); g.lineTo(pxW(b), pyW(y)); g.stroke(); }
+    });
+    for (const id of ['tower', 'hangars'] as SK.SkBiome[]) inside(id, ([a, b, c, d]) => {
+      g.strokeStyle = quiet('rgba(150,140,180,0.22)'); g.lineWidth = Math.max(1, 6 * PU);
+      for (let y = c; y <= d; y += 120) { g.beginPath(); g.moveTo(pxW(a), pyW(y)); g.lineTo(pxW(b), pyW(y)); g.stroke(); }
+      for (let x = a; x <= b; x += 160) { g.beginPath(); g.moveTo(pxW(x), pyW(c)); g.lineTo(pxW(x), pyW(d)); g.stroke(); }
+    });
+    // THE RAINBOW RING — five pastel bands across the 340-unit track: rose,
+    // peach, lemon, mint, sky, each 68 wide. Drawn widest first.
+    const BANDS = [0xf3b5c4, 0xf6cfa6, 0xf3e7a6, 0xbfe6cf, 0xb9d7f2];
+    for (let i = 0; i < 5; i++) stroke(SK.PERIMETER, (5 - i) * 68, hex(BANDS[i]), true);
+    // THE OLD STONE WAYS (09/27, 15/33) — pale lilac stone with its cracks
+    for (const r of SK.SLABS) {
+      stroke(r.pts, r.half * 2, hex(0xdfd8e4));
+      const [a, b] = [r.pts[0], r.pts[r.pts.length - 1]];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
+      g.strokeStyle = quiet('rgba(150,140,170,0.25)'); g.lineWidth = Math.max(1, 5 * PU);
+      for (let i = 0; i < 150; i++) {
+        const s = Math.random() * L, o = (Math.random() * 2 - 1) * r.half * 0.9;
+        const x = a[0] + ux * s - uy * o, y = a[1] + uy * s + ux * o;
+        const ang = Math.random() * Math.PI, len = rand(25, 70);
+        g.beginPath(); g.moveTo(pxW(x), pyW(y));
+        g.lineTo(pxW(x + Math.cos(ang) * len), pyW(y + Math.sin(ang) * len)); g.stroke();
+      }
+    }
+    // THE GRAND AVENUE (03/21, the live strip) — warm cloud-stone, a darker
+    // outline and gold edge lines on both sides, paving joints every 260
+    for (const r of SK.LIVE_RUNWAYS) {
+      stroke(r.pts, r.half * 2 + 24, hex(0xd9cfbf));
+      stroke(r.pts, r.half * 2, hex(0xefe3c9));
+      const [a, b] = [r.pts[0], r.pts[r.pts.length - 1]];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
+      for (const sgn of [-1, 1]) {
+        const off = sgn * (r.half - 40);
+        stroke([[a[0] - uy * off, a[1] + ux * off], [b[0] - uy * off, b[1] + ux * off]], 30, hex(0xe2c27e));
+      }
+      g.strokeStyle = quiet('rgba(200,180,140,0.25)'); g.lineWidth = Math.max(1, 8 * PU);
+      for (let s = 260; s < L; s += 260) {
+        const x = a[0] + ux * s, y = a[1] + uy * s;
+        g.beginPath(); g.moveTo(pxW(x - uy * r.half * 0.9), pyW(y + ux * r.half * 0.9));
+        g.lineTo(pxW(x + uy * r.half * 0.9), pyW(y - ux * r.half * 0.9)); g.stroke();
+      }
+    }
+    // THE BELL PLAZA — white marble on the avenues' crossing, two gold rings
+    // and twelve paler spokes
+    {
+      const L0 = SK.LAUNCH, cx = pxW(L0.cx), cy = pyW(L0.cy), rx = L0.rx * PU, ry = L0.ry * PU;
+      g.fillStyle = hex(0xf5f2ec);
+      g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = quiet('rgba(255,255,255,0.55)'); g.lineWidth = 30 * PU;
+      for (let i = 0; i < 12; i++) {
+        const t = (i / 12) * Math.PI * 2;
+        g.beginPath(); g.moveTo(cx + Math.cos(t) * rx * 0.54, cy + Math.sin(t) * ry * 0.54);
+        g.lineTo(cx + Math.cos(t) * rx * 0.95, cy + Math.sin(t) * ry * 0.95); g.stroke();
+      }
+      g.strokeStyle = hex(0xe6c173); g.lineWidth = 40 * PU;
+      for (const k of [0.97, 0.52]) { g.beginPath(); g.ellipse(cx, cy, rx * k, ry * k, 0, 0, Math.PI * 2); g.stroke(); }
+    }
+    g.restore();
   }
 
   // ══ PIRATE BAY BAKE ═══════════════════════════════════════════════════
@@ -3697,13 +3909,10 @@ const QUIET_LEDGER: number[][] = [];
   // taken and multiplied by it.
   const GRAIN: Record<WorldId, [number, number, number, number]> = {
     maple:   [0.45, 0.08, 0.00, 9],
-    // SKYLARK FIELD is two surfaces and they want opposite things. Dewed grass
-    // at a low sun is all grain — it is the one ground in the game with real
-    // texture at arm's length. Concrete is nearly none, and a runway that
-    // sparkles reads as gravel. Mid layer high, coarse layer modest, and the
-    // fine layer kept off maple's 0.45 so the strips stay flat: the runways
-    // are the level's sightline and a sightline should be calm.
-    skylark: [0.38, 0.22, 0.12, 8],
+    // BELLCLOUD HEIGHTS is cloud: soft up close, so the fine layer comes down
+    // off the airfield's dewed-grass 0.38, and the bake's billows carry the
+    // patch scale (docs/BELLCLOUD.md §3.2 step 5).
+    skylark: [0.18, 0.20, 0.20, 8],
     pirate:  [0.45, 0.08, 0.00, 9],
     gameday: [0.45, 0.08, 0.00, 9],
     // LANTERN NIGHT leans on the mid and coarse layers hard. Its floor is
@@ -3889,10 +4098,14 @@ const QUIET_LEDGER: number[][] = [];
     const wallGeo = new THREE.BufferGeometry();
     wallGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
     wallGeo.computeVertexNormals();
-    const wall = new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: WORLD.cliff, roughness: 1, flatShading: true, side: THREE.DoubleSide, emissive: 0x3a2a4e, emissiveIntensity: 0.3 }));
+    // BELLCLOUD HEIGHTS: the island is cloud all the way down — a pale lilac
+    // wall with no violet emissive (that is what reads the rock as purple) and
+    // a lilac underside, where every other world has rock
+    const sky = WORLD_ID === 'skylark';
+    const wall = new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: sky ? 0xe2dcef : WORLD.cliff, roughness: 1, flatShading: true, side: THREE.DoubleSide, emissive: 0x3a2a4e, emissiveIntensity: sky ? 0 : 0.3 }));
     scene.add(wall);
     // underside cap
-    const cap = new THREE.Mesh(topGeo.clone(), new THREE.MeshStandardMaterial({ color: 0x1c1636, roughness: 1, side: THREE.DoubleSide }));
+    const cap = new THREE.Mesh(topGeo.clone(), new THREE.MeshStandardMaterial({ color: sky ? 0xb9b1d6 : 0x1c1636, roughness: 1, side: THREE.DoubleSide }));
     cap.rotation.x = -Math.PI / 2; cap.position.y = -DEPTH; scene.add(cap);
   }
 
@@ -6541,44 +6754,40 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     return;   // POWDER PASS is fully populated — the Maple grid pass must not run
   }
 
-  // ══ SKYLARK FIELD: a disused airfield, and this is the one morning ═══════
-  // Same model as POWDER PASS above — polygon regions, the shared spatial
-  // hash, authored landmarks reserved BEFORE the scatter runs.
+  // ══ BELLCLOUD HEIGHTS (world 6, id 'skylark'): the cloud kingdom ═════════
+  // The last island of the Voidling kids' road trip, on the day of its
+  // festival, the Ringing of the Great Bell (docs/BELLCLOUD.md). Same model as
+  // POWDER PASS above — polygon regions, the shared spatial hash, authored
+  // landmarks reserved BEFORE the scatter runs.
   //
-  // WHAT IS DIFFERENT HERE IS THAT THE COMPOSITION IS AUTHORED, NOT SCATTERED.
-  // Lantern learned that a market is a LINE and rejection sampling gives you a
-  // car boot sale. A balloon meet is worse: it is a FIELD OF ROWS. Crews park
-  // on a grid the organisers pegged out at four in the morning, and ninety
-  // envelopes dropped at random would read as litter, not as an event. So the
-  // launch field is laid out in rows by hand and only its small stuff is
-  // scattered.
+  // IT WAS SKYLARK FIELD, A BALLOON MEET ON A DISUSED AIRFIELD, UNTIL
+  // 2026-09-25, and the geometry is the airfield's on purpose: the three
+  // strips are the Grand Avenue (03/21, live, kept clear) and the Old Stone
+  // Ways (09/27, 15/33); the launch circle is the Bell Plaza; the perimeter
+  // track is the Rainbow Ring. Three probes, the crowd's dress codes, the
+  // newsroom's district pools and the placement audit are keyed on it. The
+  // passes, streams and counts below are the airfield's too, swapped one for
+  // one (§6.6): the launch field's pegged grid of balloons is now lanes of
+  // cottages, cloud trees, turrets and bell shrines, and the balloons are
+  // visitors docked along the edge and at the Balloon Dock.
   //
-  // AND THE FOUR STAGES ARE HELD AT A RATIO. skyfield.ts authors a balloon as
-  // BAGGED, SPILLED, COLD or STANDING, and the field holds them near 5:4:3:2 —
-  // low, low, mid, tall. That ratio is the whole reason this world photographs:
-  // a field of upright envelopes at a camera looking down 46.4 degrees is a
-  // wall of opaque objects, and a field of flat gore-striped crescents on grey
-  // grass is the shot the poster sells. The standing ones are punctuation.
+  // THE BALLOONS STILL HOLD THEIR STAGES. skyfield.ts authors a balloon as
+  // BAGGED, SPILLED, COLD or STANDING. A field of upright envelopes at a camera
+  // looking down 46.4 degrees is a wall of opaque objects; out on the edge
+  // they are spaced a crew apart (CREW_GAP) and the wall cannot form.
   //
-  // …AND THE RATIO NEVER REACHED THE SCREEN, SO IT WAS NEVER TESTED. The boot
-  // sweep measured every skyfield.ts prop with its contact disc folded in
-  // (see settleFootprints, prototype3d.ts) and retired 23 of 38 standing and
-  // 19 of 36 cold envelopes before the first frame — SEED 7, qa/skylarkfield
-  // counted 15 standing of 108 on the island, 13.9%. The owner's poster for
-  // this world is envelopes standing up and lifting off, and his read of the
-  // field was grey-green ground with coloured blobs. With the sweep measuring
-  // the envelopes themselves, the crews out on the arms (8b) and a third of
-  // the tower's crews up, the island carries 200 envelopes at 2.2 : 3.9 : 3.4
-  // : 4.5 per 14 — 65 standing, 32.5%. The wall this note warns about is held
-  // off by spacing, not by keeping them flat: the launch field's pitch clears
-  // two domes, and a crew out on an arm is CREW_GAP from the next.
+  // THE BOOT SWEEP measures a Skylark prop by its own box (settleFootprints,
+  // prototype3d.ts — it once retired 42 envelopes whose contact disc widened
+  // their measured box). The claims below are sized for the rule that runs
+  // (spotOpen's 0.62 term: a prop's half-extent / 0.62), so the sweep has
+  // nothing to retire.
   if (WORLD_ID === 'skylark') {
     const P3 = (p2: SK.Pt): [number, number] => [w(p2[0]), w(p2[1])];
     SK.resetPlacement();
     // EVERY ENVELOPE CARRIES ITS PAPERS. `userData.balloon = { id, stage }` on
     // each one, so the ascension can find them, the probe can count them, and
     // a departure is attributable. stage: 0 bagged, 1 spilled, 2 cold,
-    // 3 standing, 4 the whale.
+    // 3 standing. (4 was the airfield's whale; the kingdom has none.)
     let balloonId = 0;
     /** a destination for the cast (life.ts walks to these by kind) — set on
      *  userData rather than replacing it, because noFront() lives there too */
@@ -6587,6 +6796,81 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       mesh.userData.balloon = { id: balloonId++, stage, cols };
       return mesh;
     };
+    // ── THE AUDIT'S OWN QUESTION, ASKED BEFORE A PROP LANDS ───────────────
+    // qa/placement.mjs fails this world on any SOLID (eat radius >= 2, 2+
+    // tall, 2.4+ wide on the ground: a cottage, a turret, a standing or lying
+    // envelope) whose ground rectangle another prop's enters by more than
+    // 0.35, and on any prop whose ground centre is off the island — and a new
+    // world's ceiling is zero. Claims are circles standing in for rectangles,
+    // and at a zero ceiling a circle is too fat or too thin somewhere: the
+    // first full run filed four overlaps (the worst three a cottage with a
+    // bush or a broken column 0.57-0.67 inside a corner) and one meadow bush
+    // off the island; the next, with fatter cottage claims, a broken column
+    // 0.38 into a lying envelope and the same bush — its origin was on the
+    // island, its drawn footprint's centre was not. So drop() measures the
+    // rectangle the audit measures — the prop's own vertices under 1 unit,
+    // in its own frame, turned by its yaw — and refuses a spot where it meets
+    // a solid's (or, for a solid, anything's) by more than 0.25, or where its
+    // centre is off the island. Claims still space the world; this only says
+    // no to a real collision. On SEED 7 the audit now reads offisland 0,
+    // overlap 0 and inside 0 over 4,060 static props: PASS at a ceiling of 0.
+    type Foot = { cx: number; cz: number; rOut: number; solid: boolean; axes: [number, number][]; corners: [number, number][] };
+    const FOOT_CELL = 16;
+    const feet = new Map<string, Foot[]>();
+    const footOf = (mesh: THREE.Object3D, r: number, x3: number, z3: number, yaw: number): Foot | null => {
+      const p0 = mesh.position.clone(), r0 = mesh.rotation.y;
+      mesh.position.set(0, 0, 0); mesh.rotation.y = 0; mesh.updateMatrixWorld(true);
+      let lx0 = Infinity, lx1 = -Infinity, lz0 = Infinity, lz1 = -Infinity, minY = Infinity, maxY = -Infinity;
+      const v = new THREE.Vector3();
+      mesh.traverse((o) => {
+        const g = (o as THREE.Mesh).isMesh ? (o as THREE.Mesh).geometry : null;
+        const pa = g?.attributes.position; if (!pa) return;
+        for (let i = 0; i < pa.count; i++) {
+          v.fromBufferAttribute(pa, i).applyMatrix4(o.matrixWorld);
+          if (v.y < minY) minY = v.y; if (v.y > maxY) maxY = v.y;
+          if (v.y > 1.0) continue;
+          if (v.x < lx0) lx0 = v.x; if (v.x > lx1) lx1 = v.x; if (v.z < lz0) lz0 = v.z; if (v.z > lz1) lz1 = v.z;
+        }
+      });
+      mesh.position.copy(p0); mesh.rotation.y = r0; mesh.updateMatrixWorld(true);
+      if (lx0 === Infinity) return null;
+      const cy = Math.cos(yaw), sy = Math.sin(yaw);
+      const at = (x: number, z: number): [number, number] => [x3 + x * cy + z * sy, z3 - x * sy + z * cy];
+      const hx = (lx1 - lx0) / 2, hz = (lz1 - lz0) / 2;
+      const [cx, cz] = at((lx0 + lx1) / 2, (lz0 + lz1) / 2);
+      return { cx, cz, rOut: Math.hypot(hx, hz),
+        solid: r >= 2 && !mesh.userData.spin && maxY - Math.min(0, minY) >= 2 && Math.min(2 * hx, 2 * hz) >= 2.4,
+        axes: [[cy, -sy], [sy, cy]], corners: [at(lx0, lz0), at(lx1, lz0), at(lx1, lz1), at(lx0, lz1)] };
+    };
+    /** separating-axis penetration of two oriented rectangles (0 = apart) */
+    const footDepth = (a: Foot, b: Foot): number => {
+      let best = Infinity;
+      for (const [ux, uz] of [...a.axes, ...b.axes]) {
+        let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+        for (const [x, z] of a.corners) { const t = x * ux + z * uz; if (t < a0) a0 = t; if (t > a1) a1 = t; }
+        for (const [x, z] of b.corners) { const t = x * ux + z * uz; if (t < b0) b0 = t; if (t > b1) b1 = t; }
+        const o = Math.min(a1, b1) - Math.max(a0, b0); if (o <= 0) return 0; if (o < best) best = o;
+      }
+      return best;
+    };
+    const footCells = (f: Foot, pad = 0): string[] => {
+      const out: string[] = [], R = f.rOut + pad;
+      for (let i = Math.floor((f.cx - R) / FOOT_CELL); i <= Math.floor((f.cx + R) / FOOT_CELL); i++)
+        for (let j = Math.floor((f.cz - R) / FOOT_CELL); j <= Math.floor((f.cz + R) / FOOT_CELL); j++) out.push(`${i},${j}`);
+      return out;
+    };
+    const footClear = (f: Foot): boolean => {
+      if (!insideIsland3(f.cx, f.cz)) return false;
+      const seen = new Set<Foot>();
+      for (const k of footCells(f)) for (const q of feet.get(k) ?? []) {
+        if (seen.has(q)) continue; seen.add(q);
+        if (!(f.solid || q.solid)) continue;
+        if (Math.hypot(f.cx - q.cx, f.cz - q.cz) > f.rOut + q.rOut) continue;
+        if (footDepth(f, q) > 0.25) return false;
+      }
+      return true;
+    };
+    const footAdd = (f: Foot) => { for (const k of footCells(f)) { const L = feet.get(k); if (L) L.push(f); else feet.set(k, [f]); } };
     const drop = (mesh: THREE.Object3D, p2: SK.Pt, r: number, rotY?: number, force = false, qk?: string, claim?: number) => {
       const c = claim ?? r;
       // ── LEGALITY IS drop()'s JOB, NOT THE CALLER'S ────────────────────────
@@ -6596,8 +6880,8 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       // chosen by eye against the tower and eye does not know where 15/33 is.
       // qa/placement.mjs found the met hut standing ON A RUNWAY. Checking here
       // means a pass cannot forget, and the escape is explicit: `force` is for
-      // the whale on her circle and the hangars on their apron, which are
-      // authored landmarks that outrank the rule.
+      // the Great Bell on its plaza and the castle gates on their yard, which
+      // are authored landmarks that outrank the rule.
       //
       // AND THE CLEARANCE IS THE PROP'S OWN SIZE. A fixed `clear` says "keep
       // the CENTRE this far out", which lets a long thin prop legally centred
@@ -6619,11 +6903,20 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       // just outside the lip and hang its far end over.
       if (!force && !SK.skPlaceable(p2[0], p2[1], Math.max(30, r * 34))) return false;
       if (!force && !SK.spotOpen(p2[0], p2[1], c * 20)) return false;
-      if (force) mesh.userData.authored = true;   // a landmark: the settle pass may never retire it
+      // …AND ON THE ISLAND THE CHILD SEES, as paint() already asks.
       const [x3, z3] = P3(p2);
+      if (!force && !insideIsland3(x3, z3)) return false;
+      // …and the audit's own rectangles (THE AUDIT'S OWN QUESTION, above),
+      // turned by the yaw the prop will actually stand at: place() gives a
+      // no-front prop left at 0 its spinFor() angle, so that is the one asked
+      const yaw0 = rotY ?? mesh.rotation.y;
+      const foot = footOf(mesh, r, x3, z3, mesh.userData.spin && Math.abs(yaw0) < 1e-6 ? spinFor(x3, z3) : yaw0);
+      if (!force && foot && !footClear(foot)) return false;
+      if (force) mesh.userData.authored = true;   // a landmark: the settle pass may never retire it
       if (rotY !== undefined) mesh.rotation.y = rotY;
       if (qk) mesh.userData.qk = qk;
       place(mesh, x3, z3, r);
+      if (foot) footAdd(foot);   // forced landmarks too: everything after must clear the Great Bell
       SK.claimSpot(p2[0], p2[1], c * 20);
       return true;   // …and says so, so a crew's kit only follows an envelope that landed
     };
@@ -6658,57 +6951,79 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     const pick = <T,>(a: T[]): T => a[Math.floor(rnd2() * a.length) % a.length];
     /** an envelope colour triple, so ninety balloons are not ninety of one */
     const env = () => pick(SKF.ENVELOPE);
+    /** a cloud tree's pastel and a cottage's roof go BY TURN, not by a draw,
+     *  so choosing a colour moves no seeded stream */
+    let hue = 0;
+    const ROOF_CYCLE = [SKF.ROOF_BLUE, SKF.ROSE, SKF.MINT];
     /** THE FIELD FACES ONE WAY. Crews lay out along the runway heading, not at
      *  random: a balloon meet is pegged out on a grid, and a scatter of yaws is
      *  the single fastest way to make an authored field look accidental. 030 is
      *  the main strip's heading, and +/-8 degrees of jitter keeps it human. */
     const layoutYaw = () => (30 * Math.PI) / 180 + (rnd2() - 0.5) * 0.28;
 
-    await breathe('Pegging out the field…');
+    await breathe('Raising the Great Bell…');
 
-    // 1. THE WHALE — the hero meal, force-placed on the launch circle, lying
-    //    down. She is 70 units nose to tail and the child can walk her whole
-    //    length before they are big enough to eat any of her.
+    // 1. THE GREAT BELL — the hero meal AND dot 3's landmark, force-placed on
+    //    the Bell Plaza where the avenues cross (docs/BELLCLOUD.md §5). At
+    //    r 5.5 it needs R 4.95 (EAT_RATIO 1.11), the figure the hangar's
+    //    landmark row already carried, and it must be the LARGEST edible on the
+    //    island so beginMatch's heroProp resolves to it (qa/skylarkfield.mjs E):
+    //    nothing else in this block carries r >= 5.5. `keepForPlayer` reserves
+    //    it on every dot (prototype3d.ts beginMatch): a sibling must never ring
+    //    the summit of the trip first.
     {
-      const whale = tagBalloon(SKF.skWhaleLying(), 4);
-      // PEGGED DOWN. Two full qa/ascension.mjs runs put 23 balloons in the air
-      // at 3:00 against a bar of 35 and the cascade never started, because by
-      // 2:28 the whale had been eaten — an idle child at r7 can take an r18
-      // meal, and the rivals hunt big. qa/_whale.mjs proved the cue works when
-      // she is there to answer it. So she is tethered (capture() and the
-      // rivals refuse a tethered prop) until life.ts stands her on the beat,
-      // and THEN she is the biggest meal in the game for twelve seconds —
-      // which is the rule the world is named for.
-      whale.userData.tethered = true;
-      drop(whale, [SK.LAUNCH.cx, SK.LAUNCH.cy], 18.0, layoutYaw(), true, 'big');
+      // THE ARCH FACES THE SPAWN. It spans local x, so its open face is ±z,
+      // and rotation.y = atan2(dx, dy) turns +z toward the Balloon Dock: the
+      // first frame looks through the arch at the bell.
+      const BELL_YAW = Math.atan2(SK.SK_SPAWN[0] - SK.LAUNCH.cx, SK.SK_SPAWN[1] - SK.LAUNCH.cy);
+      const bell = asLandmark(voiced(SKF.skGreatBell(), 'ding'), 'great bell');
+      bell.userData.keepForPlayer = true;
+      drop(bell, [SK.LAUNCH.cx, SK.LAUNCH.cy], 5.5, BELL_YAW, true, 'big');
       SK.claimSpot(SK.LAUNCH.cx, SK.LAUNCH.cy, SK.LAUNCH.rx * 0.85);
     }
-    // …and her precinct: the ground crew's kit ringing her, inside the circle,
-    // so eating her takes the circle out from under her rather than leaving a
-    // rind of surviving rope. Authored on the ring, not scattered.
-    for (let i = 0; i < 14; i++) {
-      const a = (i / 14) * Math.PI * 2;
+    // …and its plaza: twelve bell posts ringing it, inside the circle, and at
+    // the four old kit offsets two fountains and two banner poles. Forced, as
+    // the bell is: they sit inside the circle by design, and the circle is
+    // exactly what skPlaceable() forbids.
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
       const rr = SK.LAUNCH.rx * 0.86;
       const p2: SK.Pt = [SK.LAUNCH.cx + Math.cos(a) * rr, SK.LAUNCH.cy + Math.sin(a) * rr];
-      drop(SKF.skTetherPin(), p2, 0.34, 0, true, 'small');
+      drop(SKF.skBellPost(), p2, 0.5, -a, true, 'small');
     }
-    for (const [dx, dy, mk] of [[-880, 250, 0], [860, -300, 1], [200, 820, 2], [-300, -800, 3]] as const) {
+    for (const [dx, dy, mk] of [[-880, 250, 0], [860, -300, 0], [200, 820, 1], [-300, -800, 1]] as const) {
       const p2: SK.Pt = [SK.LAUNCH.cx + dx, SK.LAUNCH.cy + dy];
-      const m = mk === 0 ? SKF.skInflatorFan() : mk === 1 ? SKF.skTrailer()
-        : mk === 2 ? SKF.skCylinderPair() : SKF.skCrownLine();
-      // FORCED, like the whale: these four sit inside the launch circle by
-      // design, and the circle is exactly what skPlaceable() forbids. With
-      // force=false every one of them was silently rejected (density survey:
-      // "the whale's ground crew, 0 of 4"), so she lay on bare concrete with no
-      // fan, no trailer, no bottles and no crown line — a hero with no crew.
-      m.userData.kind = 'whalekit';   // QA: qa/_skcensus.mjs counts what actually landed
-      drop(m, p2, mk === 1 ? 2.0 : 0.9, layoutYaw(), true, mk === 1 ? 'car' : 'small');
+      const m = mk === 0 ? SKF.skCloudFountain() : SKF.skBannerPole();
+      m.userData.kind = 'plazakit';   // QA: counts what actually landed on the plaza
+      drop(m, p2, mk === 0 ? 1.6 : 0.5, layoutYaw(), true, 'small');
+    }
+    // THREE CLOUD BRIDGES — the poster's curving footbridge, one across each
+    // arm of the Old Stone Ways, laid now so the gardens fill in around them.
+    // The spec's "500 out from the plaza edge" puts the 15/33 south-east
+    // arm's bridge on the two ways' own crossing (6913, 5750), inside the
+    // Balloon Dock, and the 09/27 way's at that distance 31 units from the
+    // avenue's centreline; so: 15/33 north-west 1,600 from the plaza centre,
+    // 15/33 south-east 2,600 (in the gardens), and the 09/27 way west of the
+    // avenue at x 4400. Each lies ACROSS its way (long axis perpendicular) and
+    // walks along it until drop() accepts.
+    for (const [pts, along] of [[SK.RWY15, -1600], [SK.RWY15, 2600], [SK.RWY09, 0]] as const) {
+      const [a, b] = [pts[0], pts[pts.length - 1]];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
+      const base: SK.Pt = pts === SK.RWY09 ? [4400, a[1]] : [SK.LAUNCH.cx + ux * along, SK.LAUNCH.cy + uy * along];
+      const yaw = Math.atan2(-ux, -uy);   // local +x along the way's normal (-uy, ux)
+      for (const d of [0, 150, -150, 300, -300]) {
+        // claim: the bridge is 9.8 x 2.9 (qa/kitfit.mjs), half-diagonal 5.1,
+        // over spotOpen's 0.62
+        if (drop(SKF.skCloudBridge(), [base[0] + ux * d, base[1] + uy * d], 2.8, yaw, false, 'small', 8.2)) break;
+      }
     }
 
-    // 2. THE LAUNCH FIELD — the hero district and the densest lawn in the game.
-    //    ROWS, pegged out along 030, four stages at 2:4:3:5 (the pattern
-    //    below; the 5:4:3:2 this line once said is the header's). This is the one
-    //    place in the world where the composition is hand-authored.
+    // 2. THE CLOUD GARDENS (the old launch field's pegged grid). Lanes of cloud
+    //    cottages, cloud trees, sky turrets, bell shrines and fountains, on the
+    //    grid the balloons stood on — same pitch, same 030 yaw — so the
+    //    gardens read as laid out, not scattered. n % 14: 0-3 cottage, 4-8
+    //    cloud tree, 9-10 turret, 11-12 bell shrine, 13 fountain.
     {
       const R = REG('launchfield');
       let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -6764,63 +7079,41 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
           const p2: SK.Pt = [cx + ux * along + vx * across, cy + uy * along + vy * across];
           if (!SK.pointInPoly(p2[0], p2[1], R.poly)) continue;
           if (!SK.skPlaceable(p2[0], p2[1], 130)) continue;
-          // 4 : 4 : 3 : 3 — bagged, spilled, cold, standing. The bagged share
-          // came down from 5 because a bag is the one stage that is NOT a big
-          // meal, and a field whose food is mostly grass is the trap Powder
-          // fell into: measured, 0.6% of its edibles are large against Maple's
-          // 8.1%, which is why it starved a child driver on points.
-          nodes.push({ p: p2, stage: n % 14 < 2 ? 0 : n % 14 < 6 ? 1 : n % 14 < 9 ? 2 : 3 });
+          // the 14-cycle: 0-3 cottage, 4-8 cloud tree, 9-10 turret, 11-12 bell
+          // shrine, 13 fountain — so every lane has a house, a tree and a tower
+          nodes.push({ p: p2, stage: n % 14 });
           n++;
         }
       }
-      // PASS ONE — every envelope, before any of the small kit exists
-      for (const { p: p2, stage } of nodes) {
-        const cols = env();
-        const mesh = tagBalloon(stage === 0 ? SKF.skBalloonBagged(cols)
-          : stage === 1 ? SKF.skBalloonSpilled(cols)
-            : stage === 2 ? SKF.skBalloonCold(cols) : SKF.skBalloonStanding(cols), stage, cols);
-        // ONE EDIBLE, ONE RADIUS — see skyfield.ts's header on fadeOccluders
-        const r = stage === 0 ? 1.4 : stage === 1 ? 5.2 : stage === 2 ? 4.6 : 4.8;
-        // ── CLAIMS SIZED FOR THE RULE THAT ACTUALLY RUNS ────────────────────
-        // These were the envelopes' true half-diagonals, which is the number
-        // that LOOKS right and is not. spotOpen() (bay.ts:307) enforces
-        //     max((a + b) * 0.45, max(a, b) * 0.62)
-        // so a claim buys 45% of itself against a like-sized neighbour and 62%
-        // against a small one. Against the launch field's scatter of crown
-        // lines and tether pins the 0.62 term is what binds, so the claim has
-        // to be the half-diagonal DIVIDED by 0.62 for a standing envelope to
-        // actually keep a tether pin out of its skirt:
-        //     standing  half-diag 6.79 -> 6.79 / 0.62 = 10.95 -> 12.5 with margin
-        //     spilled   half-diag 5.98 -> 11.0
-        //     cold      half-diag 5.48 -> 10.5
-        //     bagged    half-diag 1.39 -> 3.5
-        // Envelope-against-envelope is held by PITCH_ALONG above, not by these.
-        const claim = stage === 0 ? 3.5 : stage === 1 ? 11.0 : stage === 2 ? 10.5 : 12.5;
-        drop(mesh, p2, r, layoutYaw(), false, 'big', claim);
+      // PASS ONE — every garden piece, before any of the small stuff exists.
+      // ── CLAIMS SIZED FOR THE RULE THAT ACTUALLY RUNS ──────────────────────
+      // spotOpen() (bay.ts) enforces max((a + b) * 0.45, max(a, b) * 0.62), so
+      // against the small scatter the 0.62 term binds and a claim has to be a
+      // prop's half-extent DIVIDED by 0.62 to keep a bush out of its wall:
+      //     cottage   roof r 2.15          -> 3.5  (a circle: the corners of
+      //               its 4.0 x 4.1 ground rect are drop()'s footprint
+      //               guard's to keep clear — see THE AUDIT'S OWN QUESTION)
+      //     tree      foot 3.9 x 3.3       -> 3.2
+      //     turret    9.0 (the spec's: it keeps a lane round every tower)
+      //     shrine    foot 2.8 x 2.8       -> 3.2
+      //     fountain  foot 3.1 x 3.1       -> 2.6
+      // Piece-against-piece is held by the pitch (250 x 238), as it was for
+      // the envelopes.
+      for (const { p: p2, stage: k } of nodes) {
+        const yaw = layoutYaw();
+        if (k < 4) drop(SKF.skCloudCottage(ROOF_CYCLE[hue++ % 3]), p2, 2.6, yaw, false, 'house', 3.5);
+        else if (k < 9) drop(SKF.skCloudTree(hue++), p2, 2.0, yaw, false, 'small', 3.2);
+        else if (k < 11) drop(SKF.skSkyTurret(), p2, 3.6, yaw, false, 'big', 9.0);
+        else if (k < 13) drop(SKF.skBellShrine(), p2, 1.6, yaw, false, 'small', 3.2);
+        else drop(SKF.skCloudFountain(), p2, 1.6, yaw, false, 'small', 2.6);
       }
-      // PASS TWO — the crew's kit, filling in around what is already standing
-      // ── THE KIT STANDS WHERE THE RULES LET IT, AND THAT IS THE EDGES ─────
-      // The density survey counted 36 of 176 kit items and I tried to fix it
-      // by forcing the kit into the gaps between domes (125 along, 119
-      // across — the measured midpoints, 1.35-1.65 units clear of a ROUND
-      // dome's edge). qa/placement.mjs then filed 37 overlaps: a standing
-      // envelope's footprint is its 9.6x9.6 bounding box, the grid runs
-      // diagonal to that box, and a basket at the midpoint sits 0.9 inside
-      // the box's corner. The probe over-approximates a dome, but the gate
-      // is the gate, and the deeper truth is that at a 250x238 pitch the
-      // field reads from above as one mass of domes: a basket between two
-      // of them is invisible. So the kit asks spotOpen like everything else
-      // and lands at the rows' ends and edges (measured: 54 pieces), where a
-      // crew's kit can be seen. The 176 was the wrong target for this pitch.
-      const kit = (mk: () => THREE.Object3D, p2: SK.Pt, r: number, yaw: number) => {
-        if (!SK.skPlaceable(p2[0], p2[1], 15)) return;
-        const m = mk(); m.userData.kind = 'crewkit';   // QA: counted by qa/_skcensus.mjs
-        drop(m, p2, r, yaw, false, 'small', r + 0.9);
-      };
-      for (const { p: p2, stage } of nodes) {
-        if (stage >= 1) kit(() => SKF.skBasket(), [p2[0] - vx * 190, p2[1] - vy * 190], 0.9, layoutYaw());
-        if (stage >= 2) kit(() => SKF.skInflatorFan(), [p2[0] + ux * 230, p2[1] + uy * 230], 0.8, layoutYaw() + Math.PI);
-        if (stage === 3) kit(() => SKF.skCylinderPair(), [p2[0] - ux * 210, p2[1] - uy * 210], 0.6, rnd2() * Math.PI * 2);
+      // PASS TWO — one puff bush beside each piece, where the balloons' kit
+      // (basket, fan, cylinders) used to stand. It asks spotOpen like
+      // everything else and lands where the rules let it.
+      for (const { p: p2 } of nodes) {
+        const q: SK.Pt = [p2[0] - vx * 190, p2[1] - vy * 190];
+        if (!SK.skPlaceable(q[0], q[1], 15)) continue;
+        drop(SKF.skPuffBush(hue++), q, 0.45, rnd2() * Math.PI * 2, false, 'small', 1.3);
       }
     }
     // ── THE LAUNCH FIELD'S OWN SMALL STUFF, ONE CLASS AT A TIME ───────────
@@ -6837,30 +7130,36 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // So each class scatters on its own footprint. The proportions are the same
     // ones the single mixed pass drew, resolved into counts rather than rolled
     // for per prop, and each class gets its own stream — so changing how many
-    // tussocks there are cannot move the crown lines.
-    for (const [n, r, sep, mk] of [
-      [149, 0.55, 0.8, () => SKF.skCrownLine()],
-      [124, 0.55, 0.8, () => SKF.skTetherPin()],
-      [112, 0.55, 0.8, () => SKF.skCylinderPair()],
-      [74, 0.55, 0.8, () => SKF.skBasket()],
-      [62, 0.55, 0.8, () => SKF.skStrawBale()],
-      [99, 0.35, 0.6, () => SKF.skTussock()],
-    ] as [number, number, number, () => THREE.Object3D][])
-      for (const p2 of SK.scatterInRegion(REG('launchfield'), n, 34, { sep }))
-        drop(mk(), p2, r, rnd2() * Math.PI * 2, false, 'small');
+    // bushes there are cannot move the bell posts.
+    //
+    // THE KINGDOM'S GARDEN FLOOR, same total (about 620) as the airfield's
+    // kit: puff bushes, cloud flowers, bell posts, cloud sheep, broken columns
+    // and benches between the lanes.
+    for (const [n, r, sep, mk, kind] of [
+      [180, 0.45, 0.8, () => SKF.skPuffBush(hue++), ''],
+      [124, 0.35, 0.6, () => SKF.skWildflowerClump(), ''],
+      [60, 0.5, 0.8, () => SKF.skBellPost(), ''],
+      [30, 0.55, 0.9, () => SKF.skSheep(), 'sheep'],   // the shepherds walk at these (life.ts)
+      [60, 0.9, 1.1, () => SKF.skBrokenColumn(), ''],
+      [40, 0.75, 0.95, () => SKF.skPicnicBench(), ''],
+    ] as [number, number, number, () => THREE.Object3D, string][])
+      for (const p2 of SK.scatterInRegion(REG('launchfield'), n, 34, { sep })) {
+        const m = mk(); if (kind) m.userData.kind = kind;
+        drop(m, p2, r, rnd2() * Math.PI * 2, false, 'small');
+      }
 
-    await breathe('Filling the balloons…');
+    await breathe('Fluffing the clouds…');
 
-    // 3. THE ARRIVALS FIELD — trailers nose-in on the hardstanding at the east
-    //    end of the disused 09/27 slab, tailgates down. The spawn is here and
-    //    the whale is 5.4 degrees off the camera's centreline, dead ahead down
-    //    the old runway, so the trailers are laid in a ROW ALONG THE SLAB — a
-    //    line of tailgates across the frame with the whale beyond them: this
-    //    is the first thing a child ever sees of this world. (It was wet grass
-    //    on the south-west arm, with the whale out of frame; brief §3A.)
+    // 3. THE BALLOON DOCK (the old arrivals field) — basket carts nose-in on
+    //    the hardstanding at the east end of the old 09/27 way. The spawn is
+    //    here and the Great Bell is 5.4 degrees off the camera's centreline,
+    //    dead ahead down the Old Way, so the carts are laid in a ROW — a line
+    //    of tailgates across the frame with the bell beyond them: the first
+    //    thing a child ever sees of this world. Visitors arrive by balloon, so
+    //    the dock's rig grid of docked balloons stays as it was.
     {
       const R = REG('arrivals');
-      // the row runs along 09/27 (east-west); the noses point at the whale
+      // the row runs along 09/27 (east-west); the noses point at the bell
       const vx = 1, vy = 0;
       let cx = 0, cy = 0;
       for (const [px, py] of R.poly) { cx += px; cy += py; }
@@ -6887,8 +7186,8 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       // going legal cost the world a dozen envelopes; this is where they come
       // back, and they come back somewhere a real meet actually rigs.
       // ── THE GRID'S TWO AXES MUST BE PERPENDICULAR, AND THEY WERE NOT ─────
-      // When the trailer row above was re-aimed at the whale (30730b1), this
-      // grid inherited its `ux,uy` (toward the whale) while keeping `vx,vy`
+      // When the trailer row above was re-aimed at the plaza (30730b1), this
+      // grid inherited its `ux,uy` (toward the plaza) while keeping `vx,vy`
       // (east-west): a 138-degree frame, so a node and its staggered
       // neighbour in the next row sat 204 world units apart — 10.2 3D, for
       // envelopes 10.6 long. qa/placement.mjs measured five of them
@@ -6926,55 +7225,55 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // down first so they get the room they need, and the small stuff fills in
     // around what is already standing.
 
+    // cloud trees where the spectator cars parked; the bags, baskets and
+    // cylinders are the visiting crews' own, so they stay
     for (const [n, r, sep, qk, mk] of [
-      [29, 1.7, 1.9, 'car', () => SKF.skSpectatorCar()],
+      [29, 2.0, 2.2, 'small', () => SKF.skCloudTree(hue++)],
       [57, 1.4, 1.6, 'big', () => SKF.skBalloonBagged(env())],
       [38, 0.6, 0.8, 'small', () => SKF.skBasket()],
       [34, 0.6, 0.8, 'small', () => SKF.skCylinderPair()],
-      [32, 0.6, 0.8, 'small', () => SKF.skTussock()],
+      [32, 0.6, 0.8, 'small', () => SKF.skPuffBush(hue++)],
     ] as [number, number, number, string, () => THREE.Object3D][])
       for (const p2 of SK.scatterInRegion(REG('arrivals'), n, 55, { sep }))
         drop(mk(), p2, r, layoutYaw(), false, qk);
 
-    // 4. THE TOWER — authored, because it is the one silhouette on the skyline
-    //    and Mr Pym broadcasts from its balcony.
+    // 4. THE CASTLE KEEP (the old tower district) — authored, because it is the
+    //    one silhouette on the skyline and the Town Crier proclaims from its
+    //    foot. Kind 'tower' is the Crier's route key (life.ts).
     {
       const R = REG('tower');
       let cx = 0, cy = 0;
       for (const [px, py] of R.poly) { cx += px; cy += py; }
       cx /= R.poly.length; cy /= R.poly.length;
-      const tower = SKF.skControlTower(); tower.userData.kind = 'tower';   // Mr Pym's balcony (life.ts)
-      drop(tower, [cx, cy], 4.2, SK.skFacingCircle(cx, cy), true, 'big');
-      const hut = SKF.skMetHut(); hut.userData.kind = 'methut';
-      drop(hut, [cx - 420, cy + 300], 0.8, rnd2() * Math.PI * 2, false, 'small');
-      drop(SKF.skBriefingCaravan(), [cx + 480, cy + 260], 2.0, layoutYaw(), false, 'house', 4.2);
-      drop(SKF.skFlagpole(), [cx - 300, cy - 420], 0.5, 0, false, 'small');
-      drop(SKF.skWindsock(), [cx + 520, cy - 380], 0.5, 0, false, 'small');
-      drop(SKF.skFireTender(), [cx + 200, cy + 620], 1.8, layoutYaw() + Math.PI / 2, false, 'car');
+      const keep = SKF.skCastleKeep(); keep.userData.kind = 'tower';
+      // r 5.0: the Keep is 8.1 across (qa/kitfit.mjs); under the bell's 5.5,
+      // so the Great Bell stays the largest edible
+      drop(keep, [cx, cy], 5.0, SK.skFacingCircle(cx, cy), true, 'big', 6.6);
+      const shrine = SKF.skBellShrine(); shrine.userData.kind = 'methut';
+      drop(shrine, [cx - 420, cy + 300], 1.6, rnd2() * Math.PI * 2, false, 'small', 3.2);
+      drop(SKF.skCloudCottage(SKF.ROSE), [cx + 480, cy + 260], 2.6, layoutYaw(), false, 'house', 4.2);
+      drop(SKF.skBannerPole(), [cx - 300, cy - 420], 0.5, 0, false, 'small');
+      drop(SKF.skBannerPole(), [cx + 520, cy - 380], 0.5, 0, false, 'small');
+      drop(SKF.skCastleWall(), [cx + 200, cy + 620], 2.8, layoutYaw() + Math.PI / 2, false, 'small', 5.0);
     }
-    // SCATTERED envelopes, with no grid to hold them apart, so the claim has to
-    // do it alone: two spilled ones need 11.46 between centres and 2 * 13 * 0.45
-    // = 11.7 buys it. sep matches so the scatter's own hash agrees with drop's.
+    // THE CASTLE PIECES round the Keep, where twenty balloons were scattered.
+    // One draw decides the piece and its radius; a turret claims its lane
+    // (9.0) as the gardens' do, and sep matches so the scatter's own hash
+    // agrees with drop's.
     for (const p2 of SK.scatterInRegion(REG('tower'), 20, 150, { sep: 9.0 })) {
-      const cols = env();
-      // ONE draw decides both the mesh and its radius. This drew twice, so a
-      // spilled envelope could carry a cold one's eat radius and vice versa.
-      // A third of them stand now, round the tower the Balloonmeister calls
-      // them up from; a standing one claims its skirt (12.5, see the launch
-      // field's note) so the cones and signs stay out of it.
       const k = rnd2();
-      const stage = k < 0.34 ? 1 : k < 0.67 ? 2 : 3;
-      drop(tagBalloon(stage === 1 ? SKF.skBalloonSpilled(cols) : stage === 2 ? SKF.skBalloonCold(cols) : SKF.skBalloonStanding(cols), stage, cols),
-        p2, stage === 1 ? 5.2 : stage === 2 ? 4.6 : 4.8, layoutYaw(), false, 'big', stage === 3 ? 12.5 : 9.0);
+      if (k < 0.4) drop(SKF.skSkyTurret(), p2, 3.6, layoutYaw(), false, 'big', 9.0);
+      else if (k < 0.75) drop(SKF.skCastleWall(), p2, 2.8, layoutYaw(), false, 'small', 5.0);
+      else drop(SKF.skCloudCottage(ROOF_CYCLE[hue++ % 3]), p2, 2.6, layoutYaw(), false, 'house', 3.5);
     }
     for (const p2 of SK.scatterInRegion(REG('tower'), 110, 50, { sep: 1.1 })) {
       const k = rnd2();
-      drop(k < 0.5 ? SKF.skPerimeterCone() : k < 0.8 ? SKF.skTaxiwaySign() : SKF.skTussock(),
+      drop(k < 0.3 ? SKF.skBannerPole() : k < 0.7 ? SKF.skPuffBush(hue++) : SKF.skBellPost(),
         p2, 0.4, rnd2() * Math.PI * 2, false, 'small');
     }
 
-    // 5. THE HANGARS — two sheds, doors half open, the Sunday flea market
-    //    running inside them.
+    // 5. THE CASTLE YARD (the old hangars) — two castle gatehouses on the yard
+    //    and the craft market between them.
     {
       const R = REG('hangars');
       let cx = 0, cy = 0;
@@ -6995,49 +7294,49 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
             if (rr === 0) break;
           }
         }
-        // force-placed, but it still has to CLAIM its apron: force skips the
-        // open test, not the claim, and a hangar that claims only its eat
-        // radius lets a retrieve vehicle park through its wall. 7.1x9.1 is a
-        // half-diagonal of 5.77, and 5.77 / 0.62 = 9.3.
-        // dot 3's landmark. §8.2 asked hangar or whale; the whale needs R 16.2
-        // against a law topping at 12, so the question is answered by arithmetic.
-        if (best) drop(asLandmark(SKF.skHangar(), 'hangar'), best, 5.5, layoutYaw() + Math.PI / 2, true, 'big', 9.5);
+        // force-placed, but it still has to CLAIM its yard: force skips the
+        // open test, not the claim. The gatehouse is 3.7 x 9.6 (qa/kitfit.mjs),
+        // a half-diagonal of 5.14, and 5.14 / 0.62 = 8.3, so 9.0. NO LANDMARK
+        // TAG: the Great Bell is dot 3's landmark and the hero both.
+        if (best) drop(SKF.skCastleGate(), best, 4.8, layoutYaw() + Math.PI / 2, true, 'big', 9.0);
       }
-      // …AND TWO CREWS ON THE APRON. The hangars were the one district with no
-      // envelope of its own, and the only one qa/skylarkfield.mjs still found
-      // mostly out of sight of one once the arms were crewed. Authored, not
-      // scattered: the first two legal spots walking out from the district's
-      // middle, before the flea market takes the ground. Their own stream, so
-      // nothing drawn from rnd2 moves.
+      // …AND TWO TURRETS ON THE YARD, where the two apron balloons stood.
+      // Authored, not scattered: the first two legal spots walking out from the
+      // district's middle, before the market takes the ground. Their own
+      // stream, so nothing drawn from rnd2 moves.
       const arnd = RNG.stream('skylark', 'apron');
-      let crewed = 0;
-      for (let ring = 1; ring <= 4 && crewed < 2; ring++) {
-        for (let a = 0; a < 10 && crewed < 2; a++) {
+      let raised = 0;
+      for (let ring = 1; ring <= 4 && raised < 2; ring++) {
+        for (let a = 0; a < 10 && raised < 2; a++) {
           const p2: SK.Pt = [cx + Math.cos((a / 10) * Math.PI * 2 + ring) * ring * 150, cy + Math.sin((a / 10) * Math.PI * 2 + ring) * ring * 150];
           if (!SK.pointInPoly(p2[0], p2[1], R.poly)) continue;
-          const up = crewed === 0;
-          const cols = SKF.ENVELOPE[Math.floor(arnd() * SKF.ENVELOPE.length) % SKF.ENVELOPE.length];
-          if (drop(tagBalloon(up ? SKF.skBalloonStanding(cols) : SKF.skBalloonCold(cols), up ? 3 : 2, cols), p2,
-            up ? 4.8 : 4.6, (30 * Math.PI) / 180 + (arnd() - 0.5) * 0.28, false, 'big', up ? 12.5 : 10.5)) crewed++;
+          if (drop(SKF.skSkyTurret(raised ? SKF.ROSE : SKF.ROOF_BLUE), p2, 3.6,
+            (30 * Math.PI) / 180 + (arnd() - 0.5) * 0.28, false, 'big', 9.0)) raised++;
         }
       }
     }
-    for (const [n, r, sep, qk, mk] of [
-      [27, 1.5, 1.7, 'car', () => SKF.skVintageTractor()],
-      [51, 0.8, 1.0, 'small', () => SKF.skTrestleTable()],
-      [21, 0.8, 1.0, 'small', () => SKF.skModelPlaneStand()],
-      [21, 0.8, 1.0, 'small', () => SKF.skRosetteWall()],
-      [18, 0.8, 1.0, 'small', () => SKF.skTeaUrn()],
-      [12, 0.8, 1.0, 'small', () => SKF.skStrawBale()],
-    ] as [number, number, number, string, () => THREE.Object3D][])
+    // THE CRAFT MARKET: stalls where the tractor line-up stood, the trestles
+    // and tea urns as they were, bell shrines for the model planes, banner
+    // poles for the rosette boards, puff bushes for the bales
+    // (the last column is the claim: a stall's and a shrine's half-diagonal
+    // over spotOpen's 0.62 — 1.57 / 0.62 and 1.98 / 0.62 — so a trestle
+    // cannot stand in one)
+    for (const [n, r, sep, qk, mk, claim] of [
+      [27, 2.2, 1.7, 'house', () => SKF.skMarketStall(hue++ % 2 ? SKF.ROOF_BLUE : SKF.ROSE), 2.6],
+      [51, 0.8, 1.0, 'small', () => SKF.skTrestleTable(), 0.8],
+      [21, 1.6, 1.0, 'small', () => SKF.skBellShrine(), 3.2],
+      [21, 0.5, 1.0, 'small', () => SKF.skBannerPole(), 0.5],
+      [18, 0.8, 1.0, 'small', () => SKF.skTeaUrn(), 0.8],
+      [12, 0.45, 1.0, 'small', () => SKF.skPuffBush(hue++), 0.45],
+    ] as [number, number, number, string, () => THREE.Object3D, number][])
       for (const p2 of SK.scatterInRegion(REG('hangars'), n, 45, { sep }))
-        drop(mk(), p2, r, layoutYaw(), false, qk);
+        drop(mk(), p2, r, layoutYaw(), false, qk, claim);
 
-    await breathe('Opening the bacon van…');
+    await breathe('Opening the cake carts…');
 
-    // 6. BREAKFAST ROW — the vans along the old taxiway spur, in a LINE,
-    //    because a row of food vans is a row and every errand in this world
-    //    ends at one of them.
+    // 6. THE CLOUD MARKET (the old breakfast row) — four pastel cake carts in a
+    //    LINE, because a row of carts is a row and every errand in this world
+    //    ends at one of them. Kind 'van' is the bakers' route key (life.ts).
     {
       // ── THE ROW IS WHERE THE GROUND IS, NOT WHERE THE POLYGON'S MIDDLE IS ──
       // This row was laid along 030 through the district's centroid, and the
@@ -7055,9 +7354,9 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const ux = Math.sin(deg), uy = -Math.cos(deg);
       const cx = 7520, cy = 5020;
       const vans = [
-        () => SKF.skBaconVan(0xe8e2d0, 0xd8443a),
+        () => SKF.skBaconVan(SKF.CAKE_ROSE, SKF.GOLD),
         () => SKF.skCoffeeHorsebox(),
-        () => SKF.skBaconVan(0x9fb6c8, 0x2f6fd0),
+        () => SKF.skBaconVan(SKF.CAKE_SKY, SKF.ROOF_BLUE),
         () => SKF.skDoughnutTrailer(),
       ];
       vans.forEach((mk, i) => {
@@ -7078,29 +7377,40 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         drop(m, p2, 2.1, deg + Math.PI / 2 + (rnd2() - 0.5) * 0.2, true, 'car', 3.0);
       });
     }
-    // All spilled, still. Every other one stood up for one build, and the
-    // standing envelope's 12.5 claim took the row's ground: qa/rng.mjs read
-    // the bins 15/29 -> 1/29 and the tussocks 14/25 -> 8/25, the district
-    // 74% of its ask against a bar of 80. Breakfast is the one district too
-    // small to carry a dome.
+    // MARKET STALLS where sixteen spilled balloons lay. The scatter keeps its
+    // 9.0 sep (its stream and its ledger row are unchanged); a stall claims
+    // its own 5.0, which is what the spec's row asks. That claim sits inside
+    // the scatter's own 180-unit one at the same point, so it moves nothing
+    // after it: qa/rng.mjs read the identical ledger at 5.0 and at 2.6.
     for (const p2 of SK.scatterInRegion(REG('breakfast'), 16, 150, { sep: 9.0 })) {
-      const cols = env();
-      drop(tagBalloon(SKF.skBalloonSpilled(cols), 1, cols), p2, 5.2, layoutYaw(), false, 'big', 9.0);
+      drop(SKF.skMarketStall(hue++ % 2 ? SKF.ROSE : SKF.ROOF_BLUE), p2, 2.2, layoutYaw(), false, 'house', 5.0);
     }
     for (const [n, r, sep, qk, mk] of [
-      [18, 1.7, 1.9, 'car', () => SKF.skSpectatorCar()],
+      [18, 2.0, 1.9, 'small', () => SKF.skCloudTree(hue++)],
       [61, 0.75, 0.95, 'small', () => SKF.skPicnicBench()],
-      [47, 0.75, 0.95, 'small', () => SKF.skStrawBale()],
-      [29, 0.75, 0.95, 'small', () => kinded(SKF.skWheelieBin(), 'bin')],
-      [25, 0.75, 0.95, 'small', () => SKF.skTussock()],
+      [47, 0.75, 0.95, 'small', () => SKF.skPuffBush(hue++)],
+      // the cloud sweepers walk bell post to bell post (life.ts's 'bin' route)
+      // BELL POSTS AND FLOWERS AT THEIR OWN SIZE. These two rows inherited
+      // the wheelie bins' and tussocks' r 0.75 / sep 0.95 — a bench's spacing
+      // for a post 0.9 x 0.5 on the ground and a clump 0.4 x 0.5 — and, last
+      // in a district the kingdom's other passes now crowd, they came up
+      // 3/29 and 16/25: the market placed 177 of its 225 asks (78.7%) against
+      // qa/rng.mjs's bar of 80. They now ask what the Cloud Gardens' rows ask
+      // for the same two props (r 0.5 / sep 0.8, r 0.35 / sep 0.6), and both
+      // rows fill (29/29, 25/25): the island places 4,519 of 4,541 (99.5%),
+      // no district thin. (The airfield's build read 8/29 and 21/25 here.)
+      [29, 0.5, 0.8, 'small', () => kinded(SKF.skBellPost(), 'bin')],
+      [25, 0.35, 0.6, 'small', () => SKF.skWildflowerClump()],
     ] as [number, number, number, string, () => THREE.Object3D][])
       for (const p2 of SK.scatterInRegion(REG('breakfast'), n, 40, { sep }))
         drop(mk(), p2, r, layoutYaw(), false, qk);
 
-    // 7. THE RUNWAYS THEMSELVES — nothing is scattered here (skPlaceable
-    //    refuses all three strips), so everything on the concrete is placed by
-    //    hand and by name: the numerals, the centreline, the edge lights and
-    //    the sheep who are on 09 every year and will not be moved.
+    // 7. THE AVENUE AND THE OLD WAYS THEMSELVES — nothing is scattered on the
+    //    live strip (skPlaceable refuses it), so everything on it is placed by
+    //    hand: the gold lanterns along all three ways' edges and the cloud
+    //    sheep beside the 09 way. The airfield's painted numerals and
+    //    centreline dashes are gone — the avenue's paving is baked into the
+    //    ground now (the cloud bake), and the kingdom has no numbers on it.
     for (const [name, pts, half] of [
       ['03', SK.RWY03, SK.RWY03_HALF] as const,
       ['09', SK.RWY09, SK.RWY09_HALF] as const,
@@ -7109,27 +7419,17 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const [a, b] = [pts[0], pts[pts.length - 1]];
       const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
       const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
-      const yaw = Math.atan2(ux, -uy);
-      // the two threshold numerals, at each end, reading up the strip
-      const recip = String((Number(name) + 18) % 36 || 36).padStart(2, '0');
-      paint(SKF.skThresholdNumerals(name, 2.4), [a[0] + ux * 260, a[1] + uy * 260], yaw);
-      paint(SKF.skThresholdNumerals(recip, 2.4), [b[0] - ux * 260, b[1] - uy * 260], yaw + Math.PI);
-      // the centreline, and the blue edge lights still on from the night
-      for (let d = 700; d < L - 700; d += 260) {
-        paint(SKF.skCentrelineDash(), [a[0] + ux * d, a[1] + uy * d], yaw);
-      }
+      // the avenue lanterns, on the old edge-light spacing
       for (let d = 400; d < L - 400; d += 520) {
         for (const sgn of [-1, 1]) {
           paint(SKF.skRunwayEdgeLight(), [a[0] + ux * d - uy * sgn * half, a[1] + uy * d + ux * sgn * half], 0);
         }
       }
-      // THE SHEEP GRAZE BESIDE 09 — and that is a better joke than putting them
-      // on it. The world's third beat is "The sheep are on the runway! / they
-      // are always on the runway", and a beat that announces a thing already
-      // true at frame one announces nothing. They start on the grass; the beat
-      // is what walks them out. It also stops nine deliberate props reporting
-      // as nine placement offences forever, which is the kind of standing
-      // exception that teaches everyone to ignore an audit.
+      // THE CLOUD SHEEP GRAZE BESIDE THE 09 WAY — and that is a better joke
+      // than putting them on it. The world's third beat is "The cloud sheep
+      // are on the avenue!", and a beat that announces a thing already true
+      // at frame one announces nothing. They start beside it; the beat is
+      // what walks them out.
       if (name === '09') {
         for (let i = 0; i < 14; i++) {
           const d = L * (0.24 + i * 0.038);
@@ -7142,86 +7442,71 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         }
       }
     }
-    // the painted launch ring
+    // 7b. the Bell Plaza's ring of gold tiles, where the painted launch ring was
     for (let i = 0; i < 40; i++) {
       const a = (i / 40) * Math.PI * 2;
       const p2: SK.Pt = [SK.LAUNCH.cx + Math.cos(a) * SK.LAUNCH.rx, SK.LAUNCH.cy + Math.sin(a) * SK.LAUNCH.ry];
       paint(SKF.skLaunchCircleMarker(), p2, a + Math.PI / 2);
     }
-
-    // 8. THE PERIMETER TRACK — marshals' cones and posts along the ring, and a
-    //    thin band of spectator cars on the grass verge outside it. This is
-    //    what draws the island's outline ON the island.
+    // 8. THE RAINBOW RING (the perimeter track) — banner poles and puff bushes
+    //    along its verge, and a ring of cloud cottages just outside it, facing
+    //    the field. This is what draws the island's outline ON the island.
     {
       const T = SK.PERIMETER;
       for (let i = 0; i < T.length - 1; i++) {
         const [x1, y1] = T[i], [x2, y2] = T[i + 1];
-        // 260 units in from the centreline, which is 60 clear of the track's
-        // own edge: a marshal stands BESIDE the track with a light wand, and a
-        // cone on the tarmac is a cone in the way
+        // 260 units in from the centreline, which is 60 clear of the ring's
+        // own edge: banner poles and puff bushes on its verge, never on it
         const nx = -(y2 - y1), ny = (x2 - x1), nl = Math.hypot(nx, ny) || 1;
         for (const t of [0.25, 0.75]) {
           const bx = x1 + (x2 - x1) * t, by = y1 + (y2 - y1) * t;
           const inward = ((6000 - bx) * nx + (6000 - by) * ny) > 0 ? 1 : -1;
           const p2: SK.Pt = [bx + (nx / nl) * 260 * inward, by + (ny / nl) * 260 * inward];
           if (!SK.skPlaceable(p2[0], p2[1], 10)) continue;
-          const m = t < 0.5 ? SKF.skPerimeterCone() : SKF.skMarshalPost();
+          const m = t < 0.5 ? SKF.skBannerPole() : SKF.skPuffBush(hue++);
           drop(m, p2, 0.4, rnd2() * Math.PI * 2, false, 'small');
         }
-        // the spectator band, just outside the track, facing the field
-        // OUTSIDE THE TRACK WHERE THERE IS LAND, INSIDE WHERE THERE IS NOT. The
-        // track runs close to the coast for half its length: replayed against
-        // the geometry (qa/_skmiss.mjs), 260 units outside clears the rules on
-        // 15 of 30 segments and 260 inside on the other 15 — so a car that
-        // cannot park outside parks inside, facing the field either way, and
-        // the band is a band rather than one car (density survey: "1 car of
-        // 30"). drop()'s own clearance is the one that binds (58 world units
-        // for a 1.7 prop), so it is the one asked here.
-        // …and a car parks where the segment lets it: five stations along the
-        // segment, outside first, then inside. Replayed (qa/_skspec.mjs): the
-        // midpoint alone hosts 15 of 30; with the stations, 29 of 30.
+        // THE RING OF COTTAGES, just outside the ring, facing the field, at the
+        // five stations the airfield's spectator cars parked on.
+        // OUTSIDE THE RING WHERE THERE IS LAND, INSIDE WHERE THERE IS NOT: the
+        // ring runs close to the coast for half its length (replayed against
+        // the geometry, qa/_skmiss.mjs: 260 outside clears the rules on 15 of
+        // 30 segments and 260 inside on the other 15), and a segment that cannot
+        // seat one at its midpoint tries the other stations (qa/_skspec.mjs).
+        // drop()'s own clearance is asked here: r 2.6 x 34 = 88 world units.
         seat: for (const t of [0.5, 0.35, 0.65, 0.2, 0.8]) {
           const bx = x1 + (x2 - x1) * t, by = y1 + (y2 - y1) * t;
           const inx = 6000 - bx, iny = 6000 - by, il = Math.hypot(inx, iny) || 1;
           for (const side of [-1, 1]) {
             const p2: SK.Pt = [bx + (inx / il) * 260 * side, by + (iny / il) * 260 * side];
-            if (!SK.onSkylarkLand(p2[0], p2[1]) || !SK.skPlaceable(p2[0], p2[1], 58)) continue;
-            const car = SKF.skSpectatorCar(pick([0x8ea3c4, 0xc4a08e, 0x9ec4a0, 0xd0d0c8]));
-            car.userData.kind = 'spectator';
-            drop(car, p2, 1.7, Math.atan2(inx, iny) + (side > 0 ? Math.PI : 0), false, 'car', 2.4);
+            if (!SK.onSkylarkLand(p2[0], p2[1]) || !SK.skPlaceable(p2[0], p2[1], 88)) continue;
+            // the door (+x) turned toward the island's middle: rotation.y
+            // maps +x to (cos, -sin), so the door faces (inx, iny) at atan2(-iny, inx)
+            if (!drop(SKF.skCloudCottage(ROOF_CYCLE[hue++ % 3]), p2, 2.6, Math.atan2(-iny, inx), false, 'house', 4.2)) continue;
             break seat;
           }
         }
       }
     }
 
-    // 8b. THE CREWS OUT ON THE ARMS — the owner's note, 2026-09-24: "Item
-    //     placement is like all just in the middle." Passes 2-6 put every
-    //     envelope on the island in five districts in its south-east quarter,
-    //     and the three arms, the track's verge and the rough carried tussocks
-    //     (qa/skylarkfield.mjs: an envelope in frame from 19.8% of the shoulder
-    //     cells, 16.4% of the verge, 5.1% of the rough). skCrewSites() says
-    //     WHERE a late crew rigs — the strips' shoulders, the verge, the holes
-    //     in the rough — and this says what each one is: an envelope at its
-    //     stage, the trailer it came in parked alongside, and the kit that
-    //     stage needs, laid out on the same 030 as the rest of the field.
+    // 8b. THE VISITORS' BALLOONS DOCKED ALONG THE EDGE, and hamlets inland.
+    //     skCrewSites() proposes where a crew rigs — the ways' shoulders, the
+    //     ring's verge, the holes in the meadows — kept CREW_GAP apart (it was
+    //     the owner's 2026-09-24 note: "Item placement is like all just in the
+    //     middle", and it still spreads the island's big meals to every arm).
+    //     On the kingdom, a site within 1,200 of the coast is a DOCKED BALLOON
+    //     exactly as the airfield's crew was (the same STAGE cycle, the basket
+    //     cart alongside, the kit its stage needs) — the poster's balloons
+    //     along the edge; 45 of the 58 proposed sites are that close to the
+    //     coast (docs/BELLCLOUD.md §14, [ran]). Inland, a site is a HAMLET: a
+    //     sky turret and two cloud trees.
     //
     //     THE STAGES RUN 4 : 2 : 1 : 1, standing : cold : spilled : bagged.
-    //     Out here they are spaced a crew apart (CREW_GAP, 21 scene units),
-    //     so the wall of opaque domes the file's header warns about cannot
-    //     form, and a standing envelope is what reads from the far side of a
-    //     strip. It is what moves the island toward the poster. Measured, SEED
-    //     7: 49 envelopes now stand outside the five districts (it was 1), and
-    //     an envelope is in frame from 84.5% of the strips' shoulders (19.8%),
-    //     86.1% of the verge (16.4%) and 98.5% of the rough (5.1%).
+    //     Spaced a crew apart (CREW_GAP, 21 scene units), so the wall of
+    //     opaque domes the file's header warns about cannot form.
     //
-    //     WHAT IT COST: the rough's own dressing. drop() refuses a tussock
-    //     inside a crew's claim, so 295 small props of the rough and verge
-    //     are not there (small edibles 3,518 -> 3,223 island-wide); every cell
-    //     still has one in frame, and those that went were grass.
-    //
-    //     Before the rough, so the grass and the wildflowers fill in around the
-    //     crews rather than the crews fighting the grass for ground. Its own
+    //     Before the meadows, so the bushes and the flowers fill in around the
+    //     docks rather than the docks fighting them for ground. Its own
     //     stream, so nothing drawn from rnd2 after this moves.
     {
       const crnd = RNG.stream('skylark', 'crews', 'dress');
@@ -7238,6 +7523,14 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       };
       let k = 0;
       for (const p2 of SK.skCrewSites()) {
+        if (SK.distToEdge(p2[0], p2[1]) >= 1200) {
+          // A HAMLET: a turret with a cloud tree either side, across the lane
+          if (!drop(SKF.skSkyTurret(ROOF_CYCLE[hue++ % 3]), p2, 3.6, cyaw(), false, 'big', 9.0)) continue;
+          for (const s of [-1, 1]) {
+            kitAt(() => SKF.skCloudTree(hue++), [p2[0] + s * vx * 330, p2[1] + s * vy * 330], 2.0, cyaw(), 3.2, 'small');
+          }
+          continue;
+        }
         const stage = STAGE[k % STAGE.length];
         const cols = SKF.ENVELOPE[Math.floor(crnd() * SKF.ENVELOPE.length) % SKF.ENVELOPE.length];
         const mesh = stage === 0 ? SKF.skBalloonBagged(cols) : stage === 1 ? SKF.skBalloonSpilled(cols)
@@ -7255,13 +7548,14 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       }
     }
 
-    // 9. THE ROUGH — the uncut grass in the three bites, dressed off distToEdge
-    //    with a band rather than a polygon, exactly as Powder dresses its rim.
+    // 9. THE CLOUD MEADOWS — the three bites of the coast, dressed off
+    //    distToEdge with a band rather than a polygon, exactly as Powder
+    //    dresses its rim: puff bushes, cloud flowers and the old kingdom's
+    //    broken columns.
     for (const p2 of SK.scatterLand(1650, 24, [110, 1800])) {
       const k = rnd2();
-      const m = k < 0.42 ? SKF.skTussock() : k < 0.66 ? SKF.skWildflowerClump()
-        : k < 0.82 ? SKF.skThistle() : k < 0.92 ? SKF.skFencePost() : SKF.skFenceRun();
-      drop(m, p2, k < 0.92 ? 0.34 : 1.0, rnd2() * Math.PI * 2, false, 'small');
+      const m = k < 0.42 ? SKF.skPuffBush(hue++) : k < 0.82 ? SKF.skWildflowerClump() : SKF.skBrokenColumn();
+      drop(m, p2, k < 0.82 ? 0.34 : 0.9, rnd2() * Math.PI * 2, false, 'small');
     }
     // …and the three things a child hunts for out there
     for (const p2 of SK.scatterLand(22, 40, [200, 1400])) {
@@ -7271,17 +7565,17 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       drop(SKF.skHare(), p2, 0.35, rnd2() * Math.PI * 2, false, 'small');
     }
     for (const p2 of SK.scatterLand(2, 60, [250, 1200])) {
-      drop(SKF.skCollapsedWindsockPole(), p2, 1.2, rnd2() * Math.PI * 2, false, 'small');
+      drop(SKF.skBrokenColumn(true), p2, 1.2, rnd2() * Math.PI * 2, false, 'small');
     }
-    // the general field: more grass everywhere the rows are not
+    // the general meadow: more puffs and flowers everywhere the lanes are not
     for (const p2 of SK.scatterLand(1500, 24)) {
       const k = rnd2();
-      const m = k < 0.55 ? SKF.skTussock() : k < 0.85 ? SKF.skWildflowerClump() : SKF.skThistle();
+      const m = k < 0.55 ? SKF.skPuffBush(hue++) : SKF.skWildflowerClump();
       drop(m, p2, 0.32, rnd2() * Math.PI * 2, false, 'small');
     }
 
-    await breathe('Waiting for the wind to drop…');
-    return;   // SKYLARK FIELD is fully populated — the Maple grid pass must not run
+    await breathe('Polishing the bell…');
+    return;   // BELLCLOUD HEIGHTS is fully populated — the Maple grid pass must not run
   }
 
   // ══ LANTERN NIGHT: a spirit market, and it is open ════════════════════
