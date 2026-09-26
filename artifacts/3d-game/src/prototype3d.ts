@@ -2737,9 +2737,11 @@ const LEVEL_SPEC: Record<WorldId, LevelSpec> = {
   // which the bell replaces as dot 3's landmark and the hero both).
   // eat, clear and every set.n are PROVISIONAL — not re-measured on
   // Bellcloud's food (qa/goalcurve.mjs has not been run on it). The set moves
-  // from VANS to HOUSES because there are no vans in the sky; 10 is under the
-  // 6N rule's ceiling for the house supply counted on the page (see the
-  // HARD_BY_WORLD note).
+  // from VANS to HOUSES because there are no vans in the sky: the kingdom
+  // carries 78 house-like props and 30 car-tagged ones (qa/questable.mjs,
+  // SEED 7), so the 6N rule allows HOUSES up to 13 and VANS 15 would need 90.
+  // qa/levels.mjs (e) passes this row: the Great Bell resolves for dot 3 and
+  // dot 2's three kinds clear their supply rule.
   skylark: { eat: 30000, landmark: 'great bell', landmarkR: 4.95, rank: 1, clear: 38,
     set: [{ kind: 'gild', n: 6, label: 'GOLD', icon: '💰' }, { kind: 'house', n: 10, label: 'HOUSES', icon: '🏠' }, { kind: 'snack', n: 100, label: 'SNACKS', icon: '🍿' }] },
 };
@@ -6635,8 +6637,9 @@ const MED_BY_WORLD: Record<string, string[]> = {
   pirate:  ['evolve', 'combo', 'gold'],
   powder:  ['evolve', 'combo', 'gold'],
   lantern: ['evolve', 'combo', 'gold'],
-  // SKYLARK FIELD has 70 car-tagged props (the retrieve vehicles and the
-  // trailers at arrivals), so 'Rush Hour: eat 6 cars' clears comfortably.
+  // SKYLARK FIELD had 70 car-tagged props; BELLCLOUD HEIGHTS has 30 (the
+  // basket carts and the four cake carts, qa/questable.mjs, SEED 7),
+  // and 'Rush Hour: eat 6 cars' still clears — questable PASSES the pool.
   skylark: ['cars', 'evolve', 'combo'],
 };
 const HARD_BY_WORLD: Record<string, string[]> = {
