@@ -754,6 +754,41 @@ const WORLD_PAR: Record<string, number> = {
   skylark: 35000,
 };
 
+// ── THE POINTS THE BEAT WINDOWS USED TO PAY ─────────────────────────────────
+// Every score in this file that was MEASURED — WORLD_PAR above, the growth
+// law's par and its floor, the coin and XP curves at the end of a match — was
+// measured in a game where four beats a match doubled or tripled every bite
+// for 14-32 seconds. The owner cut those windows on 2026-09-25 ("double
+// points ... I say we get rid of that"), so the same eating now banks fewer
+// points, and every one of those numbers would quietly have become harder.
+//
+// windowless(t) is the share of the points a match had banked by second t
+// that the same eating banks with no windows. MEASURED, not derived: the
+// seeded goal-curve autopilot (qa/goalcurve.mjs --dot=4, five full matches a
+// world, all six worlds) on the build before the cut, with the live multiplier
+// logged every match-second, so U(t) = the sum of each second's points over
+// that second's multiplier. The median over worlds, with the medians from 45 s
+// to 135 s averaged — the windows make the raw curve saw up and down, and a
+// curve that saws would move the growth law's ceiling in time with beats that
+// no longer exist. Before the first window it is 1, by construction.
+//
+// Where a number is read, it is read in today's points: par x windowless(t).
+// The tables keep the values they were measured at, in the points of the day.
+// The EAT goals are the exception, because a child reads them on the card:
+// those were re-measured and rewritten (LEVEL_SPEC).
+const WINDOWLESS: [number, number][] = [[25, 1], [45, 0.728], [150, 0.706], [165, 0.589], [180, 0.531]];
+function windowless(t: number): number {
+  const K = WINDOWLESS;
+  if (t <= K[0][0]) return K[0][1];
+  for (let i = 1; i < K.length; i++) {
+    if (t <= K[i][0]) {
+      const [t0, k0] = K[i - 1], [t1, k1] = K[i];
+      return k0 + (k1 - k0) * (t - t0) / (t1 - t0);
+    }
+  }
+  return K[K.length - 1][1];
+}
+
 
 const scene = new THREE.Scene();
 
@@ -2811,8 +2846,9 @@ function addEdible(mesh: THREE.Object3D, radius: number) {
 // compiler naming anything left out.
 interface WorldCopy {
   n: number;            // which level this is, for the title card and the chip
-  newsGap: [number, number];   // seconds between scheduled headlines, min/spread
-  signOn: number;              // …and how long before the station says hello
+  // `newsGap` (the seconds between scheduled headlines) went on 2026-09-25:
+  // after the morning the paper prints only at a milestone. See showNews.
+  signOn: number;              // how long before the station says hello
   /** THE ESTABLISHING SHOT'S SUBJECT, in 3D coords, or null to open on the void.
    *
    *  GAME DAY's design contract promises the player spawns "facing the stadium,
@@ -2841,7 +2877,9 @@ interface WorldCopy {
   winTitles: string[];  // …and the rotating title above it
   place: string;        // the noun for this world, mid-sentence
   /** THE FINALE CUE, per world — the banner when the hero landmark becomes
-   *  edible, the headline under it, and the banner when it goes.
+   *  edible, and the banner when it goes. (A headline under the first one went
+   *  on 2026-09-25: coming into range is not a milestone, eating it is — and
+   *  the paper still covers that, through heroName.)
    *
    *  These three were hard-coded to GAME DAY's stadium while `heroProp` is
    *  resolved per-match as the largest edible in the world. So Pirate Bay's
@@ -2855,7 +2893,6 @@ interface WorldCopy {
    *  and the compiler names anything left out. These three strings were simply
    *  never moved into it. `null` on a world with no hero landmark. */
   heroCue: string | null;
-  heroCueNews: string | null;
   heroGone: string | null;
   /** THE HERO LANDMARK'S NAME, as the paper would print it.
    *
@@ -2869,21 +2906,13 @@ interface WorldCopy {
    *  sentence in half the landmark templates — exactly like a sticker name,
    *  which is the other source of {X}. `null` on a world with no hero prop. */
   heroName: string | null;
-  /** THE REACTIVE ONE-SHOTS, per world. `breakingNews()` jumps the newsroom
-   *  queue when the player causes a big beat, and until now three of those
-   *  beats were hard-coded generic strings that fired in ALL FOUR worlds.
-   *  LANTERN NIGHT is where it showed: the market's public address is a
-   *  recording that has no mechanism for noticing anything, and it was
-   *  printing "It ate a house. A WHOLE house. We have questions." That is the
-   *  same class of leak as the stadium banner above, and the same fix. */
-  houseNews: string;      // the first building goes
-  // `rivalGoneNews` USED TO LIVE HERE and does not any more. One void eating
-  // another is a REACTION, not a fixed string, and it now draws from a pool in
-  // newsroom_react.ts through the same cooldown as the landmark, beat and
-  // evolve reactions — so a marquee kill and a water tower going ten seconds
-  // apart cannot print two cards over each other. All four original lines were
-  // moved into those pools verbatim; nothing was thrown away.
-  rivalFullNews: string;  // …and the survivor has slowed right down
+  // THE REACTIVE ONE-SHOTS lived here — `houseNews` (the first building goes)
+  // and `rivalFullNews` (a stuffed rival slows down), one line per world in
+  // each world's own voice — beside `rivalGoneNews`, which had already moved
+  // into newsroom_react.ts's pools. The owner, 2026-09-25: the news in the
+  // morning, and then "key milestones, like you evolve to a certain size or
+  // you consume a certain item". A first house and a full rival are neither,
+  // so both went, with `heroCueNews` above. `enderNews` stays: the last form.
 }
 /** ══ THE THIRTY GOALS ═══════════════════════════════════════════════════════
  *
@@ -2937,10 +2966,47 @@ export interface LevelSpec {
   /** Dot 5: share of the WORLD devoured. Measured p10 at ~70% of the clock. */
   clear: number;
 }
+// ── DOT 1 WAS RE-MEASURED WHEN THE BEAT WINDOWS WENT (2026-09-25) ─────────
+// EAT is the one goal a child reads in points, and the points it was set in
+// were partly paid by the x2/x3 beat windows the owner cut. So it is held at
+// the same EATING, not the same number. The goal-curve autopilot
+// (qa/goalcurve.mjs --dot=4, five seeded matches a world, a whole match each)
+// was run on the build before the cut and on the build after it, and each old
+// goal is scaled by the after/before ratio of the median run's score at 45,
+// 60, 75, 90, 105 and 120 s, averaged (one second alone is too noisy: Maple's
+// ratio reads 0.644 to 0.862 across those six), and rounded down to a 500. The comments on each row below
+// are the day-2 readings, in the old points.
+//
+//   world     old goal  after/before  new goal   the median run meets it   slowest of five
+//                                                 old goal -> new goal      old -> new
+//   maple       18,000     0.725        13,000      64 s -> 57 s              71 s -> 64 s
+//   pirate      18,000     0.770        13,500      69 s -> 58 s              78 s -> 156 s *
+//   gameday     32,000     0.715        22,500      73 s -> 74 s              87 s -> 77 s
+//   lantern     40,000     0.700        27,500      83 s -> 79 s              97 s -> 97 s
+//   powder      10,000     0.933         9,000      76 s -> 75 s              78 s -> 93 s
+//   skylark     30,000     0.885        26,500      76 s -> 74 s              93 s -> 97 s
+//
+//   * the family's bites held one Pirate run at 6,562 points or less from 75 s
+//     to 150 s (radius 0.9 at 120 s); the other four met 13,500 by 68 s.
+//
+// The FIRST estimate was derived from the old build alone — each second's
+// points over that second's live multiplier — and read 12,500 / 12,500 /
+// 22,500 / 28,500 / 7,000 / 23,500. The build after the cut met four of those
+// 9-13 s sooner than the old goals had been met (Powder's 7,000 at 63 s against
+// 76 s): by mid-match it has eaten more than the old build's unmultiplied
+// points say, and the goals are met by eating. The direct ratio replaced it.
+//
+// SET, LANDMARK and CLEAR are counted in things, radius and share of the
+// world, which no window paid; RIVALS is a place, and the par it is raced
+// against is read through windowless() (beside WORLD_PAR), as is the growth
+// law's par, so neither the family nor her size moves with the cut. On the
+// same runs: first place at the buzzer in all thirty after the cut (Pirate's
+// worst was 2nd before), and her median radius at the buzzer 12.0-15.9 before,
+// 12.0-16.6 after.
 const LEVEL_SPEC: Record<WorldId, LevelSpec> = {
   // p10 run reaches 18,790 at half the clock · barn r 5.0 needs R 4.50 (~62%)
   // · SET done at 76 s (42%) · devours 29% by 70%
-  maple: { eat: 18000, landmark: 'barn', landmarkR: 4.50, rank: 3, clear: 28,
+  maple: { eat: 13000, landmark: 'barn', landmarkR: 4.50, rank: 3, clear: 28,
     set: [{ kind: 'house', n: 5, label: 'HOUSES', icon: '🏠' }, { kind: 'car', n: 8, label: 'CARS', icon: '🚗' }, { kind: 'snack', n: 40, label: 'SNACKS', icon: '🍿' }] },
   // 19,353 at half · lookout r 4.0 needs R 3.60 (~45%) · SET at 56 s (31%)
   // GOLD IS CAPPED AT 6 EVERYWHERE, and the cap is arithmetic rather than
@@ -2949,24 +3015,24 @@ const LEVEL_SPEC: Record<WorldId, LevelSpec> = {
   // The hunt agrees — on Pirate a hunting run reached 8 gold at 56 s but 15 at
   // 81 s with a p90 of 147, and 20 never. A gold goal above this is a race
   // against the rubber band for the last few coins.
-  pirate: { eat: 18000, landmark: 'lookout', landmarkR: 3.60, rank: 3, clear: 28,
+  pirate: { eat: 13500, landmark: 'lookout', landmarkR: 3.60, rank: 3, clear: 28,
     set: [{ kind: 'gild', n: 6, label: 'GOLD', icon: '💰' }, { kind: 'cabana', n: 20, label: 'CABANAS', icon: '⛱️' }, { kind: 'snack', n: 60, label: 'SNACKS', icon: '🍿' }] },
   // 34,800 at half · clock tower r 4.5 needs R 4.05 (~51%) · SET at 99 s (55%)
-  gameday: { eat: 32000, landmark: 'clock tower', landmarkR: 4.05, rank: 2, clear: 32,
+  gameday: { eat: 22500, landmark: 'clock tower', landmarkR: 4.05, rank: 2, clear: 32,
     set: [{ kind: 'car', n: 4, label: 'TRUCKS', icon: '🛻' }, { kind: 'house', n: 8, label: 'HOUSES', icon: '🏠' }, { kind: 'snack', n: 40, label: 'SNACKS', icon: '🍿' }] },
   // 41,206 at half · gate r 5.0 needs R 4.50 (~62%) · SET at 48 s (27%) ·
   // devours 48% by 70%, the densest world in the game
-  lantern: { eat: 40000, landmark: 'gate', landmarkR: 4.50, rank: 2, clear: 45,
+  lantern: { eat: 27500, landmark: 'gate', landmarkR: 4.50, rank: 2, clear: 45,
     set: [{ kind: 'gild', n: 6, label: 'GOLD', icon: '💰' }, { kind: 'house', n: 40, label: 'STALLS', icon: '🎪' }, { kind: 'snack', n: 100, label: 'SNACKS', icon: '🍿' }] },
   // 11,104 at half · bell tower r 4.4 needs R 3.96 (~55%) · SET at 91 s (50%)
-  powder: { eat: 10000, landmark: 'bell tower', landmarkR: 3.96, rank: 1, clear: 30,
+  powder: { eat: 9000, landmark: 'bell tower', landmarkR: 3.96, rank: 1, clear: 30,
     set: [{ kind: 'gild', n: 4, label: 'GOLD', icon: '💰' }, { kind: 'house', n: 4, label: 'CHALETS', icon: '🏡' }, { kind: 'snack', n: 40, label: 'SNACKS', icon: '🍿' }] },
   // 32,020 at half · hangar r 5.5 needs R 4.95 (~73%) · SET at 39 s (22%)
   // vans were 40 on the hunt's timing (39 s) but the island carries 98 and the
   // family eats 40-50% of the board, so 40 would have been a race against the
   // rubber band for the last few. 15 clears the 6N rule and the hunt reached it
   // at 22 s.
-  skylark: { eat: 30000, landmark: 'hangar', landmarkR: 4.95, rank: 1, clear: 38,
+  skylark: { eat: 26500, landmark: 'hangar', landmarkR: 4.95, rank: 1, clear: 38,
     set: [{ kind: 'gild', n: 6, label: 'GOLD', icon: '💰' }, { kind: 'car', n: 15, label: 'VANS', icon: '🚐' }, { kind: 'snack', n: 100, label: 'SNACKS', icon: '🍿' }] },
 };
 
@@ -3261,11 +3327,9 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     // landmass, not the player's word for where they are. PIRATE BAY is the
     // tropical island in this game and it is two cards along.
     n: 1, icon: '🍁', sub: 'the little void is hungry · eat the town',
-    newsGap: [16, 8], signOn: 6, hero: null, introLen: 2.2,
+    signOn: 6, hero: null, introLen: 2.2,
     ender: '🌑 WORLD ENDER! The town is OVER.',
     enderNews: 'MAPLE FALLS has GONE!! The clock is still nine minutes fast.',
-    houseNews: 'A whole house has gone. Town hall will discuss it for four hours.',
-    rivalFullNews: 'The second void has stopped moving. It looks full. It looks slow.',
     winSub: 'the whole town belongs to the void', place: 'the town',
     winTitles: ['TOWN: DELICIOUS', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'VOID SWEET VOID', 'CHOMPION OF MAPLE FALLS'],
     // ── MAPLE HAS A FINALE NOW, AND THE REASON IT DID NOT WAS ARITHMETIC ───
@@ -3303,13 +3367,12 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     // survives as MEETING OVER, which is what adjourned means to the row of
     // people shouting it.
     heroCue: '🏛️ YOU CAN EAT THE TOWN HALL NOW — GO!',
-    heroCueNews: 'It is big enough for the town hall. The meeting has gone quiet.',
     heroGone: '🏛️ TOWN HALL: EATEN! MEETING OVER.',
     heroName: 'The Town Hall',
   },
   pirate: {
     n: 2, icon: '🏴‍☠️', sub: 'the resort is packed · eat the party',
-    newsGap: [16, 8], signOn: 6,
+    signOn: 6,
     // THE ROYAL MARINER, in 3D: island.ts authors the grand hotel at world
     // (8540, 3700). Pirate Bay was written off for a finale cue on the
     // grounds that it has "no single object the match builds toward" — but it
@@ -3320,12 +3383,9 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     hero: [(8540 - 6000) * 0.05, (3700 - 6000) * 0.05], introLen: 2.2,
     ender: '🌑 WORLD ENDER! The resort is OVER.',
     enderNews: 'PIRATE BAY is CANCELLED!! It was lovely while it lasted.',
-    houseNews: 'A whole villa, gone in one go. Do book early for next year.',
-    rivalFullNews: 'The other one has stopped moving. It looks full. Extremely full.',
     winSub: 'the whole resort belongs to the void', place: 'the resort',
     winTitles: ['RESORT: DEVOURED', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'ALL-INCLUSIVE, LITERALLY', 'CHOMPION OF THE BAY'],
     heroCue: '🏨 YOU CAN EAT THE ROYAL MARINER NOW — GO!',
-    heroCueNews: 'It is big enough for the Royal Mariner. The concierge has gone quiet.',
     heroGone: '🏨 THE ROYAL MARINER IS GONE. ALL FIVE STARS.',
     heroName: 'The Royal Mariner',
   },
@@ -3340,7 +3400,7 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     // even at the short end there is a clear ten-second gap between them.
     // The sign-on comes early too: "Good afternoon from Marston!" is the
     // opening line of a broadcast, not something you hear a quarter in.
-    newsGap: [16, 8], signOn: 6,
+    signOn: 6,
     // the bowl, in 3D: gameday.ts authors it at world (5930, 3200), and the
     // world-to-3D transform is (v - 6000) * 0.05.
     hero: [(5930 - 6000) * 0.05, (3200 - 6000) * 0.05],
@@ -3351,12 +3411,9 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     introLen: 3.4,
     ender: '🌑 WORLD ENDER! The stadium is OVER.',
     enderNews: 'MARSTON has GONE!! Hank Prewitt is still calling it, play by play.',
-    houseNews: 'Bill, that was a HOUSE. Straight down the middle, and no flag.',
-    rivalFullNews: 'The second one has stopped moving. Bill calls that a slow start.',
     winSub: 'the whole of Marston belongs to the void', place: 'the town',
     winTitles: ['FINAL: VOID, EVERYBODY ELSE 0', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'THAT IS A GAME', 'CHOMPION OF MARSTON'],
     heroCue: '🏟️ YOU CAN EAT THE STADIUM NOW — GO!',
-    heroCueNews: 'It is big enough for the stadium. Hank has stopped describing it.',
     heroGone: '🏟️ THE STADIUM IS GONE. ALL OF IT.',
     heroName: 'The Stadium',
   },
@@ -3364,7 +3421,7 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     n: 4, icon: '🏮', sub: 'the spirits think you are a guest · eat the market',
     // The market's own voice is a PA that cannot tell anything is wrong, so it
     // talks like a station that has nothing to report — often, and cheerfully.
-    newsGap: [15, 7], signOn: 5,
+    signOn: 5,
     // the bathhouse, in 3D: lantern.ts authors it at world (6280, 2500), and
     // the world-to-3D transform is (v - 6000) * 0.05.
     hero: [(6280 - 6000) * 0.05, (2500 - 6000) * 0.05],
@@ -3374,13 +3431,10 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     introLen: 3.6,
     ender: '🌑 WORLD ENDER! The market is OVER.',
     enderNews: 'THE MARKET HAS GONE. The bathhouse thanks you for visiting.',
-    houseNews: 'A guest has taken a whole house. We hope it was to their liking.',
-    rivalFullNews: 'The other guest has stopped. We think the other guest is full.',
     winSub: 'the whole market belongs to the void', place: 'the market',
     winTitles: ['MARKET: DEVOURED', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS',
                 'THE GUEST HAS FINISHED', 'HONOURED, AND ALSO ENORMOUS'],
     heroCue: '🏮 YOU CAN EAT THE BATHHOUSE NOW — GO!',
-    heroCueNews: 'It is big enough for the bathhouse. The PA is still reading the hours.',
     heroGone: '🏮 THE BATHHOUSE IS GONE. ALL SLURPED UP.',
     heroName: 'The Bathhouse',
   },
@@ -3388,7 +3442,7 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     n: 5, icon: '❄️', sub: 'school is shut · the valley slides · eat it all',
     // the closures desk reads its list at a measured pace and will not be
     // hurried by anything, including the end of the valley
-    newsGap: [15, 7], signOn: 5,
+    signOn: 5,
     // THE LODGE, in 3D: powder.ts authors it at world (6100, 2350)
     hero: [(6100 - 6000) * 0.05, (2350 - 6000) * 0.05],
     // an open slope, not a corridor: the shot holds the lodge on its hill and
@@ -3396,13 +3450,10 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     introLen: 3.5,
     ender: '🏔️ WORLD ENDER! The valley is CLOSED.',
     enderNews: 'THE VALLEY IS NOW A VOID. Grit stocks were not the issue in the end.',
-    houseNews: 'A chalet has left. The booking stands. The chalet does not.',
-    rivalFullNews: 'The other void has stopped sliding. Officials are calling it "full".',
     winSub: 'the whole valley belongs to the void', place: 'the valley',
     winTitles: ['VALLEY: DEVOURED', 'SCHOOL STAYS SHUT', 'BURP OF CHAMPIONS',
                 'PISTE OFF THE MAP', 'FROSTY, AND ALSO ENORMOUS'],
     heroCue: '🏔️ YOU CAN EAT THE LODGE NOW — GO!',
-    heroCueNews: 'It is big enough for the Lodge. The hot chocolate is still on the counter.',
     heroGone: '🏔️ THE LODGE IS GONE. ALL SLURPED UP.',
     heroName: 'The Lodge',
   },
@@ -3410,7 +3461,7 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     n: 6, icon: '🎈', sub: 'get them before they go up',
     // Mr Pym reads a briefing at a briefing's pace and finishes it every time,
     // including the wind, the cloud base and "have a good flight"
-    newsGap: [16, 8], signOn: 6,
+    signOn: 6,
     // THE WHALE, in 3D: skylark.ts puts the launch circle at world (6107, 4349)
     hero: [(6107 - 6000) * 0.05, (4349 - 6000) * 0.05],
     // an open field, not a corridor: the shot holds the whale lying across the
@@ -3418,13 +3469,10 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     introLen: 3.4,
     ender: '🎈 WORLD ENDER! The field is CLEAR.',
     enderNews: 'SKYLARK FIELD IS CLEAR IN ALL DIRECTIONS. Visibility unlimited. Conditions perfect.',
-    houseNews: 'A hangar has gone. The flea market has relocated to the grass.',
-    rivalFullNews: 'The second feature has stopped moving. It is now, technically, terrain.',
     winSub: 'the whole field belongs to the void', place: 'the field',
     winTitles: ['FIELD: CLEARED FOR TAKEOFF', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS',
                 'NOTHING LEFT TO REPORT', 'CHOMPION OF SKYLARK FIELD'],
     heroCue: '🐋 YOU CAN EAT THE WHALE NOW — GO!',
-    heroCueNews: 'It is big enough for the whale. The whale is inflating. Crews are asked to be brisk.',
     heroGone: '🐋 THE WHALE IS GONE. ALL SLURPED UP.',
     heroName: 'The Whale',
   },
@@ -4083,7 +4131,7 @@ _dbg.__settleAgain = () => settleFootprints().map((i) => {
     + `${m.userData.authored ? ' AUTHORED' : ''}${m.userData.building ? ' bldg' : ''}`;
 });
 
-_dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the live templates)
+_dbg.__news = () => showNews('qa');   // QA: fire a headline on demand (audits the live templates)
 // QA: what the MUSIC ENGINE is actually doing. qa/music.mjs judged a world by
 // "the slot was requested and the synth is quiet" — and a track that loads but
 // never starts is exactly that, so total silence read as RECORDING. This is the
@@ -4990,7 +5038,6 @@ _dbg.__matchState = () => ({
   tense: tension(),
   graze: rivals.grazeCount(),
   band: rivals.bandStat(),   // QA: is the lane multiplier pinned at its clamp?
-  fever: feverMult,          // QA: is a beat window live right now?
   combo,                     // QA: the chain qa/nomstream.mjs grades the pill and the cash-in against
   mood: prevMood,            // QA: the face the void is making — qa/endparty.mjs reads it at the end
   t: started ? matchElapsed() : 0, clock: matchClock, score: playerScore, r: voidling.radius, eaten: matchEaten, ev: rivalEv,
@@ -5625,11 +5672,11 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   // ?killbeat=1, a freeze, a slow stretch, a ray pulse and her dizzy pupils.
   // (This list used to include "a camera punch". camPunch() had been a no-op
   // since the owner's zero-shake order, so it never did.)
-  // …and the town notices a second hole vanishing, without ever learning that
-  // it had a name. COPY.rivalGoneNews was one string per world; this is a pool,
-  // through the same cooldown as every other reaction, so a marquee kill and a
-  // landmark going in the same ten seconds cannot double-print.
-  if (marquee) { townReacts({ kind: 'rivalGone' }); addCoins(35); }
+  // …and the town noticed a second hole vanishing, through the reaction pools —
+  // until 2026-09-25, when the paper was kept for the owner's milestones (an
+  // evolution, a named thing eaten). A sibling is neither; the float, the
+  // rings and the gulp above still land it.
+  if (marquee) addCoins(35);
   // real PAYOFF: the rival spirals in (rivals.ts), the void gapes wide, and a
   // shockwave stack fires at BOTH ends of the meal — the marquee play LANDS
   voidling.animGulp();
@@ -5911,9 +5958,9 @@ rivals.onNearMiss = (name, x, z) => {
 rivals.onStuffed = (name) => {
   // No card. At this moment her halo is RED (she is ~1.5x you); GOLD comes only
   // once you outgrow her (measured +41 s, natural run, refute-cards 2026-09-02).
-  // "Too full" lands here through her own stuffed line (rivals.ts, if within 55)
-  // and breakingNews below; audio.ready() marks the moment.
-  breakingNews(COPY.rivalFullNews);
+  // "Too full" lands here through her own stuffed line (rivals.ts, if within 55);
+  // audio.ready() marks the moment. (A headline went with it until 2026-09-25 —
+  // a full rival is not one of the owner's milestones.)
   audio.ready();
 };
 // QA: drive the score's stage directly, so a harness can audit each world's
@@ -6394,17 +6441,17 @@ const nomsEl = el('noms');
 // coin (which wears the tier and the bump), the count, and a beat's tag
 const nomsCEl = nomsEl.querySelector('.nC') as HTMLElement;
 const nomsNEl = nomsEl.querySelector('.nN') as HTMLElement;
-const nomsXEl = nomsEl.querySelector('.nX') as HTMLElement;
 const bannerEl = el('banner'), hungerEl = el('hunger'), hungerFill = hungerEl.querySelector('.fill') as HTMLElement;
 let prevHunger = 0;
 
-/** A scripted beat. The multiplier is a BADGE, not a clause — "Everything is
- *  DOUBLE!" was two thirds of the sentence and the least interesting third. */
-function announceBeat(icon: string, title: string, sub: string, mult: number) {
+/** A two-line card: a title and the line under it. It was the scripted
+ *  beat's card, with the multiplier as a badge; the beats went quiet on
+ *  2026-09-25 and the badge with them, and what still prints here is the
+ *  sticker find — a milestone the owner kept. (It had been wearing a "×1".) */
+function announceBeat(icon: string, title: string, sub: string) {
   announceHtml(
     `<div class="bCard"><span class="bIco">${icon}</span>`
-    + `<span class="bTx">${esc(title)}<span class="bSub">${esc(sub)}</span></span>`
-    + `<span class="bMul">×${mult}</span></div>`,
+    + `<span class="bTx">${esc(title)}<span class="bSub">${esc(sub)}</span></span></div>`,
   );
 }
 // ── ?walls=1 : the containment boundary, drawn ─────────────────────────────
@@ -7074,12 +7121,19 @@ enterMenu();   // the first screen a child sees IS her world, with her ladder on
 // ── MAPLE ISLE NEWS — the island reacts to how much of it still exists ──────
 // ── LIVE STATE the newsroom reports on ─────────────────────────────────────
 let lastMeal = 'a traffic cone';
-let feverMult = 1, feverT = 0;   // match-beat scoring multiplier
-// the ACTIVE beat's colour, and the heartbeat clock that repaints the window.
-// A beat fires loud — card, sting, flash — and then its 14-32 second WINDOW
-// looked exactly like normal play: a child who missed the card had no way to
-// know everything was worth double right now. The window itself now pulses.
-let feverCol = 0xffd23f, feverPulseT = 0;
+// ── THE BEATS GO QUIET (the owner, 2026-09-25) ─────────────────────────────
+// "these events, like there's a bakery sale or double points or whatever it
+// is. I say we get rid of that. It's empty real estate." So a beat no longer
+// raises a card, a flash, a ring, a sting or a headline, and nothing is worth
+// double: the x2/x3 window is gone from scoring, for the family as for her.
+// What a beat still does is its CUE — the parade marches, the goat gets loose,
+// the chests land, the drum tower thumps, the mountain lets go, the whale goes
+// up — silently, as something the town is doing while she eats it. That reads
+// as a living world rather than an announcement, and it asks for no screen.
+//
+// `beatT` is the live cue's own window (the beat's `dur`): how long the chests
+// stay down and the tower keeps thumping. `beatPulseT` is the tower's rhythm.
+let beatT = 0, beatPulseT = 0;
 // the match's authored spine — fires on elapsed seconds, resets every run
 // The three beats belong to the town now. A generic DONUT RUSH on an island
 // that is holding a mayoral election is a wasted beat — these are the same
@@ -7098,8 +7152,13 @@ let feverCol = 0xffd23f, feverPulseT = 0;
 // `cue` is the beat's line INTO THE WORLD (life.cue / the handlers in the
 // beat-fire block): the fun audit's standing finding was that beats changed
 // the banner and nothing else — "does TREASURE FEAST look like anything?"
+// Since 2026-09-25 the cue is ALL a beat does (see THE BEATS GO QUIET, above).
+// The rest of each row — icon, title, sub, colour, flash, news — is the beat's
+// authored record and is drawn by nothing; `mult` went with the windows. Every
+// beat keeps its slot and its jitter draw, so a seeded match deals the same
+// schedule, and a cue-less beat simply passes.
 interface MatchBeat {
-  at: number; dur: number; mult: number; fired: boolean; base: number;
+  at: number; dur: number; fired: boolean; base: number;
   col: number; flash: string; icon: string; title: string; sub: string;
   news: string; cue?: string;
   /** stable id for MIDDLE beats — the matchdeck deals them from a pool, so
@@ -7107,31 +7166,31 @@ interface MatchBeat {
   id?: string;
 }
 const MAPLE_BEATS: MatchBeat[] = [
-  { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.3)',
+  { at: 30, dur: 14, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.3)',
     icon: '🎺', title: 'Band practice', sub: 'they only know one song',
     news: 'The marching band is out. They know one song. Here it comes.' },
-  { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0x5ee8d8, flash: 'rgba(94,232,216,0.26)',
+  { at: 66, dur: 16, fired: false, base: 0, col: 0x5ee8d8, flash: 'rgba(94,232,216,0.26)',
     id: 'maple.dog', icon: '🐕', title: 'Dog off the lead!', sub: 'six people are chasing it',
     news: 'A dog is loose on Main Street. Six people are chasing it. It thinks this is a game.' },
-  { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff5d7e, flash: 'rgba(255,93,126,0.28)',
+  { at: 110, dur: 18, fired: false, base: 0, col: 0xff5d7e, flash: 'rgba(255,93,126,0.28)',
     id: 'maple.parade', icon: '📣', title: 'Town parade!', sub: 'everybody is on Main Street', cue: 'parade',
     news: 'The parade has started. The mayor calls it a scheduling matter.' },
-  { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xb875ff, flash: 'rgba(184,117,255,0.32)',
+  { at: 148, dur: 32, fired: false, base: 0, col: 0xb875ff, flash: 'rgba(184,117,255,0.32)',
     icon: '🐐', title: 'The goat is loose!', sub: 'nobody is even chasing it', cue: 'goat',
     news: 'The goat is out again. Nobody is chasing it. Everybody is watching.' },
 ];
 // PIRATE BAY runs the same three-beat spine, themed to the resort
 const PIRATE_BEATS: typeof MAPLE_BEATS = [
-  { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0x7bffe8, flash: 'rgba(123,255,232,0.28)',
+  { at: 30, dur: 14, fired: false, base: 0, col: 0x7bffe8, flash: 'rgba(123,255,232,0.28)',
     icon: '🍦', title: 'Ice cream hour!', sub: 'the hut is very pleased',
     news: 'Ice cream hour has been declared. The ice cream hut is delighted.' },
-  { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xffa63f, flash: 'rgba(255,166,63,0.26)',
+  { at: 66, dur: 16, fired: false, base: 0, col: 0xffa63f, flash: 'rgba(255,166,63,0.26)',
     id: 'pirate.parrot', icon: '🦜', title: 'The parrot escaped!', sub: 'it knows the whole menu',
     news: 'The resort parrot is loose. It has learned the breakfast menu and will not stop.' },
-  { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff2fa0, flash: 'rgba(255,47,160,0.28)',
+  { at: 110, dur: 18, fired: false, base: 0, col: 0xff2fa0, flash: 'rgba(255,47,160,0.28)',
     id: 'pirate.dance', icon: '🪩', title: 'Dance party!', sub: 'the whole bay is moving',
     news: 'DJ Coconut has dropped the big one. The floor is shaking.' },
-  { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.32)',
+  { at: 148, dur: 32, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.32)',
     icon: '🏴‍☠️', title: 'Treasure hunt!', sub: 'the map is still wrong', cue: 'treasure',
     news: 'The treasure hunt has begun. The map is still wrong.' },
 ];
@@ -7140,16 +7199,16 @@ const PIRATE_BEATS: typeof MAPLE_BEATS = [
 // paint on, they are the four moments of a match. The finale is the fourth
 // quarter, and the commentary box knows it.
 const GAMEDAY_BEATS: typeof MAPLE_BEATS = [
-  { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0xf0b429, flash: 'rgba(240,180,41,0.28)',
+  { at: 30, dur: 14, fired: false, base: 0, col: 0xf0b429, flash: 'rgba(240,180,41,0.28)',
     icon: '🏈', title: 'Kickoff!', sub: 'the ball is in the air',
     news: 'And we are under way. The ball is in the air and so, apparently, is the parking lot.' },
-  { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xc4342f, flash: 'rgba(196,52,47,0.26)',
+  { at: 66, dur: 16, fired: false, base: 0, col: 0xc4342f, flash: 'rgba(196,52,47,0.26)',
     id: 'gameday.bandfield', icon: '🥁', title: 'The band is on the field!', sub: 'nobody told them about you', cue: 'bandfield',
     news: 'The marching band has taken the field. They have not been told. They are playing anyway.' },
-  { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff8a3d, flash: 'rgba(255,138,61,0.26)',
+  { at: 110, dur: 18, fired: false, base: 0, col: 0xff8a3d, flash: 'rgba(255,138,61,0.26)',
     id: 'gameday.dogs', icon: '🌭', title: 'Concession rush!', sub: 'everybody wants a hot dog',
     news: 'Everybody has gone for a hot dog at once. The queue is now the largest thing here.' },
-  { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0x2aa9a0, flash: 'rgba(42,169,160,0.30)',
+  { at: 148, dur: 32, fired: false, base: 0, col: 0x2aa9a0, flash: 'rgba(42,169,160,0.30)',
     icon: '📣', title: 'Fourth quarter!', sub: 'the stadium is on its feet',
     news: 'Fourth quarter. The stadium is on its feet, which is fortunate, because the seats have gone.' },
 ];
@@ -7158,16 +7217,16 @@ const GAMEDAY_BEATS: typeof MAPLE_BEATS = [
 // turn — the moment the market stops offering you things — so it is the one
 // with the drum on it.
 const LANTERN_BEATS: typeof MAPLE_BEATS = [
-  { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0xffb256, flash: 'rgba(255,178,86,0.28)',
+  { at: 30, dur: 14, fired: false, base: 0, col: 0xffb256, flash: 'rgba(255,178,86,0.28)',
     icon: '🏮', title: 'The lanterns are lit!', sub: 'every one of them, for you',
     news: 'The lanterns have all been lit at once. The market says this is in your honour.' },
-  { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xff5a4a, flash: 'rgba(255,90,74,0.26)',
+  { at: 66, dur: 16, fired: false, base: 0, col: 0xff5a4a, flash: 'rgba(255,90,74,0.26)',
     id: 'lantern.free', icon: '🍡', title: 'Everything is free!', sub: 'they insist. they keep insisting',
     news: 'Every stall on Lantern Row has waived its prices for the guest in the purple.' },
-  { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0x8ad4ff, flash: 'rgba(138,212,255,0.26)',
+  { at: 110, dur: 18, fired: false, base: 0, col: 0x8ad4ff, flash: 'rgba(138,212,255,0.26)',
     id: 'lantern.drum', icon: '🥁', title: 'The drum has started', sub: 'nobody ordered the drum', cue: 'drum',
     news: 'The drum tower has begun. It is only ever struck for two reasons and this is not the other one.' },
-  { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xffd489, flash: 'rgba(255,212,137,0.32)',
+  { at: 148, dur: 32, fired: false, base: 0, col: 0xffd489, flash: 'rgba(255,212,137,0.32)',
     icon: '♨️', title: 'The bathhouse is open!', sub: 'they are calling you up',
     news: 'The bathhouse has opened its doors and lit every window. It is the last thing standing.' },
 ];
@@ -7175,16 +7234,16 @@ const LANTERN_BEATS: typeof MAPLE_BEATS = [
 // THE AVALANCHE — the only finale in the game where the food comes to YOU
 // (the piste's props ride a white wall down the Home Run; see life.ts's cue).
 const POWDER_BEATS: typeof MAPLE_BEATS = [
-  { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0xbfe4ff, flash: 'rgba(191,228,255,0.28)',
+  { at: 30, dur: 14, fired: false, base: 0, col: 0xbfe4ff, flash: 'rgba(191,228,255,0.28)',
     icon: '🛷', title: 'Sled hour!', sub: 'the hill is fully booked',
     news: 'Sledding has commenced on the Home Run. The queue is longer than the run.' },
-  { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.26)',
+  { at: 66, dur: 16, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.26)',
     id: 'powder.lake', icon: '⛸️', title: 'Lake hour!', sub: 'everyone on the ice at once',
     news: 'The frozen lake has been declared open. The lake has not been consulted.' },
-  { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff5d7e, flash: 'rgba(255,93,126,0.28)',
+  { at: 110, dur: 18, fired: false, base: 0, col: 0xff5d7e, flash: 'rgba(255,93,126,0.28)',
     id: 'powder.contest', icon: '☃️', title: 'Snowman contest!', sub: 'Chairman Frost defends his title', cue: 'contest',
     news: 'The snowman contest has begun. The reigning champion is a snowman.' },
-  { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xffffff, flash: 'rgba(230,240,255,0.34)',
+  { at: 148, dur: 32, fired: false, base: 0, col: 0xffffff, flash: 'rgba(230,240,255,0.34)',
     icon: '🏔️', title: 'AVALANCHE!!', sub: 'the mountain is coming to you', cue: 'avalanche',
     news: 'The mountain has let go. The village is advised to be somewhere else.' },
 ];
@@ -7192,16 +7251,16 @@ const POWDER_BEATS: typeof MAPLE_BEATS = [
 // the burners light, the sheep are on the runway as they are every year, and
 // the whale goes up.
 const SKYLARK_BEATS: typeof MAPLE_BEATS = [
-  { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0xffc78e, flash: 'rgba(255,199,142,0.26)',
+  { at: 30, dur: 14, fired: false, base: 0, col: 0xffc78e, flash: 'rgba(255,199,142,0.26)',
     icon: '🎈', title: 'Filling the balloons!', sub: 'four people and a very loud fan',
     news: 'Inflation has begun across the launch field. The fans are the loudest thing here.' },
-  { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xff8a3d, flash: 'rgba(255,138,61,0.28)',
+  { at: 66, dur: 16, fired: false, base: 0, col: 0xff8a3d, flash: 'rgba(255,138,61,0.28)',
     id: 'skylark.burner', icon: '🔥', title: 'Burner test!', sub: 'everyone\'s eyebrows are fine',
     news: 'Burner checks are complete. The desk confirms all eyebrows present and correct.' },
-  { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xd9e4c8, flash: 'rgba(217,228,200,0.26)',
+  { at: 110, dur: 18, fired: false, base: 0, col: 0xd9e4c8, flash: 'rgba(217,228,200,0.26)',
     id: 'skylark.sheep', icon: '🐑', title: 'The sheep are on the runway!', sub: 'they are always on the runway', cue: 'sheep',
     news: 'The sheep are on 09. The sheep are on 09 every year and will not be moved.' },
-  { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0x4a7ad6, flash: 'rgba(74,122,214,0.34)',
+  { at: 148, dur: 32, fired: false, base: 0, col: 0x4a7ad6, flash: 'rgba(74,122,214,0.34)',
     icon: '🐋', title: 'THE WHALE IS GOING UP!!', sub: 'the whole field is going with her', cue: 'whale',
     news: 'G-WAIL has been cleared to launch. The whole field is going up with her.' },
 ];
@@ -7223,9 +7282,10 @@ const BEATS = pickedWorld === 'gameday' ? GAMEDAY_BEATS
 // The new beats are cue-less, like two of the four shipped beats in every
 // world: banner, multiplier, sting, ring, news line and a MID_REACT pool in
 // newsroom_react.ts. A world set-piece cue for each is future work, recorded
-// in the ledger.
-const MID_66 = { at: 66, dur: 16, mult: 2, fired: false, base: 0 };
-const MID_110 = { at: 110, dur: 18, mult: 2, fired: false, base: 0 };
+// in the ledger. (Since 2026-09-25 a cue-less beat shows nothing at all — see
+// THE BEATS GO QUIET. The deal stays, so a seeded match draws the same.)
+const MID_66 = { at: 66, dur: 16, fired: false, base: 0 };
+const MID_110 = { at: 110, dur: 18, fired: false, base: 0 };
 const MID_POOL: Record<WorldId, MatchBeat[]> = {
   skylark: [SKYLARK_BEATS[1], SKYLARK_BEATS[2],
     { ...MID_66, id: 'skylark.crown', col: 0xa9d4ff, flash: 'rgba(169,212,255,0.26)',
@@ -7280,19 +7340,16 @@ function dealMids(d: Deal): void {
   slots.forEach(([slot, tm], k) => {
     const src = pool[d.mid[k]];
     BEATS[slot] = { ...src, at: tm.at, dur: tm.dur, base: 0, fired: false };
-    if (seasonNow) { BEATS[slot].col = seasonNow.accent; BEATS[slot].flash = seasonNow.flash; }
   });
   _dbg.__beats = BEATS;
   _dbg.__deal = d;
 }
-// ── THE SEASONAL REPAINT (events.ts) ─────────────────────────────────────────
-// While this world's season runs, every beat card, fever ring and screen
-// flash wears the season's colour instead of its own. Wholesale on purpose:
-// four distinct beat colours read as "normal play" 351 days a year, so ONE
-// colour everywhere for a fortnight is exactly what makes the fortnight feel
-// like an occasion. The beats' titles, cues and timings never change.
+// ── THE SEASON ───────────────────────────────────────────────────────────────
+// While this world's season runs it dresses the island (makeSeasonProp). It
+// used to repaint every beat card, fever ring and screen flash in its own
+// colour as well; since the beats went quiet (2026-09-25) there is no card,
+// ring or flash left to paint, so the season is its props.
 const seasonNow: SeasonEvent | null = eventForWorld(pickedWorld);
-if (seasonNow) for (const b of BEATS) { b.col = seasonNow.accent; b.flash = seasonNow.flash; }
 _dbg.__season = seasonNow;
 _dbg.__beats = BEATS;
 const MEAL_NAME: Record<string, string> = pickedWorld === 'gameday' ? {
@@ -7437,12 +7494,18 @@ let heroCued = false, heroAte = false;
 let goalCued = false;
 // reactive one-shots: big beats the player just caused jump the queue
 const newsQueue: string[] = [];
-function breakingNews(h: string) {
+/** WHY each queued line is on the ticker, in step with newsQueue — the
+ *  reaction's kind ('landmark', 'evolve', 'beat', 'rivalGone') or the one-shot
+ *  that filed it. QA only: it rides into newsLog so qa/realestate.mjs can say
+ *  which cards a match printed and for what, rather than guess from timing. */
+const newsWhy: string[] = [];
+function breakingNews(h: string, why = 'breaking') {
   if (newsQueue.length > 1) return;   // never stack a queue of cards at the player
   // The queue BYPASSES the newsroom, so it also bypassed the newsroom's own
   // 78-character ticker clip — all three hero cues ran to 84, 88 and 89 and
   // reached the card unclipped. Everything on the ticker gets the same width.
   newsQueue.push(h.length > 78 ? h.slice(0, h.lastIndexOf(' ', 78)).trim() : h);
+  newsWhy.push(why);
   // 2.5 let a busy minute machine-gun the ticker; 4s is the fastest a jumped
   // story may follow the previous one (comms redesign: one feed, breathing)
   newsCd = Math.min(newsCd, 4.0);
@@ -7488,7 +7551,7 @@ let reactHardCd = 0, reactCd = 0;
 // A QUEUE, not a single slot: the hero landmark also files late (6s), so an
 // urgent line arriving while a beat is still waiting used to overwrite it and
 // the beat was never reported at all.
-const pendingReact: { line: string; at: number }[] = [];
+const pendingReact: { line: string; at: number; why: string }[] = [];
 function townReacts(inp: Omit<ReactIn, 'world'>, delay = 0): void {
   if (!started || ended) return;
   // A NAMED THING GOING OUTRANKS THE VOID CHANGING SHAPE. See the two floors.
@@ -7518,7 +7581,7 @@ function townReacts(inp: Omit<ReactIn, 'world'>, delay = 0): void {
     const line = reactLine({ ...inp, world: pickedWorld });
     if (!line) return;
     reactCd = REACT_SOFT;
-    pendingReact.push({ line, at: reactHardCd + 0.1 });
+    pendingReact.push({ line, at: reactHardCd + 0.1, why: inp.kind });
     return;
   }
   if (!urgent && reactCd > 0) return;
@@ -7533,17 +7596,17 @@ function townReacts(inp: Omit<ReactIn, 'world'>, delay = 0): void {
   //   it here would let a landmark at t=5 print ahead of a beat line due at
   //   t=8, putting two cards three seconds apart.
   reactCd = REACT_SOFT;
-  if (delay > 0) pendingReact.push({ line, at: delay });
-  else fileReaction(line);
+  if (delay > 0) pendingReact.push({ line, at: delay, why: inp.kind });
+  else fileReaction(line, inp.kind);
 }
 /** print a reaction and start the card-spacing floor from the moment it lands */
-function fileReaction(line: string): void {
+function fileReaction(line: string, why: string): void {
   reactHardCd = REACT_HARD;
-  breakingNews(line);
+  breakingNews(line, why);
 }
 /** QA: every card that reached the screen this match, with the phase it was
  *  drawn at. Read by qa/newsarc.mjs. */
-const newsLog: { t: number; phase: number; tier: number; react: boolean; brand: string; text: string }[] = [];
+const newsLog: { t: number; tc: number; phase: number; tier: number; react: boolean; why: string; brand: string; text: string }[] = [];
 const newsSeen: string[] = [];
 // Both worlds now have their own newsroom module — ./proto3d/newsroom for
 // PIRATE BAY RESORT and ./proto3d/newsroom_maple for MAPLE FALLS. What used to
@@ -7574,7 +7637,7 @@ function fillHeadline(t: string): string {
     .replace('{R}', String(100 - pct))
     .replace('{S}', String(Math.max(1, Math.ceil(matchClock))));
 }
-function showNews() {
+function showNews(asked = 'arc') {
   // ── THE ARC DRIVES THE CARD ───────────────────────────────────────────────
   // This used to be a MOOD: `max(pctTier, formTier)` recomputed from scratch on
   // every card, three rungs, no beginning. A mood drifts, it can go backwards
@@ -7592,14 +7655,22 @@ function showNews() {
   // …and the SIGN-ON must be the first thing anyone hears. The newsroom
   // guarantees it returns the greeting on its first call, but `queue.shift() ??`
   // short-circuits — so a breaking-news one-shot fired in the opening seconds
-  // would jump the queue and the station would never say good morning.
-  if (!signedOn) { signedOn = true; newsQueue.length = 0; }
+  // would jump the queue and the station would never say good morning. That
+  // used to be fixed by emptying the queue here, which was cheap while the
+  // paper printed every half-minute. Now a queued line IS a milestone — a
+  // sticker found in the first six seconds — and the paper does not print
+  // another card on a timer to make up for it, so the queue waits instead:
+  // good morning first, the find four seconds after.
+  const first = !signedOn;
+  const why0 = first ? 'morning' : asked;
+  signedOn = true;
   // A REACTIVE LINE PREEMPTS THE ARC WITHOUT DERAILING IT. The queued line is
   // printed instead of a scheduled one, but the arc still advances a step and
   // still supplies the brand chip — so the water tower going gets reported
   // under whatever badge the town has earned, and the next scheduled card picks
   // up exactly where the story was.
-  const queued = newsQueue.shift();
+  const queued = first ? undefined : newsQueue.shift();
+  const why = queued !== undefined ? newsWhy.shift() ?? 'breaking' : why0;
   const arc = arcPhase({
     devouredPct, elapsed: matchElapsed(), matchLen, stage: curStage,
   });
@@ -7713,7 +7784,7 @@ function showNews() {
   // so it can only contain lines that actually went to screen. The probe still
   // checks #news's own bounding box separately — a log entry is evidence the
   // code ran, not evidence a child saw anything.
-  newsLog.push({ t: Math.round(matchElapsed()), phase: arc.phase, tier, react: queued !== undefined, brand, text: h });
+  newsLog.push({ t: Math.round(matchElapsed()), tc: +tClock.toFixed(3), phase: arc.phase, tier, react: queued !== undefined, why, brand, text: h });
   if (newsLog.length > 80) newsLog.shift();
 }
 
@@ -9302,7 +9373,11 @@ function endMatch(result: GoalResult = null) {
   // rewarding a child for stopping after half a minute. A log curve keeps
   // climbing — 3k pays 60, 20k pays 137, 130k pays 219 — without ever letting
   // one enormous run out-earn a week of ordinary ones.
-  const scoreCoins = Math.floor(60 * Math.log10(1 + playerScore / 500) / Math.log10(7));
+  // Both curves were set in points the beat windows helped pay; read in
+  // today's points (windowless, beside WORLD_PAR) the same meal pays the same
+  // coins and XP it did, however early a goal ends the match.
+  const payPts = playerScore / windowless(matchElapsed());
+  const scoreCoins = Math.floor(60 * Math.log10(1 + payPts / 500) / Math.log10(7));
   let reward = ([50, 35, 25, 15, 10][myRank - 1] ?? 10) + Math.min(300, scoreCoins);
   let gemGain = 0;
   if (myRank === 1 && localStorage.getItem('voidFirstWinDay') !== today) {
@@ -9311,7 +9386,7 @@ function endMatch(result: GoalResult = null) {
   }
   addCoins(reward);
   // …and XP saturated at 4,000, crossed at about the same moment
-  const scoreXp = Math.floor(22 * Math.log10(1 + playerScore / 800) / Math.log10(6));
+  const scoreXp = Math.floor(22 * Math.log10(1 + payPts / 800) / Math.log10(6));
   let gain = ([25, 18, 12, 8, 5][myRank - 1] ?? 5) + Math.min(90, scoreXp);
   if (localStorage.getItem('voidFirstMatchDay') !== today) { localStorage.setItem('voidFirstMatchDay', today); gain += 10; }
   // LEVELLING UP WAS SILENT. XP increments, persists and renders correctly —
@@ -9688,7 +9763,7 @@ function nomCash(): void {
  *  five, gold with a crown from ten, rainbow from twenty, and the count bumps
  *  on every link. No ring, no fuse, nothing that drains. Every DOM write is
  *  change-gated. */
-let nomsOn = false, nomsN = -1, nomsX = '', nomsTier = '';
+let nomsOn = false, nomsN = -1, nomsTier = '';
 function paintNoms(): void {
   if (combo < 5 || !started || ended || paused || outroT > 0) {   // the whistle ends the chain's show too
     if (nomsOn) { nomsOn = false; nomsN = -1; nomsEl.classList.remove('on'); }
@@ -9704,8 +9779,7 @@ function paintNoms(): void {
     nomsCEl.classList.add(ab);
     nomsN = combo;
   }
-  const x = feverMult > 1 ? `×${Math.round(feverMult)}` : '';
-  if (x !== nomsX) { nomsX = x; nomsXEl.textContent = x; }
+  // (a ×2/×3 tag rode on the badge during a beat window — gone with the windows)
   const tier = combo >= 20 ? '3' : combo >= 10 ? '2' : '1';
   if (tier !== nomsTier) { nomsTier = tier; nomsEl.dataset.tier = tier; }
   if (!nomsOn) { nomsOn = true; nomsEl.classList.add('on'); }
@@ -9878,8 +9952,13 @@ const evoHold = createEvoHold<Edible>();
 // as edible the moment the shell packs on.
 let shellT = 0;
 const eatRatioNow = () => EAT_RATIO * (shellT > 0 ? 1.45 : 1);
-// once-per-match milestone banners (hole.io celebrates the firsts)
-const moments = { firstBuilding: false, firstCar: false, firstRunner: false, half: false, last30: false };
+// once-per-match milestone banners (hole.io celebrates the firsts). Since
+// 2026-09-25 only HALF is left: FIRST BUILDING, FIRST CAR, FIRST RUNNER CAUGHT
+// and A WHOLE MOTORHOME were cards about the first of an ordinary kind, a few
+// seconds each in the first minute, and the owner's "so much of the screen
+// keeps getting taken up" is about exactly that. Half the world gone is a
+// milestone — it comes once, late, and only to a child who is really eating.
+const moments = { half: false, last30: false };
 // the last final-countdown second already shown, so each of 10..1 pops once
 let countTick = 0;
 const floatPos = new THREE.Vector3();
@@ -9972,7 +10051,7 @@ function capture(e: Edible, giveHunger = true) {
   // moving prey (people/animals/cars — tagged ptsMult 1.5) beats furniture of
   // the same size: chasing pays. Everything else stays radius-proportional.
   const preyMult = (e.mesh.userData.ptsMult as number | undefined) ?? 1;
-  const pts = Math.max(1, Math.round(e.radius * 12 * comboMult * preyMult * feverMult));
+  const pts = Math.max(1, Math.round(e.radius * 12 * comboMult * preyMult));
   playerScore += pts;
   // ── THE NUMBER THE OWNER ASKED FOR: "when you eat points go into a bar" ──
   // hole.io floats a "+1" on EVERY bite; ours floated one only on the set
@@ -9999,11 +10078,9 @@ function capture(e: Edible, giveHunger = true) {
     eatTickT = EAT_TICK_LIT;
     eatTickCd = EAT_TICK_LIT + EAT_TICK_DARK;
   }
-  // during a beat window every bite answers in the beat's colour — the doubled
-  // value is FELT at the exact moment and place it is earned. Small and short:
-  // this fires on every eat, and a beat window is when eats come fastest.
   // ── THE RING THAT WAS THE COMPLAINT ─────────────────────────────────────
-  // `if (feverMult > 1) fx.ring(e.mesh.position, …)` sat here: one ring at the
+  // `if (feverMult > 1) fx.ring(e.mesh.position, …)` sat here (and feverMult
+  // itself is gone now, with the beat windows, 2026-09-25): one ring at the
   // corpse of every prop swallowed inside a beat window, and beat windows cover
   // eighty of a match's hundred and eighty seconds by design, timed for when
   // eating is densest. Measured — qa/ringcount.mjs, Maple, t=24 to 50, a span
@@ -10027,7 +10104,7 @@ function capture(e: Edible, giveHunger = true) {
       payBeat = 'sticker';
       found = true;
       playerScore += TIER_POINTS[got.tier];
-      announceBeat('⭐', 'STICKER FOUND!', got.name.toUpperCase(), 1);
+      announceBeat('⭐', 'STICKER FOUND!', got.name.toUpperCase());
       audio.voice('yum');
       fx.ring(e.mesh.position.x, e.mesh.position.z, 0xffd25a, 14, 0.7);
       spawnPuff(e.mesh.position.x, 1.2, e.mesh.position.z, 14);
@@ -10048,7 +10125,7 @@ function capture(e: Edible, giveHunger = true) {
       if (!seen) {
         try { localStorage.setItem('voidBookSeen', '1'); } catch { /* private mode */ }
         setTimeout(() => announceBeat('📗', 'YOUR SCRAPBOOK',
-          `${totalCount() - 1} MORE ARE HIDDEN OUT THERE`, 1), 2600);
+          `${totalCount() - 1} MORE ARE HIDDEN OUT THERE`), 2600);
       }
     }
   }
@@ -10158,20 +10235,8 @@ function capture(e: Edible, giveHunger = true) {
   const houseLike = !!qk && HOUSE_LIKE.includes(qk);
   if (houseLike && qk !== 'house') questEvent('house');
   if (comboMult >= 2) questEvent('combo');
-  if (houseLike && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! Crunch.'); breakingNews(COPY.houseNews); }
-  if (qk === 'car' && !moments.firstCar) { moments.firstCar = true; announce('🚗 FIRST CAR! Tastes like vroom.'); }
-  // catching the first RUNNER — the top thrill on the hole.io list — had no
-  // moment, and the 1.5x chase bonus was paid in silence. Chase framing on
-  // purpose: the content rule that no line may say a person was eaten stands.
-  // (The goat and cars carry qk tags, so this fires on plain wanderers only.)
-  if (e.mesh.userData.mover && !qk && !moments.firstRunner) {
-    moments.firstRunner = true;
-    announce('🏃 FIRST RUNNER CAUGHT! things that run pay extra');
-    audio.voice('yum'); buzz(25);
-  }
-  // no COPY row for this one: 'rv' is tagged on RV Row and nowhere else, so it
-  // can only ever fire on GAME DAY. It should still sound like the booth.
-  if (qk === 'rv' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🚐 A WHOLE MOTORHOME! Gone.'); breakingNews('A whole MOTORHOME, Bill. Somebody was living in that until Sunday.'); }
+  // (FIRST BUILDING, FIRST CAR, FIRST RUNNER CAUGHT and A WHOLE MOTORHOME
+  // printed here, with a headline for the first two buildings. See `moments`.)
   // ── THE BITE IS HEARD WHEN IT GOES IN ───────────────────────────────────
   // It used to be heard HERE, last in capture(), after byPlayer and the
   // tallies above so that endBeat() — which reads them through goalMet() for a
@@ -10612,7 +10677,7 @@ function beginMatch(solo = false) {
   life.cue('match');
   lookUpAt = -1; lookUpT = -1;
   drumCueT = 0; clearBeatLoot();
-  feverMult = 1; feverT = 0; lastR = voidling.radius; matchEaten = 0; lastEatAt = -99; gShown = 0; gDebt = 0; gBiteK = 0; signedOn = false;
+  beatT = 0; lastR = voidling.radius; matchEaten = 0; lastEatAt = -99; gShown = 0; gDebt = 0; gBiteK = 0; signedOn = false;
   gDisp = 0; gVel = 0; gBrimT = 0; gPipStage = -1;   // the bar's first paint this match is a reset, not a level-up
   gRect = null; setTimeout(refreshGRect, 0);   // the bar is display:none until the match paints it
   // ── THE HERO WAS ASLEEP BEFORE THE MATCH BEGAN ────────────────────────────
@@ -12218,9 +12283,10 @@ function gildTreasure() {
 // The standing audit question — "does TREASURE FEAST look like anything?" —
 // had the honest answer NO: the beat fired the generic banner/ring/sting
 // stack and changed nothing in the world. Now the hunt is a hunt: a dozen
-// gold-trimmed chests land around the player for the length of the x3
-// window, each gilded (sparkle + ✦ on eat, same as gildTreasure's props),
-// and whatever is left un-eaten puffs away when the window closes.
+// gold-trimmed chests land around the player for the length of the beat's
+// window (it was the x3 window until 2026-09-25; it is the cue's own now),
+// each gilded (sparkle + ✦ on eat, same as gildTreasure's props), and
+// whatever is left un-eaten puffs away when the window closes.
 let beatLoot: Edible[] = [];
 function makeLootChest(): THREE.Group {
   const WOOD = 0x6a4a2a, GOLD_T = 0xf0b429, COINS = 0xffe08a;
@@ -12257,8 +12323,10 @@ function spawnBeatTreasure() {
   // single frame — and fx.ts's ring pool is exactly twelve. That one loop
   // wrapped the whole pool and silently deleted every other live ring,
   // including the beat ring fired ten lines earlier in the same frame. One ring
-  // at the player marks the drop without erasing the rest of the moment.
-  if (placed) fx.ring(voidState.x, voidState.z, 0xffd23f, 44, 0.7);
+  // at the player marked the drop instead — and since the beats went quiet
+  // (2026-09-25) that one is gone too: a gold ring round the void was the
+  // beat's announcement by another name. The chests land, gilded and
+  // sparkling, and a child finds them.
 }
 function clearBeatLoot() {
   for (const e of beatLoot) {
@@ -12271,10 +12339,11 @@ function clearBeatLoot() {
   beatLoot = [];
 }
 // ── THE DRUM BEAT POINTS AT THE DRUM ────────────────────────────────────────
-// Lantern Night's tower was built FOR its beat and never drummed. During the
-// window the tower thumps in time with the fever pulse and the pulse ring
-// beats out from the TOWER, not the void — a child hears "the drum has
-// started", looks up, and the tallest lit thing in the valley is moving.
+// Lantern Night's tower was built FOR its beat and never drummed. For the
+// cue's window the tower thumps every three seconds — a child looks up, and
+// the tallest lit thing in the valley is moving. (It thumped in time with the
+// fever pulse ring; the ring went with the windows on 2026-09-25, the thump
+// did not.)
 let drumRef: THREE.Object3D | null = null, drumBaseScale = 1, drumCueT = 0, drumThump = 0;
 function resetMatch() {
   joyRelease();   // PLAY AGAIN can be tapped and HELD — see joyRelease
@@ -12286,6 +12355,10 @@ function resetMatch() {
   // PANIC and the new one would open there.
   resetArc(); resetReact();
   reactCd = 0; reactHardCd = 0; pendingReact.length = 0;
+  // …and a line queued in the last seconds before the whistle is last match's
+  // news. The sign-on used to empty the queue; it keeps it now (showNews), so
+  // the match that owns the queue is the one that empties it.
+  newsQueue.length = 0; newsWhy.length = 0;
   newsLog.length = 0;
   // ── NOTHING FROM THE LAST MATCH MAY SPEAK IN THIS ONE ─────────────────────
   // Proven with an isolation test, not inferred: a uniquely-tagged banner
@@ -14780,38 +14853,25 @@ function animate() {
     // events with real scoring stakes give every run the same shape, so a kid
     // learns to anticipate them ("the donut rush is coming!") — which is what
     // turns one play into ten.
+    //
+    // …AND THE OWNER, WATCHING HIS OWN MATCH, SAID OTHERWISE (2026-09-25):
+    // "these events, like there's a bakery sale or double points or whatever
+    // it is. I say we get rid of that. It's empty real estate." The stakes and
+    // the announcement are gone — no card, no x2/x3 window, no ring, no flash,
+    // no sting, no buzz, and no newsroom reaction eight seconds later (that
+    // reaction was the paper's second card per beat). qa/realestate.mjs bars
+    // all of it. The rhythm the paragraph above wanted is still here, in the
+    // world: the cue below runs on the same jittered schedule, silently.
     {
       const el3 = matchLen - matchClock;
       for (const bt of BEATS) {
         if (!bt.fired && el3 >= bt.at) {
           bt.fired = true;
-          feverMult = bt.mult; feverT = bt.dur;
-          feverCol = bt.col; feverPulseT = 0.9;
-          announceBeat(bt.icon, bt.title, bt.sub, bt.mult);
-          // …and the newsroom is STILL not handed bt.news. It used to be, in
-          // the same frame, so two seconds after "The band is on the field!"
-          // the ticker said "The marching band has taken the field." Captured
-          // on Maple: five of eight headlines in a whole match were the beat
-          // text the player had just read on a card. That is why the news felt
-          // empty — most of it was an echo. The banner owns the beat.
-          //
-          // What the newsroom gets instead, eight seconds later, is the town
-          // reacting to the beat MEETING THE VOID: the band marches into the
-          // thing on Elm Street and keeps playing. That is the owner's ask
-          // ("events like a band"), it is a different event from the banner,
-          // and the delay is what keeps it from reading as an echo.
-          townReacts({ kind: 'beat', beat: BEATS.indexOf(bt), beatId: bt.id }, 8);
-          // no evolve() here: it stacked on top of matchBeat()'s own sting in
-          // the same frame, two fanfares for one banner — the beat's sting is
-          // the beat's sound
-          buzz(35);
-          fx.ring(voidState.x, voidState.z, bt.col, voidling.radius * 6, 0.9);
-          fx.flash(bt.flash, 0.35);
-      audio.matchBeat(bt.title);   // ice cream hour / dance party / treasure hunt each get their own sting
-          // …and the WORLD is told, not just the banner (the audit's standing
-          // finding: beats announced things that weren't happening). The
-          // parade starts marching, the goat gets loose beside the player,
-          // the chests land, the tower starts to thump.
+          if (!bt.cue) continue;   // a beat with no line into the world has nothing left to do
+          beatT = bt.dur; beatPulseT = 0.9;
+          // THE WORLD IS TOLD — and now it is the only thing that is. The
+          // parade starts marching, the goat gets loose beside the player, the
+          // chests land, the tower starts to thump, the mountain lets go.
           //
           // …AND THE WORLD IS TOLD ABOUT EVERY CUE, NOT THREE OF THEM. This was
           // a hand-typed whitelist — parade, goat, bandfield — so every cue
@@ -14824,7 +14884,7 @@ function animate() {
           // costs nothing; qa/beattruth.mjs now fails on any cue that reaches
           // nobody.
           if (bt.cue) life.cue(bt.cue, voidState.x, voidState.z);
-          if (bt.cue === 'whale') lookUpAt = matchElapsed() + 12;   // she lifts twelve seconds after the card
+          if (bt.cue === 'whale') lookUpAt = matchElapsed() + 12;   // she lifts twelve seconds after the cue
           if (bt.cue === 'treasure') spawnBeatTreasure();
           else if (bt.cue === 'drum') {
             drumCueT = bt.dur; drumThump = 0;
@@ -14835,40 +14895,19 @@ function animate() {
           }
         }
       }
-      if (feverT > 0) {
-        feverT -= dt;
-        // THE WINDOW IS VISIBLE, NOT JUST THE ANNOUNCEMENT. A slow ring in the
-        // beat's own colour beats out from the void every couple of seconds for
-        // as long as the multiplier is live — the world itself says "still
-        // double" without spending a banner or a sound on it. The last pulse
-        // dies with the window, which is the quiet "rush over" signal the old
-        // full-screen card was rightly deleted for.
-        feverPulseT -= dt;
-        if (feverPulseT <= 0) {
-          // 3.0, not 1.7 — that was about 47 a match. It is the only thing in
-          // the world that says the window is still live, so it stays; but now
-          // that the per-eat ring is gone it no longer has to compete with a
-          // hundred and ten a minute to be noticed.
-          feverPulseT = 3.0;
-          fx.ring(voidState.x, voidState.z, feverCol, voidling.radius * 3.0, 1.1);
-          // the drum beat's pulse comes FROM THE DRUM: the ring beats out of
-          // the tower in the same rhythm, and the tower thumps with it
-          if (drumCueT > 0 && drumRef && drumRef.visible && !drumRef.userData.eaten) {
-            // (the ring that fired here is gone — it doubled the pulse above on
-            // the same frame, at a tower the player is usually not standing at.
-            // The thump is the tower's own beat and reads better alone.)
-            drumThump = 1;
-          }
+      if (beatT > 0) {
+        beatT -= dt;
+        // the drum tower keeps its three-second thump for the cue's window. The
+        // ring that beat out from the void on the same clock said "still
+        // double", and there is no double any more, so it went with the window.
+        beatPulseT -= dt;
+        if (beatPulseT <= 0) {
+          beatPulseT = 3.0;
+          if (drumCueT > 0 && drumRef && drumRef.visible && !drumRef.userData.eaten) drumThump = 1;
         }
-        // …and NOTHING is announced when it ends. "Rush over. Keep eating!"
-        // called every one of the twelve beats a "Rush" (only one of them is
-        // named that), and spending a full hero card to tell a child that a
-        // good thing has stopped is the opposite of a reward. The multiplier
-        // badge leaving the screen is the signal.
-        if (feverT <= 0) {
-          feverMult = 1;
-          if (beatLoot.length) clearBeatLoot();   // leftover chests puff away
-        }
+        // …and NOTHING is announced when it ends; the chests the treasure
+        // hunt dropped puff away when its window closes, as they always did.
+        if (beatT <= 0 && beatLoot.length) clearBeatLoot();
       }
       // the tower's thump — a quick swell about its own base scale, skipped
       // the moment the eat animation owns the mesh
@@ -15064,7 +15103,13 @@ function animate() {
       // old 10.3 ceiling exactly, a strong one maxes the final form, and a
       // weak one still reaches WORLD ENDER, just later. Nobody is locked out
       // of the fantasy, and nobody arrives without playing.
-      const par = Math.max(1, 60 * el2 + 1.6 * el2 * el2);
+      // …in the points of the day it was fitted, so it is read through
+      // windowless(): the beat windows that paid part of those points went on
+      // 2026-09-25, and a par left in the old points would read every run as
+      // a weaker one and shut the ceiling on a child who is eating as well as
+      // she did. (The floor below is converted the same way.)
+      const wl = windowless(el2);
+      const par = Math.max(1, (60 * el2 + 1.6 * el2 * el2) * wl);
       const pace = THREE.MathUtils.clamp(playerScore / par, 0, 1.2);
       // …and pace is meaningless in the opening seconds, when the score is
       // still near zero. Blend it in over 25s so the hook stays untouched.
@@ -15106,13 +15151,13 @@ function animate() {
       // seven-second window across a SEVEN-FOLD spread in final score. The
       // ceiling was already pace-scaled; the floor underneath it was not, so
       // the floor decided the outcome and skill did nothing.
-      const scoreFloor = Math.min(lawCap, START_R * (1 + Math.pow(playerScore / 974, 0.57)) + surgeT * surgeT * 2.6 * pace);
+      const scoreFloor = Math.min(lawCap, START_R * (1 + Math.pow(playerScore / (974 * wl), 0.57)) + surgeT * surgeT * 2.6 * pace);
       // …and the same numbers, mirrored for QA. `raw` is the floor BEFORE the
       // min with lawCap, which is the term that carries the finale surge and
       // therefore the one that grows an idle player.
       _law.el2 = el2; _law.surgeT = surgeT; _law.par = par; _law.pace = pace;
       _law.paceK = paceK; _law.lawCap = lawCap; _law.scoreFloor = scoreFloor;
-      _law.raw = START_R * (1 + Math.pow(playerScore / 974, 0.57)) + surgeT * surgeT * 2.6 * pace;
+      _law.raw = START_R * (1 + Math.pow(playerScore / (974 * wl), 0.57)) + surgeT * surgeT * 2.6 * pace;
       _law.feastR = feastR; _law.maxStep = maxStep; _law.tClock = tClock;
       _law.demoteHold = demoteHold; _law.lastEatAt = lastEatAt;
       _law.fed = tClock - lastEatAt < FLOOR_FED;
@@ -15685,8 +15730,9 @@ function animate() {
   perfBeat('crowd');
   life.update(dtw, tClock, voidState.x, voidState.z, R, crowdGate);
   // the family races on the SAME terms as the player now, so it needs the same
-  // three numbers: the clock it is pacing against, the score its rubber band
-  // reads, and the shared HAPPY HOUR multiplier
+  // numbers: the clock it is pacing against and the score its rubber band
+  // reads. (A third — the shared HAPPY HOUR multiplier — went with the beat
+  // windows on 2026-09-25; the family never ate double either.)
   // …and the family stops when the match stops. Passing t=0 was not enough:
   // the rivals keep moving and scoring at t=0, so twenty seconds parked on the
   // results screen still added points to a board the panel had already
@@ -15695,7 +15741,9 @@ function animate() {
   if (!ended && !paused) {
     perfBeat('rivals');
     rivals.update(dtw, started && !soloMode ? matchElapsed() : 0, voidState.x, voidState.z, R,
-      { matchLen, playerScore, fever: feverMult, par: WORLD_PAR[pickedWorld] });   // solo: the family never joins
+      // par in today's points (windowless, beside WORLD_PAR): first place
+      // stays worth what it was against a child eating what she ate
+      { matchLen, playerScore, par: WORLD_PAR[pickedWorld] * windowless(matchElapsed()) });   // solo: the family never joins
   }
   // ── THE RULE NOBODY WAS EVER TAUGHT ────────────────────────────────────────
   // "A bigger void eats you" is the entire danger half of the game, and the
@@ -16453,7 +16501,10 @@ function animate() {
     // the title card and before the town has finished saying good morning, and
     // MUNCHKIN->GOBBLIN is not far behind it; reacting to either would spend the
     // shared cooldown on the least interesting growth in the match.
-    if (curStage >= 2) townReacts({ kind: 'evolve', form: FORMS[curStage] });
+    // …and the LAST form is covered once, by its own headline below
+    // (COPY.enderNews) — two cards for one evolution was the same milestone
+    // twice, which is the real estate the owner asked back.
+    if (curStage >= 2 && curStage < FORMS.length - 1) townReacts({ kind: 'evolve', form: FORMS[curStage] });
     track('evolve', { form: curStage, name: FORMS[curStage], sec: elapsed() });
     fx.ring(voidState.x, voidState.z, 0xc9a6ff, R * 5, 0.8);   // GOBBLIN quest
     buzz(45);
@@ -16467,7 +16518,7 @@ function animate() {
       fx.flash('#ffffff', 0.55);
       fx.shake(1.1);
       announce(COPY.ender);
-      breakingNews(COPY.enderNews);
+      breakingNews(COPY.enderNews, 'ender');
       buzz(120);
     }
     }
@@ -16544,8 +16595,8 @@ function animate() {
       // graded on `bite` read 1.13x — at the start of a match the void is so
       // small that nearly every meal is "big" to him, so it saturated and every
       // number came out 40px. Relative to her own average, the standout reads
-      // as a standout at every size. Inside a beat window it wears the beat's
-      // colour, so the doubled value is seen on the number that carries it.
+      // as a standout at every size. (Inside a beat window it wore the beat's
+      // colour; there are no windows since 2026-09-25, so it wears its own.)
       // …AND A SMALL ONE LOOKS SMALL. The scale stopped at 1 below, so a bank a
       // third of her usual came out the same 20px as an ordinary one: on
       // Gameday a +21 after a run of +50s and the +35 that opened the spree
@@ -16557,7 +16608,7 @@ function animate() {
       const k = eatFloatLm ? 1.8 : Math.min(1.8, Math.max(0.85, 1 + 0.6 * Math.log2(rel)));
       eatFloatAvg = eatFloatAvg > 0 ? eatFloatAvg * 0.75 + eatFloatPts * 0.25 : eatFloatPts;
       bubbles.flyTo(eatFloatAt, `+${eatFloatPts.toLocaleString()}`, gBarTarget, gbarPay,
-        { scale: k, color: feverMult > 1 ? `#${feverCol.toString(16).padStart(6, '0')}` : undefined });
+        { scale: k });
       eatFloatPts = 0; eatFloatLm = false;
     }
   }
@@ -16601,7 +16652,6 @@ function animate() {
       // on an optimal run, but a slower one drifts toward the warning, and
       // holdBanner queues rather than clobbers.
       holdBanner(2.4);
-      if (COPY.heroCueNews) breakingNews(COPY.heroCueNews);
       audio.ready(); buzz(30);
       fx.ring(heroProp.mesh.position.x, heroProp.mesh.position.z, 0xf0b429, heroProp.radius * 5, 0.9);
     }
@@ -16649,20 +16699,30 @@ function animate() {
     if (reactCd > 0) reactCd -= dt;
     for (let i = pendingReact.length - 1; i >= 0; i--) {
       pendingReact[i].at -= dt;
-      if (pendingReact[i].at <= 0) { fileReaction(pendingReact[i].line); pendingReact.splice(i, 1); }
+      if (pendingReact[i].at <= 0) { fileReaction(pendingReact[i].line, pendingReact[i].why); pendingReact.splice(i, 1); }
     }
     newsCd -= dt;
     // BREATHING ROOM: a headline every 14-20s meant the card was on screen
-    // roughly a third of the match — it stopped being an event. Now 30-42s,
-    // and a breaking beat still cuts the line when the player earns one.
+    // roughly a third of the match — it stopped being an event. Then 30-42s,
+    // halved at full tension ("A NEWSROOM SPEEDS UP"), with a breaking beat
+    // cutting the line when the player earned one.
+    //
+    // …AND NOW NOT AT ALL, AFTER THE MORNING. The owner, 2026-09-25, on his
+    // own recording: "the news in the morning, I think is a cool idea. And
+    // then maybe just like progressively throughout, once in a while, you
+    // know, hit key milestones, like you evolve to a certain size or you
+    // consume a certain item, then maybe there's a news thing there. Because
+    // so much of the screen keeps getting taken up." So the clock prints ONE
+    // card — the sign-on — and after it the paper waits for the queue, which
+    // only a milestone fills (an evolution, a sticker found, the hero landmark
+    // eaten: townReacts and the last-form headline). A queued line still keeps
+    // the house spacing, 4 s from the card before it. And if something else
+    // has already printed the queue by the time the clock comes due (the QA
+    // __news() hook does), the clock says nothing rather than fall back to a
+    // scheduled headline — an empty queue after the morning is silence.
     if (newsCd <= 0) {
-      // A NEWSROOM SPEEDS UP. The gap was a flat 16-24s from the sign-on to the
-      // last second of the match, so the station was as relaxed reporting the
-      // end of the town as it was reading the fair results. Halved at full
-      // tension — a bulletin every 8-12s once it is really going.
-      const urgent = 1 - 0.5 * tension();
-      newsCd = (COPY.newsGap[0] + Math.random() * COPY.newsGap[1]) * urgent;
-      showNews();
+      if (!signedOn || newsQueue.length) showNews();
+      newsCd = newsQueue.length ? 4.0 : Infinity;
     }
   }
 

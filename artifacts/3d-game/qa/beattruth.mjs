@@ -26,6 +26,15 @@
 //   HANDLE   something in life.ts tests for that name
 // A cue that fails either is an ORPHAN: a title card over nothing.
 //
+// SINCE 2026-09-25 A BEAT HAS NO TITLE CARD. The owner cut the cards, the
+// x2/x3 windows, the flash, the ring, the sting and the beat headlines ("these
+// events ... I say we get rid of that. It's empty real estate"), and a beat's
+// cue is now the whole of it: the town doing something while she eats it. So
+// this probe's question got sharper rather than retired — an orphan is no
+// longer a card over nothing but a beat that does NOTHING at all. The bars are
+// unchanged; the wording above describes the build they were written against.
+// (qa/realestate.mjs bars the cards themselves, and that every dealt cue fires.)
+//
 // It is STATIC — reads the two source files, no browser — so it costs the gate
 // nothing to hold this line every run.
 //

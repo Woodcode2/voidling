@@ -9,15 +9,16 @@ import { buildAccessory, makeVoidBody, applySkinToBody } from './void3d';
 
 export interface RivalEdible { mesh: THREE.Object3D; radius: number; }
 // live match context the family needs to race the player fairly: the clock
-// length, the player's score (the rubber band reads it) and the shared HAPPY
-// HOUR multiplier (the family eats the bake sale too).
+// length and the player's score (the rubber band reads it). The shared HAPPY
+// HOUR multiplier that rode here went with the beat windows (the owner,
+// 2026-09-25: "double points ... I say we get rid of that").
 // `par` is what FIRST PLACE is worth in a full-length match ON THIS WORLD, as
 // an ABSOLUTE score. It has to come from the caller because the worlds are not
 // comparable: measured child runs finish around 104k on Maple Falls and 230k on
 // Game Day, because Game Day is dense enough that the combo multiplier never
 // lapses. A single global constant is what made the ladder decorative — see
 // laneWant.
-export interface RivalCtx { matchLen: number; playerScore: number; fever: number; par?: number; }
+export interface RivalCtx { matchLen: number; playerScore: number; par?: number; }
 // what a rival COSTS you when it catches you — the HUD reports both halves.
 // `form` is the owner's price (decision 2, 2026-08-26: "more punishing then 10
 // percent loss. Like a level loss"): true means the handler walks the player
@@ -936,7 +937,6 @@ export function createRivals(
     update(dt, _t, px, pz, pr, ctx) {
       const matchLen = ctx?.matchLen ?? 180;
       const pScore = ctx?.playerScore ?? 0;
-      const fever = ctx?.fever ?? 1;
       const par = ctx?.par;
       // ── THE HUNT WINDOW ─────────────────────────────────────────────────
       // NIBBLES is a genuine predator for the first 55% of the match — she
@@ -2069,7 +2069,7 @@ export function createRivals(
             rv.combo++; rv.comboT = RIVAL_COMBO_HOLD; rv.dry = 0;
             const cm = 1 + Math.min(rv.combo, 25) * 0.1;
             const pm = (pick2.mesh.userData.ptsMult as number | undefined) ?? 1;
-            const raw2 = pick2.radius * 12 * cm * pm * fever;
+            const raw2 = pick2.radius * 12 * cm * pm;
             rv.raw += raw2;
             rv.score += Math.max(1, Math.round(raw2 * band));
             rv.r = growR(rv.r, pick2.radius);
@@ -2084,7 +2084,7 @@ export function createRivals(
             rv.combo++; rv.comboT = RIVAL_COMBO_HOLD; rv.dry = 0;
             const comboMult = 1 + Math.min(rv.combo, 25) * 0.1;
             const preyMult = (e.mesh.userData.ptsMult as number | undefined) ?? 1;
-            const raw1 = e.radius * 12 * comboMult * preyMult * fever;
+            const raw1 = e.radius * 12 * comboMult * preyMult;
             rv.raw += raw1;
             rv.score += Math.max(1, Math.round(raw1 * band));
             rv.r = growR(rv.r, e.radius);

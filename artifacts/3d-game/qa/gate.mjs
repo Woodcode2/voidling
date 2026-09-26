@@ -1058,6 +1058,15 @@ const SUITE = [
     cmd: ['node', 'qa/newsfeed.mjs', PORT], env: { SEED: '7' }, verdict: pf,
     why: 'the aired sequence holds: no headline twice inside one match, no run of four cards opening on the same word, no token reaching the child as braces' },
 
+  // THE OWNER'S REAL ESTATE (2026-09-25): "these events ... I say we get rid of
+  // that. It's empty real estate. ... the news in the morning ... and then
+  // ... key milestones". A whole match per world on goalcurve's virtual clock,
+  // reading every card that reached #banner and #news and the game's own reason
+  // for each news card. Live + quality until a second green promotes it.
+  { id: 'realestate', tier: 'words', profiles: ['live', 'quality'], timeout: 3000,
+    cmd: ['node', 'qa/realestate.mjs', PORT, 'all'], env: { SEED: '7' }, verdict: pf,
+    why: 'no event banners and no double-points windows; the news speaks in the morning and then only when she evolves or eats a named thing; the town\'s own happenings still happen — and the seconds of screen all the cards take per match, printed every run' },
+
   ...WORLDS.map(w => ({ id: `newsarc:${w}`, tier: 'words', profiles: ['live'], timeout: 600,
     cmd: ['node', 'qa/newsarc.mjs'], env: { ARC_WORLD: w }, verdict: exitCode,
     why: `${w} tells a story in order: morning never mentions the void, nothing repeats, a landmark gets named` })),

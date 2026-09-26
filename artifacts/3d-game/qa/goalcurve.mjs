@@ -70,6 +70,24 @@ const RUNS = Number(flag('runs', '5'));
 // ate 484 snacks and zero houses by 70% of the clock, because a snack is
 // always nearer. A goal set from a run that was not trying is not a goal.
 const HUNT = flag('hunt', '');
+// --out=<dir> keeps a comparison run from overwriting the committed day-2
+// series in qa/out/goalcurve, which the goal table cites.
+const OUT_DIR = flag('out', 'qa/out/goalcurve');
+// ── WHICH DOT THE MATCH IS, AND WHY THAT IS NOW A QUESTION ─────────────────
+// This probe was written on day 2, before there were goals, when a card on the
+// picker started a match that ran to the buzzer. Since day 5 a card starts
+// HER CURRENT DOT, and a met goal ends the match on the spot — so on a fresh
+// profile every run below is a dot-1 EAT match that stops the moment the score
+// crosses the world's EAT number. Measured 2026-09-25: Maple's five runs ended
+// at 65 match-seconds, final score p10 18,472 against a goal of 18,000. That
+// is a clean reading of how soon dot 1 is won, and no reading at all of the
+// rest of the clock.
+//
+// --dot=N seeds dots 1..N-1 as won on every world, so the card starts dot N.
+// --dot=4 is RIVALS, which is decided only at the buzzer: a full-length match
+// through the same picker, the same code path a child takes to it — the
+// curve the thirty goals were first set from. The run checks the build agrees.
+const DOT = Number(flag('dot', '0'));
 const worlds = WORLD_ARG === 'all' ? ALL_WORLDS : [WORLD_ARG];
 for (const w of worlds) if (!ALL_WORLDS.includes(w)) { console.log(`\nFAIL — unknown world "${w}"`); process.exit(1); }
 
@@ -103,6 +121,14 @@ const runOnce = async (world) => {
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
   await p.addInitScript(initScript(SEED));
   await p.addInitScript(() => { try { localStorage.setItem('voidDailyLast', new Date().toDateString()); } catch { } });
+  if (DOT > 1) await p.addInitScript((n) => { try {
+    const w = {};
+    for (const id of (localStorage.getItem('voidUnlocked') || 'maple').split(',')) {
+      w[id] = {};
+      for (let g = 1; g < n; g++) w[id][String(g)] = { st: 'done', best: 0, pct: 0, first: '', n: 1 };
+    }
+    localStorage.setItem('voidLevels', JSON.stringify({ v: 1, seen: 1, w }));
+  } catch { } }, DOT);
   await p.goto(`http://127.0.0.1:${PORT}/?w=${world}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 420000 });
   const missing = await p.evaluate(() => ['__matchState', '__kindTally', '__landmarkProbe', '__questPools', '__edibles', '__renderer']
@@ -122,6 +148,8 @@ const runOnce = async (world) => {
   await p.waitForSelector(`#worldRow .wCard[data-world="${world}"]`, { state: 'visible', timeout: 400000 });
   await p.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`)?.click(), world);
   await p.waitForFunction(() => (window.__matchState?.().armed ?? false) === true, null, { timeout: 400000 });
+  const dotNow = await p.evaluate(() => window.__goalState?.()?.n ?? 0);
+  if (DOT && dotNow !== DOT) note(`${world}: asked for dot ${DOT} and the card started dot ${dotNow}`);
 
   // SUPPLY, after the match is armed and never before: gildTreasure() runs
   // inside beginMatch (`:6255`), so a count taken on the menu reports one
@@ -208,6 +236,9 @@ const runOnce = async (world) => {
           // very different numbers.
           you: +(ms.ate?.you ?? 0).toFixed(2), fam: +(ms.ate?.family ?? 0).toFixed(2),
           rank: ms.rank ?? 0, k: { ...window.__kindTally() },
+          // the score multiplier live at this sample, 1 outside a beat window —
+          // so a series can say how much of a score the windows paid for
+          fv: ms.fever ?? 1,
           // THE NUMBER THAT RE-SPECIFIES LANDMARK. Not "did she reach the
           // landmark" but "what was the biggest thing she COULD eat, at this
           // moment" — the largest uneaten prop inside the eat rule
@@ -255,7 +286,7 @@ const runOnce = async (world) => {
       rivals: ms.rivals.map((x) => ({ n: x.name, s: Math.round(x.score), j: x.joined })) };
   });
   await p.close();
-  return { ended, gc, final, supply, landmark };
+  return { ended, gc, final, supply, landmark, dot: dotNow };
 };
 
 // ── A DISTRIBUTION, NOT A NUMBER, AND THAT IS NOT A LIMITATION ────────────
@@ -285,6 +316,25 @@ const span = (a, f = (x) => x) => {
   return `p10 ${pct(v, 0.1)} · p50 ${pct(v, 0.5)} · p90 ${pct(v, 0.9)}`;
 };
 
+// ── KEEP THE SERIES, so the next question does not cost another hour ──────
+// Every run of this probe is about fifty minutes of wall time, and the first
+// pass answered five questions and raised a sixth it had no data for. The raw
+// samples are written out so any later question — what radius at what second,
+// what was edible when — is a file read rather than a re-run. Per world, as
+// each finishes: a full-length sweep of six worlds is three hours on a shared
+// box, and a series that exists only at the end is three hours of nothing.
+const keepSeries = (w, runs) => {
+  try {
+    mkdirSync(OUT_DIR, { recursive: true });
+    writeFileSync(`${OUT_DIR}/${w}.json`, JSON.stringify({
+      world: w, seed: SEED, runs: runs.length, dot: runs[0].dot,
+      supply: runs[0].supply, landmark: runs[0].landmark,
+      series: runs.map((r) => ({ final: r.final, gc: r.gc })),
+    }, null, 1));
+    console.log(`  series written to ${OUT_DIR}/${w}.json`);
+  } catch (e) { console.log(`  [could not write the series: ${e.message}]`); }
+};
+
 for (const world of worlds) {
   const runs = [];
   for (let i = 0; i < RUNS; i++) {
@@ -295,6 +345,7 @@ for (const world of worlds) {
   }
   if (!runs.length) continue;
   out[world] = runs;
+  keepSeries(world, runs);
 
   const lm = runs[0].landmark.nearHero || runs[0].landmark.biggest;
   const crossR = (r, n) => { const h = r.gc.find((s) => s.r >= n); return h ? Math.round(h.t) : null; };
@@ -302,7 +353,7 @@ for (const world of worlds) {
   const END = Math.round(med(runs.map((r) => r.gc[r.gc.length - 1].t)));
 
   console.log(`  ══ ${world.toUpperCase()} ══  ${END} match-seconds · ${runs.length} seeded run(s) · SEED ${SEED}`
-    + (HUNT ? ` · HUNTING "${HUNT}"` : ''));
+    + ` · playing dot ${runs[0].dot || 'none'}` + (HUNT ? ` · HUNTING "${HUNT}"` : ''));
   if (HUNT) {
     // time to N of the hunted kind — the number a SET goal is actually made of
     const toN = (r, n) => { const h = r.gc.find((x) => (x.k[HUNT] || 0) >= n); return h ? Math.round(h.t) : null; };
@@ -337,22 +388,7 @@ for (const world of worlds) {
   console.log('');
 }
 
-// ── KEEP THE SERIES, so the next question does not cost another hour ──────
-// Every run of this probe is about fifty minutes of wall time, and the first
-// pass answered five questions and raised a sixth it had no data for. The raw
-// samples are written out so any later question — what radius at what second,
-// what was edible when — is a file read rather than a re-run.
-try {
-  mkdirSync('qa/out/goalcurve', { recursive: true });
-  for (const [w, runs] of Object.entries(out)) {
-    writeFileSync(`qa/out/goalcurve/${w}.json`, JSON.stringify({
-      world: w, seed: SEED, runs: runs.length,
-      supply: runs[0].supply, landmark: runs[0].landmark,
-      series: runs.map((r) => ({ final: r.final, gc: r.gc })),
-    }, null, 1));
-  }
-  console.log(`  series written to qa/out/goalcurve/`);
-} catch (e) { console.log(`  [could not write the series: ${e.message}]`); }
+// (the series are written per world, as each one finishes — see keepSeries)
 
 await b.close();
 const secs = ((Date.now() - t0) / 1000).toFixed(0);
