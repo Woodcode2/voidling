@@ -420,3 +420,21 @@ the build if any of the above stops being true.
 
 After the first upload, add internal testers in App Store Connect →
 TestFlight. External testing needs one beta review (~1 day).
+
+### First-launch checks on the phone (the owner's 2026-09-25 recording)
+
+- **The menu theme starts on launch, with no tap.** In Safari it cannot: a web
+  page gets no sound before the first touch, and a child's first touch is
+  usually PLAY, so on the web the theme is first heard back on the menu after
+  a match. The app is not a web page: Capacitor 8's `CAPBridgeViewController`
+  already builds its web view with `mediaTypesRequiringUserActionForPlayback
+  = []` and `allowsInlineMediaPlayback = true`
+  (`node_modules/@capacitor/ios/Capacitor/Capacitor/CAPBridgeViewController.swift`,
+  `webViewConfiguration(for:)`), which lifts WebKit's gesture rule for Web
+  Audio too. Check it on the first TestFlight build: cold-launch with the
+  ringer on and the theme should be playing under the splash. If it is not,
+  subclass `CAPBridgeViewController`, set those two lines in the override,
+  and point `Main.storyboard`'s `customClass` at the subclass.
+- **No freeze a second into the first match.** Every shader is now built
+  before the match starts (`qa/shaderwarm.mjs`); the recording's 950 ms stall
+  was the first bite that drew a new material.
