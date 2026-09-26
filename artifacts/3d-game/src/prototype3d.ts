@@ -2644,22 +2644,48 @@ function warmShaders(at: string): WarmRun {
     }
     const fresh = new Set<unknown>((renderer.info.programs ?? []).filter((q) => !known.has(q)));
     for (const q of fresh) known.add(q);
-    const draw = fresh.size ? reps.filter((o) => matsOf(o).some((m) => {
+    const usesFresh = (m: THREE.Material): boolean => {
       const progs = (renderer.properties.get(m) as { programs?: Map<string, unknown> }).programs;
       if (progs) for (const q of progs.values()) if (fresh.has(q)) return true;
       return false;
-    })) : [];
-    if (!draw.length && !force) return;
-    drawn += draw.length;
-    for (const o of draw) {
-      if (masks.has(o)) continue;
-      masks.set(o, o.layers.mask); o.layers.enable(WARM_LAYER);
-      culls.set(o, o.frustumCulled); o.frustumCulled = false;
-    }
+    };
+    const draw = fresh.size ? reps.filter((o) => matsOf(o).some(usesFresh)) : [];
+    // ── A COMPILED PROGRAM IS NOT YET A DRAWN ONE ─────────────────────────
+    // The gate clones above used to be compiled and never drawn, and the
+    // first real draw of one still stopped the frame. Skylark, the first 30 s
+    // of a steered drive on the build that did that: the one frame over
+    // 500 ms was a tint clone's first draw, 1505 ms, 1469 of them inside
+    // getProgramParameter — three's first-use query, waiting on whatever the
+    // driver still owed the program (another drive: three frames of
+    // 958-1082 ms, ~1 s of each in the same call). Linked is not ready; drawn
+    // is. So they are drawn too, worn by their representatives, in a render
+    // of their own below, and qa/shaderwarm.mjs counts first draws as well
+    // as links.
+    //   The price is paid here now, and it is not small on Skylark: the boot
+    // warm went from 2019 ms (compiled only) to 9676 ms (drawn), sandbox
+    // wall under swiftshader, one run each — the driver work those first
+    // draws in play used to stop for, moved behind the loading cover. Maple's
+    // barely moved (1382 -> 1596 ms).
+    const drawGated = fresh.size ? gated.filter((g) => usesFresh(g.gm)) : [];
+    if (!draw.length && !drawGated.length && !force) return;
+    drawn += draw.length + drawGated.length;
+    const onLayer = (o: THREE.Object3D) => {
+      if (!masks.has(o)) { masks.set(o, o.layers.mask); culls.set(o, o.frustumCulled); }
+      o.layers.enable(WARM_LAYER); o.frustumCulled = false;
+    };
+    for (const o of draw) onLayer(o);
     for (const o of lights) if (!masks.has(o)) { masks.set(o, o.layers.mask); o.layers.enable(WARM_LAYER); }
     camera.layers.set(WARM_LAYER);
     renderer.shadowMap.needsUpdate = true;
     if (c) c.render(); else renderer.render(scene, camera);
+    if (drawGated.length) {
+      for (const o of draw) o.layers.disable(WARM_LAYER);
+      const was = drawGated.map((g) => g.o.material);
+      drawGated.forEach((g) => { g.o.material = g.gm; onLayer(g.o); });
+      renderer.shadowMap.needsUpdate = true;
+      try { if (c) c.render(); else renderer.render(scene, camera); }
+      finally { drawGated.forEach((g, i) => { g.o.material = was[i]; }); }
+    }
     camera.layers.mask = camMask;
   };
   let uploads = 0;
